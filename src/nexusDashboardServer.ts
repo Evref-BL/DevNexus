@@ -113,6 +113,11 @@ interface DashboardThreadActionContext {
   cwd: string | null;
 }
 
+type DashboardFeatureRecord = NexusDashboardSnapshot["features"]["records"][number];
+type DashboardThreadRecord = NexusDashboardSnapshot["threads"]["records"][number];
+type DashboardTrackedWorkItem = NexusDashboardSnapshot["trackedWork"]["records"][number];
+type DashboardWorktreeRecord = NexusDashboardSnapshot["worktrees"]["records"][number];
+
 interface DashboardCachePolicy {
   readonly freshMs: number;
   readonly staleMs: number;
@@ -2200,9 +2205,17 @@ export function renderNexusDashboardClientModule(): string {
     "    ['Target branch', feature?.finalPublicationTarget ?? 'unknown'],",
     "  ];",
     "  if (feature?.updatedAt) facts.push(['Updated', formatTime(feature.updatedAt)]);",
-    "  const actions = [];",
+    "  const actions = featureActions(snapshot, feature);",
     "  const detail = { title: feature?.title ?? 'Feature', body: feature?.detail ?? 'Feature branch delivery plan.', facts, events: [], actions };",
     "  return { ...detail, chat: { prompt: featurePrompt(feature ?? detail), title: `Continue ${detail.title}`, targetId: id } };",
+    "}",
+    "",
+    "function featureActions(snapshot, feature) {",
+    "  if (!feature) return [];",
+    "  const branches = featureGitBranches(feature);",
+    "  const threads = threadsForGitBranches(snapshot, branches);",
+    "  const trackedWork = trackedWorkForGitBranches(snapshot, branches);",
+    "  return uniqueActions([...threads.flatMap((thread) => thread.actions ?? []), ...trackedWork.flatMap((item) => item.actions ?? [])]);",
     "}",
     "",
     "function featurePrompt(feature) {",
@@ -3321,20 +3334,33 @@ async function resolveDashboardThreadActionContext(
   snapshotOptions: BuildNexusDashboardSnapshotOptions,
   targetId: string,
 ): Promise<DashboardThreadActionContext | null> {
-  if (!targetId.startsWith("thread:")) {
-    return null;
-  }
-  const threadRecordId = targetId.slice("thread:".length);
-  if (!threadRecordId) {
-    return null;
-  }
   const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
+  if (targetId.startsWith("thread:")) {
+    const threadRecordId = targetId.slice("thread:".length);
+    if (!threadRecordId) {
+      return null;
+    }
+    return dashboardThreadContextById(snapshot, threadRecordId);
+  }
+  if (targetId.startsWith("tracked-work:")) {
+    return dashboardThreadContextByTrackedWorkSelectId(snapshot, targetId);
+  }
+  if (targetId.startsWith("feature:")) {
+    return dashboardThreadContextByFeatureSelectId(snapshot, targetId);
+  }
+  return null;
+}
+
+function dashboardThreadContextById(
+  snapshot: NexusDashboardSnapshot,
+  threadRecordId: string,
+): DashboardThreadActionContext | null {
   const thread = snapshot.threads.records.find((record) =>
     record.id === threadRecordId
   );
-  const worktree = snapshot.worktrees.records.find((record) =>
-    record.id === threadRecordId
-  );
+  const worktree = thread
+    ? dashboardWorktreeForThread(snapshot, thread)
+    : snapshot.worktrees.records.find((record) => record.id === threadRecordId);
   if (!thread && !worktree) {
     return null;
   }
@@ -3342,6 +3368,139 @@ async function resolveDashboardThreadActionContext(
     threadId: thread?.assistantThreadId ?? null,
     cwd: dashboardChatCwd(worktree?.worktreePath ?? null),
   };
+}
+
+function dashboardThreadContextByTrackedWorkSelectId(
+  snapshot: NexusDashboardSnapshot,
+  targetId: string,
+): DashboardThreadActionContext | null {
+  const item = dashboardTrackedWorkBySelectId(snapshot, targetId);
+  if (!item) {
+    return null;
+  }
+  const thread = snapshot.threads.records.find((record) =>
+    dashboardThreadMatchesTrackedWork(record, item)
+  );
+  const worktree = thread
+    ? dashboardWorktreeForThread(snapshot, thread)
+    : dashboardWorktreeForTrackedWork(snapshot, item);
+  if (!thread && !worktree) {
+    return null;
+  }
+  return {
+    threadId: thread?.assistantThreadId ?? null,
+    cwd: dashboardChatCwd(worktree?.worktreePath ?? null),
+  };
+}
+
+function dashboardThreadContextByFeatureSelectId(
+  snapshot: NexusDashboardSnapshot,
+  targetId: string,
+): DashboardThreadActionContext | null {
+  const feature = snapshot.features.records.find((record) => record.id === targetId);
+  if (!feature) {
+    return null;
+  }
+  const branches = dashboardFeatureBranches(feature);
+  const thread = snapshot.threads.records.find((record) =>
+    dashboardBranchSetsIntersect([record.branchName], branches)
+  );
+  const worktree = thread
+    ? dashboardWorktreeForThread(snapshot, thread)
+    : snapshot.worktrees.records.find((record) =>
+      dashboardBranchSetsIntersect([record.branchName], branches)
+    );
+  if (!thread && !worktree) {
+    return null;
+  }
+  return {
+    threadId: thread?.assistantThreadId ?? null,
+    cwd: dashboardChatCwd(worktree?.worktreePath ?? null),
+  };
+}
+
+function dashboardTrackedWorkBySelectId(
+  snapshot: NexusDashboardSnapshot,
+  targetId: string,
+): DashboardTrackedWorkItem | null {
+  const parts = targetId.split(":");
+  const componentId = parts[1] ?? "";
+  const itemId = parts.slice(2).join(":");
+  if (!componentId || !itemId) {
+    return null;
+  }
+  return snapshot.trackedWork.records.find((item) =>
+    item.componentId === componentId && item.id === itemId
+  ) ?? null;
+}
+
+function dashboardThreadMatchesTrackedWork(
+  thread: DashboardThreadRecord,
+  item: DashboardTrackedWorkItem,
+): boolean {
+  const itemIds = new Set(
+    [item.id, item.logicalItemId].filter((value): value is string => Boolean(value)),
+  );
+  return Boolean(
+    thread.workItemId && itemIds.has(thread.workItemId) &&
+      (!thread.componentId || thread.componentId === item.componentId),
+  );
+}
+
+function dashboardWorktreeForThread(
+  snapshot: NexusDashboardSnapshot,
+  thread: DashboardThreadRecord,
+): DashboardWorktreeRecord | null {
+  return snapshot.worktrees.records.find((record) => record.id === thread.id) ??
+    snapshot.worktrees.records.find((record) =>
+      dashboardBranchSetsIntersect([record.branchName], [thread.branchName])
+    ) ??
+    snapshot.worktrees.records.find((record) =>
+      Boolean(thread.workItemId && record.workItemId === thread.workItemId)
+    ) ??
+    null;
+}
+
+function dashboardWorktreeForTrackedWork(
+  snapshot: NexusDashboardSnapshot,
+  item: DashboardTrackedWorkItem,
+): DashboardWorktreeRecord | null {
+  const itemIds = new Set(
+    [item.id, item.logicalItemId].filter((value): value is string => Boolean(value)),
+  );
+  return snapshot.worktrees.records.find((record) =>
+    Boolean(record.workItemId && itemIds.has(record.workItemId)) &&
+    (!record.componentId || record.componentId === item.componentId)
+  ) ?? null;
+}
+
+function dashboardFeatureBranches(feature: DashboardFeatureRecord): string[] {
+  return [
+    feature.featureBranch,
+    ...(feature.branches ?? []),
+  ].filter((branch): branch is string => Boolean(branch?.trim()));
+}
+
+function dashboardBranchSetsIntersect(
+  left: Array<string | null | undefined>,
+  right: Array<string | null | undefined>,
+): boolean {
+  const normalizedRight = new Set(right.map(dashboardNormalizeBranchName).filter(Boolean));
+  return left.map(dashboardNormalizeBranchName).some((branch) =>
+    Boolean(branch) &&
+    (normalizedRight.has(branch) ||
+      [...normalizedRight].some((candidate) =>
+        candidate.endsWith(`/${branch}`) || branch.endsWith(`/${candidate}`)
+      ))
+  );
+}
+
+function dashboardNormalizeBranchName(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/^refs\/heads\//u, "")
+    .replace(/^refs\/remotes\//u, "")
+    .replace(/^remotes\//u, "");
 }
 
 function dashboardChatCwd(worktreePath: string | null): string | null {

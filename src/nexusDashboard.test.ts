@@ -2859,6 +2859,89 @@ describe("nexus dashboard", () => {
     expect(detail.chat?.prompt).toContain("Continue cockpit item: Add cockpit issue lane.");
   });
 
+  it("surfaces related issue and PR actions from selected feature details", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      events: [],
+      weave: {
+        nodes: [],
+      },
+      features: {
+        records: [
+          {
+            id: "feature:cockpit-graph",
+            title: "Cockpit graph",
+            status: "needs-review",
+            statusLabel: "Needs review",
+            branchStrategy: "feature branch",
+            featureBranch: "codex/dev-nexus/dashboard-cockpit-kit",
+            branches: ["codex/dev-nexus/dashboard-cockpit-kit"],
+            reviewBranchPattern: "codex/dev-nexus/dashboard-*",
+            finalPublicationTarget: "main",
+            detail: "Feature needs review before publication.",
+          },
+        ],
+      },
+      threads: {
+        records: [
+          {
+            id: "thread-graph",
+            branchName: "codex/dev-nexus/dashboard-cockpit-kit",
+            actions: [
+              {
+                label: "Open PR #263",
+                href: "https://github.com/Evref-BL/DevNexus/pull/263",
+                provider: "github",
+                kind: "pull-request",
+                title: "dashboard graph",
+              },
+            ],
+          },
+        ],
+      },
+      trackedWork: {
+        records: [
+          {
+            id: "github-42",
+            logicalItemId: null,
+            title: "dashboard-cockpit-kit issue follow-up",
+            detail: "Review the dashboard-cockpit-kit provider action.",
+            webUrl: "https://github.com/Evref-BL/DevNexus/issues/42",
+            actions: [
+              {
+                label: "Open issue #42",
+                href: "https://github.com/Evref-BL/DevNexus/issues/42",
+                provider: "github",
+                kind: "issue",
+                title: "provider action",
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const detail = hooks.selectedDetail(snapshot, "feature:cockpit-graph");
+
+    expect(detail.title).toBe("Cockpit graph");
+    expect(detail.actions).toEqual([
+      expect.objectContaining({
+        href: "https://github.com/Evref-BL/DevNexus/pull/263",
+      }),
+      expect.objectContaining({
+        href: "https://github.com/Evref-BL/DevNexus/issues/42",
+      }),
+    ]);
+    expect(detail.chat).toMatchObject({
+      targetId: "feature:cockpit-graph",
+      title: "Continue Cockpit graph",
+    });
+  });
+
   it("routes signal cards to the relevant cockpit section", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
@@ -4594,6 +4677,103 @@ describe("nexus dashboard", () => {
           prompt: "Continue cockpit target.",
           title: "Resume dashboard branch",
           threadId: "existing-thread",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("resumes related assistant thread context from tracked work targets", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-resume-work-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-21T09:00:00.000Z"),
+    });
+    const item = await tracker.createWorkItem({
+      projectRoot,
+      title: "Review dashboard chat context",
+      status: "ready",
+    });
+    const branchName = "codex/dev-nexus/dashboard-chat-context";
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(config.id, {
+          id: "lease-chat-context",
+          workItemId: item.id,
+          branchName,
+        }),
+      ],
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-21T10:02:00.000Z",
+      record: {
+        id: "run-chat-context",
+        projectId: config.id,
+        componentId: "primary",
+        status: "completed",
+        startedAt: "2026-05-21T10:01:00.000Z",
+        finishedAt: "2026-05-21T10:02:00.000Z",
+        workItemId: item.id,
+        branchName,
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-chat-context",
+          profileId: "codex-app-server",
+          threadId: "tracked-work-thread",
+          turnId: "turn-old",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: false,
+          threadPersistence: "durable",
+          cwd: projectRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus", "automation", "result.json"),
+          failureSummary: null,
+        },
+      },
+    });
+    const codexChatStarter = new RecordingCodexChatStarter();
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      codexChatStarter,
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      const response = await fetch(`${server.url}api/codex/thread`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-dev-nexus-action-token": actionToken!,
+        },
+        body: JSON.stringify({
+          prompt: "Continue tracked work.",
+          title: "Tracked work",
+          targetId: `tracked-work:primary:${item.id}`,
+        }),
+      });
+
+      expect(response.status).toBe(201);
+      expect(codexChatStarter.starts).toEqual([
+        {
+          projectRoot,
+          prompt: "Continue tracked work.",
+          title: "Tracked work",
+          threadId: "tracked-work-thread",
         },
       ]);
     } finally {
