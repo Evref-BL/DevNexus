@@ -243,6 +243,7 @@ describe("DevNexus MCP server", () => {
       "target_cycle_record",
       "target_report",
       "current_agent_adopt",
+      "current_agent_heartbeat",
       "current_agent_record",
       "worktree_prepare",
       "coordination_status",
@@ -1676,6 +1677,72 @@ describe("DevNexus MCP server", () => {
         ok: false,
         error: "DevNexus claim verification failed before mutation: expired",
       });
+    } finally {
+      restoreOptionalEnv("DEV_NEXUS_AUTOMATION_MODE", previousAutomationMode);
+      restoreOptionalEnv("DEV_NEXUS_WORK_ITEM_CLAIM_STATUS", previousClaimStatus);
+      restoreOptionalEnv("DEV_NEXUS_AGENT_CONTEXT_FILE", previousContextFile);
+    }
+  });
+
+  it("heartbeats current-agent authority claims through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = mcpAuthorityClaim();
+    const heartbeatClaim: NexusWorkItemClaimAuthorityRecord = {
+      ...authorityClaim,
+      expiresAt: "2026-05-23T11:00:00.000Z",
+      lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      owner: {
+        ...authorityClaim.owner,
+        expiresAt: "2026-05-23T11:00:00.000Z",
+      },
+    };
+    const contextFile = writeMcpAgentContext(projectRoot, authorityClaim);
+    const heartbeats: number[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async heartbeatClaim(input) {
+        heartbeats.push(input.leaseDurationMs);
+        return {
+          status: "heartbeat",
+          claim: heartbeatClaim,
+        };
+      },
+    };
+    const previousAutomationMode = process.env.DEV_NEXUS_AUTOMATION_MODE;
+    const previousClaimStatus = process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS;
+    const previousContextFile = process.env.DEV_NEXUS_AGENT_CONTEXT_FILE;
+    try {
+      process.env.DEV_NEXUS_AUTOMATION_MODE = "agent_launch";
+      process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS = "claimed";
+      process.env.DEV_NEXUS_AGENT_CONTEXT_FILE = contextFile;
+      const result = toolJson(
+        await callDevNexusMcpTool(
+          "current_agent_heartbeat",
+          {
+            projectRoot,
+            leaseDurationMs: 1800000,
+          },
+          {
+            workItemClaimAuthority: claimAuthority,
+            now: fixedClock("2026-05-23T10:00:00.000Z"),
+          },
+        ),
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        status: "heartbeat",
+        authorityClaim: {
+          expiresAt: "2026-05-23T11:00:00.000Z",
+          lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+        },
+      });
+      expect(heartbeats).toEqual([1800000]);
     } finally {
       restoreOptionalEnv("DEV_NEXUS_AUTOMATION_MODE", previousAutomationMode);
       restoreOptionalEnv("DEV_NEXUS_WORK_ITEM_CLAIM_STATUS", previousClaimStatus);

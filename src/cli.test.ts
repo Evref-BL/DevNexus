@@ -7604,6 +7604,67 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("heartbeats current-agent authority claims through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const heartbeatClaim: NexusWorkItemClaimAuthorityRecord = {
+      ...authorityClaim,
+      expiresAt: "2026-05-23T11:00:00.000Z",
+      lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      owner: {
+        ...authorityClaim.owner,
+        expiresAt: "2026-05-23T11:00:00.000Z",
+      },
+    };
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const heartbeats: number[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async heartbeatClaim(input) {
+        heartbeats.push(input.leaseDurationMs);
+        return {
+          status: "heartbeat",
+          claim: heartbeatClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "automation",
+        "current-agent",
+        "heartbeat",
+        projectRoot,
+        "--lease-duration-ms",
+        "1800000",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "heartbeat",
+      authorityClaim: {
+        expiresAt: "2026-05-23T11:00:00.000Z",
+        lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      },
+    });
+    expect(heartbeats).toEqual([1800000]);
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

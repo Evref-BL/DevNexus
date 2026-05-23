@@ -18,6 +18,7 @@ export const devNexusCoreMcpToolNames = [
   "target_cycle_record",
   "target_report",
   "current_agent_adopt",
+  "current_agent_heartbeat",
   "current_agent_record",
   "worktree_prepare",
   "coordination_status",

@@ -59,6 +59,7 @@ import type {
 import type {
   NexusWorkItemClaimAuthority,
   NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityHeartbeatResult,
   NexusWorkItemClaimAuthorityVerifyResult,
   NexusWorkItemClaimObservation,
   NexusWorkItemClaimOwner,
@@ -467,6 +468,42 @@ export async function verifyNexusWorkItemAuthorityClaim(options: {
   return claimAuthority.verifyClaim({
     key: options.authorityClaim.key,
     leaseToken: options.authorityClaim.owner.leaseToken,
+    now: currentDate(options.now),
+  });
+}
+
+export async function heartbeatNexusWorkItemAuthorityClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  authorityClaim: NexusWorkItemClaimAuthorityRecord;
+  leaseDurationMs?: number;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
+  now?: () => Date | string;
+}): Promise<NexusWorkItemClaimAuthorityHeartbeatResult> {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
+  if (!claimAuthority.heartbeatClaim) {
+    throw new Error(
+      `Claim authority backend ${claimAuthority.kind} does not support claim heartbeat`,
+    );
+  }
+
+  return claimAuthority.heartbeatClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.authorityClaim.owner.leaseToken,
+    leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
     now: currentDate(options.now),
   });
 }

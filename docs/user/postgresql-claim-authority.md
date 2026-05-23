@@ -134,6 +134,17 @@ Currently guarded paths:
 - CLI and MCP worktree preparation;
 - CLI and MCP current-agent completion recording.
 
+Long-running current-agent workers can renew an authority-backed claim without
+recording a terminal result:
+
+```bash
+dev-nexus automation current-agent heartbeat <workspace-root> --lease-duration-ms 3600000 --json
+```
+
+The matching MCP tool is `current_agent_heartbeat`. Both surfaces read the
+current launch context, use the selected authority backend, and return the
+updated claim record.
+
 Blocked or failed current-agent outcomes are still allowed so a stale worker can
 report that it stopped.
 

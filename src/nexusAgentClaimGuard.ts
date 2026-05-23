@@ -7,12 +7,14 @@ import {
   loadProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  heartbeatNexusWorkItemAuthorityClaim,
   verifyNexusWorkItemAuthorityClaim,
   type NexusWorkItemClaimAuthority,
   type NexusWorkItemClaimAuthorityRecord,
 } from "./nexusWorkItemClaim.js";
 
 export type NexusAgentClaimGuardStatus =
+  | "heartbeat"
   | "not_applicable"
   | "verified";
 
@@ -30,6 +32,11 @@ export interface VerifyNexusAgentClaimForMutationOptions {
   env?: NodeJS.ProcessEnv;
   claimAuthority?: NexusWorkItemClaimAuthority;
   now?: () => Date | string;
+}
+
+export interface HeartbeatNexusAgentClaimOptions
+  extends VerifyNexusAgentClaimForMutationOptions {
+  leaseDurationMs?: number;
 }
 
 interface AgentLaunchContextClaim {
@@ -95,6 +102,65 @@ export async function verifyNexusAgentClaimForMutation(
     status: "verified",
     reason: "authority-backed claim verified",
     authorityClaim: verification.claim,
+  };
+}
+
+export async function heartbeatNexusAgentClaim(
+  options: HeartbeatNexusAgentClaimOptions,
+): Promise<NexusAgentClaimGuardResult> {
+  const env = options.env ?? process.env;
+  if (env.DEV_NEXUS_AUTOMATION_MODE !== "agent_launch") {
+    return {
+      status: "not_applicable",
+      reason: "not running inside a DevNexus agent launch",
+    };
+  }
+  if (env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS !== "claimed") {
+    throw new Error(
+      `DevNexus agent launch heartbeat requires a claimed work item; current claim status is ${env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS ?? "none"}`,
+    );
+  }
+
+  const contextFile = requiredNonEmptyString(
+    env.DEV_NEXUS_AGENT_CONTEXT_FILE,
+    "DEV_NEXUS_AGENT_CONTEXT_FILE",
+  );
+  const claim = agentLaunchClaimFromContext(contextFile);
+  assertClaimMatchesRequestedWork({
+    claim,
+    componentId: options.componentId,
+    workItemId: options.workItemId,
+  });
+  const authorityClaim = normalizeAuthorityClaim(claim.authorityClaim);
+  if (!authorityClaim) {
+    return {
+      status: "not_applicable",
+      reason: "current claim has no authority-backed fencing record",
+    };
+  }
+
+  const projectConfig = loadProjectConfig(options.projectRoot);
+  const heartbeat = await heartbeatNexusWorkItemAuthorityClaim({
+    projectRoot: options.projectRoot,
+    projectConfig,
+    automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    authorityClaim,
+    leaseDurationMs: options.leaseDurationMs,
+    homePath: options.homePath,
+    env,
+    claimAuthority: options.claimAuthority,
+    now: options.now,
+  });
+  if (heartbeat.status !== "heartbeat") {
+    throw new Error(
+      `DevNexus claim heartbeat failed: ${heartbeat.reason}`,
+    );
+  }
+
+  return {
+    status: "heartbeat",
+    reason: "authority-backed claim heartbeat accepted",
+    authorityClaim: heartbeat.claim,
   };
 }
 

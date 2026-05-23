@@ -355,6 +355,10 @@ Progress:
   failed run records when the claim is no longer verified at result-recording
   time, preventing stale workers from recording successful completion after
   lease loss or reclaim.
+- 2026-05-23: Slice 6C added explicit current-agent claim heartbeat through the
+  core guard helper, CLI `automation current-agent heartbeat`, and MCP
+  `current_agent_heartbeat`. Long-running authority-backed current agents can
+  now renew their lease without recording a terminal result.
 
 ## Human Gates
 
@@ -375,5 +379,5 @@ Progress:
 - Whether completed, blocked, and failed worker records should synchronously
   release database claims, rely on lease expiry, or use an explicit separate
   release command.
-- How to heartbeat long-running synchronous command workers without requiring a
-  database dependency for users who keep the optimistic tracker backend.
+- Whether spawned command workers should run an automatic heartbeat sidecar, or
+  require the worker command to call the explicit heartbeat surface itself.

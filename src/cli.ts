@@ -214,7 +214,9 @@ import {
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
+  heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,
+  type NexusAgentClaimGuardResult,
 } from "./nexusAgentClaimGuard.js";
 import { buildNexusQuickFixPlan } from "./nexusQuickFix.js";
 import {
@@ -911,6 +913,12 @@ interface ParsedAutomationCurrentAgentAdoptCommand {
   projectRoot: string;
   runId?: string;
   owner?: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationCurrentAgentHeartbeatCommand {
+  projectRoot: string;
+  leaseDurationMs?: number;
   json?: boolean;
 }
 
@@ -2636,6 +2644,19 @@ async function handleAutomationCurrentAgentCommand(
     return 0;
   }
 
+  if (command === "heartbeat") {
+    const parsed = parseAutomationCurrentAgentHeartbeatCommand(argv);
+    const result = await heartbeatNexusAgentClaim({
+      projectRoot: path.resolve(parsed.projectRoot),
+      env: dependencies.env ?? process.env,
+      claimAuthority: dependencies.workItemClaimAuthority,
+      leaseDurationMs: parsed.leaseDurationMs,
+      now: dependencies.now,
+    });
+    printAutomationCurrentAgentHeartbeatResult(result, parsed, stdout);
+    return 0;
+  }
+
   if (command === "record") {
     const parsed = parseAutomationCurrentAgentRecordCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -2661,7 +2682,7 @@ async function handleAutomationCurrentAgentCommand(
     return 0;
   }
 
-  throw new Error("automation current-agent requires adopt or record");
+  throw new Error("automation current-agent requires adopt, heartbeat, or record");
 }
 
 function currentAgentResultRequiresVerifiedClaim(
@@ -5779,6 +5800,44 @@ function parseAutomationCurrentAgentAdoptCommand(
   return parsed as ParsedAutomationCurrentAgentAdoptCommand;
 }
 
+function parseAutomationCurrentAgentHeartbeatCommand(
+  argv: string[],
+): ParsedAutomationCurrentAgentHeartbeatCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation current-agent heartbeat requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedAutomationCurrentAgentHeartbeatCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--lease-ms":
+      case "--lease-duration-ms":
+        parsed.leaseDurationMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation current-agent heartbeat option: ${arg}`);
+    }
+  }
+
+  return parsed as ParsedAutomationCurrentAgentHeartbeatCommand;
+}
+
 function parseAutomationCurrentAgentRecordCommand(
   argv: string[],
 ): ParsedAutomationCurrentAgentRecordCommand {
@@ -7794,6 +7853,26 @@ function printAutomationCurrentAgentAdoptionResult(
   }
   if (result.resultFile) {
     writeLine(stdout, `  Result file: ${result.resultFile}`);
+  }
+}
+
+function printAutomationCurrentAgentHeartbeatResult(
+  result: NexusAgentClaimGuardResult,
+  parsed: ParsedAutomationCurrentAgentHeartbeatCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus current-agent claim ${result.status}.`);
+  writeLine(stdout, `  Summary: ${result.reason}`);
+  if (result.authorityClaim) {
+    writeLine(stdout, `  Authority: ${result.authorityClaim.authorityKind}`);
+    writeLine(stdout, `  Fencing token: ${result.authorityClaim.fencingToken}`);
+    writeLine(stdout, `  Expires at: ${result.authorityClaim.expiresAt}`);
   }
 }
 

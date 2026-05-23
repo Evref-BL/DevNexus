@@ -66,6 +66,7 @@ import {
   type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
 import {
+  heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,
 } from "./nexusAgentClaimGuard.js";
 import {
@@ -556,6 +557,20 @@ const tools: McpTool[] = [
         owner: { type: ["string", "null"] },
         coordinatorLoop: { type: "boolean" },
         runIdPrefix: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "current_agent_heartbeat",
+    description: "Renew the current coordinator's authority-backed work-item claim lease.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        leaseDurationMs: { type: "number" },
       },
       additionalProperties: false,
     },
@@ -1549,6 +1564,21 @@ export async function callDevNexusMcpTool(
             : await adoptNexusAutomationCurrentAgent(adoptOptions)),
         });
       }
+      case "current_agent_heartbeat":
+        return toolResult({
+          ok: true,
+          ...(await heartbeatNexusAgentClaim({
+            projectRoot: projectRootFromArgs(args),
+            env: process.env,
+            claimAuthority: context.workItemClaimAuthority,
+            leaseDurationMs: optionalPositiveInteger(
+              args,
+              "leaseDurationMs",
+              "arguments",
+            ),
+            now: context.now,
+          })),
+        });
       case "current_agent_record":
         assertMcpMutationAllowed(args, context, {
           command: "current_agent_record",

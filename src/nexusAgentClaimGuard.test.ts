@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
+  heartbeatNexusAgentClaim,
   saveProjectConfig,
   verifyNexusAgentClaimForMutation,
   type NexusProjectConfig,
@@ -93,6 +94,101 @@ describe("agent claim guard", () => {
         now: () => "2026-05-23T10:00:00.000Z",
       }),
     ).rejects.toThrow(/claim verification failed before mutation: token_mismatch/);
+  });
+
+  it("heartbeats authority-backed launch claims for long-running agents", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-heartbeat-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = testAuthorityClaim();
+    const contextFile = writeAgentContext(projectRoot, authorityClaim);
+    const heartbeats: Array<{
+      workItemId: string;
+      leaseToken: string;
+      leaseDurationMs: number;
+      now: string;
+    }> = [];
+    const heartbeatClaim: NexusWorkItemClaimAuthorityRecord = {
+      ...authorityClaim,
+      expiresAt: "2026-05-23T11:00:00.000Z",
+      lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      owner: {
+        ...authorityClaim.owner,
+        expiresAt: "2026-05-23T11:00:00.000Z",
+      },
+    };
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async heartbeatClaim(input) {
+        heartbeats.push({
+          workItemId: input.key.workItemId,
+          leaseToken: input.leaseToken,
+          leaseDurationMs: input.leaseDurationMs,
+          now: input.now.toISOString(),
+        });
+        return {
+          status: "heartbeat",
+          claim: heartbeatClaim,
+        };
+      },
+    };
+
+    await expect(
+      heartbeatNexusAgentClaim({
+        projectRoot,
+        componentId: "primary",
+        workItemId: "local-1",
+        env: agentEnv(contextFile),
+        claimAuthority,
+        leaseDurationMs: 30 * 60 * 1000,
+        now: () => "2026-05-23T10:00:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      status: "heartbeat",
+      authorityClaim: {
+        expiresAt: "2026-05-23T11:00:00.000Z",
+        lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      },
+    });
+    expect(heartbeats).toEqual([
+      {
+        workItemId: "local-1",
+        leaseToken: "lease-1",
+        leaseDurationMs: 30 * 60 * 1000,
+        now: "2026-05-23T10:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("blocks claim heartbeat when the authority rejects the lease token", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-heartbeat-rejected-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = testAuthorityClaim();
+    const contextFile = writeAgentContext(projectRoot, authorityClaim);
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async heartbeatClaim() {
+        return {
+          status: "rejected",
+          reason: "token_mismatch",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    await expect(
+      heartbeatNexusAgentClaim({
+        projectRoot,
+        env: agentEnv(contextFile),
+        claimAuthority,
+        now: () => "2026-05-23T10:00:00.000Z",
+      }),
+    ).rejects.toThrow(/claim heartbeat failed: token_mismatch/);
   });
 
   it("blocks guarded mutations for a different work item", async () => {

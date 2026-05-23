@@ -390,12 +390,15 @@ process.
 
 ```bash
 dev-nexus automation current-agent adopt <workspace-root> --run-id current-1 --json
+dev-nexus automation current-agent heartbeat <workspace-root> --lease-duration-ms 3600000 --json
 dev-nexus automation current-agent record <workspace-root> --run-id current-1 --status completed --summary "Completed requested work."
 ```
 
 If adoption returns `shouldProceed: false`, the current agent must not continue
 the automation run. If it returns `true`, the agent proceeds under the returned
 `DEV_NEXUS_*` environment values and records the terminal result.
+Use `current-agent heartbeat` during long-running work when the adoption context
+contains an authority-backed claim.
 
 ## Publication Boundary
 
