@@ -13,6 +13,7 @@ import {
   createLocalWorkTrackerProvider,
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   nexusWorktreeLeaseKind,
   renderNexusDashboardClientModule,
   saveProjectConfig,
@@ -63,6 +64,7 @@ async function loadDashboardClientTestHooks(): Promise<{
     rows: Array<{ lane: number }>,
     lanes: Array<{ index: number }>,
   ) => string;
+  renderFeatureOverview: (snapshot: unknown, selectedId?: string | null) => string;
   renderActionStrip: (
     actions: Array<{
       href: string;
@@ -118,7 +120,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -622,6 +624,151 @@ describe("nexus dashboard", () => {
     expect(snapshot.events.find((event) => event.id === "target-cycle-cycle-1")).toMatchObject({
       href: "https://github.com/Evref-BL/DevNexus/pull/66",
     });
+  });
+
+  it("builds a feature overview from feature branch delivery policy and related threads", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-features-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    const config = {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, config);
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-23T09:00:00.000Z",
+      leases: [
+        worktreeLease(config.id, {
+          id: "lease-feature-branch",
+          branchName: "feat/codex-goals",
+          lastSeenAt: "2026-05-23T08:30:00.000Z",
+          updatedAt: "2026-05-23T08:30:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-review-branch",
+          branchName: "feat/codex-goals/header-card",
+          lastSeenAt: "2026-05-23T08:45:00.000Z",
+          updatedAt: "2026-05-23T08:45:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-unrelated",
+          branchName: "fix/other-thing",
+          lastSeenAt: "2026-05-23T08:50:00.000Z",
+          updatedAt: "2026-05-23T08:50:00.000Z",
+        }),
+      ],
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-23T09:05:00.000Z"),
+    });
+
+    expect(snapshot.features).toMatchObject({
+      activeCount: 2,
+      needsAttentionCount: 0,
+      records: expect.arrayContaining([
+        expect.objectContaining({
+          id: "feature:primary:codex-goals",
+          title: "codex-goals",
+          componentIds: ["primary"],
+          branchStrategy: "hybrid",
+          status: "active",
+          statusLabel: "Active",
+          featureBranch: "feat/codex-goals",
+          reviewBranchPattern: "feat/codex-goals/{change}",
+          finalPublicationTarget: "main",
+          threadCount: 2,
+          branchCount: 2,
+          branches: ["feat/codex-goals", "feat/codex-goals/header-card"],
+        }),
+      ]),
+    });
+  });
+
+  it("infers active feature groups from branch families when no feature policy is configured", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-inferred-features-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-23T09:00:00.000Z",
+      leases: [
+        worktreeLease(config.id, {
+          id: "lease-feature-api",
+          branchName: "feat/codex-goals/api",
+          lastSeenAt: "2026-05-23T08:30:00.000Z",
+          updatedAt: "2026-05-23T08:30:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-feature-ui",
+          branchName: "feat/codex-goals/ui",
+          lastSeenAt: "2026-05-23T08:45:00.000Z",
+          updatedAt: "2026-05-23T08:45:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-dashboard",
+          branchName: "codex/dev-nexus/dashboard-cockpit-kit",
+          lastSeenAt: "2026-05-23T08:50:00.000Z",
+          updatedAt: "2026-05-23T08:50:00.000Z",
+        }),
+      ],
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-23T09:05:00.000Z"),
+    });
+
+    expect(snapshot.features.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "feature:inferred:codex-goals",
+          title: "codex-goals",
+          branchStrategy: "inferred",
+          status: "active",
+          branchCount: 2,
+          branches: ["feat/codex-goals/api", "feat/codex-goals/ui"],
+        }),
+        expect.objectContaining({
+          id: "feature:inferred:dashboard-cockpit-kit",
+          title: "dashboard-cockpit-kit",
+          branchStrategy: "inferred",
+          status: "active",
+          branchCount: 1,
+          branches: ["codex/dev-nexus/dashboard-cockpit-kit"],
+        }),
+      ]),
+    );
   });
 
   it("classifies thread lifecycle states and resumable assistant chats", async () => {
@@ -1388,6 +1535,77 @@ describe("nexus dashboard", () => {
     const graph = hooks.renderBranchGraph(timeline.rows, timeline.lanes);
     expect(graph).toContain(" H 118");
     expect(graph).not.toContain(" C ");
+  });
+
+  it("renders active features as the primary project workflow surface", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      features: {
+        activeCount: 1,
+        needsAttentionCount: 0,
+        records: [
+          {
+            id: "feature:primary:codex-goals",
+            title: "codex-goals",
+            featureId: "codex-goals",
+            componentIds: ["primary"],
+            componentNames: ["DevNexus"],
+            releaseTrainVersionId: "v-next",
+            branchStrategy: "hybrid",
+            status: "active",
+            statusLabel: "Active",
+            tone: "active",
+            detail: "hybrid branch strategy, feature branch feat/codex-goals, 2 branches, 2 threads, targeting main.",
+            featureBranch: "feat/codex-goals",
+            reviewBranchPattern: "feat/codex-goals/{change}",
+            defaultChangeBaseBranch: "feat/codex-goals",
+            finalReviewTarget: "main",
+            finalPublicationTarget: "main",
+            reviewMode: "review_branch_pr",
+            finalPullRequestCreation: "at_review_gate",
+            commentPolicy: "status_only",
+            threadCount: 2,
+            activeThreadCount: 2,
+            needsDecisionCount: 0,
+            branchCount: 2,
+            branches: ["feat/codex-goals", "feat/codex-goals/header-card"],
+            updatedAt: "2026-05-23T09:00:00.000Z",
+            warnings: [],
+          },
+        ],
+      },
+      events: [],
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderFeatureOverview(
+      snapshot,
+      "feature:primary:codex-goals",
+    );
+    const detail = hooks.selectedDetail(snapshot, "feature:primary:codex-goals");
+
+    expect(rendered).toContain("Active Features");
+    expect(rendered).toContain("codex-goals");
+    expect(rendered).toContain("hybrid");
+    expect(rendered).toContain("feat/codex-goals");
+    expect(rendered).toContain("2 branches");
+    expect(rendered).toContain("data-select-id=\"feature:primary:codex-goals\"");
+    expect(detail).toMatchObject({
+      title: "codex-goals",
+      facts: expect.arrayContaining([
+        ["Type", "feature"],
+        ["Branch strategy", "hybrid"],
+        ["Feature branch", "feat/codex-goals"],
+        ["Target branch", "main"],
+      ]),
+    });
   });
 
   it("renders compact provider chips with provider and external-link affordances", async () => {

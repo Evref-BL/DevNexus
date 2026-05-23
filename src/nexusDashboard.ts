@@ -38,6 +38,10 @@ import {
   type NexusEligibleWorkMode,
 } from "./nexusEligibleWorkSummary.js";
 import {
+  buildNexusFeatureBranchDeliveryPlan,
+  type NexusFeatureBranchDeliveryPlanItem,
+} from "./nexusFeatureBranchDeliveryPlan.js";
+import {
   loadProjectConfig,
   projectWorktreesRootPath,
   type NexusProjectConfig,
@@ -578,6 +582,51 @@ export interface NexusDashboardTrackedWorkSummary {
   records: NexusDashboardTrackedWorkItem[];
 }
 
+export type NexusDashboardFeatureStatus =
+  | "planned"
+  | "active"
+  | "needs-review"
+  | "blocked"
+  | "ready";
+
+export interface NexusDashboardFeatureRecord {
+  id: string;
+  title: string;
+  featureId: string;
+  componentIds: string[];
+  componentNames: string[];
+  releaseTrainVersionId: string | null;
+  branchStrategy: string;
+  status: NexusDashboardFeatureStatus;
+  statusLabel: string;
+  tone: NexusDashboardSignalTone;
+  detail: string;
+  featureBranch: string | null;
+  reviewBranchPattern: string;
+  defaultChangeBaseBranch: string;
+  finalReviewTarget: string;
+  finalPublicationTarget: string;
+  reviewMode: string;
+  finalPullRequestCreation: string;
+  commentPolicy: string;
+  threadCount: number;
+  activeThreadCount: number;
+  needsDecisionCount: number;
+  branchCount: number;
+  branches: string[];
+  updatedAt: string | null;
+  warnings: string[];
+}
+
+export interface NexusDashboardFeatureSummary {
+  totalCount: number;
+  activeCount: number;
+  needsAttentionCount: number;
+  records: NexusDashboardFeatureRecord[];
+  incomplete?: boolean;
+  detail?: string | null;
+}
+
 export interface NexusDashboardEvent {
   id: string;
   time: string;
@@ -640,6 +689,7 @@ export interface NexusDashboardSnapshot {
   targetReport: NexusDashboardDataResult<NexusAutomationTargetReport>;
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
+  features: NexusDashboardFeatureSummary;
   plugins: NexusDashboardPluginSummary;
   trackedWork: NexusDashboardTrackedWorkSummary;
   publication: NexusDashboardPublicationSummary[];
@@ -821,6 +871,12 @@ export async function buildNexusDashboardSnapshot(
     },
   );
   const trackedWork = summarizeTrackedWork(eligibleWork.value, providerUrls);
+  const features = summarizeFeatures({
+    projectRoot,
+    projectConfig,
+    worktrees,
+    threads,
+  });
   const publication = summarizePublication(automation.value);
   const authority = summarizeAuthority(
     automation.value?.authority ?? targetReport.value?.authority ?? null,
@@ -874,6 +930,7 @@ export async function buildNexusDashboardSnapshot(
     targetReport,
     worktrees,
     threads,
+    features,
     plugins,
     trackedWork,
     publication,
@@ -894,6 +951,12 @@ export async function buildNexusDashboardWorkspaceShell(
   const componentSummaries = components.map(summarizeComponentShell);
   const project = projectSummary(projectRoot, projectConfig, componentSummaries);
   const plugins = summarizeConfiguredPlugins(projectConfig);
+  const features = summarizeFeatures({
+    projectRoot,
+    projectConfig,
+    worktrees: emptyWorktreeSummary(),
+    threads: emptyThreadSummary(),
+  });
 
   return {
     version: 1,
@@ -916,6 +979,7 @@ export async function buildNexusDashboardWorkspaceShell(
     targetReport: pendingDashboardResult("Loading target report."),
     worktrees: emptyWorktreeSummary(),
     threads: emptyThreadSummary(),
+    features,
     plugins,
     trackedWork: emptyTrackedWorkSummary(),
     publication: [],
@@ -1004,6 +1068,12 @@ export async function buildNexusDashboardWorkspaceSection(
         detail: "Showing active lease and chat records while cleanup proof loads.",
       },
     );
+    const features = summarizeFeatures({
+      projectRoot,
+      projectConfig,
+      worktrees,
+      threads,
+    });
     return {
       version: 1,
       generatedAt,
@@ -1014,6 +1084,7 @@ export async function buildNexusDashboardWorkspaceSection(
         components: componentSummaries,
         worktrees,
         threads,
+        features,
         events: buildDashboardEvents({
           generatedAt,
           automation: null,
@@ -1045,10 +1116,10 @@ export async function buildNexusDashboardWorkspaceSection(
   const localTrackedWork = summarizeLocalTrackedWork({
     generatedAt,
     projectRoot,
-  projectConfig,
-  components,
-  providerUrls,
-});
+    projectConfig,
+    components,
+    providerUrls,
+  });
   return {
     version: 1,
     generatedAt,
@@ -2666,6 +2737,413 @@ function emptyTrackedWorkSummary(): NexusDashboardTrackedWorkSummary {
     excludedCount: 0,
     records: [],
   };
+}
+
+function summarizeFeatures(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  worktrees: NexusDashboardWorktreeSummary;
+  threads: NexusDashboardThreadSummary;
+}): NexusDashboardFeatureSummary {
+  const plan = capture(() =>
+    buildNexusFeatureBranchDeliveryPlan({
+      projectRoot: options.projectRoot,
+    }),
+  );
+  if (!plan.value) {
+    return {
+      totalCount: 0,
+      activeCount: 0,
+      needsAttentionCount: 0,
+      records: [],
+      incomplete: true,
+      detail: plan.error?.message ?? "Feature branch delivery is unavailable.",
+    };
+  }
+
+  const configuredRecords = plan.value.items.map((item) =>
+    dashboardFeatureRecord(item, options.worktrees, options.threads),
+  );
+  const records = [
+    ...configuredRecords,
+    ...inferredFeatureRecords({
+      configuredItems: plan.value.items,
+      projectConfig: options.projectConfig,
+      threads: options.threads,
+      worktrees: options.worktrees,
+    }),
+  ];
+  return {
+    totalCount: records.length,
+    activeCount: records.filter((record) =>
+      record.status === "active" ||
+      record.status === "needs-review" ||
+      record.status === "blocked"
+    ).length,
+    needsAttentionCount: records.filter((record) =>
+      record.status === "needs-review" || record.status === "blocked"
+    ).length,
+    records,
+    incomplete: false,
+    detail: plan.value.warnings.length > 0
+      ? plan.value.warnings.join("; ")
+      : null,
+  };
+}
+
+function dashboardFeatureRecord(
+  item: NexusFeatureBranchDeliveryPlanItem,
+  worktrees: NexusDashboardWorktreeSummary,
+  threads: NexusDashboardThreadSummary,
+): NexusDashboardFeatureRecord {
+  const feature = item.feature;
+  const relatedWorktrees = worktrees.records.filter((worktree) =>
+    branchBelongsToFeature(worktree.branchName, item),
+  );
+  const relatedThreads = threads.records.filter((thread) =>
+    branchBelongsToFeature(thread.branchName, item),
+  );
+  const branches = uniqueNonEmptyStrings(
+    relatedWorktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+  );
+  const needsDecisionCount = relatedThreads.filter((thread) =>
+    thread.decision === "review" ||
+    thread.decision === "rescue" ||
+    thread.decision === "blocked"
+  ).length;
+  const activeThreadCount = relatedThreads.filter((thread) =>
+    thread.decision === "continue" || thread.decision === "resume"
+  ).length;
+  const warnings = uniqueNonEmptyStrings([
+    ...feature.warnings,
+    ...worktrees.warnings.filter((warning) =>
+      branches.some((branch) => warning.includes(branch)),
+    ),
+  ]);
+  const status = dashboardFeatureStatus({
+    relatedWorktreeCount: relatedWorktrees.length,
+    needsDecisionCount,
+    warnings,
+  });
+  const branchPlan = feature.branchPlan;
+
+  return {
+    id: `feature:${item.componentId}:${feature.activeScopeId}`,
+    title: feature.activeScopeId,
+    featureId: feature.activeScopeId,
+    componentIds: [item.componentId],
+    componentNames: [item.componentName],
+    releaseTrainVersionId: item.releaseTrainVersionId,
+    branchStrategy: feature.defaultBranchStrategy,
+    status,
+    statusLabel: dashboardFeatureStatusLabel(status),
+    tone: dashboardFeatureTone(status),
+    detail: dashboardFeatureDetail({
+      branchStrategy: feature.defaultBranchStrategy,
+      featureBranch: branchPlan.featureBranch,
+      reviewBranchPattern: branchPlan.reviewBranchPattern,
+      finalPublicationTarget: branchPlan.finalPublicationTarget,
+      threadCount: relatedThreads.length,
+      branchCount: branches.length,
+    }),
+    featureBranch: branchPlan.featureBranch,
+    reviewBranchPattern: branchPlan.reviewBranchPattern,
+    defaultChangeBaseBranch: branchPlan.defaultChangeBaseBranch,
+    finalReviewTarget: branchPlan.finalReviewTarget,
+    finalPublicationTarget: branchPlan.finalPublicationTarget,
+    reviewMode: feature.reviewMode,
+    finalPullRequestCreation: feature.finalPullRequestCreation,
+    commentPolicy: feature.commentPolicy,
+    threadCount: relatedThreads.length,
+    activeThreadCount,
+    needsDecisionCount,
+    branchCount: branches.length,
+    branches,
+    updatedAt: latestIsoString([
+      ...relatedWorktrees.map((worktree) => worktree.updatedAt),
+      ...relatedThreads.map((thread) => thread.updatedAt),
+    ]),
+    warnings,
+  };
+}
+
+function inferredFeatureRecords(options: {
+  configuredItems: NexusFeatureBranchDeliveryPlanItem[];
+  projectConfig: NexusProjectConfig;
+  worktrees: NexusDashboardWorktreeSummary;
+  threads: NexusDashboardThreadSummary;
+}): NexusDashboardFeatureRecord[] {
+  const matchedBranches = new Set(
+    options.worktrees.records
+      .map((worktree) => worktree.branchName)
+      .filter((branchName): branchName is string =>
+        Boolean(branchName) &&
+        options.configuredItems.some((item) =>
+          branchBelongsToFeature(branchName, item),
+        )
+      ),
+  );
+  const groups = new Map<string, {
+    family: InferredFeatureFamily;
+    worktrees: NexusDashboardWorktreeSummary["records"];
+    threads: NexusDashboardThreadSummary["records"];
+  }>();
+
+  for (const worktree of options.worktrees.records) {
+    if (!worktree.branchName || matchedBranches.has(worktree.branchName)) {
+      continue;
+    }
+    const family = inferFeatureFamilyFromBranch(worktree.branchName);
+    if (!family) {
+      continue;
+    }
+    const group = groups.get(family.key) ?? {
+      family,
+      worktrees: [],
+      threads: [],
+    };
+    group.worktrees.push(worktree);
+    groups.set(family.key, group);
+  }
+
+  for (const thread of options.threads.records) {
+    if (!thread.branchName || matchedBranches.has(thread.branchName)) {
+      continue;
+    }
+    const family = inferFeatureFamilyFromBranch(thread.branchName);
+    const group = family ? groups.get(family.key) : null;
+    if (group && !group.threads.some((candidate) => candidate.id === thread.id)) {
+      group.threads.push(thread);
+    }
+  }
+
+  return [...groups.values()]
+    .map((group) =>
+      inferredFeatureRecord(
+        group,
+        options.projectConfig.repo.defaultBranch ?? "main",
+      ),
+    )
+    .sort((left, right) =>
+      (new Date(right.updatedAt ?? 0).getTime() || 0) -
+      (new Date(left.updatedAt ?? 0).getTime() || 0)
+    );
+}
+
+interface InferredFeatureFamily {
+  key: string;
+  title: string;
+  featureBranch: string;
+  reviewBranchPattern: string;
+}
+
+function inferredFeatureRecord(
+  group: {
+    family: InferredFeatureFamily;
+    worktrees: NexusDashboardWorktreeSummary["records"];
+    threads: NexusDashboardThreadSummary["records"];
+  },
+  targetBranch: string,
+): NexusDashboardFeatureRecord {
+  const branches = uniqueNonEmptyStrings(
+    group.worktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+  );
+  const needsDecisionCount = group.threads.filter((thread) =>
+    thread.decision === "review" ||
+    thread.decision === "rescue" ||
+    thread.decision === "blocked"
+  ).length;
+  const activeThreadCount = group.threads.filter((thread) =>
+    thread.decision === "continue" || thread.decision === "resume"
+  ).length;
+  const status = dashboardFeatureStatus({
+    relatedWorktreeCount: group.worktrees.length,
+    needsDecisionCount,
+    warnings: [],
+  });
+  const updatedAt = latestIsoString([
+    ...group.worktrees.map((worktree) => worktree.updatedAt),
+    ...group.threads.map((thread) => thread.updatedAt),
+  ]);
+
+  return {
+    id: `feature:inferred:${dashboardFeatureSlug(group.family.key)}`,
+    title: group.family.title,
+    featureId: group.family.key,
+    componentIds: uniqueNonEmptyStrings(
+      group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+    ),
+    componentNames: uniqueNonEmptyStrings(
+      group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+    ),
+    releaseTrainVersionId: null,
+    branchStrategy: "inferred",
+    status,
+    statusLabel: dashboardFeatureStatusLabel(status),
+    tone: dashboardFeatureTone(status),
+    detail: `${branches.length} ${plural(branches.length, "branch", "branches")} inferred from active worktree branches. Configure feature branch delivery to make this workflow explicit.`,
+    featureBranch: group.family.featureBranch,
+    reviewBranchPattern: group.family.reviewBranchPattern,
+    defaultChangeBaseBranch: group.family.featureBranch,
+    finalReviewTarget: targetBranch,
+    finalPublicationTarget: targetBranch,
+    reviewMode: "branch_family",
+    finalPullRequestCreation: "unknown",
+    commentPolicy: "unknown",
+    threadCount: group.threads.length,
+    activeThreadCount,
+    needsDecisionCount,
+    branchCount: branches.length,
+    branches,
+    updatedAt,
+    warnings: [],
+  };
+}
+
+function inferFeatureFamilyFromBranch(
+  branchName: string,
+): InferredFeatureFamily | null {
+  const parts = branchName.split("/").filter(Boolean);
+  if (
+    parts.length === 0 ||
+    branchName === "main" ||
+    branchName.endsWith("/HEAD") ||
+    branchName.endsWith("/main")
+  ) {
+    return null;
+  }
+  const intentPrefixes = new Set([
+    "feat",
+    "feature",
+    "fix",
+    "chore",
+    "docs",
+    "refactor",
+    "test",
+    "ci",
+  ]);
+  if (parts[0] && intentPrefixes.has(parts[0]) && parts[1]) {
+    const key = parts[1];
+    return {
+      key,
+      title: key,
+      featureBranch: `${parts[0]}/${key}`,
+      reviewBranchPattern: `${parts[0]}/${key}/{change}`,
+    };
+  }
+  if (parts[0] === "codex" && parts.length >= 3) {
+    const key = parts.slice(2).join("/");
+    return {
+      key,
+      title: parts.at(-1) ?? key,
+      featureBranch: branchName,
+      reviewBranchPattern: `${branchName}/{change}`,
+    };
+  }
+  if (parts.length >= 2 && /^dev-nexus(?:-|$)/u.test(parts[0] ?? "")) {
+    const key = parts.slice(1).join("/");
+    return {
+      key,
+      title: parts.at(-1) ?? key,
+      featureBranch: branchName,
+      reviewBranchPattern: `${branchName}/{change}`,
+    };
+  }
+  return {
+    key: branchName,
+    title: parts.at(-1) ?? branchName,
+    featureBranch: branchName,
+    reviewBranchPattern: `${branchName}/{change}`,
+  };
+}
+
+function dashboardFeatureSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "") || "manual";
+}
+
+function branchBelongsToFeature(
+  branchName: string | null,
+  item: NexusFeatureBranchDeliveryPlanItem,
+): boolean {
+  if (!branchName) {
+    return false;
+  }
+  const plan = item.feature.branchPlan;
+  const reviewPrefix = plan.reviewBranchPattern.split("{change}")[0] ?? "";
+  const prefixes = uniqueNonEmptyStrings([
+    plan.featureBranch ?? "",
+    trimTrailingSlash(reviewPrefix),
+  ]);
+  return prefixes.some((prefix) =>
+    branchName === prefix || branchName.startsWith(`${prefix}/`),
+  );
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/u, "");
+}
+
+function dashboardFeatureStatus(options: {
+  relatedWorktreeCount: number;
+  needsDecisionCount: number;
+  warnings: string[];
+}): NexusDashboardFeatureStatus {
+  if (options.warnings.some((warning) => /blocked|failed|conflict/iu.test(warning))) {
+    return "blocked";
+  }
+  if (options.needsDecisionCount > 0) {
+    return "needs-review";
+  }
+  if (options.relatedWorktreeCount > 0) {
+    return "active";
+  }
+  return "planned";
+}
+
+function dashboardFeatureStatusLabel(
+  status: NexusDashboardFeatureStatus,
+): string {
+  if (status === "needs-review") {
+    return "Needs review";
+  }
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function dashboardFeatureTone(
+  status: NexusDashboardFeatureStatus,
+): NexusDashboardSignalTone {
+  if (status === "blocked") {
+    return "danger";
+  }
+  if (status === "needs-review") {
+    return "warn";
+  }
+  if (status === "active" || status === "ready") {
+    return "active";
+  }
+  return "neutral";
+}
+
+function dashboardFeatureDetail(options: {
+  branchStrategy: string;
+  featureBranch: string | null;
+  reviewBranchPattern: string;
+  finalPublicationTarget: string;
+  threadCount: number;
+  branchCount: number;
+}): string {
+  const branch = options.featureBranch
+    ? `feature branch ${options.featureBranch}`
+    : `review branches ${options.reviewBranchPattern}`;
+  return `${displayBranchStrategy(options.branchStrategy)} branch strategy, ${branch}, ${options.branchCount} ${plural(options.branchCount, "branch", "branches")}, ${options.threadCount} ${plural(options.threadCount, "thread", "threads")}, targeting ${options.finalPublicationTarget}.`;
+}
+
+function displayBranchStrategy(value: string): string {
+  return value.replace(/[_-]+/gu, " ");
 }
 
 function dashboardShellSignals(
