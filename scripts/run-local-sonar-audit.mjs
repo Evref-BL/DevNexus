@@ -89,11 +89,9 @@ async function main() {
       )}`,
       token,
     );
-    const issues = await sonarGet(
+    const issues = await sonarRelevantIssues(
       hostUrl,
-      `/api/issues/search?componentKeys=${encodeURIComponent(
-        projectKey,
-      )}&types=BUG,VULNERABILITY,CODE_SMELL&severities=BLOCKER,CRITICAL&ps=500`,
+      projectKey,
       token,
     );
     const result = evaluateQualityGate({ measures, issues });
@@ -245,6 +243,31 @@ async function sonarGet(hostUrl, requestPath, token) {
     await sleep(1000);
   }
   throw lastError instanceof Error ? lastError : new Error(`Sonar request failed: ${requestPath}`);
+}
+
+async function sonarRelevantIssues(hostUrl, projectKey, token) {
+  const [bugAndVulnerabilityIssues, seriousCodeSmellIssues] = await Promise.all([
+    sonarGet(
+      hostUrl,
+      `/api/issues/search?componentKeys=${encodeURIComponent(
+        projectKey,
+      )}&types=BUG,VULNERABILITY&ps=500`,
+      token,
+    ),
+    sonarGet(
+      hostUrl,
+      `/api/issues/search?componentKeys=${encodeURIComponent(
+        projectKey,
+      )}&types=CODE_SMELL&severities=BLOCKER,CRITICAL&ps=500`,
+      token,
+    ),
+  ]);
+  return {
+    issues: [
+      ...(bugAndVulnerabilityIssues.issues ?? []),
+      ...(seriousCodeSmellIssues.issues ?? []),
+    ],
+  };
 }
 
 function sleep(ms) {

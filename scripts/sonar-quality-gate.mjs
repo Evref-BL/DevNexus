@@ -5,14 +5,12 @@ const DEFAULT_OPTIONS = {
   minCoverage: 70,
   minBranchCoverage: 60,
   maxDuplicatedLinesDensity: 10,
-  failBugSeverities: new Set(["BLOCKER", "CRITICAL"]),
 };
 
 export function evaluateQualityGate(input, options = {}) {
   const gateOptions = {
     ...DEFAULT_OPTIONS,
     ...options,
-    failBugSeverities: new Set(options.failBugSeverities ?? DEFAULT_OPTIONS.failBugSeverities),
   };
   const measures = normalizeMeasures(input.measures ?? input);
   const issues = Array.isArray(input.issues?.issues) ? input.issues.issues : [];
@@ -33,20 +31,18 @@ export function evaluateQualityGate(input, options = {}) {
     failures.push(`Sonar reported ${measures.vulnerabilities} vulnerabilities.`);
   }
 
+  if ((measures.bugs ?? 0) > 0) {
+    failures.push(`Sonar reported ${measures.bugs} bugs.`);
+  }
+
   const vulnerabilityIssues = issues.filter((issue) => issue.type === "VULNERABILITY");
   if (vulnerabilityIssues.length > 0) {
     failures.push(`Sonar reported ${vulnerabilityIssues.length} vulnerability issues.`);
   }
 
-  const blockingBugIssues = issues.filter(
-    (issue) => issue.type === "BUG" && gateOptions.failBugSeverities.has(issue.severity),
-  );
-  if (blockingBugIssues.length > 0) {
-    failures.push(
-      `Sonar reported ${blockingBugIssues.length} BUG issues at severities ${[
-        ...gateOptions.failBugSeverities,
-      ].join(", ")}.`,
-    );
+  const bugIssues = issues.filter((issue) => issue.type === "BUG");
+  if (bugIssues.length > 0) {
+    failures.push(`Sonar reported ${bugIssues.length} BUG issues.`);
   }
 
   if ((measures.security_hotspots ?? 0) > 0) {
@@ -133,10 +129,6 @@ async function main() {
     maxDuplicatedLinesDensity: Number(
       args.maxDuplicatedLinesDensity ?? DEFAULT_OPTIONS.maxDuplicatedLinesDensity,
     ),
-    failBugSeverities: String(args.failBugSeverities ?? "BLOCKER,CRITICAL")
-      .split(",")
-      .map((severity) => severity.trim())
-      .filter(Boolean),
   });
 
   console.log(JSON.stringify(result, null, 2));
@@ -197,14 +189,37 @@ async function readInput(args) {
     )}`,
     token,
   );
-  const issues = await sonarGet(
+  const issues = await sonarRelevantIssues(
     hostUrl,
-    `/api/issues/search?componentKeys=${encodeURIComponent(
-      projectKey,
-    )}&types=BUG,VULNERABILITY,CODE_SMELL&severities=BLOCKER,CRITICAL&ps=500`,
+    projectKey,
     token,
   );
   return { measures, issues };
+}
+
+async function sonarRelevantIssues(hostUrl, projectKey, token) {
+  const [bugAndVulnerabilityIssues, seriousCodeSmellIssues] = await Promise.all([
+    sonarGet(
+      hostUrl,
+      `/api/issues/search?componentKeys=${encodeURIComponent(
+        projectKey,
+      )}&types=BUG,VULNERABILITY&ps=500`,
+      token,
+    ),
+    sonarGet(
+      hostUrl,
+      `/api/issues/search?componentKeys=${encodeURIComponent(
+        projectKey,
+      )}&types=CODE_SMELL&severities=BLOCKER,CRITICAL&ps=500`,
+      token,
+    ),
+  ]);
+  return {
+    issues: [
+      ...(bugAndVulnerabilityIssues.issues ?? []),
+      ...(seriousCodeSmellIssues.issues ?? []),
+    ],
+  };
 }
 
 function readJsonFile(path) {
@@ -233,7 +248,7 @@ Defaults:
   --min-coverage 70
   --min-branch-coverage 60
   --max-duplicated-lines-density 10
-  --fail-bug-severities BLOCKER,CRITICAL`);
+  failures: any Sonar bug or vulnerability, low coverage, or high duplication`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -28,7 +28,7 @@ describe("evaluateQualityGate", () => {
         branch_coverage: "70.7",
         duplicated_lines_density: "4.8",
         vulnerabilities: "0",
-        bugs: "32",
+        bugs: "0",
         security_hotspots: "83",
       }),
       issues: {
@@ -83,19 +83,36 @@ describe("evaluateQualityGate", () => {
     expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("vulnerabilities")]));
   });
 
-  it("fails on blocker or critical bug issues", () => {
+  it("fails on bug measures", () => {
     const result = evaluateQualityGate({
       measures: measures({
         coverage: "80",
         branch_coverage: "70",
         duplicated_lines_density: "4.8",
         vulnerabilities: "0",
+        bugs: "1",
+      }),
+      issues: { issues: [] },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("bugs")]));
+  });
+
+  it("fails on any bug issue", () => {
+    const result = evaluateQualityGate({
+      measures: measures({
+        coverage: "80",
+        branch_coverage: "70",
+        duplicated_lines_density: "4.8",
+        vulnerabilities: "0",
+        bugs: "0",
       }),
       issues: {
         issues: [
           {
             type: "BUG",
-            severity: "CRITICAL",
+            severity: "MAJOR",
             rule: "typescript:S0000",
             component: "Evref-BL_DevNexus:src/example.ts",
           },
