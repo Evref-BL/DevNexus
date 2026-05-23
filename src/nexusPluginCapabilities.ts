@@ -1,4 +1,4 @@
-import type { NexusMcpExposureMode } from "./nexusMcpExposurePolicy.js";
+import type { NexusMcpExposureMode } from "./nexusMcpExposureTypes.js";
 
 export type NexusPluginCapabilityKind =
   | "projected_skill"
