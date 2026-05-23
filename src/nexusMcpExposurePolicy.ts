@@ -5,11 +5,17 @@ import type {
 import {
   activeNexusProjectMcpAgentTargets,
   type NexusProjectAgentMcpTarget,
-  type NexusProjectConfig,
-} from "./nexusProjectConfig.js";
-
-export type NexusMcpExposureMode = "direct" | "gateway" | "hidden" | "inherit";
-export type NexusResolvedMcpExposureMode = Exclude<NexusMcpExposureMode, "inherit">;
+  type NexusProjectAgentTargetConfigSource,
+} from "./nexusProjectAgentTargets.js";
+export {
+  isNexusMcpExposureMode,
+  type NexusMcpExposureMode,
+  type NexusResolvedMcpExposureMode,
+} from "./nexusMcpExposureTypes.js";
+import type {
+  NexusMcpExposureMode,
+  NexusResolvedMcpExposureMode,
+} from "./nexusMcpExposureTypes.js";
 
 export type NexusMcpExposureSource =
   | "server"
@@ -45,15 +51,6 @@ export interface NexusPluginMcpServerExposureResolution
   capabilityId: string;
   serverName: string;
   agent: string;
-}
-
-export function isNexusMcpExposureMode(value: unknown): value is NexusMcpExposureMode {
-  return (
-    value === "direct" ||
-    value === "gateway" ||
-    value === "hidden" ||
-    value === "inherit"
-  );
 }
 
 export function resolveNexusMcpExposure(
@@ -144,7 +141,9 @@ export function resolveNexusMcpExposure(
 }
 
 export function resolveNexusPluginMcpServerExposures(
-  config: Pick<NexusProjectConfig, "mcp" | "agentTargets" | "skills" | "plugins">,
+  config: NexusProjectAgentTargetConfigSource & {
+    plugins?: NexusProjectPluginConfig[];
+  },
   options: { agent?: string } = {},
 ): NexusPluginMcpServerExposureResolution[] {
   const agentTargets = selectedMcpAgentTargets(config, options.agent);
@@ -174,7 +173,7 @@ export function resolveNexusPluginMcpServerExposures(
 }
 
 function selectedMcpAgentTargets(
-  config: Pick<NexusProjectConfig, "mcp" | "agentTargets" | "skills">,
+  config: NexusProjectAgentTargetConfigSource,
   selectedAgent?: string,
 ): NexusProjectAgentMcpTarget[] {
   const targets = activeNexusProjectMcpAgentTargets(config);
