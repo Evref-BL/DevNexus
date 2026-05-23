@@ -323,6 +323,11 @@ Progress:
   `DEV_NEXUS_POSTGRES_CLAIM_AUTHORITY_SMOKE=1` is set, creates/uses the
   configured schema, applies the exported schema SQL, verifies one-winner
   claiming and fencing-token verification, then releases the synthetic claim.
+- 2026-05-23: Slice 5C added `npm run smoke:postgres-containers`, a gated
+  Docker canary that starts PostgreSQL plus two isolated DevNexus runner
+  containers. The runners race for one synthetic work item through the real
+  PostgreSQL backend and the script asserts one winner, one loser observing the
+  same fencing token, heartbeat, release, and a released database row.
 
 ### Slice 6: Current-Agent Coordination Parity
 

@@ -214,3 +214,28 @@ The smoke creates the target schema if it does not exist, applies
 that a second owner loses the race, then releases the claim. It uses
 `DEV_NEXUS_CLAIMS_SCHEMA` when set and otherwise defaults to
 `dev_nexus_smoke`.
+
+## Local multi-container race canary
+
+Use the container canary before testing on another physical host:
+
+```bash
+npm run smoke:postgres-containers
+```
+
+The canary requires Docker. It builds a temporary DevNexus runner image from the
+current checkout, starts a private Docker network with `postgres:16-alpine`,
+then starts two isolated runner containers with separate workspace and
+`DEV_NEXUS_HOME` directories. Both runners race for the same synthetic eligible
+work item through the PostgreSQL claim authority.
+
+The script asserts:
+
+- exactly one runner returns `claimed`;
+- exactly one runner returns `lost_race`;
+- the loser observes the winner's fencing token;
+- the winning runner can heartbeat and release the claim;
+- the database row ends in `released` state.
+
+The container canary is intentionally not part of `npm run check` because it
+requires Docker, network access, and image builds.
