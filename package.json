@@ -24,6 +24,7 @@
     "package.json",
     "scripts/first-workspace-onboarding-smoke.mjs",
     "scripts/postgres-claim-authority-container-canary.mjs",
+    "scripts/run-local-sonar-audit.mjs",
     "scripts/sonar-quality-gate.mjs"
   ],
   "publishConfig": {
@@ -47,6 +48,7 @@
     "coverage:plugins": "npm --prefix plugins/dev-nexus-research run coverage",
     "coverage:all": "npm run coverage && npm run coverage:plugins",
     "quality:sonar-gate": "node scripts/sonar-quality-gate.mjs",
+    "quality:sonar-local": "node scripts/run-local-sonar-audit.mjs",
     "check": "npm run build && npm test && npm run smoke:onboarding && npm run check:plugins",
     "smoke:onboarding": "node scripts/first-workspace-onboarding-smoke.mjs",
     "smoke:postgres-containers": "node scripts/postgres-claim-authority-container-canary.mjs",
