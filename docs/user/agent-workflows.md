@@ -206,6 +206,12 @@ and records verification, then a user or maintainer decides what to publish. See
 [Publication workflows](publication-workflows.md) before opting into
 green-main, CI tiers, merge queues, or release trains.
 
+When a component has publication policy, agents should publish review branches
+through DevNexus publication commands instead of raw `git push` or `gh pr`
+commands. Use `publication review-handoff` for the normal configured push plus
+pull-request path, or `publication pull-request upsert --dry-run` when only the
+planned provider mutation should be reviewed.
+
 For green-main publication, save provider check data and let DevNexus classify
 the pull request or merge request before any merge attempt. Check collection is
 provider-specific until DevNexus has a neutral collector adapter, but the

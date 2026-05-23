@@ -683,6 +683,10 @@ handoff, publication, or cleanup.
 5. If publication is allowed, use the configured remote, credential profile,
    selected branchStrategy, target branch, and review path. For green-main policy,
    prefer branch or pull request validation and required checks before merge.
+   When a publication policy exists, use DevNexus publication commands such as
+   \`publication branch-push\`, \`publication pull-request upsert\`, or
+   \`publication review-handoff\` instead of raw \`git push\` or \`gh pr\`
+   provider writes.
    A review branch in a feature branchStrategy targets the feature branch;
    final publication happens from the feature branch only
    after the accumulated work is coherent, reviewed, verified, and approved.

@@ -320,6 +320,20 @@ Collect pull-request evidence through the configured publication credential:
 dev-nexus publication pull-request evidence <workspace-root> --component api --number 123 --json
 ```
 
+Prepare a provider review through the configured publication credential:
+
+```bash
+dev-nexus publication pull-request upsert <workspace-root> --component api --head feat/example --title "Add example" --dry-run --json
+dev-nexus publication review-handoff <workspace-root> --component api --branch feat/example --title "Add example" --json
+```
+
+`pull-request upsert --dry-run` resolves the repository, base/head branch,
+credential profile, actor, and create/update plan without contacting the forge.
+`review-handoff` composes the configured branch push and pull-request upsert so
+agents do not choose remotes or accounts manually. If the local branch tracks a
+different remote than the component publication policy, the branch push result
+reports that mismatch in its warnings.
+
 Review merge queue readiness:
 
 ```bash
