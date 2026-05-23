@@ -60,6 +60,7 @@ export function resolveExpectedAutomationGitIdentity(options: {
       "GIT_AUTHOR_EMAIL",
       "GIT_COMMITTER_EMAIL",
     ]) ?? null;
+  const githubNoReplyEmail = explicitGithubNoReplyEmail(actor);
   const name =
     envName ??
     publicationGitIdentity?.name ??
@@ -72,20 +73,15 @@ export function resolveExpectedAutomationGitIdentity(options: {
     envEmail ??
     publicationGitIdentity?.email ??
     profile?.gitUserEmail ??
-    explicitGithubNoReplyEmail(actor) ??
+    githubNoReplyEmail ??
     null;
-  const source =
-    envName || envEmail
-      ? "publication.commandEnvironment"
-      : publicationGitIdentity?.name || publicationGitIdentity?.email
-        ? "publication.gitIdentity"
-      : profile?.gitUserName || profile?.gitUserEmail
-        ? `authProfile:${profile.id}`
-        : explicitGithubNoReplyEmail(actor)
-          ? "publication.actor.github_noreply"
-          : profile
-            ? `authProfile:${profile.id}`
-            : "publication.actor";
+  const source = expectedGitIdentitySource({
+    envName,
+    envEmail,
+    publicationGitIdentity,
+    profile,
+    githubNoReplyEmail,
+  });
   const warnings: string[] = [];
   if (!email) {
     warnings.push(
@@ -104,6 +100,34 @@ export function resolveExpectedAutomationGitIdentity(options: {
     source,
     warnings,
   };
+}
+
+function expectedGitIdentitySource(options: {
+  envName: string | null;
+  envEmail: string | null;
+  publicationGitIdentity: NexusAutomationPublicationConfig["gitIdentity"];
+  profile: NexusHostingAuthProfileConfig | null;
+  githubNoReplyEmail: string | null;
+}): string {
+  if (options.envName || options.envEmail) {
+    return "publication.commandEnvironment";
+  }
+  if (
+    options.publicationGitIdentity?.name ||
+    options.publicationGitIdentity?.email
+  ) {
+    return "publication.gitIdentity";
+  }
+  if (options.profile?.gitUserName || options.profile?.gitUserEmail) {
+    return `authProfile:${options.profile.id}`;
+  }
+  if (options.githubNoReplyEmail) {
+    return "publication.actor.github_noreply";
+  }
+  if (options.profile) {
+    return `authProfile:${options.profile.id}`;
+  }
+  return "publication.actor";
 }
 
 export function readObservedGitIdentity(options: {
