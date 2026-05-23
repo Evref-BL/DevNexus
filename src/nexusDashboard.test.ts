@@ -942,6 +942,79 @@ describe("nexus dashboard", () => {
     );
   });
 
+  it("infers active feature groups from Git refs without worktree leases", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-inferred-git-features-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const field = "\x1f";
+    const record = "\x1e";
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "show-ref -d --head") {
+        return ok(args as string[], [
+          "main000000000000000000000000000000000000000 refs/heads/main",
+          "api0000000000000000000000000000000000000000 refs/remotes/origin/feat/codex-goals/api",
+          "ui00000000000000000000000000000000000000000 refs/heads/feat/codex-goals/ui",
+          "",
+        ].join("\n"));
+      }
+      if (command.startsWith("-c log.showSignature=false log")) {
+        return ok(args as string[], [
+          [
+            "ui00000000000000000000000000000000000000000",
+            "main000000000000000000000000000000000000000",
+            "Codex",
+            "codex@example.com",
+            "1779537600",
+            "Add UI branch",
+          ].join(field),
+          [
+            "api0000000000000000000000000000000000000000",
+            "main000000000000000000000000000000000000000",
+            "Codex",
+            "codex@example.com",
+            "1779537300",
+            "Add API branch",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      return baseGitRunner(args, cwd);
+    };
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner,
+      now: fixedClock("2026-05-23T09:05:00.000Z"),
+    });
+
+    expect(snapshot.features.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "feature:inferred:codex-goals",
+          title: "codex-goals",
+          branchStrategy: "inferred",
+          status: "active",
+          featureBranch: "feat/codex-goals",
+          branchCount: 2,
+          branches: [
+            "origin/feat/codex-goals/api",
+            "feat/codex-goals/ui",
+          ],
+          componentIds: ["primary"],
+          componentNames: ["Dashboard Demo"],
+        }),
+      ]),
+    );
+    expect(
+      snapshot.features.records.find(
+        (feature) => feature.id === "feature:inferred:codex-goals",
+      )?.detail,
+    ).toContain("Git refs");
+  });
+
   it("classifies thread lifecycle states and resumable assistant chats", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-thread-lifecycle-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

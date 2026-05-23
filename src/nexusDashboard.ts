@@ -932,6 +932,7 @@ export async function buildNexusDashboardSnapshot(
   const features = summarizeFeatures({
     projectRoot,
     projectConfig,
+    history,
     worktrees,
     threads,
   });
@@ -1014,6 +1015,7 @@ export async function buildNexusDashboardWorkspaceShell(
   const features = summarizeFeatures({
     projectRoot,
     projectConfig,
+    history,
     worktrees: emptyWorktreeSummary(),
     threads: emptyThreadSummary(),
   });
@@ -1140,6 +1142,7 @@ export async function buildNexusDashboardWorkspaceSection(
     const features = summarizeFeatures({
       projectRoot,
       projectConfig,
+      history: emptyGitHistorySummary(),
       worktrees,
       threads,
     });
@@ -3048,9 +3051,44 @@ function tagNamesFromRefs(refs: NexusDashboardGitHistoryRef[]): string[] {
   );
 }
 
+function gitHistoryBranchReferences(
+  history: NexusDashboardGitHistorySummary,
+): DashboardFeatureBranchReference[] {
+  return history.repositories.flatMap((repository) =>
+    repository.branchNames.map((branchName) => ({
+      branchName,
+      componentId: repository.componentId,
+      componentName: repository.componentName,
+      updatedAt: gitHistoryBranchUpdatedAt(repository, branchName),
+    })),
+  );
+}
+
+function gitHistoryBranchUpdatedAt(
+  repository: NexusDashboardGitHistoryRepository,
+  branchName: string,
+): string | null {
+  const normalized = normalizeDashboardBranchName(branchName);
+  const commit = repository.commits.find((candidate) =>
+    candidate.refs.some((ref) =>
+      (ref.kind === "branch" || ref.kind === "remote") &&
+      normalizeDashboardBranchName(ref.name) === normalized
+    ),
+  );
+  return commit?.committedAt ?? null;
+}
+
+function normalizeDashboardBranchName(branchName: string): string {
+  return branchName
+    .trim()
+    .replace(/^refs\/heads\//u, "")
+    .replace(/^refs\/remotes\//u, "");
+}
+
 function summarizeFeatures(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
+  history: NexusDashboardGitHistorySummary;
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
 }): NexusDashboardFeatureSummary {
@@ -3071,12 +3109,13 @@ function summarizeFeatures(options: {
   }
 
   const configuredRecords = plan.value.items.map((item) =>
-    dashboardFeatureRecord(item, options.worktrees, options.threads),
+    dashboardFeatureRecord(item, options.history, options.worktrees, options.threads),
   );
   const records = [
     ...configuredRecords,
     ...inferredFeatureRecords({
       configuredItems: plan.value.items,
+      history: options.history,
       projectConfig: options.projectConfig,
       threads: options.threads,
       worktrees: options.worktrees,
@@ -3102,6 +3141,7 @@ function summarizeFeatures(options: {
 
 function dashboardFeatureRecord(
   item: NexusFeatureBranchDeliveryPlanItem,
+  history: NexusDashboardGitHistorySummary,
   worktrees: NexusDashboardWorktreeSummary,
   threads: NexusDashboardThreadSummary,
 ): NexusDashboardFeatureRecord {
@@ -3109,11 +3149,17 @@ function dashboardFeatureRecord(
   const relatedWorktrees = worktrees.records.filter((worktree) =>
     branchBelongsToFeature(worktree.branchName, item),
   );
+  const relatedGitBranches = gitHistoryBranchReferences(history).filter((branch) =>
+    branchBelongsToFeature(branch.branchName, item),
+  );
   const relatedThreads = threads.records.filter((thread) =>
     branchBelongsToFeature(thread.branchName, item),
   );
   const branches = uniqueNonEmptyStrings(
-    relatedWorktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+    [
+      ...relatedGitBranches.map((branch) => branch.branchName),
+      ...relatedWorktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+    ],
   );
   const needsDecisionCount = relatedThreads.filter((thread) =>
     thread.decision === "review" ||
@@ -3131,6 +3177,7 @@ function dashboardFeatureRecord(
   ]);
   const status = dashboardFeatureStatus({
     relatedWorktreeCount: relatedWorktrees.length,
+    relatedBranchCount: branches.length,
     needsDecisionCount,
     warnings,
   });
@@ -3169,6 +3216,7 @@ function dashboardFeatureRecord(
     branchCount: branches.length,
     branches,
     updatedAt: latestIsoString([
+      ...relatedGitBranches.map((branch) => branch.updatedAt),
       ...relatedWorktrees.map((worktree) => worktree.updatedAt),
       ...relatedThreads.map((thread) => thread.updatedAt),
     ]),
@@ -3178,13 +3226,17 @@ function dashboardFeatureRecord(
 
 function inferredFeatureRecords(options: {
   configuredItems: NexusFeatureBranchDeliveryPlanItem[];
+  history: NexusDashboardGitHistorySummary;
   projectConfig: NexusProjectConfig;
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
 }): NexusDashboardFeatureRecord[] {
+  const gitBranches = gitHistoryBranchReferences(options.history);
   const matchedBranches = new Set(
-    options.worktrees.records
-      .map((worktree) => worktree.branchName)
+    [
+      ...gitBranches.map((branch) => branch.branchName),
+      ...options.worktrees.records.map((worktree) => worktree.branchName),
+    ]
       .filter((branchName): branchName is string =>
         Boolean(branchName) &&
         options.configuredItems.some((item) =>
@@ -3194,9 +3246,22 @@ function inferredFeatureRecords(options: {
   );
   const groups = new Map<string, {
     family: InferredFeatureFamily;
+    branches: DashboardFeatureBranchReference[];
     worktrees: NexusDashboardWorktreeSummary["records"];
     threads: NexusDashboardThreadSummary["records"];
   }>();
+
+  for (const branch of gitBranches) {
+    if (matchedBranches.has(branch.branchName)) {
+      continue;
+    }
+    const family = inferFeatureFamilyFromBranch(branch.branchName);
+    if (!family) {
+      continue;
+    }
+    const group = inferredFeatureGroup(groups, family);
+    addInferredFeatureBranch(group, branch);
+  }
 
   for (const worktree of options.worktrees.records) {
     if (!worktree.branchName || matchedBranches.has(worktree.branchName)) {
@@ -3206,13 +3271,14 @@ function inferredFeatureRecords(options: {
     if (!family) {
       continue;
     }
-    const group = groups.get(family.key) ?? {
-      family,
-      worktrees: [],
-      threads: [],
-    };
+    const group = inferredFeatureGroup(groups, family);
+    addInferredFeatureBranch(group, {
+      branchName: worktree.branchName,
+      componentId: worktree.componentId,
+      componentName: worktree.componentId,
+      updatedAt: worktree.updatedAt,
+    });
     group.worktrees.push(worktree);
-    groups.set(family.key, group);
   }
 
   for (const thread of options.threads.records) {
@@ -3220,8 +3286,17 @@ function inferredFeatureRecords(options: {
       continue;
     }
     const family = inferFeatureFamilyFromBranch(thread.branchName);
-    const group = family ? groups.get(family.key) : null;
-    if (group && !group.threads.some((candidate) => candidate.id === thread.id)) {
+    if (!family) {
+      continue;
+    }
+    const group = inferredFeatureGroup(groups, family);
+    addInferredFeatureBranch(group, {
+      branchName: thread.branchName,
+      componentId: thread.componentId,
+      componentName: thread.componentId,
+      updatedAt: thread.updatedAt,
+    });
+    if (!group.threads.some((candidate) => candidate.id === thread.id)) {
       group.threads.push(thread);
     }
   }
@@ -3239,6 +3314,52 @@ function inferredFeatureRecords(options: {
     );
 }
 
+interface DashboardFeatureBranchReference {
+  branchName: string;
+  componentId: string | null;
+  componentName: string | null;
+  updatedAt: string | null;
+}
+
+function inferredFeatureGroup(
+  groups: Map<string, {
+    family: InferredFeatureFamily;
+    branches: DashboardFeatureBranchReference[];
+    worktrees: NexusDashboardWorktreeSummary["records"];
+    threads: NexusDashboardThreadSummary["records"];
+  }>,
+  family: InferredFeatureFamily,
+): {
+  family: InferredFeatureFamily;
+  branches: DashboardFeatureBranchReference[];
+  worktrees: NexusDashboardWorktreeSummary["records"];
+  threads: NexusDashboardThreadSummary["records"];
+} {
+  const group = groups.get(family.key) ?? {
+    family,
+    branches: [],
+    worktrees: [],
+    threads: [],
+  };
+  groups.set(family.key, group);
+  return group;
+}
+
+function addInferredFeatureBranch(
+  group: {
+    branches: DashboardFeatureBranchReference[];
+  },
+  branch: DashboardFeatureBranchReference,
+): void {
+  if (group.branches.some((candidate) =>
+    candidate.branchName === branch.branchName &&
+    candidate.componentId === branch.componentId
+  )) {
+    return;
+  }
+  group.branches.push(branch);
+}
+
 interface InferredFeatureFamily {
   key: string;
   title: string;
@@ -3249,13 +3370,17 @@ interface InferredFeatureFamily {
 function inferredFeatureRecord(
   group: {
     family: InferredFeatureFamily;
+    branches: DashboardFeatureBranchReference[];
     worktrees: NexusDashboardWorktreeSummary["records"];
     threads: NexusDashboardThreadSummary["records"];
   },
   targetBranch: string,
 ): NexusDashboardFeatureRecord {
   const branches = uniqueNonEmptyStrings(
-    group.worktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+    [
+      ...group.branches.map((branch) => branch.branchName),
+      ...group.worktrees.flatMap((worktree) => [worktree.branchName ?? ""]),
+    ],
   );
   const needsDecisionCount = group.threads.filter((thread) =>
     thread.decision === "review" ||
@@ -3267,10 +3392,12 @@ function inferredFeatureRecord(
   ).length;
   const status = dashboardFeatureStatus({
     relatedWorktreeCount: group.worktrees.length,
+    relatedBranchCount: branches.length,
     needsDecisionCount,
     warnings: [],
   });
   const updatedAt = latestIsoString([
+    ...group.branches.map((branch) => branch.updatedAt),
     ...group.worktrees.map((worktree) => worktree.updatedAt),
     ...group.threads.map((thread) => thread.updatedAt),
   ]);
@@ -3280,17 +3407,23 @@ function inferredFeatureRecord(
     title: group.family.title,
     featureId: group.family.key,
     componentIds: uniqueNonEmptyStrings(
-      group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+      [
+        ...group.branches.map((branch) => branch.componentId ?? ""),
+        ...group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+      ],
     ),
     componentNames: uniqueNonEmptyStrings(
-      group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+      [
+        ...group.branches.map((branch) => branch.componentName ?? ""),
+        ...group.worktrees.flatMap((worktree) => [worktree.componentId ?? ""]),
+      ],
     ),
     releaseTrainVersionId: null,
     branchStrategy: "inferred",
     status,
     statusLabel: dashboardFeatureStatusLabel(status),
     tone: dashboardFeatureTone(status),
-    detail: `${branches.length} ${plural(branches.length, "branch", "branches")} inferred from active worktree branches. Configure feature branch delivery to make this workflow explicit.`,
+    detail: `${branches.length} ${plural(branches.length, "branch", "branches")} inferred from Git refs and active worktree branches. Configure feature branch delivery to make this workflow explicit.`,
     featureBranch: group.family.featureBranch,
     reviewBranchPattern: group.family.reviewBranchPattern,
     defaultChangeBaseBranch: group.family.featureBranch,
@@ -3312,25 +3445,21 @@ function inferredFeatureRecord(
 function inferFeatureFamilyFromBranch(
   branchName: string,
 ): InferredFeatureFamily | null {
-  const parts = branchName.split("/").filter(Boolean);
+  const intentPrefixes = featureIntentPrefixes();
+  const rawParts = branchName.split("/").filter(Boolean);
+  const parts =
+    rawParts[1] && intentPrefixes.has(rawParts[1])
+      ? rawParts.slice(1)
+      : rawParts;
+  const normalizedBranchName = parts.join("/");
   if (
     parts.length === 0 ||
-    branchName === "main" ||
+    normalizedBranchName === "main" ||
     branchName.endsWith("/HEAD") ||
     branchName.endsWith("/main")
   ) {
     return null;
   }
-  const intentPrefixes = new Set([
-    "feat",
-    "feature",
-    "fix",
-    "chore",
-    "docs",
-    "refactor",
-    "test",
-    "ci",
-  ]);
   if (parts[0] && intentPrefixes.has(parts[0]) && parts[1]) {
     const key = parts[1];
     return {
@@ -3345,8 +3474,8 @@ function inferFeatureFamilyFromBranch(
     return {
       key,
       title: parts.at(-1) ?? key,
-      featureBranch: branchName,
-      reviewBranchPattern: `${branchName}/{change}`,
+      featureBranch: normalizedBranchName,
+      reviewBranchPattern: `${normalizedBranchName}/{change}`,
     };
   }
   if (parts.length >= 2 && /^dev-nexus(?:-|$)/u.test(parts[0] ?? "")) {
@@ -3354,16 +3483,29 @@ function inferFeatureFamilyFromBranch(
     return {
       key,
       title: parts.at(-1) ?? key,
-      featureBranch: branchName,
-      reviewBranchPattern: `${branchName}/{change}`,
+      featureBranch: normalizedBranchName,
+      reviewBranchPattern: `${normalizedBranchName}/{change}`,
     };
   }
   return {
-    key: branchName,
-    title: parts.at(-1) ?? branchName,
-    featureBranch: branchName,
-    reviewBranchPattern: `${branchName}/{change}`,
+    key: normalizedBranchName,
+    title: parts.at(-1) ?? normalizedBranchName,
+    featureBranch: normalizedBranchName,
+    reviewBranchPattern: `${normalizedBranchName}/{change}`,
   };
+}
+
+function featureIntentPrefixes(): Set<string> {
+  return new Set([
+    "feat",
+    "feature",
+    "fix",
+    "chore",
+    "docs",
+    "refactor",
+    "test",
+    "ci",
+  ]);
 }
 
 function dashboardFeatureSlug(value: string): string {
@@ -3387,9 +3529,22 @@ function branchBelongsToFeature(
     plan.featureBranch ?? "",
     trimTrailingSlash(reviewPrefix),
   ]);
+  const normalizedBranchName = normalizeFeatureBranchForMatching(branchName);
   return prefixes.some((prefix) =>
-    branchName === prefix || branchName.startsWith(`${prefix}/`),
+    branchName === prefix ||
+    branchName.startsWith(`${prefix}/`) ||
+    normalizedBranchName === prefix ||
+    normalizedBranchName.startsWith(`${prefix}/`),
   );
+}
+
+function normalizeFeatureBranchForMatching(branchName: string): string {
+  const parts = branchName.split("/").filter(Boolean);
+  const intentPrefixes = featureIntentPrefixes();
+  if (parts[1] && intentPrefixes.has(parts[1])) {
+    return parts.slice(1).join("/");
+  }
+  return branchName;
 }
 
 function trimTrailingSlash(value: string): string {
@@ -3398,6 +3553,7 @@ function trimTrailingSlash(value: string): string {
 
 function dashboardFeatureStatus(options: {
   relatedWorktreeCount: number;
+  relatedBranchCount: number;
   needsDecisionCount: number;
   warnings: string[];
 }): NexusDashboardFeatureStatus {
@@ -3407,7 +3563,7 @@ function dashboardFeatureStatus(options: {
   if (options.needsDecisionCount > 0) {
     return "needs-review";
   }
-  if (options.relatedWorktreeCount > 0) {
+  if (options.relatedWorktreeCount > 0 || options.relatedBranchCount > 0) {
     return "active";
   }
   return "planned";
