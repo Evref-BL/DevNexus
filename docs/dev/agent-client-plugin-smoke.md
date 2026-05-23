@@ -8,7 +8,7 @@ Code plugin prototypes.
 The automated smoke test is:
 
 ```bash
-npm test -- src/nexusAgentClientPluginNoNetworkSmoke.test.ts
+npm test -- test/agents/nexusAgentClientPluginNoNetworkSmoke.test.ts
 ```
 
 It creates temporary DevNexus workspace fixtures and fake source-current

@@ -206,7 +206,7 @@ environment and set:
 ```bash
 DEV_NEXUS_POSTGRES_CLAIM_AUTHORITY_SMOKE=1 \
 DEV_NEXUS_CLAIMS_DATABASE_URL='postgres://user:password@host:5432/dev_nexus' \
-npm test -- src/nexusPostgresWorkItemClaimAuthority.live.test.ts
+npm test -- test/work-items/nexusPostgresWorkItemClaimAuthority.live.test.ts
 ```
 
 The smoke creates the target schema if it does not exist, applies

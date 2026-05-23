@@ -8,79 +8,79 @@ import {
   writeJson,
   writeLine,
   type TextWriter,
-} from "./cliSupport.js";
+} from "./cli/cliSupport.js";
 import {
   assertCliMutationAllowed,
   type DevNexusCliDependencies,
-} from "./cliCommandContext.js";
-export type { DevNexusCliDependencies } from "./cliCommandContext.js";
-import { handleCiFailureIntakeCommand } from "./cliCiFailureIntakeCommand.js";
+} from "./cli/cliCommandContext.js";
+export type { DevNexusCliDependencies } from "./cli/cliCommandContext.js";
+import { handleCiFailureIntakeCommand } from "./cli/cliCiFailureIntakeCommand.js";
 import {
   projectComponentAddUsage,
   projectSetupUsage,
   usage,
-} from "./cliUsage.js";
+} from "./cli/cliUsage.js";
 export {
   projectComponentAddUsage,
   projectSetupUsage,
   usage,
-} from "./cliUsage.js";
-import { handleDiagnosticsCommand } from "./cliDiagnosticsCommand.js";
-import { handleAuthCommand } from "./cliAuthCommand.js";
-import { handleHostCommand } from "./cliHostCommand.js";
-import { handlePublicationCommand } from "./cliPublicationCommand.js";
-import { handleReviewCommand } from "./cliReviewCommand.js";
-import { isCliEntrypoint } from "./cliRuntime.js";
+} from "./cli/cliUsage.js";
+import { handleDiagnosticsCommand } from "./cli/cliDiagnosticsCommand.js";
+import { handleAuthCommand } from "./cli/cliAuthCommand.js";
+import { handleHostCommand } from "./cli/cliHostCommand.js";
+import { handlePublicationCommand } from "./cli/cliPublicationCommand.js";
+import { handleReviewCommand } from "./cli/cliReviewCommand.js";
+import { isCliEntrypoint } from "./cli/cliRuntime.js";
 import {
   parseQuickFixPlanCommand,
   printQuickFixFinish,
   printQuickFixPlan,
   printQuickFixStart,
-} from "./cliQuickFixCommand.js";
+} from "./cli/cliQuickFixCommand.js";
 import {
   handleRemoteExecutionCommand,
   type ParsedRemoteExecutionRequestCreateCommand,
-} from "./cliRemoteExecutionCommand.js";
+} from "./cli/cliRemoteExecutionCommand.js";
 import {
   createNexusAutomationCommandExecutor,
-} from "./nexusAutomationCommandExecutor.js";
+} from "./automation/nexusAutomationCommandExecutor.js";
 import {
   createNexusAutomationAgentCommandLauncher,
   runNexusAutomationAgentLaunchOnce,
   type RunNexusAutomationAgentLaunchOnceResult,
-} from "./nexusAutomationAgentLaunch.js";
+} from "./automation/nexusAutomationAgentLaunch.js";
 import {
   resolveNexusAutomationAgentCommand,
   shellQuoteArgument,
-} from "./nexusAutomationAgentProfile.js";
+} from "./automation/nexusAutomationAgentProfile.js";
 import {
   probeCodexAppServerInitialize,
   type CodexAppServerInitializeProbeReport,
-} from "./codexAppServerInitializeProbe.js";
+} from "./codex-app/codexAppServerInitializeProbe.js";
 import {
   enqueueNexusAutomationWorkItem,
   type EnqueueNexusAutomationWorkItemResult,
-} from "./nexusAutomationEnqueue.js";
+} from "./automation/nexusAutomationEnqueue.js";
 import {
   prepareNexusAutomationHeartbeat,
   type NexusAutomationHeartbeatPreparation,
   type NexusAutomationHeartbeatStatus,
-} from "./nexusAutomationHeartbeat.js";
+} from "./automation/nexusAutomationHeartbeat.js";
 import {
   runNexusAutomationOnce,
   type RunNexusAutomationOnceResult,
-} from "./nexusAutomationRunOnce.js";
+} from "./automation/nexusAutomationRunOnce.js";
 import {
   runNexusAutomationScheduler,
   type NexusAutomationSchedulerTick,
   type RunNexusAutomationSchedulerResult,
-} from "./nexusAutomationScheduler.js";
+} from "./automation/nexusAutomationScheduler.js";
 import {
   runNexusAutomationCoordinatorLoop,
   type NexusAutomationCoordinatorLoopProgressEvent,
   type NexusAutomationCoordinatorLoopTick,
   type RunNexusAutomationCoordinatorLoopResult,
-} from "./nexusAutomationCoordinatorLoop.js";
+} from "./automation/nexusAutomationCoordinatorLoop.js";
 import {
   adoptNexusAutomationCurrentAgent,
   adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
@@ -89,53 +89,53 @@ import {
   type AdoptNexusAutomationCurrentAgentResult,
   type NexusAutomationCurrentAgentAdoptionResultInput,
   type NexusAutomationCurrentAgentAdoptionResultStatus,
-} from "./nexusAutomationCurrentAgentAdoption.js";
+} from "./automation/nexusAutomationCurrentAgentAdoption.js";
 import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
   type NexusAutomationWorkItemClaimAuthorityStatus,
-} from "./nexusAutomationStatus.js";
+} from "./automation/nexusAutomationStatus.js";
 import {
   summarizeAutomationStatus,
   summarizeCoordinationStatus,
   summarizeProjectStatus,
   summarizeTargetCycleLedger,
   summarizeTargetReport,
-} from "./nexusMcpServer.js";
+} from "./mcp/nexusMcpServer.js";
 import type {
   NexusAuthorityComponentSummary,
   NexusAuthorityProjectSummary,
-} from "./nexusAuthority.js";
+} from "./authority/nexusAuthority.js";
 import {
   loadNexusPublicationAuthProfiles,
   resolveNexusPublicationPolicy,
   NexusPublicationActorStatus,
   NexusPublicationStatus,
-} from "./nexusPublicationPolicy.js";
-import type { NexusGitIdentityStatus } from "./nexusGitIdentity.js";
+} from "./publication/nexusPublicationPolicy.js";
+import type { NexusGitIdentityStatus } from "./git/nexusGitIdentity.js";
 import {
   getNexusAutomationAgentProfileSummary,
   type NexusAutomationAgentProfileSummary,
-} from "./nexusAutomationAgentSurface.js";
+} from "./automation/nexusAutomationAgentSurface.js";
 import {
   getNexusEligibleWorkSummary,
   type NexusEligibleWorkMode,
   type NexusEligibleWorkSummary,
-} from "./nexusEligibleWorkSummary.js";
+} from "./work-items/nexusEligibleWorkSummary.js";
 import {
   buildNexusDashboardSnapshot,
   type NexusDashboardSnapshot,
-} from "./nexusDashboard.js";
+} from "./dashboard/nexusDashboard.js";
 import {
   startNexusDashboardServer,
   type NexusDashboardServerHandle,
-} from "./nexusDashboardServer.js";
+} from "./dashboard/nexusDashboardServer.js";
 import {
   defaultNexusAutomationConfig,
-} from "./nexusAutomationConfig.js";
+} from "./automation/nexusAutomationConfig.js";
 import type {
   NexusExternalIssueVisibilitySummary,
-} from "./nexusExternalIssueVisibility.js";
+} from "./operations/nexusExternalIssueVisibility.js";
 import {
   appendNexusAutomationTargetCycleRecord,
   nexusAutomationTargetCycleLedgerPath,
@@ -144,11 +144,11 @@ import {
   type NexusAutomationTargetCycleStatus,
   type NexusAutomationTargetCycleWorkItemInput,
   type NexusAutomationTargetCycleWorkItemStatus,
-} from "./nexusAutomationTargetCycle.js";
+} from "./automation/nexusAutomationTargetCycle.js";
 import {
   buildNexusAutomationTargetReport,
   type NexusAutomationTargetReport,
-} from "./nexusAutomationTargetReport.js";
+} from "./automation/nexusAutomationTargetReport.js";
 import {
   createNexusCoordinationHandoff,
   getNexusCoordinationIntegrationPlan,
@@ -160,7 +160,7 @@ import {
   type NexusCoordinationHandoffStatus,
   type NexusCoordinationIntegrationPlan,
   type NexusCoordinationStatus,
-} from "./nexusCoordination.js";
+} from "./coordination/nexusCoordination.js";
 import {
   createNexusCoordinationRequest,
   parseNexusCoordinationRequestIntent,
@@ -168,12 +168,12 @@ import {
   type NexusCoordinationRequestIntent,
   type NexusCoordinationRequestResult,
   type NexusCoordinationRequestStatus,
-} from "./nexusCoordinationRequest.js";
-import type { NexusRemoteExecutionAttachmentRef } from "./nexusRemoteExecution.js";
+} from "./coordination/nexusCoordinationRequest.js";
+import type { NexusRemoteExecutionAttachmentRef } from "./remote-execution/nexusRemoteExecution.js";
 import {
   buildNexusCleanupPlan,
   type NexusCleanupPlan,
-} from "./nexusCleanupPlan.js";
+} from "./operations/nexusCleanupPlan.js";
 import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
@@ -185,49 +185,49 @@ import {
   type NexusSetupPlatform,
   type NexusSetupRecordedStepStatus,
   type RecordNexusSetupStepResult,
-} from "./nexusSetupAssistant.js";
+} from "./project/nexusSetupAssistant.js";
 import {
   materializeNexusProjectAgentMcpConfig,
   resolveNexusProjectAgentMcpTargets,
   type MaterializeNexusProjectAgentMcpConfigResult,
   type MaterializedNexusAgentMcpTarget,
-} from "./nexusAgentMcpConfig.js";
+} from "./agents/nexusAgentMcpConfig.js";
 import {
   buildNexusMcpContextBudgetReport,
   type NexusMcpContextBudgetReport,
-} from "./nexusMcpContextBudget.js";
+} from "./mcp/nexusMcpContextBudget.js";
 import {
   resolveNexusMcpExposure,
   resolveNexusPluginMcpServerExposures,
   type NexusPluginMcpServerExposureResolution,
-} from "./nexusMcpExposurePolicy.js";
+} from "./mcp/nexusMcpExposurePolicy.js";
 import {
   refreshNexusProjectPlugin,
   type RefreshNexusProjectPluginResult,
-} from "./nexusProjectPluginRefresh.js";
+} from "./project/nexusProjectPluginRefresh.js";
 import {
   applyNexusAgentProjectionCleanup,
   planNexusAgentProjectionCleanup,
   type NexusAgentProjectionCleanupApplyResult,
   type NexusAgentProjectionCleanupPlan,
-} from "./nexusAgentProjectionCleanup.js";
-import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
-import { runDevNexusMcpGatewayStdioServer } from "./nexusMcpGateway.js";
+} from "./agents/nexusAgentProjectionCleanup.js";
+import { runDevNexusMcpStdioServer } from "./mcp/nexusMcpServer.js";
+import { runDevNexusMcpGatewayStdioServer } from "./mcp/nexusMcpGateway.js";
 import {
   nexusMcpGatewayAgentTargets,
-} from "./nexusMcpGatewayProjection.js";
+} from "./mcp/nexusMcpGatewayProjection.js";
 import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
-} from "./nexusManualWorktree.js";
+} from "./worktrees/nexusManualWorktree.js";
 import {
   heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,
   type NexusAgentClaimGuardResult,
-} from "./nexusAgentClaimGuard.js";
-import { buildNexusQuickFixPlan } from "./nexusQuickFix.js";
+} from "./agents/nexusAgentClaimGuard.js";
+import { buildNexusQuickFixPlan } from "./operations/nexusQuickFix.js";
 import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
@@ -236,7 +236,7 @@ import {
   type NexusAuthorityAction,
   type NexusAuthorityMutationBlock,
   type NexusEffectiveAuthorityResolution,
-} from "./nexusAuthority.js";
+} from "./authority/nexusAuthority.js";
 import {
   createDefaultNexusHomeConfigBase,
   defaultNexusHomePath,
@@ -246,13 +246,13 @@ import {
   saveNexusHomeConfigFile,
   validateNexusHomeConfigBase,
   type NexusHomeConfigBase,
-} from "./nexusHomeConfig.js";
+} from "./project/nexusHomeConfig.js";
 import {
   loadProjectConfig,
   selectNexusProjectMcpAgentTargets,
   type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
-} from "./nexusProjectConfig.js";
+} from "./project/nexusProjectConfig.js";
 import {
   applyNexusProjectSetup,
   buildNexusProjectSetupApplyNextActions,
@@ -263,18 +263,18 @@ import {
   nexusProjectSetupRequiredAnswerPaths,
   type NexusProjectSetupApplyResult,
   type NexusProjectSetupProposal,
-} from "./nexusProjectSetupWizard.js";
+} from "./project/nexusProjectSetupWizard.js";
 import {
   buildNexusProjectSetupReadinessReport,
   type NexusProjectSetupReadinessReport,
-} from "./nexusProjectSetupReadiness.js";
+} from "./project/nexusProjectSetupReadiness.js";
 import {
   applyNexusProjectComponentAdd,
   previewNexusProjectComponentAdd,
   readNexusProjectComponentAddAnswersFile,
   type NexusProjectComponentAddApplyResult,
   type NexusProjectComponentAddProposal,
-} from "./nexusProjectComponentAdd.js";
+} from "./project/nexusProjectComponentAdd.js";
 import {
   applyNexusProjectHosting,
   planNexusProjectHosting,
@@ -286,7 +286,7 @@ import {
   type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingPlanResult,
   type NexusProjectHostingStatusResult,
-} from "./nexusProjectHosting.js";
+} from "./project/nexusProjectHosting.js";
 import {
   configureNexusProjectTracker,
   createNexusProject,
@@ -300,28 +300,28 @@ import {
   type LinkNexusProjectTrackerResult,
   type ListNexusProjectsResult,
   type NexusProjectHomeStore,
-} from "./nexusProjectHomeService.js";
+} from "./project/nexusProjectHomeService.js";
 import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
-} from "./nexusProjectLifecycle.js";
+} from "./project/nexusProjectLifecycle.js";
 import {
   buildNexusProjectStatusForPath,
   type NexusProjectStatusBase,
-} from "./nexusProjectRegistry.js";
+} from "./project/nexusProjectRegistry.js";
 import {
   getNexusWorkItemDiscoveryStatus,
   type NexusWorkItemDiscoveryStatus,
-} from "./nexusWorkItemDiscoveryStatus.js";
+} from "./work-items/nexusWorkItemDiscoveryStatus.js";
 import {
   claimNexusEligibleWorkItem,
   type NexusWorkItemClaimResult,
   type NexusWorkItemStaleClaimPolicy,
-} from "./nexusWorkItemClaim.js";
+} from "./work-items/nexusWorkItemClaim.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
-} from "./workItemService.js";
+} from "./work-items/workItemService.js";
 import {
   createWorkItemSyncPlan,
   defaultWorkItemSyncPolicy,
@@ -340,7 +340,7 @@ import {
   type WorkItemSyncPolicyConfig,
   type WorkItemSyncRun,
   type WorkItemSyncWriteDisposition,
-} from "./workItemSyncPlanner.js";
+} from "./work-items/workItemSyncPlanner.js";
 import {
   createWorkItemImportPlan,
   defaultWorkItemImportPolicy,
@@ -353,21 +353,21 @@ import {
   type WorkItemImportPlan,
   type WorkItemImportPolicyConfig,
   type WorkItemImportRun,
-} from "./workItemImportPlanner.js";
+} from "./work-items/workItemImportPlanner.js";
 import {
   createWorkItemTrackerLinkService,
   type LinkWorkItemTrackerReferenceResult,
   type ShowWorkItemTrackerLinksResult,
   type UnlinkWorkItemTrackerReferenceResult,
-} from "./workItemTrackerLinks.js";
-import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
+} from "./work-items/workItemTrackerLinks.js";
+import { defaultGitRunner, type GitRunner } from "./worktrees/gitWorktreeService.js";
 import type {
   WorkComment,
   WorkItem,
   WorkItemPatch,
   WorkStatus,
   WorkStatusQuery,
-} from "./workTrackingTypes.js";
+} from "./work-items/workTrackingTypes.js";
 
 interface ProjectHostingStatusCliResult {
   projectRoot: string;

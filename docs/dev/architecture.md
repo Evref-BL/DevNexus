@@ -261,8 +261,8 @@ npm run check
 Focused test runs are useful while iterating:
 
 ```bash
-npm test -- src/nexusProjectConfig.test.ts
-npm test -- src/nexusMcpServer.test.ts
+npm test -- test/project/nexusProjectConfig.test.ts
+npm test -- test/mcp/nexusMcpServer.test.ts
 ```
 
 Keep README and user docs concise. Put implementation details, invariants, and
