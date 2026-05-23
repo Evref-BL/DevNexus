@@ -1185,10 +1185,28 @@ function githubCliHost(host?: string | null): string {
   if (!value || value === "https://github.com" || value === "api.github.com") {
     return "github.com";
   }
-  return value
-    .replace(/^https?:\/\//u, "")
-    .replace(/^api\./u, "")
-    .replace(/\/+$/u, "");
+  const normalized = stripTrailingSlashes(stripHttpScheme(value));
+  return normalized.startsWith("api.") ? normalized.slice("api.".length) : normalized;
+}
+
+function stripHttpScheme(value: string): string {
+  if (value.startsWith("https://")) {
+    return value.slice("https://".length);
+  }
+  if (value.startsWith("http://")) {
+    return value.slice("http://".length);
+  }
+
+  return value;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 function normalizeProvider(provider: string): string {

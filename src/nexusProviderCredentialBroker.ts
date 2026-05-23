@@ -1575,10 +1575,8 @@ function normalizeGitHubAppGitHost(hostOrApiBaseUrl?: string | null): string {
     );
     return url.hostname === "api.github.com" ? "github.com" : url.hostname;
   } catch {
-    return value
-      .replace(/^https?:\/\//u, "")
-      .replace(/\/.*$/u, "")
-      .replace(/^api\.github\.com$/u, "github.com");
+    const host = takeBeforeSlash(stripHttpScheme(value));
+    return host === "api.github.com" ? "github.com" : host;
   }
 }
 
@@ -1627,10 +1625,35 @@ function normalizeGitHubAppApiBaseUrl(hostOrApiBaseUrl?: string | null): string 
     return "https://api.github.com";
   }
   if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value.replace(/\/+$/, "");
+    return stripTrailingSlashes(value);
   }
 
-  return `https://${value.replace(/\/+$/, "")}/api/v3`;
+  return `https://${stripTrailingSlashes(value)}/api/v3`;
+}
+
+function stripHttpScheme(value: string): string {
+  if (value.startsWith("https://")) {
+    return value.slice("https://".length);
+  }
+  if (value.startsWith("http://")) {
+    return value.slice("http://".length);
+  }
+
+  return value;
+}
+
+function takeBeforeSlash(value: string): string {
+  const slash = value.indexOf("/");
+  return slash >= 0 ? value.slice(0, slash) : value;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 function requiredGitHubAppPrivateKeyPath(

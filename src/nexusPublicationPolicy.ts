@@ -1646,10 +1646,9 @@ function gitRemoteUrlFromCredential(
       `Credential ${credential.profileId} uses ${gitCredential.protocol} Git transport; token-backed publication requires https.`,
     );
   }
-  const host = gitCredential.host
-    .trim()
-    .replace(/^https?:\/\//u, "")
-    .replace(/\/+$/u, "");
+  const host = stripTrailingSlashes(
+    stripHttpScheme(gitCredential.host.trim()),
+  );
   const repositoryPath = gitCredential.path?.trim();
   if (!host || !repositoryPath) {
     throw new NexusPublicationPolicyError(
@@ -1789,7 +1788,8 @@ function matchesExpectedUrl(expected: string, observed: Array<string | null>): b
 }
 
 function normalizeUrl(value: string | null): string | null {
-  return value?.trim().replace(/\/+$/u, "") || null;
+  const normalized = value ? stripTrailingSlashes(value.trim()) : "";
+  return normalized || null;
 }
 
 function sshHostAlias(value: string | null): string | null {
@@ -1814,10 +1814,28 @@ function githubActorHost(target: NexusPublicationTarget): string {
   if (!host || host === "https://github.com" || host === "api.github.com") {
     return "github.com";
   }
-  return host
-    .replace(/^https?:\/\//u, "")
-    .replace(/^api\./u, "")
-    .replace(/\/+$/u, "");
+  const normalized = stripTrailingSlashes(stripHttpScheme(host));
+  return normalized.startsWith("api.") ? normalized.slice("api.".length) : normalized;
+}
+
+function stripHttpScheme(value: string): string {
+  if (value.startsWith("https://")) {
+    return value.slice("https://".length);
+  }
+  if (value.startsWith("http://")) {
+    return value.slice("http://".length);
+  }
+
+  return value;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 function handlesEqual(left: string, right: string): boolean {
