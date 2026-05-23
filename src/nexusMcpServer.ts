@@ -62,8 +62,13 @@ import {
 import {
   claimNexusEligibleWorkItem,
   type NexusEligibleWorkClaimProviderFactory,
+  type NexusWorkItemClaimAuthority,
   type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
+import {
+  heartbeatNexusAgentClaim,
+  verifyNexusAgentClaimForMutation,
+} from "./nexusAgentClaimGuard.js";
 import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
@@ -112,9 +117,14 @@ import {
 import {
   buildNexusFeatureFinalizationPlan,
 } from "./nexusFeatureFinalizationPlan.js";
-import type {
-  NexusPublicationProviderEvidenceInput,
+import {
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
+import {
+  buildNexusReviewPlan,
+  type NexusReviewLocalAuthorization,
+} from "./nexusReviewPolicy.js";
 import {
   adoptNexusAutomationCurrentAgent,
   adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
@@ -239,6 +249,7 @@ export interface DevNexusMcpToolContext {
   workItemProviderOptions?: CreateWorkTrackerProviderOptions;
   workItemCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
 }
 
@@ -603,6 +614,47 @@ const tools: McpTool[] = [
     },
   },
   {
+    name: "review_plan",
+    description: "Build a read-only component review plan from review policy, local authorization, and optional provider evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        branchRole: { type: "string" },
+        paths: {
+          type: "array",
+          items: { type: "string" },
+        },
+        labels: {
+          type: "array",
+          items: { type: "string" },
+        },
+        requestedAction: { type: "string" },
+        branchName: { type: "string" },
+        headSha: { type: "string" },
+        localAuthorization: {
+          type: "object",
+          properties: {
+            authorized: { type: "boolean" },
+            authorizedAt: { type: "string" },
+            branchName: { type: "string" },
+            headSha: { type: "string" },
+            requestedAction: { type: "string" },
+            summary: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "current_agent_adopt",
     description: "Create or reuse DevNexus agent-launch context for the current coordinator without spawning nested model execution.",
     inputSchema: {
@@ -615,6 +667,20 @@ const tools: McpTool[] = [
         owner: { type: ["string", "null"] },
         coordinatorLoop: { type: "boolean" },
         runIdPrefix: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "current_agent_heartbeat",
+    description: "Renew the current coordinator's authority-backed work-item claim lease.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        leaseDurationMs: { type: "number" },
       },
       additionalProperties: false,
     },
@@ -1635,6 +1701,11 @@ export async function callDevNexusMcpTool(
             now: context.now,
           }),
         });
+      case "review_plan":
+        return toolResult({
+          ok: true,
+          plan: reviewPlanFromArgs(args),
+        });
       case "current_agent_adopt": {
         const coordinatorLoop =
           optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
@@ -1654,20 +1725,46 @@ export async function callDevNexusMcpTool(
             : await adoptNexusAutomationCurrentAgent(adoptOptions)),
         });
       }
+      case "current_agent_heartbeat":
+        return toolResult({
+          ok: true,
+          ...(await heartbeatNexusAgentClaim({
+            projectRoot: projectRootFromArgs(args),
+            env: process.env,
+            claimAuthority: context.workItemClaimAuthority,
+            leaseDurationMs: optionalPositiveInteger(
+              args,
+              "leaseDurationMs",
+              "arguments",
+            ),
+            now: context.now,
+          })),
+        });
       case "current_agent_record":
         assertMcpMutationAllowed(args, context, {
           command: "current_agent_record",
           mutationClass: "target_state",
         });
-        return toolResult({
-          ok: true,
-          ...recordNexusAutomationCurrentAgentAdoptionResult({
-            projectRoot: projectRootFromArgs(args),
-            runId: requiredString(args, "runId", "arguments"),
-            result: currentAgentResultFromArgs(args),
-            now: context.now,
-          }),
-        });
+        {
+          const result = currentAgentResultFromArgs(args);
+          if (result.status === "completed") {
+            await verifyNexusAgentClaimForMutation({
+              projectRoot: projectRootFromArgs(args),
+              env: process.env,
+              claimAuthority: context.workItemClaimAuthority,
+              now: context.now,
+            });
+          }
+          return toolResult({
+            ok: true,
+            ...recordNexusAutomationCurrentAgentAdoptionResult({
+              projectRoot: projectRootFromArgs(args),
+              runId: requiredString(args, "runId", "arguments"),
+              result,
+              now: context.now,
+            }),
+          });
+        }
       case "worktree_prepare": {
         const projectRoot = projectRootFromArgs(args);
         const componentId = optionalString(args, "componentId", "arguments");
@@ -1695,6 +1792,14 @@ export async function callDevNexusMcpTool(
           workItemId,
           workItemTitle,
           topic,
+          now: context.now,
+        });
+        await verifyNexusAgentClaimForMutation({
+          projectRoot,
+          componentId: resolvedWorkItem.componentId ?? componentId ?? null,
+          workItemId: resolvedWorkItem.itemId ?? workItemId ?? null,
+          env: process.env,
+          claimAuthority: context.workItemClaimAuthority,
           now: context.now,
         });
         const prepared = prepareNexusManualWorktree({
@@ -2062,6 +2167,7 @@ export async function callDevNexusMcpTool(
               agentId: optionalNullableString(args, "agentId", "arguments"),
               ownerId: optionalNullableString(args, "ownerId", "arguments"),
             },
+            homePath: optionalString(args, "homePath", "arguments"),
             leaseDurationMs: optionalPositiveInteger(
               args,
               "leaseDurationMs",
@@ -3493,6 +3599,79 @@ function providerEvidenceFromArgs(
   });
 }
 
+function reviewPlanFromArgs(args: Record<string, unknown>) {
+  const projectRoot = projectRootFromArgs(args);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const componentId = optionalString(args, "componentId", "arguments");
+  const component = componentId
+    ? components.find((candidate) => candidate.id === componentId)
+    : resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  if (!component) {
+    throw new Error(`Workspace component is not configured: ${componentId}`);
+  }
+
+  return buildNexusReviewPlan({
+    componentId: component.id,
+    policy: component.review,
+    branchRole: optionalString(args, "branchRole", "arguments"),
+    paths: optionalStringArrayArg(args, "paths", "arguments"),
+    labels: optionalStringArrayArg(args, "labels", "arguments"),
+    requestedAction: optionalString(args, "requestedAction", "arguments"),
+    branchName: optionalString(args, "branchName", "arguments"),
+    headSha: optionalString(args, "headSha", "arguments"),
+    localAuthorization: localAuthorizationFromArgs(args),
+    providerEvidence:
+      normalizeNexusPublicationProviderEvidence(providerEvidenceFromArgs(args))[0] ??
+      null,
+  });
+}
+
+function localAuthorizationFromArgs(
+  args: Record<string, unknown>,
+): Partial<NexusReviewLocalAuthorization> | null {
+  const value = args.localAuthorization;
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const record = asRecord(value, "arguments.localAuthorization");
+  return {
+    authorized: optionalBoolean(record, "authorized", "arguments.localAuthorization") ??
+      false,
+    authorizedAt:
+      optionalString(record, "authorizedAt", "arguments.localAuthorization") ??
+      null,
+    branchName:
+      optionalString(record, "branchName", "arguments.localAuthorization") ?? null,
+    headSha:
+      optionalString(record, "headSha", "arguments.localAuthorization") ?? null,
+    requestedAction:
+      optionalString(record, "requestedAction", "arguments.localAuthorization") ??
+      null,
+    summary: optionalString(record, "summary", "arguments.localAuthorization") ?? null,
+  };
+}
+
+function optionalStringArrayArg(
+  args: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] {
+  const values = args[key];
+  if (values === undefined || values === null) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    throw new Error(`${pathName}.${key} must be an array`);
+  }
+  return values.map((value, index) => {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`${pathName}.${key}[${index}] must be a non-empty string`);
+    }
+    return value.trim();
+  });
+}
+
 function remoteExecutionMutationClassFromArgs(
   args: Record<string, unknown>,
 ): NexusRunnerMutationClass {
@@ -3843,6 +4022,7 @@ export function summarizeProjectStatus(project: NexusProjectStatusBase) {
       project.workTrackers.map((tracker) => tracker.provider),
     ),
     workTrackers: project.workTrackers.map(summarizeResolvedWorkTracker),
+    workItemClaimAuthority: project.workItemClaimAuthority,
     workTracking: summarizeWorkTracking(project.workTracking ?? null),
     unsupportedWorkTrackingCapabilities:
       project.workTrackingCapabilityReport?.unsupported ?? null,
@@ -4004,6 +4184,7 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
     })),
     omittedCurrentActorCount: omittedCount(status.currentActors),
     authority: summarizeAuthorityProject(status.authority),
+    workItemClaimAuthority: status.workItemClaimAuthority,
     selectorQuery: status.selectorQuery,
     candidateCount: status.candidateCount,
     eligibleWorkMode: status.eligibleWorkMode,

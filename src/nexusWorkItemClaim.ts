@@ -26,6 +26,22 @@ import {
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+  type NexusClaimAuthorityProfileConfig,
+} from "./nexusHomeConfig.js";
+import {
+  createNexusNodePostgresClaimSqlClient,
+  type NexusNodePostgresModule,
+} from "./nexusNodePostgresClaimSqlClient.js";
+import {
+  NexusPostgresWorkItemClaimAuthority,
+} from "./nexusPostgresWorkItemClaimAuthority.js";
+import {
+  resolveNexusProjectPath,
+} from "./nexusPathResolver.js";
+import {
   nexusWorkItemDiscoveryCredentialEnvironment,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
@@ -40,49 +56,45 @@ import type {
   WorkStatus,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
-
-export interface NexusWorkItemClaimOwnerInput {
-  hostId: string;
-  agentId?: string | null;
-  ownerId?: string | null;
-}
-
-export interface NexusWorkItemClaimOwner {
-  version: 1;
-  hostId: string;
-  agentId: string | null;
-  ownerId: string | null;
-  leaseToken: string;
-  claimedAt: string;
-  expiresAt: string;
-}
-
-export type NexusWorkItemStaleClaimPolicy = "report" | "reclaim";
-
-export interface NexusWorkItemClaimObservation {
-  id: string;
-  title: string;
-  componentId: string;
-  trackerId: string;
-  observedStatus: WorkStatus;
-  owner: NexusWorkItemClaimOwner;
-}
-
-export type NexusWorkItemClaimSkipReason =
-  | "missing_tracker"
-  | "no_longer_ready"
-  | "already_in_progress"
-  | "claimed_by_another_owner"
-  | "selector_mismatch";
-
-export interface NexusWorkItemClaimSkippedCandidate {
-  id: string;
-  title: string;
-  componentId: string;
-  trackerId: string | null;
-  reason: NexusWorkItemClaimSkipReason;
-  observedStatus: WorkStatus | null;
-}
+import type {
+  NexusWorkItemClaimAuthority,
+  NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityHeartbeatResult,
+  NexusWorkItemClaimAuthorityVerifyResult,
+  NexusWorkItemClaimObservation,
+  NexusWorkItemClaimOwner,
+  NexusWorkItemClaimOwnerInput,
+  NexusWorkItemClaimResult,
+  NexusWorkItemClaimSkipReason,
+  NexusWorkItemClaimSkippedCandidate,
+  NexusWorkItemStaleClaimPolicy,
+} from "./nexusWorkItemClaimAuthority.js";
+export {
+  NexusMemoryWorkItemClaimAuthority,
+  nexusWorkItemClaimAuthorityKey,
+} from "./nexusWorkItemClaimAuthority.js";
+export type {
+  NexusWorkItemClaimAuthority,
+  NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  NexusWorkItemClaimAuthorityClaimCandidateResult,
+  NexusWorkItemClaimAuthorityHeartbeatResult,
+  NexusWorkItemClaimAuthorityInspectOptions,
+  NexusWorkItemClaimAuthorityInspectResult,
+  NexusWorkItemClaimAuthorityKey,
+  NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityReclaimExpiredClaimOptions,
+  NexusWorkItemClaimAuthorityReclaimResult,
+  NexusWorkItemClaimAuthorityReleaseResult,
+  NexusWorkItemClaimAuthorityState,
+  NexusWorkItemClaimAuthorityVerifyResult,
+  NexusWorkItemClaimObservation,
+  NexusWorkItemClaimOwner,
+  NexusWorkItemClaimOwnerInput,
+  NexusWorkItemClaimResult,
+  NexusWorkItemClaimSkipReason,
+  NexusWorkItemClaimSkippedCandidate,
+  NexusWorkItemStaleClaimPolicy,
+} from "./nexusWorkItemClaimAuthority.js";
 
 export type NexusEligibleWorkClaimProviderFactory = (
   context: NexusEligibleWorkProviderContext,
@@ -100,50 +112,17 @@ export interface ClaimNexusEligibleWorkItemOptions {
   provider?: WorkTrackerProvider;
   providerFactory?: NexusEligibleWorkClaimProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  homePath?: string;
   env?: NodeJS.ProcessEnv;
   owner: NexusWorkItemClaimOwnerInput;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
   leaseDurationMs?: number;
   staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   leaseTokenFactory?: () => string;
   now?: () => Date | string;
 }
-
-export type NexusWorkItemClaimResult =
-  | {
-      status: "claimed";
-      workItem: WorkItem;
-      componentId: string;
-      trackerId: string;
-      owner: NexusWorkItemClaimOwner;
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-      reclaimedFrom?: NexusWorkItemClaimObservation;
-    }
-  | {
-      status: "no_claim";
-      reason:
-        | "no_eligible_candidate"
-        | "candidates_not_claimable"
-        | "active_claims"
-        | "stale_claims";
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-    }
-  | {
-      status: "lost_race";
-      reason: "verification_failed";
-      candidate: WorkItem;
-      observedWorkItem: WorkItem;
-      componentId: string;
-      trackerId: string;
-      owner: NexusWorkItemClaimOwner;
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-      reclaimedFrom?: NexusWorkItemClaimObservation;
-    };
 
 const defaultLeaseDurationMs = 60 * 60 * 1000;
 const claimMarkerName = "dev-nexus-work-item-claim";
@@ -163,6 +142,84 @@ interface ClaimInspectionResult {
   activeClaims: ClaimInspectionCandidate[];
   staleClaims: ClaimInspectionCandidate[];
 }
+
+const optimisticTrackerClaimAuthority: NexusWorkItemClaimAuthority = {
+  kind: "optimistic-tracker",
+  async claimCandidate(options) {
+    assertWorkTrackerCapability(
+      options.provider,
+      "update",
+      "claim work items",
+    );
+    await options.provider.updateWorkItem(options.ref, {
+      status: "in_progress",
+      description: descriptionWithClaim(
+        options.freshWorkItem.description,
+        options.owner,
+      ),
+    });
+    const observed = await options.provider.getWorkItem(options.ref);
+    const observedClaim = activeWorkItemClaim(observed, options.now);
+    if (
+      observed.status !== "in_progress" ||
+      observedClaim?.leaseToken !== options.owner.leaseToken
+    ) {
+      return {
+        status: "lost_race",
+        observedWorkItem: observed,
+      };
+    }
+
+    if (options.provider.capabilities.comment) {
+      await options.provider.addComment(
+        options.ref,
+        claimComment(options.owner),
+      );
+    }
+
+    return {
+      status: "claimed",
+      workItem: observed,
+    };
+  },
+  async reclaimExpiredClaim(options) {
+    assertWorkTrackerCapability(
+      options.provider,
+      "update",
+      "reclaim stale work item claims",
+    );
+    await options.provider.updateWorkItem(options.ref, {
+      status: "in_progress",
+      description: descriptionWithClaim(
+        options.freshWorkItem.description,
+        options.owner,
+      ),
+    });
+    const observed = await options.provider.getWorkItem(options.ref);
+    const observedClaim = activeWorkItemClaim(observed, options.now);
+    if (
+      observed.status !== "in_progress" ||
+      observedClaim?.leaseToken !== options.owner.leaseToken
+    ) {
+      return {
+        status: "lost_race",
+        observedWorkItem: observed,
+      };
+    }
+
+    if (options.provider.capabilities.comment) {
+      await options.provider.addComment(
+        options.ref,
+        reclaimComment(options.owner, options.previousOwner),
+      );
+    }
+
+    return {
+      status: "claimed",
+      workItem: observed,
+    };
+  },
+};
 
 export async function claimNexusEligibleWorkItem(
   options: ClaimNexusEligibleWorkItemOptions,
@@ -199,6 +256,7 @@ export async function claimNexusEligibleWorkItem(
     now: options.now,
   });
   const now = currentDate(options.now);
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
   const activeClaims: NexusWorkItemClaimObservation[] = [];
   if (eligibleWork.eligibleWorkItems.length === 0) {
     const inspectedClaims = await inspectExistingWorkItemClaims({
@@ -211,6 +269,8 @@ export async function claimNexusEligibleWorkItem(
     });
     const reclaimed = await maybeReclaimStaleClaim({
       options,
+      projectRoot,
+      env,
       inspection: inspectedClaims,
       now,
       skippedCandidates: [],
@@ -241,7 +301,6 @@ export async function claimNexusEligibleWorkItem(
 
     const { provider, tracker } = resolved;
     assertWorkTrackerCapability(provider, "get", "verify claim candidates");
-    assertWorkTrackerCapability(provider, "update", "claim work items");
     const ref = workItemRefForCandidate(candidate);
     const fresh = await provider.getWorkItem(ref);
     const activeClaim = activeWorkItemClaim(fresh, now);
@@ -283,39 +342,66 @@ export async function claimNexusEligibleWorkItem(
       now,
       leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
     });
-    await provider.updateWorkItem(ref, {
-      status: "in_progress",
-      description: descriptionWithClaim(fresh.description, owner),
+    const claimAttempt = await claimAuthority.claimCandidate({
+      projectId: options.projectConfig.id,
+      candidate,
+      tracker,
+      provider,
+      ref,
+      freshWorkItem: fresh,
+      owner,
+      now,
     });
-    const observed = await provider.getWorkItem(ref);
-    const observedClaim = activeWorkItemClaim(observed, now);
-    if (
-      observed.status !== "in_progress" ||
-      observedClaim?.leaseToken !== owner.leaseToken
-    ) {
+    if (claimAttempt.status === "lost_race") {
       return {
         status: "lost_race",
         reason: "verification_failed",
         candidate: fresh,
-        observedWorkItem: observed,
+        observedWorkItem: claimAttempt.observedWorkItem,
         componentId: candidate.componentId,
         trackerId: tracker.id,
         owner,
+        ...(claimAttempt.authorityClaim
+          ? { authorityClaim: claimAttempt.authorityClaim }
+          : {}),
+        skippedCandidates,
+        ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
+      };
+    }
+    const verification = await verifyAuthorityBackedClaim({
+      claimAuthority,
+      authorityClaim: claimAttempt.authorityClaim,
+      provider,
+      ref,
+      owner,
+      now,
+    });
+    if (verification.status === "lost_race") {
+      return {
+        status: "lost_race",
+        reason: "verification_failed",
+        candidate: fresh,
+        observedWorkItem: verification.observedWorkItem,
+        componentId: candidate.componentId,
+        trackerId: tracker.id,
+        owner,
+        ...(verification.authorityClaim
+          ? { authorityClaim: verification.authorityClaim }
+          : {}),
         skippedCandidates,
         ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
       };
     }
 
-    if (provider.capabilities.comment) {
-      await provider.addComment(ref, claimComment(owner));
-    }
-
     return {
       status: "claimed",
-      workItem: observed,
+      workItem: claimAttempt.workItem,
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,
+      ...(verification.authorityClaim
+        ? { authorityClaim: verification.authorityClaim }
+        : {}),
       skippedCandidates,
       ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
     };
@@ -335,6 +421,8 @@ export async function claimNexusEligibleWorkItem(
   ];
   const reclaimed = await maybeReclaimStaleClaim({
     options,
+    projectRoot,
+    env,
     inspection: inspectedClaims,
     now,
     skippedCandidates,
@@ -347,6 +435,76 @@ export async function claimNexusEligibleWorkItem(
   return noClaimResult("candidates_not_claimable", skippedCandidates, {
     activeClaims: combinedActiveClaims,
     staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+  });
+}
+
+export async function verifyNexusWorkItemAuthorityClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  authorityClaim: NexusWorkItemClaimAuthorityRecord;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
+  now?: () => Date | string;
+}): Promise<NexusWorkItemClaimAuthorityVerifyResult> {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
+  if (!claimAuthority.verifyClaim) {
+    throw new Error(
+      `Claim authority backend ${claimAuthority.kind} does not support claim verification`,
+    );
+  }
+
+  return claimAuthority.verifyClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.authorityClaim.owner.leaseToken,
+    now: currentDate(options.now),
+  });
+}
+
+export async function heartbeatNexusWorkItemAuthorityClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  authorityClaim: NexusWorkItemClaimAuthorityRecord;
+  leaseDurationMs?: number;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
+  now?: () => Date | string;
+}): Promise<NexusWorkItemClaimAuthorityHeartbeatResult> {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
+  if (!claimAuthority.heartbeatClaim) {
+    throw new Error(
+      `Claim authority backend ${claimAuthority.kind} does not support claim heartbeat`,
+    );
+  }
+
+  return claimAuthority.heartbeatClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.authorityClaim.owner.leaseToken,
+    leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
+    now: currentDate(options.now),
   });
 }
 
@@ -438,6 +596,8 @@ async function inspectExistingWorkItemClaims(options: {
 
 async function maybeReclaimStaleClaim(options: {
   options: ClaimNexusEligibleWorkItemOptions;
+  projectRoot: string;
+  env: NodeJS.ProcessEnv;
   inspection: ClaimInspectionResult;
   now: Date;
   skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
@@ -452,7 +612,6 @@ async function maybeReclaimStaleClaim(options: {
 
   const staleClaim = options.inspection.staleClaims[0]!;
   const { provider, ref, workItem, candidate, tracker } = staleClaim;
-  assertWorkTrackerCapability(provider, "update", "reclaim stale work item claims");
   const owner = claimOwner({
     input: options.options.owner,
     leaseToken:
@@ -461,48 +620,133 @@ async function maybeReclaimStaleClaim(options: {
     leaseDurationMs:
       options.options.leaseDurationMs ?? defaultLeaseDurationMs,
   });
-  await provider.updateWorkItem(ref, {
-    status: "in_progress",
-    description: descriptionWithClaim(workItem.description, owner),
+  const claimAuthority = await claimAuthorityForConfig(
+    options.options,
+    options.projectRoot,
+    options.env,
+  );
+  if (!claimAuthority.reclaimExpiredClaim) {
+    return null;
+  }
+  const reclaimAttempt = await claimAuthority.reclaimExpiredClaim({
+    projectId: options.options.projectConfig.id,
+    candidate,
+    tracker,
+    provider,
+    ref,
+    freshWorkItem: workItem,
+    previousOwner: staleClaim.observation.owner,
+    owner,
+    now: options.now,
   });
-  const observed = await provider.getWorkItem(ref);
-  const observedClaim = activeWorkItemClaim(observed, options.now);
   const activeClaims = options.activeClaims ?? [];
   const staleClaims = options.inspection.staleClaims.map((item) => item.observation);
-  if (
-    observed.status !== "in_progress" ||
-    observedClaim?.leaseToken !== owner.leaseToken
-  ) {
+  if (reclaimAttempt.status === "rejected") {
+    return null;
+  }
+  if (reclaimAttempt.status === "lost_race") {
     return {
       status: "lost_race",
       reason: "verification_failed",
       candidate: workItem,
-      observedWorkItem: observed,
+      observedWorkItem: reclaimAttempt.observedWorkItem,
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,
+      ...(reclaimAttempt.authorityClaim
+        ? { authorityClaim: reclaimAttempt.authorityClaim }
+        : {}),
+      skippedCandidates: options.skippedCandidates,
+      reclaimedFrom: staleClaim.observation,
+      ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+    };
+  }
+  const verification = await verifyAuthorityBackedClaim({
+    claimAuthority,
+    authorityClaim: reclaimAttempt.authorityClaim,
+    provider,
+    ref,
+    owner,
+    now: options.now,
+  });
+  if (verification.status === "lost_race") {
+    return {
+      status: "lost_race",
+      reason: "verification_failed",
+      candidate: workItem,
+      observedWorkItem: verification.observedWorkItem,
+      componentId: candidate.componentId,
+      trackerId: tracker.id,
+      owner,
+      ...(verification.authorityClaim
+        ? { authorityClaim: verification.authorityClaim }
+        : {}),
       skippedCandidates: options.skippedCandidates,
       reclaimedFrom: staleClaim.observation,
       ...claimDiagnosticsFields({ activeClaims, staleClaims }),
     };
   }
 
-  if (provider.capabilities.comment) {
-    await provider.addComment(
-      ref,
-      reclaimComment(owner, staleClaim.observation.owner),
-    );
-  }
-
   return {
     status: "claimed",
-    workItem: observed,
+    workItem: reclaimAttempt.workItem,
     componentId: candidate.componentId,
     trackerId: tracker.id,
     owner,
+    ...(verification.authorityClaim
+      ? { authorityClaim: verification.authorityClaim }
+      : {}),
     skippedCandidates: options.skippedCandidates,
     reclaimedFrom: staleClaim.observation,
     ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+  };
+}
+
+async function verifyAuthorityBackedClaim(options: {
+  claimAuthority: NexusWorkItemClaimAuthority;
+  authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+  provider: WorkTrackerProvider;
+  ref: WorkItemRef;
+  owner: NexusWorkItemClaimOwner;
+  now: Date;
+}): Promise<
+  | {
+      status: "verified";
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+    }
+  | {
+      status: "lost_race";
+      observedWorkItem: WorkItem;
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+    }
+> {
+  if (!options.authorityClaim || !options.claimAuthority.verifyClaim) {
+    return {
+      status: "verified",
+      ...(options.authorityClaim
+        ? { authorityClaim: options.authorityClaim }
+        : {}),
+    };
+  }
+
+  const verification = await options.claimAuthority.verifyClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.owner.leaseToken,
+    now: options.now,
+  });
+  if (verification.status === "verified") {
+    return {
+      status: "verified",
+      authorityClaim: verification.claim,
+    };
+  }
+
+  return {
+    status: "lost_race",
+    observedWorkItem: await options.provider.getWorkItem(options.ref),
+    ...(verification.claim
+      ? { authorityClaim: verification.claim }
+      : { authorityClaim: options.authorityClaim }),
   };
 }
 
@@ -529,6 +773,100 @@ function noClaimResult(
     skippedCandidates,
     ...claimDiagnosticsFields(diagnostics),
   };
+}
+
+async function claimAuthorityForConfig(
+  options: Pick<
+    ClaimNexusEligibleWorkItemOptions,
+    | "automationConfig"
+    | "claimAuthority"
+    | "projectConfig"
+    | "homePath"
+    | "nodePostgresModule"
+    | "nodePostgresModuleLoader"
+  >,
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): Promise<NexusWorkItemClaimAuthority> {
+  if (options.claimAuthority) {
+    return options.claimAuthority;
+  }
+  const backend = options.automationConfig.workItemClaims.authority.backend;
+  if (backend === "optimistic_tracker") {
+    return optimisticTrackerClaimAuthority;
+  }
+
+  return postgresClaimAuthorityForConfig(options, projectRoot, env);
+}
+
+async function postgresClaimAuthorityForConfig(
+  options: Pick<
+    ClaimNexusEligibleWorkItemOptions,
+    | "automationConfig"
+    | "projectConfig"
+    | "homePath"
+    | "nodePostgresModule"
+    | "nodePostgresModuleLoader"
+  >,
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): Promise<NexusWorkItemClaimAuthority> {
+  const profileId =
+    options.automationConfig.workItemClaims.authority.postgres.connectionProfileId;
+  if (!profileId) {
+    throw new Error(
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+    );
+  }
+
+  const profile = loadClaimAuthorityProfiles({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    homePath: options.homePath,
+  }).find((candidate) => candidate.id === profileId);
+  if (!profile) {
+    throw new Error(
+      `PostgreSQL claim authority profile ${profileId} was not found in DevNexus home config`,
+    );
+  }
+
+  const connectionString = optionalNonEmptyString(env[profile.connectionStringEnv]);
+  if (!connectionString) {
+    throw new Error(
+      `PostgreSQL claim authority profile ${profile.id} requires environment variable ${profile.connectionStringEnv}`,
+    );
+  }
+
+  const client = await createNexusNodePostgresClaimSqlClient({
+    connectionString,
+    schema: profile.schema,
+    module: options.nodePostgresModule,
+    loadModule: options.nodePostgresModuleLoader,
+  });
+  return new NexusPostgresWorkItemClaimAuthority({ client });
+}
+
+function loadClaimAuthorityProfiles(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): NexusClaimAuthorityProfileConfig[] {
+  const homePath = options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+  try {
+    return loadNexusHomeConfigFile(
+      homePath,
+      validateNexusHomeConfigBase,
+    ).claimAuthorityProfiles ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function claimDiagnosticsFields(diagnostics: {

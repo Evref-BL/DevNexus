@@ -296,6 +296,76 @@ describe("home config primitives", () => {
     });
   });
 
+  it("validates host-local claim authority profiles without storing database secrets", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
+
+    expect(
+      createDefaultNexusHomeConfigBase(homePath, {
+        claimAuthorityProfiles: [
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+            schema: "dev_nexus",
+          },
+        ],
+      }).claimAuthorityProfiles,
+    ).toEqual([
+      {
+        id: "shared-claims",
+        backend: "postgres",
+        driver: "node_postgres",
+        connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+        schema: "dev_nexus",
+      },
+    ]);
+
+    expect(() =>
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        claimAuthorityProfiles: [
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+          },
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "OTHER_DATABASE_URL",
+          },
+        ],
+        projects: [],
+      }),
+    ).toThrow(/Claim authority profile id is duplicated/);
+
+    expect(() =>
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        claimAuthorityProfiles: [
+          {
+            id: "unsafe-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionString: "postgres://secret@example.invalid/db",
+          },
+        ],
+        projects: [],
+      }),
+    ).toThrow(/claimAuthorityProfiles\[0\]\.connectionString must not be stored/);
+  });
+
   it("validates host-local host overlays by stable host id", () => {
     const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
 

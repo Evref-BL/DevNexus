@@ -31,11 +31,23 @@ export interface NexusHomePathsConfig {
   workspacesRoot: string;
 }
 
+export type NexusClaimAuthorityProfileBackend = "postgres";
+export type NexusPostgresClaimAuthorityProfileDriver = "node_postgres";
+
+export interface NexusClaimAuthorityProfileConfig {
+  id: string;
+  backend: NexusClaimAuthorityProfileBackend;
+  driver: NexusPostgresClaimAuthorityProfileDriver;
+  connectionStringEnv: string;
+  schema: string | null;
+}
+
 export interface NexusHomeConfigBase {
   version: 1;
   paths: NexusHomePathsConfig;
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  claimAuthorityProfiles?: NexusClaimAuthorityProfileConfig[];
   hostOverlays?: NexusHomeHostOverlayConfig[];
   projects: NexusProjectReference[];
 }
@@ -45,6 +57,7 @@ export interface CreateDefaultNexusHomeConfigBaseOptions {
   workspacesRoot?: string;
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  claimAuthorityProfiles?: NexusClaimAuthorityProfileConfig[];
   hostOverlays?: NexusHomeHostOverlayConfig[];
 }
 
@@ -433,6 +446,78 @@ function validateHostingAuthProfiles(
   return authProfiles;
 }
 
+function validateClaimAuthorityProfileBackend(
+  value: unknown,
+  pathName: string,
+): NexusClaimAuthorityProfileBackend {
+  if (value === "postgres") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be postgres`);
+}
+
+function validatePostgresClaimAuthorityProfileDriver(
+  value: unknown,
+  pathName: string,
+): NexusPostgresClaimAuthorityProfileDriver {
+  if (value === "node_postgres") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be node_postgres`);
+}
+
+function validateClaimAuthorityProfile(
+  value: unknown,
+  index: number,
+): NexusClaimAuthorityProfileConfig {
+  const pathName = `claimAuthorityProfiles[${index}]`;
+  const record = assertRecord(value, pathName);
+  if (record.connectionString !== undefined) {
+    throw new NexusConfigError(
+      `${pathName}.connectionString must not be stored in DevNexus home config; use ${pathName}.connectionStringEnv`,
+    );
+  }
+  return {
+    id: requiredString(record, "id", pathName),
+    backend: validateClaimAuthorityProfileBackend(
+      record.backend,
+      `${pathName}.backend`,
+    ),
+    driver: validatePostgresClaimAuthorityProfileDriver(
+      record.driver,
+      `${pathName}.driver`,
+    ),
+    connectionStringEnv: requiredString(record, "connectionStringEnv", pathName),
+    schema: optionalString(record, "schema", pathName) ?? null,
+  };
+}
+
+function validateClaimAuthorityProfiles(
+  value: unknown,
+): NexusClaimAuthorityProfileConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("claimAuthorityProfiles must be an array");
+  }
+
+  const profiles = value.map(validateClaimAuthorityProfile);
+  const ids = new Set<string>();
+  for (const profile of profiles) {
+    if (ids.has(profile.id)) {
+      throw new NexusConfigError(
+        `Claim authority profile id is duplicated: ${profile.id}`,
+      );
+    }
+    ids.add(profile.id);
+  }
+
+  return profiles;
+}
+
 function validateHomeHostTransport(
   value: unknown,
   overlayPathName: string,
@@ -633,6 +718,11 @@ export function createDefaultNexusHomeConfigBase(
   if (options.authProfiles) {
     config.authProfiles = validateHostingAuthProfiles(options.authProfiles);
   }
+  if (options.claimAuthorityProfiles) {
+    config.claimAuthorityProfiles = validateClaimAuthorityProfiles(
+      options.claimAuthorityProfiles,
+    );
+  }
   if (options.hostOverlays) {
     config.hostOverlays = validateHomeHostOverlays(options.hostOverlays);
   }
@@ -652,6 +742,9 @@ export function validateNexusHomeConfigBase(
   const paths = assertRecord(record.paths, "paths");
   const agent = validateNexusAgentConfig(record.agent, "agent");
   const authProfiles = validateHostingAuthProfiles(record.authProfiles);
+  const claimAuthorityProfiles = validateClaimAuthorityProfiles(
+    record.claimAuthorityProfiles,
+  );
   const hostOverlays = validateHomeHostOverlays(record.hostOverlays);
   const config: NexusHomeConfigBase = {
     version: 1,
@@ -667,6 +760,9 @@ export function validateNexusHomeConfigBase(
   }
   if (authProfiles) {
     config.authProfiles = authProfiles;
+  }
+  if (claimAuthorityProfiles) {
+    config.claimAuthorityProfiles = claimAuthorityProfiles;
   }
   if (hostOverlays) {
     config.hostOverlays = hostOverlays;

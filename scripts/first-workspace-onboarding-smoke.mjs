@@ -343,11 +343,13 @@ function runDevNexus(runtimeRoot, args, env) {
 }
 
 function run(command, args, options) {
-  const result = spawnSync(command, args, {
+  const spawnTarget = commandSpawnTarget(command, args);
+  const result = spawnSync(spawnTarget.command, spawnTarget.args, {
     cwd: options.cwd,
     env: options.env ?? process.env,
     encoding: "utf8",
     stdio: "pipe",
+    windowsHide: true,
   });
   if (result.error) {
     throw result.error;
@@ -367,6 +369,28 @@ function run(command, args, options) {
     stdout: result.stdout,
     stderr: result.stderr,
   };
+}
+
+function commandSpawnTarget(command, args) {
+  if (
+    process.platform === "win32" &&
+    [".bat", ".cmd"].includes(path.extname(command).toLowerCase())
+  ) {
+    return {
+      command: envValue("COMSPEC") ?? "cmd.exe",
+      args: ["/d", "/s", "/c", command, ...args],
+    };
+  }
+
+  return { command, args };
+}
+
+function envValue(key) {
+  const match = Object.entries(process.env).find(
+    ([envKey]) => envKey.toLowerCase() === key.toLowerCase(),
+  );
+
+  return match?.[1];
 }
 
 function readJson(filePath) {

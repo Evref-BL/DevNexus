@@ -26,6 +26,8 @@ publication rules agents need before they edit code.
 
 - [Agent workflows](user/agent-workflows.md) covers worktrees, automation loops,
   result files, and coordination handoffs.
+- [PostgreSQL claim authority](user/postgresql-claim-authority.md) explains how
+  to opt into strong multi-host work-item claims.
 - [Publication workflows](user/publication-workflows.md) covers review handoff,
   green-main checks, release trains, feature branch delivery, and finalization
   gates.
@@ -40,6 +42,9 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [PostgreSQL claim authority initiative](dev/postgresql-claim-authority.md)
+  tracks the long-lived design and slice plan for strong multi-host claim
+  coordination.
 - [Review policy design](dev/review-policy.md) records the source-backed
   concept for local, provider, and gated review behavior.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the

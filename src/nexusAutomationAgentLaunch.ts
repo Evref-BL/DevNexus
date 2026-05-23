@@ -79,12 +79,21 @@ import type {
 } from "./nexusAutomationEligibleWorkItems.js";
 import {
   claimNexusEligibleWorkItem,
-  type NexusWorkItemClaimObservation,
+  verifyNexusWorkItemAuthorityClaim,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusWorkItemClaimOwner,
   type NexusWorkItemClaimOwnerInput,
-  type NexusWorkItemClaimResult,
-  type NexusWorkItemClaimSkippedCandidate,
 } from "./nexusWorkItemClaim.js";
+import {
+  automationComponentEligibleWorkItemsForClaim as componentEligibleWorkItemsForClaim,
+  automationWorkItemClaimFromResult as agentLaunchWorkItemClaim,
+  automationWorkItemClaimSkipSummary,
+  blockedAutomationWorkItemClaim as blockedWorkItemClaim,
+  disabledAutomationWorkItemClaim as disabledWorkItemClaim,
+  type NexusAutomationWorkItemClaim,
+  type NexusAutomationWorkItemClaimStatus,
+} from "./nexusAutomationWorkItemClaimContext.js";
 import {
   buildNexusExternalIssueVisibilitySummary,
   type NexusExternalIssueVisibilitySummary,
@@ -182,22 +191,10 @@ export type {
 } from "./nexusAutomationEligibleWorkItems.js";
 
 export type NexusAutomationAgentLaunchWorkItemClaimStatus =
-  NexusWorkItemClaimResult["status"] | "blocked" | "disabled";
+  NexusAutomationWorkItemClaimStatus;
 
-export interface NexusAutomationAgentLaunchWorkItemClaim {
-  status: NexusAutomationAgentLaunchWorkItemClaimStatus;
-  reason: string | null;
-  componentId: string | null;
-  trackerId: string | null;
-  workItemId: string | null;
-  logicalWorkItemId: string | null;
-  workItemTitle: string | null;
-  owner: NexusWorkItemClaimOwner | null;
-  reclaimedFrom: NexusWorkItemClaimObservation | null;
-  skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-  activeClaims: NexusWorkItemClaimObservation[];
-  staleClaims: NexusWorkItemClaimObservation[];
-}
+export type NexusAutomationAgentLaunchWorkItemClaim =
+  NexusAutomationWorkItemClaim;
 
 export interface NexusAutomationAgentLaunchContext {
   version: 1;
@@ -314,6 +311,7 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   workItemClaimOwner?: NexusWorkItemClaimOwnerInput;
+  claimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
@@ -730,6 +728,7 @@ export async function runNexusAutomationAgentLaunchOnce(
           projectConfig,
           components,
           automationConfig,
+          homePath: options.homePath,
           selectorQuery,
           mode: options.eligibleWorkMode ?? automationConfig.eligibleWorkMode,
           provider: options.provider,
@@ -740,6 +739,7 @@ export async function runNexusAutomationAgentLaunchOnce(
           }),
           providerOptions: options.providerOptions,
           env: discoveryEnv,
+          claimAuthority: options.claimAuthority,
           owner: workItemClaimOwner({
             options,
             runId,
@@ -758,7 +758,10 @@ export async function runNexusAutomationAgentLaunchOnce(
           });
         } else {
           const finishedAt = currentIso(options.now);
-          const summary = workItemClaimSkipSummary(workItemClaim);
+          const summary = automationWorkItemClaimSkipSummary(
+            workItemClaim,
+            "coordinator launch",
+          );
           ledger = appendNexusAutomationRunRecord({
             projectRoot,
             config: automationConfig,
@@ -880,7 +883,7 @@ export async function runNexusAutomationAgentLaunchOnce(
     contextFile = launchFiles.contextFile;
     resultFile = launchFiles.resultFile;
 
-    const agentResult = await options.launcher({
+    let agentResult = await options.launcher({
       runId,
       startedAt,
       projectRoot,
@@ -899,8 +902,19 @@ export async function runNexusAutomationAgentLaunchOnce(
       contextFile,
       resultFile,
     });
-    const status = normalizeAgentStatus(agentResult.status);
     const finishedAt = currentIso(options.now);
+    agentResult = await verifyCompletedAgentLaunchClaim({
+      projectRoot,
+      projectConfig,
+      automationConfig,
+      homePath: options.homePath,
+      env: options.env,
+      claimAuthority: options.claimAuthority,
+      workItemClaim,
+      agentResult,
+      finishedAt,
+    });
+    const status = normalizeAgentStatus(agentResult.status);
     const summary = agentResult.summary ?? defaultAgentSummary(status);
     ledger = appendNexusAutomationRunRecord({
       projectRoot,
@@ -1159,6 +1173,7 @@ function preflightNexusAutomationAgentPolicy(
       `Agent subagent cap is ${policy.maxConcurrentSubagents}`,
       "automation.agent.maxConcurrentSubagents must be a positive integer",
     ),
+    workItemClaimLeaseCoversAgentTimeoutCheck(automationConfig, policy),
   ];
 
   if (!policy.coordinatorProfileId) {
@@ -1215,6 +1230,51 @@ function preflightNexusAutomationAgentPolicy(
   }
 
   return checks;
+}
+
+function workItemClaimLeaseCoversAgentTimeoutCheck(
+  automationConfig: NexusAutomationConfig,
+  policy: NexusAutomationAgentPolicy,
+): NexusAutomationPreflightCheck {
+  const leaseDurationMs = automationConfig.workItemClaims.leaseDurationMs;
+  const timeoutMs = automationConfig.agent.timeoutMs;
+  const hasConfiguredSynchronousCommand =
+    automationConfig.agent.command !== null ||
+    (
+      policy.coordinatorProfile !== null &&
+      policy.coordinatorProfile.executorMode !== "app_server"
+    );
+  if (!automationConfig.workItemClaims.enabled) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "passed",
+      message: "Work-item claims are disabled; lease coverage is not required",
+    };
+  }
+  if (timeoutMs === null && !hasConfiguredSynchronousCommand) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "passed",
+      message:
+        "No configured synchronous agent timeout; launcher-specific claim lease coverage applies",
+    };
+  }
+  if (timeoutMs === null) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "failed",
+      message:
+        "automation.agent.timeoutMs must be set and less than automation.workItemClaims.leaseDurationMs because synchronous agent commands cannot heartbeat while running",
+    };
+  }
+
+  const covered = timeoutMs < leaseDurationMs;
+  return check(
+    "workItemClaim:leaseCoversAgentTimeout",
+    covered,
+    `Work-item claim lease ${leaseDurationMs}ms exceeds agent timeout ${timeoutMs}ms`,
+    "automation.agent.timeoutMs must be less than automation.workItemClaims.leaseDurationMs because synchronous agent commands cannot heartbeat while running",
+  );
 }
 
 export function generateNexusAutomationAgentRunId(
@@ -1302,136 +1362,70 @@ function workItemClaimOwner(options: {
   };
 }
 
-function agentLaunchWorkItemClaim(
-  claim: NexusWorkItemClaimResult,
-): NexusAutomationAgentLaunchWorkItemClaim {
-  if (claim.status === "claimed") {
-    return {
-      status: "claimed",
-      reason: null,
-      componentId: claim.componentId,
-      trackerId: claim.trackerId,
-      workItemId: claim.workItem.id,
-      logicalWorkItemId: claim.workItem.externalRef?.itemId ?? claim.workItem.id,
-      workItemTitle: claim.workItem.title,
-      owner: claim.owner,
-      reclaimedFrom: claim.reclaimedFrom ?? null,
-      skippedCandidates: claim.skippedCandidates,
-      activeClaims: claim.activeClaims ?? [],
-      staleClaims: claim.staleClaims ?? [],
-    };
+async function verifyCompletedAgentLaunchClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
+  agentResult: NexusAutomationAgentLaunchResult;
+  finishedAt: string;
+}): Promise<NexusAutomationAgentLaunchResult> {
+  const status = normalizeAgentStatus(options.agentResult.status);
+  const workItemClaim = options.workItemClaim;
+  const authorityClaim = workItemClaim?.authorityClaim;
+  if (status !== "completed" || !authorityClaim) {
+    return options.agentResult;
   }
 
-  if (claim.status === "lost_race") {
-    return {
-      status: "lost_race",
-      reason: claim.reason,
-      componentId: claim.componentId,
-      trackerId: claim.trackerId,
-      workItemId: claim.candidate.id,
-      logicalWorkItemId: claim.candidate.externalRef?.itemId ?? claim.candidate.id,
-      workItemTitle: claim.candidate.title,
-      owner: claim.owner,
-      reclaimedFrom: claim.reclaimedFrom ?? null,
-      skippedCandidates: claim.skippedCandidates,
-      activeClaims: claim.activeClaims ?? [],
-      staleClaims: claim.staleClaims ?? [],
-    };
-  }
+  try {
+    const verification = await verifyNexusWorkItemAuthorityClaim({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      automationConfig: options.automationConfig,
+      homePath: options.homePath,
+      env: options.env,
+      claimAuthority: options.claimAuthority,
+      authorityClaim,
+      now: () => options.finishedAt,
+    });
+    if (verification.status === "verified") {
+      workItemClaim.authorityClaim = verification.claim;
+      return options.agentResult;
+    }
 
+    return failedCompletedAgentLaunchClaim({
+      agentResult: options.agentResult,
+      summary: `Completed agent result rejected because authority claim verification failed: ${verification.status}`,
+    });
+  } catch (error) {
+    return failedCompletedAgentLaunchClaim({
+      agentResult: options.agentResult,
+      summary: `Completed agent result rejected because authority claim verification failed: ${errorMessage(error)}`,
+    });
+  }
+}
+
+function failedCompletedAgentLaunchClaim(options: {
+  agentResult: NexusAutomationAgentLaunchResult;
+  summary: string;
+}): NexusAutomationAgentLaunchResult {
   return {
-    status: "no_claim",
-    reason: claim.reason,
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    reclaimedFrom: null,
-    skippedCandidates: claim.skippedCandidates,
-    activeClaims: claim.activeClaims ?? [],
-    staleClaims: claim.staleClaims ?? [],
+    ...options.agentResult,
+    status: "failed",
+    summary: options.summary,
+    verification: [
+      ...(options.agentResult.verification ?? []),
+      {
+        command: "DevNexus authority claim verification",
+        status: "failed",
+        summary: options.summary,
+      },
+    ],
+    error: options.summary,
   };
-}
-
-function disabledWorkItemClaim(): NexusAutomationAgentLaunchWorkItemClaim {
-  return {
-    status: "disabled",
-    reason: "disabled_by_project_policy",
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    reclaimedFrom: null,
-    skippedCandidates: [],
-    activeClaims: [],
-    staleClaims: [],
-  };
-}
-
-function blockedWorkItemClaim(
-  reason: string,
-): NexusAutomationAgentLaunchWorkItemClaim {
-  return {
-    status: "blocked",
-    reason,
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    reclaimedFrom: null,
-    skippedCandidates: [],
-    activeClaims: [],
-    staleClaims: [],
-  };
-}
-
-function componentEligibleWorkItemsForClaim(options: {
-  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
-  claim: Extract<NexusWorkItemClaimResult, { status: "claimed" }>;
-}): NexusAutomationComponentEligibleWorkItems[] {
-  const existing = options.componentEligibleWorkItems.find(
-    (component) => component.componentId === options.claim.componentId,
-  );
-  return [
-    {
-      componentId: options.claim.componentId,
-      workItems: [options.claim.workItem],
-      ...(existing?.importCandidateWorkItems
-        ? { importCandidateWorkItems: existing.importCandidateWorkItems }
-        : {}),
-      ...(existing?.excludedWorkItems
-        ? { excludedWorkItems: existing.excludedWorkItems }
-        : {}),
-      ...(existing?.warnings ? { warnings: existing.warnings } : {}),
-      ...(existing?.blockers ? { blockers: existing.blockers } : {}),
-      ...(existing?.trackerResults ? { trackerResults: existing.trackerResults } : {}),
-    },
-  ];
-}
-
-function workItemClaimSkipSummary(
-  claim: NexusAutomationAgentLaunchWorkItemClaim,
-): string {
-  if (claim.status === "lost_race") {
-    return `Work-item claim lost race for ${claim.workItemId ?? "candidate"}; coordinator launch skipped`;
-  }
-  if (claim.reason === "active_claims") {
-    return "Eligible work is already claimed by another owner";
-  }
-  if (claim.reason === "stale_claims") {
-    return "Eligible work has stale claims and reclaim policy is disabled";
-  }
-  if (claim.reason === "candidates_not_claimable") {
-    return "Eligible work items were not claimable";
-  }
-
-  return "No eligible work item could be claimed";
 }
 
 function buildAgentLaunchContext(
@@ -1669,11 +1663,21 @@ function agentLaunchEnvironment(
     DEV_NEXUS_CLAIMED_WORK_ITEM_ID: input.workItemClaim?.workItemId ?? "",
     DEV_NEXUS_CLAIM_COMPONENT_ID: input.workItemClaim?.componentId ?? "",
     DEV_NEXUS_CLAIM_TRACKER_ID: input.workItemClaim?.trackerId ?? "",
+    DEV_NEXUS_CLAIM_LEASE_DURATION_MS:
+      input.automationConfig.workItemClaims.leaseDurationMs.toString(),
+    DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS:
+      input.automationConfig.workItemClaims.heartbeatIntervalMs.toString(),
     DEV_NEXUS_CLAIM_LEASE_TOKEN: input.workItemClaim?.owner?.leaseToken ?? "",
     DEV_NEXUS_CLAIM_HOST_ID: input.workItemClaim?.owner?.hostId ?? "",
     DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",
     DEV_NEXUS_CLAIM_OWNER_ID: input.workItemClaim?.owner?.ownerId ?? "",
     DEV_NEXUS_CLAIM_EXPIRES_AT: input.workItemClaim?.owner?.expiresAt ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_KIND:
+      input.workItemClaim?.authorityClaim?.authorityKind ?? "",
+    DEV_NEXUS_CLAIM_FENCING_TOKEN:
+      input.workItemClaim?.authorityClaim?.fencingToken.toString() ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_STATE:
+      input.workItemClaim?.authorityClaim?.state ?? "",
   };
 }
 

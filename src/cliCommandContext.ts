@@ -11,7 +11,10 @@ import type {
   NexusDashboardServerHandle,
   startNexusDashboardServer,
 } from "./nexusDashboardServer.js";
-import type { NexusEligibleWorkClaimProviderFactory } from "./nexusWorkItemClaim.js";
+import type {
+  NexusEligibleWorkClaimProviderFactory,
+  NexusWorkItemClaimAuthority,
+} from "./nexusWorkItemClaim.js";
 import {
   assertNexusSharedCheckoutMutationAllowed,
   parseNexusSharedCheckoutGuardOverride,
@@ -41,6 +44,7 @@ export interface DevNexusCliDependencies {
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
 }
 

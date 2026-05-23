@@ -20,6 +20,9 @@ import {
   type GitRunner,
   type NexusAutomationConfig,
   type NexusAutomationCommandRunner,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
   type WorkTrackerProvider,
@@ -28,11 +31,19 @@ import {
 const tempDirs: string[] = [];
 
 function projectedDevNexusMcpToml(): string {
-  return `[mcp_servers.dev_nexus]\ncommand = "node"\nargs = ["${currentNexusCliScriptPath()}", "mcp-stdio"]\n`;
+  return `[mcp_servers.dev_nexus]\ncommand = ${tomlString("node")}\nargs = [${
+    [currentNexusCliScriptPath(), "mcp-stdio"].map(tomlString).join(", ")
+  }]\n`;
 }
 
 function expectedProjectedDevNexusMcpCommandLine(): string {
-  return `"node" "${currentNexusCliScriptPath()}" "mcp-stdio"`;
+  return ["node", currentNexusCliScriptPath(), "mcp-stdio"]
+    .map((part) => JSON.stringify(part))
+    .join(" ");
+}
+
+function tomlString(value: string): string {
+  return JSON.stringify(value);
 }
 
 function runNexusAutomationAgentLaunchOnce(
@@ -842,6 +853,8 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_CLAIMED_WORK_ITEM_ID).toBe("local-1");
       expect(options.env.DEV_NEXUS_CLAIM_COMPONENT_ID).toBe("primary");
       expect(options.env.DEV_NEXUS_CLAIM_TRACKER_ID).toBe("default");
+      expect(options.env.DEV_NEXUS_CLAIM_LEASE_DURATION_MS).toBe("3600000");
+      expect(options.env.DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS).toBe("1200000");
       expect(options.env.DEV_NEXUS_CLAIM_LEASE_TOKEN).toBe("lease-agent-1");
       expect(options.env.DEV_NEXUS_CLAIM_HOST_ID).toBe("host-a");
       expect(options.env.DEV_NEXUS_CLAIM_AGENT_ID).toBe("agent-claim-1");
@@ -936,6 +949,272 @@ describe("nexus automation agent launch", () => {
       workItemId: "local-1",
       workItemTitle: "Claim before launch",
       status: "completed",
+    });
+  });
+
+  it("passes verified authority fencing facts to launched agents", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Authority claim context",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 77);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "verified",
+          claim: authorityClaim!,
+        };
+      },
+    };
+
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      expect(options.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS).toBe("claimed");
+      expect(options.env.DEV_NEXUS_CLAIM_AUTHORITY_KIND).toBe("test-authority");
+      expect(options.env.DEV_NEXUS_CLAIM_FENCING_TOKEN).toBe("77");
+      expect(options.env.DEV_NEXUS_CLAIM_AUTHORITY_STATE).toBe("active");
+
+      const context = JSON.parse(
+        fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
+      );
+      expect(context.workItemClaim).toMatchObject({
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 77,
+          state: "active",
+          owner: {
+            leaseToken: "lease-authority-1",
+          },
+        },
+      });
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator saw authority fencing",
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "launched",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-authority-claim",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-authority-1",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      workItemClaim: {
+        status: "claimed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 77,
+        },
+      },
+    });
+  });
+
+  it("skips launch when an authority-backed claim cannot be verified", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Authority claim rejected",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 78);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "token_mismatch",
+          claim: authorityClaim ?? undefined,
+        };
+      },
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-authority-claim-rejected",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-authority-rejected",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "skipped",
+      summary: expect.stringContaining("lost race"),
+      launch: null,
+      workItemClaim: {
+        status: "lost_race",
+        reason: "verification_failed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 78,
+        },
+      },
+    });
+  });
+
+  it("fails completed launches when the authority claim is no longer current", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Authority claim expires before completion",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    let verificationCount = 0;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 79);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        verificationCount += 1;
+        if (!authorityClaim) {
+          return { status: "missing" };
+        }
+        if (verificationCount > 1) {
+          return {
+            status: "expired",
+            claim: authorityClaim,
+          };
+        }
+
+        return {
+          status: "verified",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-authority-completion-expired",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-authority-expired",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => ({
+        status: "completed",
+        summary: "Stale worker completed after its lease expired",
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary: expect.stringContaining(
+        "authority claim verification failed: expired",
+      ),
+      launch: {
+        status: "failed",
+        verification: expect.arrayContaining([
+          expect.objectContaining({
+            command: "DevNexus authority claim verification",
+            status: "failed",
+          }),
+        ]),
+      },
+      workItemClaim: {
+        status: "claimed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 79,
+        },
+      },
+    });
+    expect(
+      readNexusAutomationRunLedger(projectRoot, loadProjectConfig(projectRoot).automation!)
+        .runs.at(-1),
+    ).toMatchObject({
+      id: "agent-authority-completion-expired",
+      status: "failed",
+      verification: expect.arrayContaining([
+        expect.objectContaining({
+          command: "DevNexus authority claim verification",
+          status: "failed",
+        }),
+      ]),
     });
   });
 
@@ -1039,6 +1318,79 @@ describe("nexus automation agent launch", () => {
       preflight: expect.arrayContaining([
         expect.objectContaining({
           name: "workItemClaim",
+          status: "failed",
+        }),
+      ]),
+    });
+  });
+
+  it("blocks synchronous agent launches that can outlive the claim lease", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          timeoutMs: 60 * 60 * 1000,
+        },
+        workItemClaims: {
+          ...projectConfig().automation!.workItemClaims,
+          leaseDurationMs: 30 * 60 * 1000,
+          heartbeatIntervalMs: 10 * 60 * 1000,
+        },
+      },
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-lease-timeout-block",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      preflight: expect.arrayContaining([
+        expect.objectContaining({
+          name: "workItemClaim:leaseCoversAgentTimeout",
+          status: "failed",
+        }),
+      ]),
+    });
+  });
+
+  it("blocks synchronous agent launches without a claim-bounded timeout", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          timeoutMs: null,
+        },
+      },
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-lease-timeout-missing-block",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      preflight: expect.arrayContaining([
+        expect.objectContaining({
+          name: "workItemClaim:leaseCoversAgentTimeout",
           status: "failed",
         }),
       ]),
@@ -1779,3 +2131,34 @@ describe("nexus automation agent launch", () => {
     });
   });
 });
+
+function testAuthorityClaim(
+  input: NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  fencingToken: number,
+): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: input.projectId,
+      componentId: input.candidate.componentId,
+      trackerId: input.tracker.id,
+      provider: input.ref.provider ?? input.candidate.provider,
+      workItemId: input.ref.id ?? input.candidate.id,
+      ...(input.ref.externalRef?.repositoryOwner
+        ? { repositoryOwner: input.ref.externalRef.repositoryOwner }
+        : {}),
+      ...(input.ref.externalRef?.repositoryName
+        ? { repositoryName: input.ref.externalRef.repositoryName }
+        : {}),
+      ...(input.ref.externalRef?.itemNumber
+        ? { itemNumber: input.ref.externalRef.itemNumber }
+        : {}),
+    },
+    owner: input.owner,
+    fencingToken,
+    state: "active",
+    claimedAt: input.owner.claimedAt,
+    expiresAt: input.owner.expiresAt,
+    lastHeartbeatAt: input.now.toISOString(),
+  };
+}

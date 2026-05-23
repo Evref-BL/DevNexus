@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +9,7 @@ import {
   defaultNexusFeatureBranchDeliveryConfig,
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
+  NexusReviewPolicyEnforcementError,
   pushNexusPublicationBranchForComponent,
   saveProjectConfig,
   saveNexusHomeConfigFile,
@@ -73,6 +75,36 @@ describe("publication operations", () => {
         cwd: sourceRoot,
         token: "installation-token",
       }),
+    ]);
+  });
+
+  it("warns when a review branch tracks a non-policy upstream remote", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    initGitRepositoryWithUpstream({
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/app-publication-cli",
+      upstreamRemote: "bot",
+    });
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/app-publication-cli",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args) => ({
+        args: [...args],
+        stdout: "",
+        stderr: "Everything up-to-date",
+        exitCode: 0,
+      }),
+    });
+
+    expect(result.credential.profileId).toBe("dev-nexus-app-github");
+    expect(result.push.plan.remote).toBe("https://github.com/Evref-BL/DevNexus.git");
+    expect(result.warnings).toEqual([
+      "Branch codex/dev-nexus/app-publication-cli tracks remote bot, not configured publication remote app.",
     ]);
   });
 
@@ -795,6 +827,186 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("blocks pull request merges when configured review policy is not satisfied", async () => {
+    const { projectRoot, homePath } = createPublicationProject();
+    saveProjectConfig(projectRoot, publicationProjectConfigWithReview(homePath));
+    const requests: Array<{ pathname: string; method: string }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = new URL(String(input));
+      requests.push({
+        pathname: url.pathname,
+        method: init?.method ?? "GET",
+      });
+      if (url.pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add review policy enforcement",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "feat/component-review-policy",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 24 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    await expect(
+      mergeNexusPublicationPullRequestForComponent({
+        projectRoot,
+        number: 191,
+        method: "squash",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      }),
+    ).rejects.toMatchObject({
+      name: "NexusReviewPolicyEnforcementError",
+      decision: {
+        status: "blocked",
+        requestedAction: "provider.pull_request.merge",
+        reviewPlan: {
+          status: "review_required",
+          transport: "pull_request",
+          matchedRuleIndex: 0,
+        },
+      },
+    });
+    expect(requests.map((request) => `${request.method} ${request.pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls/191",
+        "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
+        "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
+      ]);
+  });
+
+  it("allows pull request merges after configured provider review gates pass", async () => {
+    const { projectRoot, homePath } = createPublicationProject();
+    saveProjectConfig(projectRoot, publicationProjectConfigWithReview(homePath));
+    const requests: Array<{ pathname: string; method: string }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = new URL(String(input));
+      requests.push({
+        pathname: url.pathname,
+        method: init?.method ?? "GET",
+      });
+      if (url.pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add review policy enforcement",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "feat/component-review-policy",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 24 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/pulls/191/merge")) {
+        return new Response(
+          JSON.stringify({
+            merged: true,
+            sha: "merge-commit",
+            message: "Pull Request successfully merged",
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const result = await mergeNexusPublicationPullRequestForComponent({
+      projectRoot,
+      number: 191,
+      method: "squash",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.reviewEnforcement).toMatchObject({
+      status: "allowed",
+      requestedAction: "provider.pull_request.merge",
+      reviewPlan: {
+        status: "ready",
+        matchedRuleIndex: 0,
+      },
+    });
+    expect(result.merge.merged).toBe(true);
+    expect(requests.map((request) => `${request.method} ${request.pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls/191",
+        "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
+        "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
+        "PUT /repos/Evref-BL/DevNexus/pulls/191/merge",
+      ]);
+  });
+
   it("blocks direct target-branch pushes when green-main policy requires a pull request", async () => {
     const { projectRoot, sourceRoot } = createPublicationProject();
 
@@ -812,6 +1024,37 @@ describe("publication operations", () => {
         },
       }),
     ).rejects.toThrow(/blocks direct pushes to target branch main/u);
+  });
+
+  it("blocks direct target-branch pushes when component review policy is unsatisfied", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(projectRoot, publicationProjectConfigWithReview(
+      homePath,
+      {
+        push: true,
+        directTargetPush: "allowed",
+        review: {
+          default: {
+            transport: "local",
+            gates: ["human_required"],
+          },
+        },
+      },
+    ));
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "main",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: () => {
+          throw new Error("git should not run");
+        },
+      }),
+    ).rejects.toBeInstanceOf(NexusReviewPolicyEnforcementError);
   });
 });
 
@@ -1154,6 +1397,155 @@ describe("publication CLI operations", () => {
     ]);
   });
 
+  it("dry-runs pull request upserts through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("dry-run should not call the provider");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "upsert",
+        projectRoot,
+        "--head",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        "Use DevNexus App credentials for publication.",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      dryRun: true,
+      pullRequest: null,
+      plan: {
+        operation: "create",
+        head: "codex/dev-nexus/app-publication-cli",
+        base: "main",
+        title: "Add App publication commands",
+        bodyProvided: true,
+        draft: false,
+      },
+      credential: {
+        profileId: "dev-nexus-app-github",
+        kind: "github_app",
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
+  it("dry-runs component pull request upserts with App credentials in a dogfood-shaped workspace", async () => {
+    const { projectRoot } = createMultiComponentPublicationProject();
+
+    const result = await upsertNexusPublicationPullRequestForComponent({
+      projectRoot,
+      componentId: "dev-nexus",
+      head: "codex/dev-nexus/app-publication-cli",
+      title: "Add App publication commands",
+      dryRun: true,
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: async () => {
+        throw new Error("dry-run should not call the provider");
+      },
+    });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.repository).toMatchObject({
+      owner: "Evref-BL",
+      name: "DevNexus",
+    });
+    expect(result.credential).toMatchObject({
+      profileId: "dev-nexus-app-github",
+      actorId: "dev-nexus-automation-app",
+      account: "devnexus-automation",
+      kind: "github_app",
+    });
+    expect(result.plan).toMatchObject({
+      operation: "create",
+      head: "codex/dev-nexus/app-publication-cli",
+      base: "main",
+    });
+    expect(result.pullRequest).toBeNull();
+  });
+
+  it("dry-runs review handoff through configured branch push and pull request planning", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("dry-run should not call the provider");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        "Use DevNexus App credentials for publication.",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdout.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      dryRun: true,
+      branchPush: {
+        dryRun: true,
+        credential: {
+          profileId: "dev-nexus-app-github",
+        },
+        push: {
+          plan: {
+            remote: "https://github.com/Evref-BL/DevNexus.git",
+            refspec: "codex/dev-nexus/app-publication-cli",
+          },
+        },
+      },
+      pullRequest: {
+        dryRun: true,
+        plan: {
+          operation: "create",
+          head: "codex/dev-nexus/app-publication-cli",
+          base: "main",
+        },
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
   it("normalizes escaped line breaks in inline pull request bodies", async () => {
     const { projectRoot } = createPublicationProject();
     const stdout = textWriter();
@@ -1370,6 +1762,89 @@ describe("publication CLI operations", () => {
       },
     ]);
   });
+
+  it("prints review policy merge blockers as structured JSON", async () => {
+    const { projectRoot, homePath } = createPublicationProject();
+    saveProjectConfig(projectRoot, publicationProjectConfigWithReview(homePath));
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add review policy enforcement",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "feat/component-review-policy",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 24 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "merge",
+        projectRoot,
+        "--number",
+        "191",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      error: {
+        code: "review_policy_blocked",
+      },
+      reviewEnforcement: {
+        status: "blocked",
+        requestedAction: "provider.pull_request.merge",
+      },
+      reviewPlan: {
+        status: "review_required",
+        transport: "pull_request",
+      },
+    });
+  });
 });
 
 function createPublicationProject(): { projectRoot: string; homePath: string; sourceRoot: string } {
@@ -1522,6 +1997,67 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
   };
 }
 
+function publicationProjectConfigWithReview(
+  homePath: string,
+  options: {
+    push?: boolean;
+    directTargetPush?: "allowed" | "blocked";
+    review?: NonNullable<NexusProjectConfig["components"]>[number]["review"];
+  } = {},
+): NexusProjectConfig {
+  const base = publicationProjectConfig(homePath);
+  return {
+    ...base,
+    automation: {
+      ...base.automation,
+      publication: {
+        ...base.automation!.publication,
+        push: options.push ?? base.automation!.publication.push,
+        greenMain: {
+          ...(base.automation!.publication.greenMain ?? {}),
+          ...(options.directTargetPush
+            ? { directTargetPush: options.directTargetPush }
+            : {}),
+        },
+      },
+    },
+    components: [
+      {
+        id: "primary",
+        name: "Publication Project",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+        workTracking: {
+          provider: "github",
+          repository: {
+            owner: "Evref-BL",
+            name: "DevNexus",
+          },
+        },
+        review: options.review ?? {
+          default: {
+            transport: "local",
+            gates: ["human_required"],
+          },
+          rules: [
+            {
+              match: {
+                branchRole: "feature_finalization",
+              },
+              transport: "pull_request",
+              gates: ["provider_approval_required", "ci_required"],
+            },
+          ],
+        },
+        relationships: [],
+      },
+    ],
+  };
+}
+
 function featureFallbackPublicationProjectConfig(
   homePath: string,
   strategy:
@@ -1601,6 +2137,52 @@ function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
   return tempDir;
+}
+
+function initGitRepositoryWithUpstream(options: {
+  repositoryPath: string;
+  branch: string;
+  upstreamRemote: string;
+}): void {
+  runGit(options.repositoryPath, ["init"]);
+  runGit(options.repositoryPath, ["checkout", "--orphan", options.branch]);
+  fs.writeFileSync(path.join(options.repositoryPath, "README.md"), "test\n", "utf8");
+  runGit(options.repositoryPath, ["add", "README.md"]);
+  runGit(options.repositoryPath, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "Initial commit",
+  ]);
+  runGit(options.repositoryPath, [
+    "remote",
+    "add",
+    options.upstreamRemote,
+    "git@github.com:Gabot-Darbot/DevNexus.git",
+  ]);
+  runGit(options.repositoryPath, [
+    "config",
+    `branch.${options.branch}.remote`,
+    options.upstreamRemote,
+  ]);
+  runGit(options.repositoryPath, [
+    "config",
+    `branch.${options.branch}.merge`,
+    `refs/heads/${options.branch}`,
+  ]);
+}
+
+function runGit(repositoryPath: string, args: string[]): void {
+  const command = spawnSync("git", args, {
+    cwd: repositoryPath,
+    encoding: "utf8",
+  });
+  if (command.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${command.stderr}`);
+  }
 }
 
 function textWriter(): { write(chunk: string): boolean; output(): string } {

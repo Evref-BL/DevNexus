@@ -40,7 +40,11 @@ import {
   type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
+import {
+  NexusReviewPolicyEnforcementError,
+} from "./nexusReviewPolicyEnforcement.js";
 import type { NexusPublicationGitPushRunner } from "./nexusPublicationPolicy.js";
+import type { NexusReviewLocalAuthorization } from "./nexusReviewPolicy.js";
 import {
   classifyNexusPublicationProviderEvidenceChecks,
   normalizeNexusPublicationProviderEvidence,
@@ -93,6 +97,9 @@ interface ParsedPublicationBranchPushCommand {
   featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
+  authorized?: boolean;
+  authorizationTimestamp?: string | null;
+  authorizationSummary?: string | null;
   dryRun?: boolean;
   json?: boolean;
 }
@@ -108,6 +115,25 @@ interface ParsedPublicationPullRequestUpsertCommand {
   body?: string | null;
   bodyFile?: string | null;
   draft?: boolean;
+  dryRun?: boolean;
+  json?: boolean;
+}
+
+interface ParsedPublicationReviewHandoffCommand {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  repositoryPath?: string;
+  branch: string;
+  base?: string | null;
+  title: string;
+  body?: string | null;
+  bodyFile?: string | null;
+  draft?: boolean;
+  featureId?: string | null;
+  forceWithLease?: boolean;
+  forceWithLeaseExpectedCommit?: string | null;
+  dryRun?: boolean;
   json?: boolean;
 }
 
@@ -117,6 +143,10 @@ interface ParsedPublicationPullRequestMergeCommand {
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+  branchRole?: string | null;
+  authorized?: boolean;
+  authorizationTimestamp?: string | null;
+  authorizationSummary?: string | null;
   json?: boolean;
 }
 
@@ -199,6 +229,7 @@ export async function handlePublicationCommand(
         featureId: parsed.featureId,
         forceWithLease: parsed.forceWithLease,
         forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+        localAuthorization: publicationLocalAuthorization(parsed),
         baseEnv: dependencies.env ?? process.env,
         fetch: dependencies.fetch,
         credentialCommandRunner: dependencies.credentialCommandRunner,
@@ -212,6 +243,14 @@ export async function handlePublicationCommand(
         printPublicationBranchPushBlockedError(
           error,
           parsed,
+          dependencies.stdout ?? process.stdout,
+        );
+        return 1;
+      }
+      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+        printPublicationReviewPolicyBlockedError(
+          error,
+          Boolean(parsed.dryRun),
           dependencies.stdout ?? process.stdout,
         );
         return 1;
@@ -238,6 +277,7 @@ export async function handlePublicationCommand(
       title: parsed.title,
       body: publicationPullRequestBody(parsed),
       draft: parsed.draft,
+      dryRun: parsed.dryRun,
       baseEnv: dependencies.env ?? process.env,
       fetch: dependencies.fetch,
       credentialCommandRunner: dependencies.credentialCommandRunner,
@@ -250,6 +290,50 @@ export async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "review-handoff") {
+    const parsed = parsePublicationReviewHandoffCommand(argv);
+    const branchPush = await pushNexusPublicationBranchForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
+      repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+      branch: parsed.branch,
+      featureId: parsed.featureId,
+      forceWithLease: parsed.forceWithLease,
+      forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+      gitRunner: parsed.dryRun
+        ? dryRunPublicationGitPushRunner
+        : dependencies.publicationGitPushRunner,
+      remoteProbeRunner: dependencies.publicationGitPushRunner,
+    });
+    const branchPushOk = parsed.dryRun || branchPush.push.git.exitCode === 0;
+    const pullRequest = branchPushOk
+      ? await upsertNexusPublicationPullRequestForComponent({
+          projectRoot: parsed.projectRoot,
+          componentId: parsed.componentId,
+          projectRepository: parsed.projectRepository,
+          head: parsed.branch,
+          base: parsed.base,
+          title: parsed.title,
+          body: publicationPullRequestBody(parsed),
+          draft: parsed.draft,
+          dryRun: parsed.dryRun,
+          baseEnv: dependencies.env ?? process.env,
+          fetch: dependencies.fetch,
+          credentialCommandRunner: dependencies.credentialCommandRunner,
+        })
+      : null;
+    printPublicationReviewHandoffResult(
+      { branchPush, pullRequest },
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return branchPushOk ? 0 : 1;
+  }
+
   if (argv[1] === "pull-request" && argv[2] === "merge") {
     const parsed = parsePublicationPullRequestMergeCommand(argv);
     const result = await mergeNexusPublicationPullRequestForComponent({
@@ -258,10 +342,25 @@ export async function handlePublicationCommand(
       projectRepository: parsed.projectRepository,
       number: parsed.number,
       method: parsed.method,
+      branchRole: parsed.branchRole,
+      localAuthorization: publicationLocalAuthorization(parsed),
       baseEnv: dependencies.env ?? process.env,
       fetch: dependencies.fetch,
       credentialCommandRunner: dependencies.credentialCommandRunner,
+    }).catch((error: unknown) => {
+      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+        printPublicationReviewPolicyBlockedError(
+          error,
+          false,
+          dependencies.stdout ?? process.stdout,
+        );
+        return null;
+      }
+      throw error;
     });
+    if (!result) {
+      return 1;
+    }
     printPublicationPullRequestMergeResult(
       result,
       parsed,
@@ -453,7 +552,7 @@ export async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
+    "publication requires branch-push, pull-request upsert, pull-request merge, review-handoff, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
   );
 }
 
@@ -575,6 +674,15 @@ function parsePublicationBranchPushCommand(
         parsed.forceWithLease = true;
         parsed.forceWithLeaseExpectedCommit = next();
         break;
+      case "--authorized":
+        parsed.authorized = true;
+        break;
+      case "--authorization-timestamp":
+        parsed.authorizationTimestamp = next();
+        break;
+      case "--authorization-summary":
+        parsed.authorizationSummary = next();
+        break;
       case "--dry-run":
         parsed.dryRun = true;
         break;
@@ -645,6 +753,9 @@ function parsePublicationPullRequestUpsertCommand(
       case "--draft":
         parsed.draft = true;
         break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -664,6 +775,92 @@ function parsePublicationPullRequestUpsertCommand(
   assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
 
   return parsed as ParsedPublicationPullRequestUpsertCommand;
+}
+
+function parsePublicationReviewHandoffCommand(
+  argv: string[],
+): ParsedPublicationReviewHandoffCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "review-handoff") {
+    throw new Error("publication requires review-handoff");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication review-handoff requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationReviewHandoffCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
+      case "--repository-path":
+        parsed.repositoryPath = next();
+        break;
+      case "--branch":
+        parsed.branch = next();
+        break;
+      case "--base":
+        parsed.base = next();
+        break;
+      case "--title":
+        parsed.title = next();
+        break;
+      case "--body":
+        parsed.body = next();
+        break;
+      case "--body-file":
+        parsed.bodyFile = next();
+        break;
+      case "--draft":
+        parsed.draft = true;
+        break;
+      case "--feature":
+        parsed.featureId = next();
+        break;
+      case "--force-with-lease":
+        parsed.forceWithLease = true;
+        break;
+      case "--force-with-lease-expected":
+        parsed.forceWithLease = true;
+        parsed.forceWithLeaseExpectedCommit = next();
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication review-handoff option: ${arg}`);
+    }
+  }
+  if (!parsed.branch) {
+    throw new Error("publication review-handoff requires --branch");
+  }
+  if (!parsed.title) {
+    throw new Error("publication review-handoff requires --title");
+  }
+  if (parsed.body !== undefined && parsed.bodyFile) {
+    throw new Error("publication review-handoff accepts --body or --body-file, not both");
+  }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
+
+  return parsed as ParsedPublicationReviewHandoffCommand;
 }
 
 function parsePublicationPullRequestMergeCommand(
@@ -702,6 +899,18 @@ function parsePublicationPullRequestMergeCommand(
         break;
       case "--method":
         parsed.method = parsePublicationPullRequestMergeMethod(next(), arg);
+        break;
+      case "--branch-role":
+        parsed.branchRole = next();
+        break;
+      case "--authorized":
+        parsed.authorized = true;
+        break;
+      case "--authorization-timestamp":
+        parsed.authorizationTimestamp = next();
+        break;
+      case "--authorization-summary":
+        parsed.authorizationSummary = next();
         break;
       case "--json":
         parsed.json = true;
@@ -1157,7 +1366,7 @@ const dryRunPublicationGitPushRunner: NexusPublicationGitPushRunner = (
 });
 
 function publicationPullRequestBody(
-  parsed: ParsedPublicationPullRequestUpsertCommand,
+  parsed: Pick<ParsedPublicationPullRequestUpsertCommand, "body" | "bodyFile">,
 ): string | null | undefined {
   if (parsed.body !== undefined) {
     if (parsed.body === null) {
@@ -1176,6 +1385,23 @@ function normalizeInlinePullRequestBody(body: string): string {
   return body.includes(escapedLineBreak)
     ? body.replaceAll(escapedLineBreak, String.fromCharCode(10))
     : body;
+}
+
+function publicationLocalAuthorization(
+  parsed: {
+    authorized?: boolean;
+    authorizationTimestamp?: string | null;
+    authorizationSummary?: string | null;
+  },
+): Partial<NexusReviewLocalAuthorization> | null {
+  if (!parsed.authorized) {
+    return null;
+  }
+  return {
+    authorized: true,
+    authorizedAt: parsed.authorizationTimestamp ?? null,
+    summary: parsed.authorizationSummary ?? null,
+  };
 }
 
 function readReleaseTrainEvidenceInput(
@@ -1298,29 +1524,7 @@ function printPublicationBranchPushResult(
   parsed: ParsedPublicationBranchPushCommand,
   stdout: TextWriter,
 ): void {
-  const payload = {
-    ok: parsed.dryRun || result.push.git.exitCode === 0,
-    dryRun: Boolean(parsed.dryRun),
-    projectRoot: result.projectRoot,
-    componentId: result.componentId,
-    target: result.target,
-    repository: result.repository,
-    branch: result.branch,
-    targetBranch: result.targetBranch,
-    featureBranchDelivery: result.featureBranchDelivery,
-    forceWithLease: result.forceWithLease,
-    forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
-    credential: result.credential,
-    push: {
-      git: result.push.git,
-      plan: {
-        ...result.push.plan,
-        args: result.push.plan.redactedArgs,
-        redactedArgs: result.push.plan.redactedArgs,
-        environment: result.push.plan.redactedEnvironment,
-      },
-    },
-  };
+  const payload = publicationBranchPushPayload(result, Boolean(parsed.dryRun));
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -1350,6 +1554,9 @@ function printPublicationBranchPushResult(
   writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
   writeLine(stdout, `  Transport: ${result.push.plan.transport}`);
   writeLine(stdout, `  Refspec: ${result.push.plan.refspec}`);
+  for (const warning of result.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
   if (result.forceWithLease) {
     writeLine(stdout, "  Force with lease: true");
   }
@@ -1378,34 +1585,146 @@ function printPublicationBranchPushBlockedError(
   });
 }
 
+function printPublicationReviewPolicyBlockedError(
+  error: NexusReviewPolicyEnforcementError,
+  dryRun: boolean,
+  stdout: TextWriter,
+): void {
+  writeJson(stdout, {
+    ok: false,
+    dryRun,
+    error: {
+      code: "review_policy_blocked",
+      message: error.message,
+    },
+    reviewEnforcement: error.decision,
+    reviewPlan: error.reviewPlan,
+  });
+}
+
 function printPublicationPullRequestUpsertResult(
   result: NexusPublicationPullRequestUpsertResult,
   parsed: ParsedPublicationPullRequestUpsertCommand,
   stdout: TextWriter,
 ): void {
+  const payload = publicationPullRequestUpsertPayload(result);
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(
+    stdout,
+    `DevNexus publication pull request ${result.dryRun ? "upsert dry-run" : "upserted"}.`,
+  );
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  if (result.pullRequest) {
+    writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+    if (result.pullRequest.url) {
+      writeLine(stdout, `  URL: ${result.pullRequest.url}`);
+    }
+  }
+  writeLine(stdout, `  Operation: ${result.plan.operation}`);
+  writeLine(stdout, `  Head: ${result.plan.head}`);
+  writeLine(stdout, `  Base: ${result.plan.base}`);
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.pullRequest?.metadata.backend ?? result.plan.backend}`);
+}
+
+function printPublicationReviewHandoffResult(
+  result: {
+    branchPush: NexusPublicationBranchPushResult;
+    pullRequest: NexusPublicationPullRequestUpsertResult | null;
+  },
+  parsed: ParsedPublicationReviewHandoffCommand,
+  stdout: TextWriter,
+): void {
+  const branchPushPayload = publicationBranchPushPayload(
+    result.branchPush,
+    Boolean(parsed.dryRun),
+  );
   const payload = {
-    ok: true,
-    projectRoot: result.projectRoot,
-    componentId: result.componentId,
-    target: result.target,
-    repository: result.repository,
-    credential: result.credential,
-    pullRequest: result.pullRequest,
+    ok: branchPushPayload.ok && result.pullRequest !== null,
+    dryRun: Boolean(parsed.dryRun),
+    projectRoot: result.branchPush.projectRoot,
+    componentId: result.branchPush.componentId,
+    target: result.branchPush.target,
+    repository: result.branchPush.repository,
+    branchPush: branchPushPayload,
+    pullRequest: result.pullRequest
+      ? publicationPullRequestUpsertPayload(result.pullRequest)
+      : null,
   };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
   }
 
-  writeLine(stdout, "DevNexus publication pull request upserted.");
-  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
-  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
-  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
-  if (result.pullRequest.url) {
-    writeLine(stdout, `  URL: ${result.pullRequest.url}`);
+  writeLine(
+    stdout,
+    `DevNexus publication review handoff ${parsed.dryRun ? "dry-run" : "completed"}.`,
+  );
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.branchPush.target)}`);
+  writeLine(stdout, `  Repository: ${result.branchPush.repository.owner}/${result.branchPush.repository.name}`);
+  writeLine(stdout, `  Branch: ${result.branchPush.branch}`);
+  writeLine(stdout, `  Branch credential: ${result.branchPush.credential.profileId} (${result.branchPush.credential.kind})`);
+  if (result.pullRequest) {
+    writeLine(stdout, `  Pull request credential: ${result.pullRequest.credential.profileId} (${result.pullRequest.credential.kind})`);
+    if (result.pullRequest.pullRequest) {
+      writeLine(stdout, `  Pull request: #${result.pullRequest.pullRequest.number}`);
+      if (result.pullRequest.pullRequest.url) {
+        writeLine(stdout, `  URL: ${result.pullRequest.pullRequest.url}`);
+      }
+    }
   }
-  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
-  writeLine(stdout, `  Backend: ${result.pullRequest.metadata.backend}`);
+}
+
+function publicationBranchPushPayload(
+  result: NexusPublicationBranchPushResult,
+  dryRun: boolean,
+) {
+  return {
+    ok: dryRun || result.push.git.exitCode === 0,
+    dryRun,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    target: result.target,
+    repository: result.repository,
+    branch: result.branch,
+    targetBranch: result.targetBranch,
+    featureBranchDelivery: result.featureBranchDelivery,
+    warnings: result.warnings,
+    forceWithLease: result.forceWithLease,
+    forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
+    reviewEnforcement: result.reviewEnforcement,
+    credential: result.credential,
+    push: {
+      git: result.push.git,
+      plan: {
+        ...result.push.plan,
+        args: result.push.plan.redactedArgs,
+        redactedArgs: result.push.plan.redactedArgs,
+        environment: result.push.plan.redactedEnvironment,
+      },
+    },
+  };
+}
+
+function publicationPullRequestUpsertPayload(
+  result: NexusPublicationPullRequestUpsertResult,
+) {
+  return {
+    ok: true,
+    dryRun: result.dryRun,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    target: result.target,
+    repository: result.repository,
+    credential: result.credential,
+    plan: result.plan,
+    pullRequest: result.pullRequest,
+  };
 }
 
 function printPublicationPullRequestMergeResult(
@@ -1421,6 +1740,7 @@ function printPublicationPullRequestMergeResult(
     repository: result.repository,
     credential: result.credential,
     pullRequest: result.pullRequest,
+    reviewEnforcement: result.reviewEnforcement,
     merge: result.merge,
   };
   if (parsed.json) {

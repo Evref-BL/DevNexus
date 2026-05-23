@@ -23,6 +23,8 @@ import {
   type GitRunner,
   type NexusProjectHostingProviderAdapter,
   type NexusAutomationCommandRunner,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectConfig,
   type ProjectGitCommandResult,
   type ProjectGitRunner,
@@ -39,6 +41,10 @@ import {
 const tempDirs: string[] = [];
 const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
 const originalCwd = process.cwd();
+
+function tomlArgs(values: string[]): string {
+  return `args = [${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+}
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -434,6 +440,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
     expect(output.output()).toContain("dev-nexus publication green-main plan");
+    expect(output.output()).toContain("dev-nexus review plan");
     expect(output.output()).toContain("dev-nexus quick-fix plan");
     expect(output.output()).toContain("dev-nexus quick-fix start");
     expect(output.output()).toContain("dev-nexus quick-fix finish");
@@ -446,6 +453,85 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("prints review plans from component review policy", async () => {
+    const projectRoot = makeTempDir("dev-nexus-review-plan-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            review: {
+              default: {
+                transport: "pull_request",
+                gates: ["provider_approval_required"],
+              },
+              rules: [
+                {
+                  match: {
+                    paths: ["docs/**"],
+                  },
+                  transport: "local",
+                  gates: ["human_required"],
+                },
+              ],
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const output = captureOutput();
+    await expect(
+      main(
+        [
+          "review",
+          "plan",
+          projectRoot,
+          "--component",
+          "primary",
+          "--path",
+          "docs/dev/review-policy.md",
+          "--requested-action",
+          "merge",
+          "--branch",
+          "docs/review-policy",
+          "--head",
+          "abc123",
+          "--authorized",
+          "--authorization-timestamp",
+          "2026-05-23T10:00:00Z",
+          "--json",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      plan: {
+        componentId: "primary",
+        status: "ready",
+        nextAction: "proceed",
+        transport: "local",
+        matchedRuleIndex: 0,
+        providerMutations: [],
+        context: {
+          requestedAction: "merge",
+          branchName: "docs/review-policy",
+          headSha: "abc123",
+        },
+      },
+    });
   });
 
   it("logs in, reports status, and logs out of GitHub App user auth", async () => {
@@ -2615,6 +2701,58 @@ describe("dev-nexus cli", () => {
 
     const payload = JSON.parse(output.output());
     expect(payload.worktree.branchName).toBe("codex/primary/guard-bootstrap");
+  });
+
+  it("blocks worktree preparation when an agent-launch authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "expired",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "worktree",
+        "prepare",
+        projectRoot,
+        "--work-item",
+        "local-1",
+        "--work-item-title",
+        "Claimed issue",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        gitRunner: fakeGitRunner(gitCalls),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "DevNexus claim verification failed before mutation: expired",
+      },
+    });
+    expect(gitCalls).toEqual([]);
   });
 
   it("prepares manual component and workspace-meta worktrees through the CLI", async () => {
@@ -5432,6 +5570,12 @@ describe("dev-nexus cli", () => {
       lock: {
         status: "none",
       },
+      workItemClaimAuthority: {
+        backend: "optimistic_tracker",
+        status: "ready",
+        postgresConnectionProfileId: null,
+        blockers: [],
+      },
       externalIssueVisibility: {
         componentCount: 1,
         defaultTrackerOnlyComponentCount: 1,
@@ -6393,7 +6537,9 @@ describe("dev-nexus cli", () => {
     );
     expect(codexConfig).toContain("[mcp_servers.dev_nexus]");
     expect(codexConfig).toContain("[mcp_servers.dev_nexus_gateway]");
-    expect(codexConfig).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-gateway-stdio"]`);
+    expect(codexConfig).toContain(
+      tomlArgs([currentNexusCliScriptPath(), "mcp-gateway-stdio"]),
+    );
     expect(codexConfig).not.toContain("workflow_mcp");
   });
 
@@ -8169,6 +8315,119 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("blocks completed current-agent records when an authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "released",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "automation",
+        "current-agent",
+        "record",
+        projectRoot,
+        "--run-id",
+        "current-cli-stale",
+        "--status",
+        "completed",
+        "--summary",
+        "Stale worker should not complete",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "DevNexus claim verification failed before mutation: released",
+      },
+    });
+  });
+
+  it("heartbeats current-agent authority claims through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const heartbeatClaim: NexusWorkItemClaimAuthorityRecord = {
+      ...authorityClaim,
+      expiresAt: "2026-05-23T11:00:00.000Z",
+      lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      owner: {
+        ...authorityClaim.owner,
+        expiresAt: "2026-05-23T11:00:00.000Z",
+      },
+    };
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const heartbeats: number[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async heartbeatClaim(input) {
+        heartbeats.push(input.leaseDurationMs);
+        return {
+          status: "heartbeat",
+          claim: heartbeatClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "automation",
+        "current-agent",
+        "heartbeat",
+        projectRoot,
+        "--lease-duration-ms",
+        "1800000",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "heartbeat",
+      authorityClaim: {
+        expiresAt: "2026-05-23T11:00:00.000Z",
+        lastHeartbeatAt: "2026-05-23T10:00:00.000Z",
+      },
+    });
+    expect(heartbeats).toEqual([1800000]);
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -8560,6 +8819,90 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("resolves PostgreSQL claim profiles from claim-next --home", async () => {
+    const root = makeTempDir("dev-nexus-cli-claim-");
+    const projectRoot = path.join(root, "workspace");
+    const homePath = path.join(root, "home");
+    const config = githubWorkItemProjectConfig();
+    const postgresAutomationConfig = {
+      ...config.automation!,
+      workItemClaims: {
+        ...config.automation!.workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: postgresAutomationConfig,
+    });
+    fs.mkdirSync(homePath, { recursive: true });
+    fs.writeFileSync(
+      path.join(homePath, "dev-nexus.home.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          paths: {
+            projectsRoot: path.join(homePath, "projects"),
+            workspacesRoot: path.join(homePath, "workspaces"),
+          },
+          projects: [],
+          claimAuthorityProfiles: [
+            {
+              id: "shared-claims",
+              backend: "postgres",
+              driver: "node_postgres",
+              connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+              schema: "dev_nexus",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-13", "PostgreSQL claim through CLI", {
+        labels: ["automation"],
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--home",
+        homePath,
+        "--host",
+        "host-a",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        env: {},
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "PostgreSQL claim authority profile shared-claims requires environment variable DEV_NEXUS_CLAIMS_DATABASE_URL",
+      },
+    });
+    expect(provider.updates).toEqual([]);
+  });
+
   it("reports no eligible work through claim-next without failing the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-claim-");
     saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
@@ -8902,6 +9245,65 @@ function cloneClaimItem(item: WorkItem): WorkItem {
     labels: item.labels ? [...item.labels] : undefined,
     assignees: item.assignees ? [...item.assignees] : undefined,
     externalRef: item.externalRef ? { ...item.externalRef } : undefined,
+  };
+}
+
+function writeCliAgentContext(
+  projectRoot: string,
+  authorityClaim: NexusWorkItemClaimAuthorityRecord,
+): string {
+  const contextFile = path.join(projectRoot, ".dev-nexus", "context.json");
+  fs.mkdirSync(path.dirname(contextFile), { recursive: true });
+  fs.writeFileSync(
+    contextFile,
+    `${JSON.stringify({
+      workItemClaim: {
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        logicalWorkItemId: "local-1",
+        authorityClaim,
+      },
+    })}\n`,
+    "utf8",
+  );
+
+  return contextFile;
+}
+
+function cliAgentEnv(contextFile: string): NodeJS.ProcessEnv {
+  return {
+    DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
+    DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: "claimed",
+    DEV_NEXUS_AGENT_CONTEXT_FILE: contextFile,
+  };
+}
+
+function cliAuthorityClaim(): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: "demo-project",
+      componentId: "primary",
+      trackerId: "default",
+      provider: "local",
+      workItemId: "local-1",
+    },
+    owner: {
+      version: 1,
+      hostId: "host-a",
+      agentId: "agent-a",
+      ownerId: null,
+      leaseToken: "lease-1",
+      claimedAt: "2026-05-23T09:00:00.000Z",
+      expiresAt: "2026-05-23T10:30:00.000Z",
+    },
+    fencingToken: 12,
+    state: "active",
+    claimedAt: "2026-05-23T09:00:00.000Z",
+    expiresAt: "2026-05-23T10:30:00.000Z",
+    lastHeartbeatAt: "2026-05-23T09:00:00.000Z",
   };
 }
 

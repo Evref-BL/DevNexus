@@ -225,6 +225,12 @@ and records verification, then a user or maintainer decides what to publish. See
 [Publication workflows](publication-workflows.md) before opting into
 green-main, CI tiers, merge queues, or release trains.
 
+When a component has publication policy, agents should publish review branches
+through DevNexus publication commands instead of raw `git push` or `gh pr`
+commands. Use `publication review-handoff` for the normal configured push plus
+pull-request path, or `publication pull-request upsert --dry-run` when only the
+planned provider mutation should be reviewed.
+
 For green-main publication, save provider check data and let DevNexus classify
 the pull request or merge request before any merge attempt. Check collection is
 provider-specific until DevNexus has a neutral collector adapter, but the
@@ -437,12 +443,18 @@ process.
 
 ```bash
 dev-nexus automation current-agent adopt <workspace-root> --run-id current-1 --json
+dev-nexus automation current-agent heartbeat <workspace-root> --json
 dev-nexus automation current-agent record <workspace-root> --run-id current-1 --status completed --summary "Completed requested work."
 ```
 
 If adoption returns `shouldProceed: false`, the current agent must not continue
 the automation run. If it returns `true`, the agent proceeds under the returned
 `DEV_NEXUS_*` environment values and records the terminal result.
+Use `current-agent heartbeat` during long-running work when the adoption context
+contains an authority-backed claim. The default claim lease is 60 minutes, and
+the default heartbeat interval exposed as `DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS`
+is 20 minutes. Call the heartbeat before that interval elapses unless the
+project config overrides the cadence.
 
 ## Publication Boundary
 

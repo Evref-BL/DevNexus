@@ -2,7 +2,8 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - "**"
   push:
     branches:
       - main
@@ -54,8 +55,10 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref || '' }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          TARGET_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
           DISPATCH_TIER: ${{ inputs.validation_tier || 'auto' }}
         run: |
           set -euo pipefail
@@ -89,7 +92,10 @@ jobs:
               fi
               ;;
             pull_request)
-              if [[ "$PR_HEAD_REF" == candidate/* || "$PR_HEAD_REF" == integration/* || "$PR_HEAD_REF" == release/* ]]; then
+              if [[ "$PR_BASE_REF" == "$TARGET_BRANCH" ]]; then
+                tier="full"
+                reason="protected target pull request"
+              elif [[ "$PR_HEAD_REF" == candidate/* || "$PR_HEAD_REF" == integration/* || "$PR_HEAD_REF" == release/* ]]; then
                 tier="full"
                 reason="publication candidate branch"
               else
