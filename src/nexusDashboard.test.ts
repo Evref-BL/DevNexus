@@ -1075,7 +1075,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("color-scheme");
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
-    expect(module).toContain("Workspace Activity");
+    expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");
     expect(module).toContain("Action Needed");
@@ -1175,7 +1175,7 @@ describe("nexus dashboard", () => {
     expect(module).not.toContain("Copy Codex brief");
     expect(module).not.toContain("Start Codex chat");
     expect(module).not.toContain("data-start-codex-prompt");
-    expect(module).toContain("Parallel work map");
+    expect(module).toContain("Workspace map");
     expect(module).toContain("dn-work-stack");
     expect(module).toContain("dn-plugin-row");
     expect(module).toContain("dn-workspace-card");
@@ -1214,10 +1214,13 @@ describe("nexus dashboard", () => {
     expect(module).toContain("externalLinkIcon");
     expect(module).toContain("clipboardIcon");
     expect(module).toContain("signal-components");
+    expect(module).toContain("Not Git history");
+    expect(module).toContain("Each rail is a workspace category");
     expect(module).toContain("Source checkout");
-    expect(module).toContain("Worktree branch");
-    expect(module).toContain("Other worktrees");
-    expect(module).toContain("Approvals and blockers");
+    expect(module).toContain("Active branch");
+    expect(module).toContain("More branches");
+    expect(module).toContain("Automation");
+    expect(module).toContain("Decisions");
     expect(module).toContain("rowGuides");
     expect(module).not.toContain("tonebox");
     expect(module).not.toContain("renderRailLabels");
@@ -1355,18 +1358,18 @@ describe("nexus dashboard", () => {
 
     const lanes = hooks.timelineLanes(snapshot);
     expect(lanes.map((lane) => [lane.label, lane.detail])).toEqual([
-      ["Source checkout", "main"],
-      ["Worktree branch", "dev-nexus/alpha-branch"],
-      ["Worktree branch", "dev-nexus/beta-branch"],
-      ["Other worktrees", "1 more branch"],
-      ["Runs and cycles", "Coordinator history"],
-      ["Approvals and blockers", "Human decisions"],
+      ["Source checkout", "main component heads"],
+      ["Active branch", "dev-nexus/alpha-branch"],
+      ["Active branch", "dev-nexus/beta-branch"],
+      ["More branches", "1 grouped branch"],
+      ["Automation", "Runs and target cycles"],
+      ["Decisions", "Approvals and blockers"],
     ]);
 
     const laneKey = hooks.renderLaneKey(lanes);
-    expect(laneKey).toContain("<strong>Worktree branch</strong>");
+    expect(laneKey).toContain("<strong>Active branch</strong>");
     expect(laneKey).toContain("dev-nexus/alpha-branch");
-    expect(laneKey).toContain("Human decisions");
+    expect(laneKey).toContain("Approvals and blockers");
 
     const timeline = hooks.historyRows(snapshot);
     const alphaRow = timeline.rows.find((row) => row.node.id === "worktree:alpha");
