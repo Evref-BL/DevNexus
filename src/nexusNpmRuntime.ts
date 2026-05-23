@@ -181,38 +181,7 @@ export function inspectNexusNpmRuntimeInstall(options: {
   }
 
   for (const requirement of packages) {
-    const installedPackageJsonPath = path.join(
-      nodeModulesPath,
-      ...requirement.installName.split("/"),
-      "package.json",
-    );
-    const installed = readInstalledPackageJson(installedPackageJsonPath);
-    if (!installed) {
-      issues.push(
-        `missing installed package ${requirement.installName}: ${installedPackageJsonPath}`,
-      );
-      continue;
-    }
-
-    if (installed.name && installed.name !== requirement.packageName) {
-      issues.push(
-        `${requirement.installName} package identity is ${installed.name}, expected ${requirement.packageName}`,
-      );
-    }
-    if (
-      requirement.expectedVersion &&
-      installed.version !== requirement.expectedVersion
-    ) {
-      issues.push(
-        `${requirement.installName} version is ${installed.version ?? "unknown"}, expected ${requirement.expectedVersion}`,
-      );
-    }
-
-    for (const binName of installedBinNames(installed)) {
-      if (!runtimeBinExists(nodeModulesPath, binName)) {
-        issues.push(`${requirement.installName} bin ${binName} is missing from node_modules/.bin`);
-      }
-    }
+    issues.push(...inspectRuntimePackageRequirement(nodeModulesPath, requirement));
   }
 
   return {
@@ -222,6 +191,66 @@ export function inspectNexusNpmRuntimeInstall(options: {
     issues,
     packages,
   };
+}
+
+function inspectRuntimePackageRequirement(
+  nodeModulesPath: string,
+  requirement: NexusNpmRuntimePackageRequirement,
+): string[] {
+  const installedPackageJsonPath = path.join(
+    nodeModulesPath,
+    ...requirement.installName.split("/"),
+    "package.json",
+  );
+  const installed = readInstalledPackageJson(installedPackageJsonPath);
+  if (!installed) {
+    return [
+      `missing installed package ${requirement.installName}: ${installedPackageJsonPath}`,
+    ];
+  }
+
+  return [
+    ...runtimePackageIdentityIssues(requirement, installed),
+    ...runtimePackageBinIssues(
+      nodeModulesPath,
+      requirement.installName,
+      installed,
+    ),
+  ];
+}
+
+function runtimePackageIdentityIssues(
+  requirement: NexusNpmRuntimePackageRequirement,
+  installed: { name?: string; version?: string },
+): string[] {
+  const issues: string[] = [];
+  if (installed.name && installed.name !== requirement.packageName) {
+    issues.push(
+      `${requirement.installName} package identity is ${installed.name}, expected ${requirement.packageName}`,
+    );
+  }
+  if (
+    requirement.expectedVersion &&
+    installed.version !== requirement.expectedVersion
+  ) {
+    issues.push(
+      `${requirement.installName} version is ${installed.version ?? "unknown"}, expected ${requirement.expectedVersion}`,
+    );
+  }
+  return issues;
+}
+
+function runtimePackageBinIssues(
+  nodeModulesPath: string,
+  installName: string,
+  installed: { name?: string; bin?: unknown },
+): string[] {
+  return installedBinNames(installed)
+    .filter((binName) => !runtimeBinExists(nodeModulesPath, binName))
+    .map(
+      (binName) =>
+        `${installName} bin ${binName} is missing from node_modules/.bin`,
+    );
 }
 
 export function preflightNexusNpmRuntimeInstall(
