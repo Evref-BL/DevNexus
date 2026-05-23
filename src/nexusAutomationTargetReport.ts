@@ -825,83 +825,121 @@ function summarizeActiveBlockers(options: {
     staleInProgressWorkItems,
   } = options;
   const active: NexusAutomationTargetReportActiveBlocker[] = [];
-  if (
-    lastCycle &&
-    (lastCycle.status === "completed" || lastCycle.status === "skipped")
-  ) {
-    for (const item of staleInProgressWorkItems) {
-      active.push({
-        source: "work_item",
-        componentId: item.componentId,
-        trackerId: item.trackerId,
-        trackerProvider: item.trackerProvider,
-        cycleId: lastCycle.id,
-        runId: lastCycle.runId,
-        workItemId: item.id,
-        workItemTitle: item.title,
-        message:
-          `Coordinator-owned work item is still in_progress after target cycle ${lastCycle.id} ${lastCycle.status}.`,
-      });
-    }
+  if (isCompletedOrSkippedCycle(lastCycle)) {
+    active.push(
+      ...staleInProgressWorkItemBlockers(lastCycle, staleInProgressWorkItems),
+    );
     return active;
   }
 
   if (lastCycle) {
-    for (const blocker of lastCycle.blockers) {
-      active.push({
-        source: "cycle",
-        componentId: null,
-        trackerId: null,
-        trackerProvider: null,
-        cycleId: lastCycle.id,
-        runId: lastCycle.runId,
-        workItemId: null,
-        workItemTitle: null,
-        message: blocker,
-      });
+    active.push(...cycleBlockerMessages(lastCycle));
+    active.push(...blockedCycleWorkItemBlockers(lastCycle, workItemResolver));
+  }
+
+  if (isReportableRunBlocker(lastCycle, lastRun)) {
+    active.push(runBlocker(lastCycle, lastRun, workItemResolver));
+  }
+
+  return active;
+}
+
+function isCompletedOrSkippedCycle(
+  cycle: NexusAutomationTargetCycleRecord | null,
+): cycle is NexusAutomationTargetCycleRecord {
+  return cycle?.status === "completed" || cycle?.status === "skipped";
+}
+
+function staleInProgressWorkItemBlockers(
+  cycle: NexusAutomationTargetCycleRecord,
+  workItems: NexusAutomationTargetReportWorkItemReference[],
+): NexusAutomationTargetReportActiveBlocker[] {
+  return workItems.map((item) => ({
+    source: "work_item",
+    componentId: item.componentId,
+    trackerId: item.trackerId,
+    trackerProvider: item.trackerProvider,
+    cycleId: cycle.id,
+    runId: cycle.runId,
+    workItemId: item.id,
+    workItemTitle: item.title,
+    message:
+      `Coordinator-owned work item is still in_progress after target cycle ${cycle.id} ${cycle.status}.`,
+  }));
+}
+
+function cycleBlockerMessages(
+  cycle: NexusAutomationTargetCycleRecord,
+): NexusAutomationTargetReportActiveBlocker[] {
+  return cycle.blockers.map((blocker) => ({
+    source: "cycle",
+    componentId: null,
+    trackerId: null,
+    trackerProvider: null,
+    cycleId: cycle.id,
+    runId: cycle.runId,
+    workItemId: null,
+    workItemTitle: null,
+    message: blocker,
+  }));
+}
+
+function blockedCycleWorkItemBlockers(
+  cycle: NexusAutomationTargetCycleRecord,
+  workItemResolver: LocalWorkItemResolver,
+): NexusAutomationTargetReportActiveBlocker[] {
+  return cycle.workItems.flatMap((item) => {
+    const resolved = workItemResolver(item.componentId, item.id);
+    const status = resolved?.status ?? item.status ?? null;
+    if (item.cycleStatus !== "blocked" && status !== "blocked") {
+      return [];
     }
-    for (const item of lastCycle.workItems) {
-      const resolved = workItemResolver(item.componentId, item.id);
-      const status = resolved?.status ?? item.status ?? null;
-      if (item.cycleStatus !== "blocked" && status !== "blocked") {
-        continue;
-      }
-      active.push({
+    return [
+      {
         source: "work_item",
         componentId: item.componentId,
         trackerId: item.trackerId,
         trackerProvider: item.trackerProvider,
-        cycleId: lastCycle.id,
-        runId: lastCycle.runId,
+        cycleId: cycle.id,
+        runId: cycle.runId,
         workItemId: item.id,
         workItemTitle: item.title ?? resolved?.title ?? null,
         message: item.notes,
-      });
-    }
-  }
+      },
+    ];
+  });
+}
 
-  if (
-    lastRun &&
-    (lastRun.status === "blocked" || lastRun.status === "failed") &&
-    (!lastCycle || lastCycle.runId === lastRun.id)
-  ) {
-    const resolved = lastRun.workItemId
-      ? workItemResolver(lastRun.componentId, lastRun.workItemId)
-      : null;
-    active.push({
-      source: "run",
-      componentId: lastRun.componentId,
-      trackerId: null,
-      trackerProvider: null,
-      cycleId: lastCycle?.id ?? null,
-      runId: lastRun.id,
-      workItemId: lastRun.workItemId,
-      workItemTitle: lastRun.workItemTitle ?? resolved?.title ?? null,
-      message: lastRun.error,
-    });
-  }
+function isReportableRunBlocker(
+  cycle: NexusAutomationTargetCycleRecord | null,
+  run: NexusAutomationRunRecord | null,
+): run is NexusAutomationRunRecord {
+  return Boolean(
+    run &&
+      (run.status === "blocked" || run.status === "failed") &&
+      (!cycle || cycle.runId === run.id),
+  );
+}
 
-  return active;
+function runBlocker(
+  cycle: NexusAutomationTargetCycleRecord | null,
+  run: NexusAutomationRunRecord,
+  workItemResolver: LocalWorkItemResolver,
+): NexusAutomationTargetReportActiveBlocker {
+  const resolved = run.workItemId
+    ? workItemResolver(run.componentId, run.workItemId)
+    : null;
+  return {
+    source: "run",
+    componentId: run.componentId,
+    trackerId: null,
+    trackerProvider: null,
+    cycleId: cycle?.id ?? null,
+    runId: run.id,
+    workItemId: run.workItemId,
+    workItemTitle: run.workItemTitle ?? resolved?.title ?? null,
+    message: run.error,
+  };
 }
 
 function summarizeComponentProgress(options: {
