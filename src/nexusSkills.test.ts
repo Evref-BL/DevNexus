@@ -245,7 +245,7 @@ describe("nexus skills", () => {
     expect(fs.existsSync(path.join(projectRoot, ".claude"))).toBe(false);
   });
 
-  it("includes core workflow skills with expanded acronyms and attribution", () => {
+  it("includes core workflow skills with expanded acronyms and synthetic user-facing text", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
     expect(skillIds).toEqual([
@@ -332,6 +332,9 @@ describe("nexus skills", () => {
       "separate initiative",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
+      "independently reviewable vertical progress",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
       "do not force all work into a programming model",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
@@ -339,12 +342,6 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "human-in-the-loop",
-    );
-    expect(skillMarkdown["take-the-lead"]).toContain(
-      "https://openai.github.io/openai-agents-python/human_in_the_loop/",
-    );
-    expect(skillMarkdown["take-the-lead"]).toContain(
-      "45effb4b7d7de1226ebba7ba304bccfcf0a37fdf",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "choose the current skill chain",
@@ -357,6 +354,18 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "routing map for substantial led work",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Sizing And Routing Call",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "largest coherent vertical slice",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Product Backlog Item or story",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Estimate the shape of the work",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "recommended next action",
@@ -379,23 +388,8 @@ describe("nexus skills", () => {
     expect(skillMarkdown["grill-me"]).toContain(
       "general-purpose interview",
     );
-    expect(skillMarkdown["grill-me"]).toContain(
-      "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
-    );
-    expect(skillMarkdown["design-with-user"]).toContain(
-      "Adapted from `obra/superpowers` version `5.1.0`",
-    );
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "general \"grill me\" interview mode",
-    );
-    expect(skillMarkdown["design-with-user"]).toContain(
-      "skills/brainstorming/SKILL.md",
-    );
-    expect(skillMarkdown["design-with-user"]).toContain(
-      "generic initiatives",
-    );
-    expect(skillMarkdown["write-implementation-plan"]).toContain(
-      "skills/writing-plans/SKILL.md",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
       "one initiative or delivery surface",
@@ -404,19 +398,16 @@ describe("nexus skills", () => {
       "selected delivery topology",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
-      "human-in-the-loop gates",
+      "bounded vertical slices",
     );
-    expect(skillMarkdown["execute-initiative-plan"]).toContain(
-      "skills/executing-plans/SKILL.md",
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "human-in-the-loop gates",
     );
     expect(skillMarkdown["execute-initiative-plan"]).toContain(
       "initiative or delivery surface",
     );
     expect(skillMarkdown["execute-initiative-plan"]).toContain(
       "lacks a delivery topology",
-    );
-    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
-      "skills/using-git-worktrees/SKILL.md",
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
       "worktree_prepare",
@@ -431,9 +422,6 @@ describe("nexus skills", () => {
       "approved initiative integration branch",
     );
     expect(skillMarkdown["parallel-work-dispatch"]).toContain(
-      "skills/dispatching-parallel-agents/SKILL.md",
-    );
-    expect(skillMarkdown["parallel-work-dispatch"]).toContain(
       "agent-led coordination through",
     );
     expect(skillMarkdown["parallel-work-dispatch"]).toContain(
@@ -443,25 +431,13 @@ describe("nexus skills", () => {
       "must not revert edits made by others",
     );
     expect(skillMarkdown["request-work-review"]).toContain(
-      "skills/requesting-code-review/SKILL.md",
-    );
-    expect(skillMarkdown["request-work-review"]).toContain(
       "severity with concrete file",
-    );
-    expect(skillMarkdown["receive-review-feedback"]).toContain(
-      "skills/receiving-code-review/SKILL.md",
     );
     expect(skillMarkdown["receive-review-feedback"]).toContain(
       "External feedback is input to evaluate",
     );
     expect(skillMarkdown["verify-before-completion"]).toContain(
-      "skills/verification-before-completion/SKILL.md",
-    );
-    expect(skillMarkdown["verify-before-completion"]).toContain(
       "fresh verification",
-    );
-    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
-      "skills/finishing-a-development-branch/SKILL.md",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "green-main policy",
@@ -475,14 +451,8 @@ describe("nexus skills", () => {
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "Do not silently",
     );
-    expect(skillMarkdown.diagnose).toContain(
-      "skills/systematic-debugging/SKILL.md",
-    );
     expect(skillMarkdown.diagnose).toContain("root cause");
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
-    expect(skillMarkdown.tdd).toContain(
-      "skills/test-driven-development/SKILL.md",
-    );
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",
     );
@@ -495,17 +465,12 @@ describe("nexus skills", () => {
     expect(skillMarkdown.documentation).toContain(
       "using the `humanizer` companion skill",
     );
-    expect(skillMarkdown.documentation).toContain("blader/humanizer");
     expect(skillMarkdown.documentation).toContain("GitHub Docs");
     expect(skillMarkdown.documentation).toContain("Write the Docs");
     expect(skillMarkdown.documentation).toContain(
       "Google developer documentation style guide",
     );
     expect(skillMarkdown.humanizer).toContain("name: humanizer");
-    expect(skillMarkdown.humanizer).toContain(
-      "Vendored from `blader/humanizer`",
-    );
-    expect(skillMarkdown.humanizer).toContain("Signs of AI writing");
     expect(skillMarkdown.humanizer).toContain("Preserve commands exactly");
     expect(skillMarkdown["setup-agent-skills"]).toContain(
       "Architecture Decision Records (ADRs)",
@@ -515,13 +480,13 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["setup-agent-skills"]).not.toContain("matt");
     expect(skillMarkdown["write-agent-skill"]).toContain(
-      "skills/writing-skills/SKILL.md",
-    );
-    expect(skillMarkdown["write-agent-skill"]).toContain(
-      "exact commit hash",
+      "Store provenance and license metadata in DevNexus manifests",
     );
     expect(skillMarkdown["to-issues"]).toContain(
       "Product Requirements Document (PRD)",
+    );
+    expect(skillMarkdown["to-issues"]).toContain(
+      "Split the work into vertical slices",
     );
     expect(skillMarkdown["to-issues"]).toContain("human-in-the-loop (HITL)");
     expect(skillMarkdown["to-issues"]).toContain(
@@ -530,6 +495,36 @@ describe("nexus skills", () => {
     expect(skillMarkdown["to-prd"]).toContain(
       "Product Requirements Document (PRD)",
     );
+    const userFacingSourceMarkers = [
+      "## Attribution",
+      "Adapted from",
+      "adapted from",
+      "Vendored from",
+      "Source path",
+      "Source paths",
+      "DevNexus adaptation",
+      "DevNexus-compatible source attribution",
+      "obra/superpowers",
+      "mattpocock/skills",
+      "blader/humanizer",
+      "Prime Radiant",
+      "Jesse Vincent",
+      "Matt Pocock",
+      "Siqi Chen",
+      "human_in_the_loop.md",
+      "openai-agents-python",
+      "45effb4b7d7de1226ebba7ba304bccfcf0a37fdf",
+      "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
+      "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+      "8b3a17889fbf12bedae20974a3c9f9de746ed754",
+    ];
+    for (const [id, markdown] of Object.entries(skillMarkdown)) {
+      for (const marker of userFacingSourceMarkers) {
+        expect(markdown, `${id} should not expose ${marker}`).not.toContain(
+          marker,
+        );
+      }
+    }
     for (const skill of defaultCoreSkillPack) {
       expect(skill.manifest.supportedAgents).toEqual(["codex", "claude"]);
     }

@@ -7,6 +7,11 @@ import {
   mergeNexusCiTierPolicy,
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
+import {
+  summarizeNexusInitiativeDeliveryPolicy,
+  type NexusInitiativeDeliveryPolicySummary,
+} from "./nexusInitiativeDeliveryPolicy.js";
+import { readNexusGitRemoteFacts } from "./nexusGitRemoteFacts.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
@@ -47,6 +52,7 @@ export interface NexusPublicationTrainPolicySummary {
   objective: string | null;
   targetBranch: string;
   branches: NexusPublicationTrainBranchPolicySummary;
+  initiativeDelivery: NexusInitiativeDeliveryPolicySummary | null;
   selector: NexusPublicationTrainSelectorPolicySummary;
   ciTiers: NexusPublicationTrainCiTierPolicySummary;
   warnings: string[];
@@ -87,6 +93,7 @@ export function summarizeNexusPublicationTrainPolicy(options: {
     options.component.defaultBranch ??
     options.projectConfig.repo.defaultBranch ??
     "main";
+  const remoteFacts = componentRemoteFacts(options.component, publication.remote);
   const ciTiers = resolveTrainCiTiers({
     train,
     projectConfig: options.projectConfig,
@@ -120,6 +127,17 @@ export function summarizeNexusPublicationTrainPolicy(options: {
         train.branchNaming.unscopedName,
       ),
     },
+    initiativeDelivery: train.initiativeDelivery
+      ? summarizeNexusInitiativeDeliveryPolicy({
+          config: train.initiativeDelivery,
+          fallbackScopeId: activeVersionId,
+          unscopedName: train.branchNaming.unscopedName,
+          targetBranch,
+          publicationRemote: publication.remote ?? null,
+          remoteUrls: remoteFacts.urls,
+          remotePushUrls: remoteFacts.pushUrls,
+        })
+      : null,
     selector: {
       statuses: [...train.selector.statuses],
       labels: [...train.selector.labels],
@@ -136,6 +154,27 @@ export function summarizeNexusPublicationTrainPolicy(options: {
     },
     warnings,
   };
+}
+
+function componentRemoteFacts(
+  component: ResolvedNexusProjectComponent,
+  publicationRemote: string | null,
+): ReturnType<typeof readNexusGitRemoteFacts> {
+  const facts = component.sourceRootExists
+    ? readNexusGitRemoteFacts(component.sourceRoot)
+    : { urls: {}, pushUrls: {} };
+  const remote = publicationRemote ?? "origin";
+  if (component.remoteUrl && !facts.urls[remote]) {
+    return {
+      urls: {
+        ...facts.urls,
+        [remote]: component.remoteUrl,
+      },
+      pushUrls: facts.pushUrls,
+    };
+  }
+
+  return facts;
 }
 
 function activeVersionFor(

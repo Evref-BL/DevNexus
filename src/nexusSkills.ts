@@ -208,8 +208,7 @@ const humanizerSkillMarkdown = skillMarkdown(
   `
 # Humanizer
 
-Vendored from \`blader/humanizer\`, this is a DevNexus adaptation of the MIT-licensed upstream
-skill. Use it when text reads like an AI draft: inflated, over-structured,
+Use this skill when text reads like an AI draft: inflated, over-structured,
 over-polite, vague, promotional, or too evenly polished.
 
 ## Task
@@ -283,12 +282,6 @@ For larger or risky edits, provide:
 3. Final rewrite.
 4. Optional concise summary of what changed.
 
-## Attribution
-
-Adapted from \`blader/humanizer\` version 2.5.1 at commit
-\`8b3a17889fbf12bedae20974a3c9f9de746ed754\`, licensed under MIT by Siqi Chen.
-The pattern catalog is based on Wikipedia's "Signs of AI writing" guidance
-maintained by WikiProject AI Cleanup.
 `,
 );
 
@@ -437,7 +430,7 @@ const humanizerSkill: NexusSkillDefinition = {
     id: "humanizer",
     name: "humanizer",
     description:
-      "Vendored MIT writing-polish skill adapted from blader/humanizer. Use when editing or reviewing prose to remove signs of AI-generated writing while preserving meaning, technical accuracy, and the user's intended voice.",
+      "Writing-polish workflow for editing prose to remove signs of AI-generated writing while preserving meaning, technical accuracy, and the user's intended voice.",
     version: "2.5.1-dev-nexus.0",
     license: "MIT",
     source: {
@@ -458,7 +451,7 @@ const humanizerSkill: NexusSkillDefinition = {
 const designWithUserSkill = adaptedSuperpowersSkill(
   "design-with-user",
   "design-with-user",
-  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be shaped before execution.",
+  "Collaborative design workflow for multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be shaped before execution.",
   ["skills/brainstorming/SKILL.md"],
   `
 # Design With User
@@ -497,21 +490,13 @@ scope, and risk decisions.
 - If the user already has a plan and wants it challenged, use \`grill-me\` or
   \`grill-with-docs\` before returning to collaborative design.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/brainstorming/SKILL.md\`.
-This DevNexus adaptation changes the workflow to support generic initiatives,
-DevNexus durable records, and risk-scaled design gates.
 `,
 );
 
 const grillMeSkill = adaptedMattPocockSkill(
   "grill-me",
   "grill-me",
-  "Plan and design interrogation workflow adapted from Matt Pocock's grill-me. Use when the user asks to be grilled, stress-test a plan, challenge assumptions, resolve a decision tree, or reach shared understanding through one-question-at-a-time pressure.",
+  "Plan and design interrogation workflow for when the user asks to be grilled, stress-test a plan, challenge assumptions, resolve a decision tree, or reach shared understanding through one-question-at-a-time pressure.",
   ["skills/productivity/grill-me/SKILL.md"],
   `
 # Grill Me
@@ -547,21 +532,13 @@ decides.
   or assumption.
 - Do not ask multiple questions disguised as one.
 
-## Attribution
-
-Adapted from \`mattpocock/skills\` at commit
-\`b8be62ffacb0118fa3eaa29a0923c87c8c11985c\`, licensed under MIT by Matt
-Pocock. Source path:
-\`skills/productivity/grill-me/SKILL.md\`.
-This DevNexus adaptation adds role boundaries, durable-state expectations, and
-DevNexus-compatible source attribution.
 `,
 );
 
 const writeImplementationPlanSkill = adaptedSuperpowersSkill(
   "write-implementation-plan",
   "write-implementation-plan",
-  "Implementation planning workflow adapted from Superpowers writing-plans. Use after design or requirements are approved and before execution when work needs owned slices, DevNexus component or artifact scope, acceptance criteria, and verification.",
+  "Implementation planning workflow for turning approved requirements into owned slices, DevNexus component or artifact scope, acceptance criteria, and verification.",
   ["skills/writing-plans/SKILL.md"],
   `
 # Write Implementation Plan
@@ -580,8 +557,10 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 3. Map the changed surfaces before writing tasks. Name the owning component,
    files or artifacts, tracker anchor, expected worktree, command working
    directory, and selected delivery topology where those are knowable.
-4. Split the work into bounded slices. Each slice needs one owner, one scope,
-   dependencies, acceptance criteria, verification commands, and handoff notes.
+4. Split the work into bounded vertical slices where possible. Each slice needs
+   one owner, one scope, dependencies, acceptance criteria, verification
+   commands, and handoff notes. Do not make slices smaller than the next real
+   review, risk, ownership, or human-in-the-loop gate requires.
 5. For Git-backed plans, choose the delivery topology before the first branch:
    direct slice, stacked slice, initiative integration branch, throw-away
    integration rehearsal, or release/version policy. Record the base branch,
@@ -608,8 +587,8 @@ Use this shape when writing a saved implementation plan:
 1. Goal and done criteria.
 2. Integration surface, delivery topology, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
-4. Task slices with files, acceptance criteria, steps, verification, and
-   handoff.
+4. Work-item or vertical slices with files, acceptance criteria, steps,
+   verification, and handoff.
 5. Human approval gates and publication path.
 6. Open questions and blockers.
 
@@ -622,22 +601,13 @@ Use this shape when writing a saved implementation plan:
 - Do not make the plan programming-centric when the work is documentation,
   research, operations, or another artifact workflow.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/writing-plans/SKILL.md\`.
-This DevNexus adaptation changes the workflow to use initiative surfaces,
-component ownership, tracker anchors, approval gates, and DevNexus verification
-records directly.
 `,
 );
 
 const prepareDevNexusWorktreeSkill = adaptedSuperpowersSkill(
   "prepare-dev-nexus-worktree",
   "prepare-dev-nexus-worktree",
-  "DevNexus worktree preparation workflow adapted from Superpowers using-git-worktrees. Use before mutating component source or workspace metadata so work happens in an owned isolated surface with preserved context and verification.",
+  "DevNexus worktree preparation workflow. Use before mutating component source or workspace metadata so work happens in an owned isolated surface with preserved context and verification.",
   ["skills/using-git-worktrees/SKILL.md"],
   `
 # Prepare DevNexus Worktree
@@ -686,22 +656,13 @@ skills, planning documents, or another durable project surface.
 - Do not delete or clean up an owned worktree until integration status and
   publication policy are clear.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/using-git-worktrees/SKILL.md\`.
-This DevNexus adaptation replaces generic worktree fallback behavior with
-DevNexus component worktrees, workspace/meta worktrees, setup projection,
-coordination handoffs, and shared-checkout guards.
 `,
 );
 
 const finishDevNexusBranchSkill = adaptedSuperpowersSkill(
   "finish-dev-nexus-branch",
   "finish-dev-nexus-branch",
-  "DevNexus branch completion workflow adapted from Superpowers finishing-a-development-branch. Use when implementation is ready to verify, record, publish, hand off, or clean up under component policy and human approval gates.",
+  "DevNexus branch completion workflow. Use when implementation is ready to verify, record, publish, hand off, or clean up under component policy and human approval gates.",
   ["skills/finishing-a-development-branch/SKILL.md"],
   `
 # Finish DevNexus Branch
@@ -759,22 +720,13 @@ handoff, publication, or cleanup.
   approval and a durable record of the reason.
 - Do not clean up worktrees that another chat or host may still own.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/finishing-a-development-branch/SKILL.md\`.
-This DevNexus adaptation changes the finish flow to use component publication
-policy, authority checks, App/bot credential expectations, coordination
-handoffs, target-cycle facts, and human-in-the-loop approval gates.
 `,
 );
 
 const executeInitiativePlanSkill = adaptedSuperpowersSkill(
   "execute-initiative-plan",
   "execute-initiative-plan",
-  "Plan execution workflow adapted from Superpowers executing-plans. Use when an approved plan should be carried through in the current session with checkpoints, verification, and DevNexus records.",
+  "Plan execution workflow. Use when an approved plan should be carried through in the current session with checkpoints, verification, and DevNexus records.",
   ["skills/executing-plans/SKILL.md"],
   `
 # Execute Initiative Plan
@@ -815,21 +767,13 @@ accumulate on one initiative or delivery surface.
   recommend one and get the needed decision first.
 - Do not continue after verification fails unless the next step is diagnosis.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/executing-plans/SKILL.md\`.
-This DevNexus adaptation changes plan execution to use initiative surfaces,
-component ownership, worktree policy, tracker records, and publication gates.
 `,
 );
 
 const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   "parallel-work-dispatch",
   "parallel-work-dispatch",
-  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use when independent slices can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
+  "Parallel work coordination workflow. Use when independent slices can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
   [
     "skills/dispatching-parallel-agents/SKILL.md",
     "skills/subagent-driven-development/SKILL.md",
@@ -887,23 +831,13 @@ parallel work is useful instead of waiting for the user to name subagents.
 - Do not accept worker success reports without reviewing diffs and running the
   relevant verification.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source paths:
-\`skills/dispatching-parallel-agents/SKILL.md\` and
-\`skills/subagent-driven-development/SKILL.md\`.
-This DevNexus adaptation adds explicit user authorization for subagents,
-DevNexus worktree ownership, disjoint write scopes, integration handoffs, and
-target-cycle records.
 `,
 );
 
 const requestWorkReviewSkill = adaptedSuperpowersSkill(
   "request-work-review",
   "request-work-review",
-  "Review-request workflow adapted from Superpowers requesting-code-review. Use before merging, publishing, or proceeding past a meaningful slice to verify requirements, risks, and implementation quality.",
+  "Review-request workflow. Use before merging, publishing, or proceeding past a meaningful slice to verify requirements, risks, and implementation quality.",
   ["skills/requesting-code-review/SKILL.md"],
   `
 # Request Work Review
@@ -938,21 +872,13 @@ before it becomes the basis for more work, publication, or cleanup.
   recording a reasoned rejection.
 - Do not hide required human approval inside an agent-only review.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/requesting-code-review/SKILL.md\`.
-This DevNexus adaptation broadens review beyond code while preserving concrete
-requirements, revision ranges, severity ordering, and verification evidence.
 `,
 );
 
 const receiveReviewFeedbackSkill = adaptedSuperpowersSkill(
   "receive-review-feedback",
   "receive-review-feedback",
-  "Review-feedback handling workflow adapted from Superpowers receiving-code-review. Use when responding to human, agent, or provider review feedback without blind agreement or unverified changes.",
+  "Review-feedback handling workflow. Use when responding to human, agent, or provider review feedback without blind agreement or unverified changes.",
   ["skills/receiving-code-review/SKILL.md"],
   `
 # Receive Review Feedback
@@ -986,22 +912,13 @@ request, issue comment, external reviewer, or automated check.
 - Do not mark feedback resolved without fresh verification evidence or a clear
   explanation of why verification was not run.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/receiving-code-review/SKILL.md\`.
-This DevNexus adaptation keeps the technical rigor of the upstream review flow
-while adding workspace policy, initiative decisions, and provider-thread
-recordkeeping.
 `,
 );
 
 const verifyBeforeCompletionSkill = adaptedSuperpowersSkill(
   "verify-before-completion",
   "verify-before-completion",
-  "Verification gate adapted from Superpowers verification-before-completion. Use before claiming work is complete, fixed, ready, published, or safe to hand off.",
+  "Verification gate. Use before claiming work is complete, fixed, ready, published, or safe to hand off.",
   ["skills/verification-before-completion/SKILL.md"],
   `
 # Verify Before Completion
@@ -1044,21 +961,13 @@ or safe to hand off.
   while knowingly skipping the verification required by the claim.
 - Do not hide failed or skipped verification in optimistic language.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/verification-before-completion/SKILL.md\`.
-This DevNexus adaptation routes verification evidence into tracker records,
-target-cycle facts, handoffs, pull requests, and final responses.
 `,
 );
 
 const diagnoseSkill = adaptedSuperpowersSkill(
   "diagnose",
   "diagnose",
-  "Systematic debugging workflow adapted from Superpowers systematic-debugging. Use for defects, failed checks, regressions, or unexpected behavior before proposing fixes.",
+  "Systematic debugging workflow. Use for defects, failed checks, regressions, or unexpected behavior before proposing fixes.",
   ["skills/systematic-debugging/SKILL.md"],
   `
 # Diagnose
@@ -1094,22 +1003,13 @@ workflow needs root-cause analysis before a fix.
 - After repeated failed fixes, stop and question the architecture or task
   boundary instead of trying one more guess.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/systematic-debugging/SKILL.md\`.
-This DevNexus adaptation adds multi-component workspace boundaries, generated
-support state, provider credentials, worktree setup, and durable root-cause
-records.
 `,
 );
 
 const tddSkill = adaptedSuperpowersSkill(
   "tdd",
   "tdd",
-  "Test-driven development workflow adapted from Superpowers test-driven-development. Use when adding or changing behavior that can be covered by an automated test or comparable executable check.",
+  "Test-driven development workflow. Use when adding or changing behavior that can be covered by an automated test or comparable executable check.",
   ["skills/test-driven-development/SKILL.md"],
   `
 # Test-Driven Development (TDD)
@@ -1147,21 +1047,13 @@ automated test or comparable executable check.
 - If the work is documentation, operations, or research, choose the equivalent
   executable or reviewable check rather than pretending a unit test is required.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/test-driven-development/SKILL.md\`.
-This DevNexus adaptation keeps red-green-refactor discipline while allowing
-non-code work to use the nearest executable or reviewable verification.
 `,
 );
 
 const writeAgentSkillSkill = adaptedSuperpowersSkill(
   "write-agent-skill",
   "write-agent-skill",
-  "Agent skill authoring workflow adapted from Superpowers writing-skills. Use when creating or revising DevNexus, component, or plugin skills with concise triggers, metadata, verification, and attribution.",
+  "Agent skill authoring workflow. Use when creating or revising DevNexus, component, or plugin skills with concise triggers, metadata, verification, and projection checks.",
   ["skills/writing-skills/SKILL.md"],
   `
 # Write Agent Skill
@@ -1180,8 +1072,8 @@ project-local agent skills.
 4. Make it generic when the workflow is generic. Avoid coupling a project-wide
    skill to one component, branch, tracker, or programming-only assumption
    unless that is the point of the skill.
-5. Include attribution when adapted from another source: license, upstream
-   repository, tag or version, exact commit hash, and source path.
+5. Store provenance and license metadata in DevNexus manifests and support files
+   instead of user-facing skill text.
 6. Verify the skill materializes through DevNexus support state and projects
    into configured agent-native directories. Add or update focused tests when
    the skill is part of the curated pack.
@@ -1194,18 +1086,10 @@ project-local agent skills.
   component skill pack.
 - Do not make the skill verbose enough that agents will ignore it.
 - Do not import licensed text without preserving the required notice and exact
-  provenance.
+  provenance in DevNexus metadata.
 - Do not write a skill that conflicts with higher-priority agent, workspace, or
   safety instructions.
 
-## Attribution
-
-Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
-\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
-Vincent / Prime Radiant. Source path:
-\`skills/writing-skills/SKILL.md\`.
-This DevNexus adaptation adds curated-pack metadata, projection verification,
-license provenance, and generic workflow constraints.
 `,
 );
 
@@ -1267,9 +1151,10 @@ delivery topology says how slice branches reach it.
 3. Inventory current state: prior decisions, active branches or artifacts,
    verification already run, blockers, and unrelated work that must be
    preserved.
-4. Slice by independently reviewable progress. Each slice needs one owner, one
-   scope, one verification path, and a clear contribution to the initiative
-   surface.
+4. Slice by independently reviewable vertical progress where possible. Each
+   slice needs one owner, one scope, one verification path, and a clear
+   contribution to the initiative surface. Do not make slices smaller than the
+   next real review, risk, ownership, or human-in-the-loop gate requires.
 5. Route every slice back to the initiative surface. If a slice wants a new
    surface or objective, decide whether it belongs here or should become a
    separate initiative.
@@ -1348,21 +1233,25 @@ constraints, approvals, and final direction.
    make, and include your recommendation when you have one.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
-4. Route through the relevant skill chain and invoke the next skill in that
+4. Before routing substantial work, make a sizing and routing call: classify
+   the work shape, choose the largest coherent vertical slice that can be
+   completed and verified before the next human-in-the-loop gate, and explain
+   the tradeoff briefly.
+5. Route through the relevant skill chain and invoke the next skill in that
    chain. In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the
    routing map for substantial led work when it is available. For work large
    enough to plan or slice, check whether \`parallel-work-dispatch\` would
    accelerate safe independent progress.
-5. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+6. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
-6. Track commitments, blockers, verification, and the next action so the user
+7. Track commitments, blockers, verification, and the next action so the user
    can decide from state, not from memory.
-7. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+8. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
    credentials, external provider writes, publication, destructive cleanup, or
    live runtime gates.
-8. Close loops. When a decision is made, record what changed and continue from
+9. Close loops. When a decision is made, record what changed and continue from
    that decision instead of relitigating it.
-9. End every substantive response with a push toward the next step: the
+10. End every substantive response with a push toward the next step: the
    recommended next action, the human-in-the-loop unblock needed, a short set
    of direction choices with your default, or a ready-to-run prompt the user
    can approve.
@@ -1380,6 +1269,32 @@ prompt instead of ending on a passive status summary.
 When leading multi-step work, choose the current skill chain before taking the
 next action. Say the chain when it matters, then invoke the next skill in that
 chain.
+
+## Sizing And Routing Call
+
+Use ordinary product and Agile planning terms so the recommendation is
+understandable across tools:
+
+- Direct answer: no durable work item is needed.
+- Task: one narrow technical action or support step.
+- Bug: a defect to reproduce, diagnose, fix, and verify.
+- Product Backlog Item or story: one independently useful vertical slice that
+  can reach Definition of Done in one led pass.
+- Epic: a larger outcome that must be split into related stories or Product
+  Backlog Items.
+- Initiative: a durable objective spanning multiple epics, components,
+  surfaces, or decision cycles.
+
+Do not equate "lead" with "make tiny slices." Prefer the largest coherent
+vertical slice that can be implemented, reviewed, verified, and handed off
+before the next real human-in-the-loop gate. Split only when scope uncertainty,
+review boundaries, ownership, risk, verification cost, provider mutation,
+credentials, or live-runtime safety make a smaller gate necessary.
+
+Estimate the shape of the work, not a calendar promise, unless the user asks
+for an actual time estimate. Use evidence from the codebase and tracker first;
+if the shape is uncertain, perform the next reversible discovery step, then
+revise the routing call.
 
 For Git-backed initiative work, choose the Git delivery topology before
 preparing a worktree. Direct slice topology is the default when slices can land
@@ -1446,16 +1361,6 @@ next skill chosen.
   gates.
 - Do not create status theater. Keep updates short, concrete, and tied to the
   next decision or action.
-
-## Reference
-
-OpenAI's Agents SDK human-in-the-loop guide describes the approval pattern this
-skill follows at decision gates: pause sensitive action, surface the pending
-decision, approve or reject, then resume from durable state.
-Source: openai/openai-agents-python docs/human_in_the_loop.md at
-45effb4b7d7de1226ebba7ba304bccfcf0a37fdf.
-https://github.com/openai/openai-agents-python/blob/45effb4b7d7de1226ebba7ba304bccfcf0a37fdf/docs/human_in_the_loop.md
-https://openai.github.io/openai-agents-python/human_in_the_loop/
 `,
   ),
   designWithUserSkill,
@@ -1620,7 +1525,7 @@ Long architecture, all command variants, provider-specific auth, historical desi
 
 ## Humanizer Pairing
 
-Use the vendored \`humanizer\` skill after the documentation structure is correct.
+Use the \`humanizer\` companion skill after the documentation structure is correct.
 Documentation decides what belongs where; humanizer improves how the prose
 sounds. Do not let polish change commands, facts, warnings, status, provider
 support, or project vocabulary.
@@ -1632,7 +1537,6 @@ support, or project vocabulary.
 - [Write the Docs documentation principles](https://www.writethedocs.org/guide/writing/docs-principles/): docs should be skimmable, current, discoverable, addressable, and close to the code they describe.
 - [Google developer documentation style guide](https://developers.google.com/style): prefer workspace-specific style first; clarity and consistency matter more than rigid rules.
 - [Google documentation best practices](https://google.github.io/styleguide/docguide/best_practices.html): update docs with code, keep minimum viable documentation fresh, and treat design docs as archives once implementation lands.
-- [blader/humanizer](https://github.com/blader/humanizer) and [Wikipedia "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing): use the vendored \`humanizer\` companion skill to remove inflated, vague, formulaic, and chatbot-like prose.
 `,
   ),
   humanizerSkill,
@@ -1647,7 +1551,10 @@ Use this skill when a plan, specification, or Product Requirements Document (PRD
 
 1. Gather the source plan, existing issue context, tracker conventions, and relevant domain glossary or Architecture Decision Records.
 2. Explore enough code to understand the current implementation state before proposing issue boundaries.
-3. Split the work into tracer-bullet vertical slices: each issue should deliver a narrow end-to-end behavior that can be demonstrated or verified on its own.
+3. Split the work into vertical slices: each issue should deliver an end-to-end
+   behavior or result that can be demonstrated or verified on its own. Use a
+   technical task only when the work cannot honestly be framed as user-visible
+   or end-to-end progress.
 4. Mark each proposed slice as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
 5. Present the proposed issue list for review with title, type, blockers, user stories covered, and acceptance criteria.
 6. After approval, create or update tracker issues in dependency order. Do not close or rewrite the parent issue unless explicitly asked.

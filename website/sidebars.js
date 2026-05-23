@@ -2,6 +2,7 @@
 const sidebars = {
   mainSidebar: [
     "index",
+    "dev-nexus-features",
     {
       type: "category",
       label: "User Guide",

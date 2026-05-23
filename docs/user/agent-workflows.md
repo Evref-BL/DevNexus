@@ -24,6 +24,11 @@ available. A user request to lead the work is enough authorization to recommend
 subagents, subject to workspace policy, tool availability, cost,
 provider-mutation, credential, and runtime approval gates.
 
+Use [Concepts](concepts.md#work-sizing-terms) for sizing terms. DevNexus uses
+`work item` as the neutral tracker record, `slice` as an independently
+reviewable vertical increment, and `delivery topology` as the Git and review
+route for slice branches.
+
 ## MCP Server
 
 Start the generic stdio Model Context Protocol (MCP) server with:
@@ -46,6 +51,9 @@ setup_record
 target_cycle_list
 target_cycle_record
 target_report
+publication_initiative_plan
+publication_initiative_report
+publication_initiative_finalization
 current_agent_adopt
 current_agent_record
 coordination_status
@@ -166,6 +174,32 @@ first worktree. The words "feature", "initiative", "bugfix campaign", and
   base new work on it.
 - Use the workspace release policy for version, train, candidate, and merge
   queue decisions.
+
+For initiative delivery, let the worktree and publication tools choose the
+provider surface from policy. The default final pull-request timing is
+`at_review_gate`, so agents should not open a final PR when the initiative branch
+is created unless policy explicitly says `at_initiative_start`. When upstream
+branch pushes are unavailable, use the configured `branchPublication` fallback
+remote instead of inventing a fork or pushing with a human account.
+
+Use `publication branch-push --initiative` to let DevNexus probe the configured
+remote path. For `publication_remote_then_fallback`, the command checks the
+publication remote with a dry-run push before it selects the fallback remote.
+Use `initiative-finalization` to get the final PR action; for GitHub forks it
+renders the `owner:branch` head ref when the fallback remote URL identifies the
+fork.
+
+For stacked or hybrid work, pass `--initiative-parent` and
+`--initiative-stack-position` when a slice is not the first slice in the stack.
+The generated worker context records the parent branch and stack position, so
+later agents can distinguish a normal update from a restack. Restacking a
+pushed branch requires human approval when it needs `--force-with-lease`.
+
+If `initiative-report` or `initiative-finalization` says the review branch is
+behind or diverged, prefer the reported merge-update command unless a human
+explicitly chooses rebase. Rebase rewrites the branch and needs a
+force-with-lease push, so it is a human-in-the-loop gate for public initiative
+branches.
 
 Prepare a component-scoped worktree when implementation should be isolated:
 

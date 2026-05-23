@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
+  defaultNexusInitiativeDeliveryConfig,
   materializeNexusProjectSkills,
   nexusWorkerContextJsonPath,
   prepareNexusManualWorktree,
@@ -369,6 +370,162 @@ describe("nexus manual worktree worker target preparation", () => {
     expect(result.setup.context!.briefingMarkdown).toContain(
       "- automation Git identity: Example Bot <bot@example.invalid>",
     );
+  });
+
+  it("derives branch, base ref, and worker context from initiative delivery policy", () => {
+    const { projectRoot, calls } = prepareProject({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: null,
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+              branchPublication: {
+                strategy: "publication_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
+            },
+            selector: {
+              statuses: ["ready"],
+              labels: [],
+              milestones: [],
+              assignees: [],
+              providerQuery: null,
+            },
+          },
+        },
+      },
+    });
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      initiativeId: "codex-goals",
+      initiativeSlice: "target projection",
+      branchIntent: "feat",
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(result.worktree.branchName).toBe("feat/codex-goals/target-projection");
+    expect(result.worktree.baseRef).toBe("feat/codex-goals");
+    expect(context.initiativeDelivery).toMatchObject({
+      initiativeId: "codex-goals",
+      sliceSlug: "target-projection",
+      topology: "hybrid",
+      integrationBranch: "feat/codex-goals",
+      branchTarget: "feat/codex-goals",
+      parentBranch: "feat/codex-goals",
+      stackPosition: 1,
+      childBranches: [],
+      stackPublicationEligible: true,
+      finalPublicationTarget: "main",
+      reviewMode: "slice_pr",
+      finalPullRequestCreation: "at_review_gate",
+      providerNoise: "status_only",
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        publicationRemote: "origin",
+        fallbackRemote: "fork",
+        selectedRemote: "origin",
+        requiresFallbackApproval: true,
+      },
+    });
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Initiative: codex-goals",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Review target: feat/codex-goals",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Stack position: 1",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Final PR creation: at_review_gate",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Branch publication remote: origin (fallback: fork)",
+    );
+  });
+
+  it("records selected stack parent and position in initiative worktree context", () => {
+    const { projectRoot, calls } = prepareProject({
+      home: "home",
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: null,
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "stacked",
+            },
+            selector: {
+              statuses: ["ready"],
+              labels: [],
+              milestones: [],
+              assignees: [],
+              providerQuery: null,
+            },
+          },
+        },
+      },
+    });
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      initiativeId: "codex-goals",
+      initiativeSlice: "worker context",
+      initiativeParentBranch: "feat/codex-goals/target-projection",
+      initiativeStackPosition: 2,
+      branchIntent: "feat",
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(result.worktree.baseRef).toBe("feat/codex-goals/target-projection");
+    expect(context.initiativeDelivery).toMatchObject({
+      topology: "stacked",
+      branchTarget: "feat/codex-goals/target-projection",
+      parentBranch: "feat/codex-goals/target-projection",
+      stackPosition: 2,
+      stackPublicationEligible: true,
+    });
   });
 
   it("prepares worktrees with the project default automation Git identity", () => {

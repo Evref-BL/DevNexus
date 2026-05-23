@@ -183,11 +183,28 @@ export interface NexusAutomationTargetReportPublicationDecisionSummary
   workItemTitle: string | null;
 }
 
+export interface NexusAutomationTargetReportCodexGoalSummary {
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  workItemTitle: string | null;
+  goalId: string | null;
+  threadId: string | null;
+  status: string | null;
+  tokenBudget: number | null;
+  tokensUsed: number | null;
+  timeUsedSeconds: number | null;
+  setStatus: string;
+  readStatus: string;
+  summary: string;
+}
+
 export interface NexusAutomationTargetReportExecutionSummary {
   runCount: number;
   commitIds: string[];
   verification: NexusAutomationTargetReportVerificationSummary[];
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
+  codexGoals: NexusAutomationTargetReportCodexGoalSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
 }
 
@@ -203,6 +220,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   commitIds: string[];
   verification: NexusAutomationTargetReportVerificationSummary[];
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
+  codexGoals: NexusAutomationTargetReportCodexGoalSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
   publication: NexusAutomationPublicationPolicySummary | null;
   publicationTrain: NexusPublicationTrainPolicySummary | null;
@@ -716,14 +734,82 @@ function summarizeExecution(
       },
     ];
   });
+  const codexGoals = ledger.runs.flatMap((run) => {
+    if (!run.codexAppServer?.goal) {
+      return [];
+    }
+    const summary = runById.get(run.id);
+    return [
+      summarizeCodexGoal({
+        run,
+        workItemTitle: summary?.workItemTitle ?? null,
+      }),
+    ];
+  });
 
   return {
     runCount: ledger.runs.length,
     commitIds: uniqueStrings(ledger.runs.flatMap((run) => run.commitIds)),
     verification,
     publicationDecisions,
+    codexGoals,
     runs,
   };
+}
+
+function summarizeCodexGoal(options: {
+  run: NexusAutomationRunRecord;
+  workItemTitle: string | null;
+}): NexusAutomationTargetReportCodexGoalSummary {
+  const goal = options.run.codexAppServer!.goal!;
+  return {
+    runId: options.run.id,
+    componentId: options.run.componentId,
+    workItemId: options.run.workItemId,
+    workItemTitle: options.workItemTitle,
+    goalId: goal.goalId,
+    threadId: goal.threadId,
+    status: goal.status,
+    tokenBudget: goal.tokenBudget,
+    tokensUsed: goal.tokensUsed,
+    timeUsedSeconds: goal.timeUsedSeconds,
+    setStatus: goal.setStatus,
+    readStatus: goal.readStatus,
+    summary: codexGoalSummaryText(goal),
+  };
+}
+
+function codexGoalSummaryText(
+  goal: NonNullable<NexusAutomationCodexAppServerLaunchMetadata["goal"]>,
+): string {
+  if (goal.readStatus === "read") {
+    const status = goal.status ?? "unknown";
+    const thread = goal.threadId ?? "unknown";
+    return [
+      `Codex Goal ${status} for thread ${thread}`,
+      codexGoalTokenSummary(goal),
+      goal.timeUsedSeconds === null ? null : `time ${goal.timeUsedSeconds}s`,
+    ].filter((part): part is string => !!part).join("; ") + ".";
+  }
+
+  const failure = goal.failureSummary ? `: ${goal.failureSummary}` : "";
+  return `Codex Goal set=${goal.setStatus} read=${goal.readStatus}${failure}.`;
+}
+
+function codexGoalTokenSummary(
+  goal: NonNullable<NexusAutomationCodexAppServerLaunchMetadata["goal"]>,
+): string | null {
+  if (goal.tokensUsed === null && goal.tokenBudget === null) {
+    return null;
+  }
+  if (goal.tokensUsed !== null && goal.tokenBudget !== null) {
+    return `tokens ${goal.tokensUsed}/${goal.tokenBudget}`;
+  }
+  if (goal.tokensUsed !== null) {
+    return `tokens used ${goal.tokensUsed}`;
+  }
+
+  return `token budget ${goal.tokenBudget}`;
 }
 
 function summarizeActiveBlockers(options: {
@@ -890,6 +976,9 @@ function summarizeComponentProgress(options: {
       options.executionSummary.publicationDecisions.filter(
         (decisionRecord) => decisionRecord.componentId === componentId,
       );
+    const codexGoals = options.executionSummary.codexGoals.filter(
+      (goal) => goal.componentId === componentId,
+    );
 
     return {
       componentId,
@@ -903,6 +992,7 @@ function summarizeComponentProgress(options: {
       commitIds: uniqueStrings(draft.runs.flatMap((run) => run.commitIds)),
       verification,
       publicationDecisions,
+      codexGoals,
       runs: draft.runs,
       publication: draft.component
         ? summarizeNexusAutomationPublicationPolicy(

@@ -3,6 +3,7 @@ import {
   type CodexAppServerCapabilityAdapter,
 } from "./codexAppServerCapabilityAdapter.js";
 import {
+  CodexAppServerJsonRpcError,
   CodexAppServerJsonRpcClient,
   createCodexAppServerStdioJsonRpcTransport,
   summarizeCodexAppServerJsonRpcFailure,
@@ -15,6 +16,9 @@ import type {
   NexusAutomationAgentLauncher,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunch.js";
+import type {
+  NexusAutomationCodexAppServerGoalMetadata,
+} from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   readNexusAutomationAgentResultFile,
 } from "./nexusAutomationAgentLaunch.js";
@@ -34,6 +38,11 @@ export interface NexusAutomationCodexAppServerForkOptions {
   turnId?: string | null;
 }
 
+export interface NexusAutomationCodexAppServerGoalOptions {
+  enabled?: boolean;
+  tokenBudget?: number | null;
+}
+
 export interface NexusAutomationCodexAppServerClientFactoryInput {
   input: NexusAutomationAgentLaunchInput;
   profile: NexusAutomationAgentProfilePolicy;
@@ -51,6 +60,7 @@ export interface CreateNexusAutomationCodexAppServerLauncherOptions {
   turnInput?: string | ((input: NexusAutomationAgentLaunchInput) => string);
   threadPersistence?: NexusAutomationCodexAppServerThreadPersistence;
   fork?: NexusAutomationCodexAppServerForkOptions;
+  goal?: NexusAutomationCodexAppServerGoalOptions | false;
   env?: NodeJS.ProcessEnv;
   adapter?: CodexAppServerCapabilityAdapter;
   client?: CodexAppServerJsonRpcClient;
@@ -98,6 +108,7 @@ export function createNexusAutomationCodexAppServerLauncher(
     let ephemeral = true;
     let threadId: string | null = null;
     let turnId: string | null = null;
+    let goal: NexusAutomationCodexAppServerGoalMetadata | null = null;
     const fork = options.fork ?? null;
     const action = fork ? "thread_fork" : "thread_start";
 
@@ -147,6 +158,12 @@ export function createNexusAutomationCodexAppServerLauncher(
           "id",
           "thread.id",
         ], "thread id");
+        goal = await maybeSetCodexThreadGoal({
+          adapter,
+          input,
+          threadId,
+          goalOptions: options.goal,
+        });
         const turnResult = await adapter.client.request(
           "turn/start",
           codexTurnParams({
@@ -174,6 +191,11 @@ export function createNexusAutomationCodexAppServerLauncher(
             options.turnCompletionNotificationTimeoutMs ??
             defaultTurnCompletionNotificationTimeoutMs,
         });
+        goal = await maybeReadCodexThreadGoal({
+          adapter,
+          threadId,
+          goal,
+        });
 
         const reported = readNexusAutomationAgentResultFile(input.resultFile);
         if (reported.status !== "loaded") {
@@ -192,6 +214,7 @@ export function createNexusAutomationCodexAppServerLauncher(
               ephemeral,
               cwd,
               failureSummary: reported.error,
+              goal,
             }),
           };
         }
@@ -220,6 +243,7 @@ export function createNexusAutomationCodexAppServerLauncher(
             ephemeral,
             cwd,
             failureSummary: resultFailureSummary,
+            goal,
           }),
         };
       } finally {
@@ -246,6 +270,7 @@ export function createNexusAutomationCodexAppServerLauncher(
                 ephemeral,
                 cwd: cwd || input.projectRoot,
                 failureSummary,
+                goal,
               }),
             }
           : {}),
@@ -546,6 +571,241 @@ function codexTurnParams(options: {
   });
 }
 
+async function maybeSetCodexThreadGoal(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  input: NexusAutomationAgentLaunchInput;
+  threadId: string;
+  goalOptions: CreateNexusAutomationCodexAppServerLauncherOptions["goal"];
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
+  const projection = resolveCodexThreadGoalProjection(options.goalOptions);
+  if (!projection.enabled) {
+    return null;
+  }
+
+  const metadata = initialCodexThreadGoalMetadata({
+    adapter: options.adapter,
+    threadId: options.threadId,
+    tokenBudget: projection.tokenBudget,
+  });
+  if (!options.adapter.capabilities.threadGoalSet.available) {
+    return metadata;
+  }
+
+  try {
+    await options.adapter.client.request(
+      options.adapter.capabilities.threadGoalSet.method,
+      codexThreadGoalSetParams({
+        input: options.input,
+        threadId: options.threadId,
+        tokenBudget: projection.tokenBudget,
+      }),
+    );
+    return {
+      ...metadata,
+      setStatus: "set",
+    };
+  } catch (error) {
+    if (isCodexThreadGoalUnavailableError(error)) {
+      return {
+        ...metadata,
+        setStatus: "unavailable",
+        readStatus: "unavailable",
+        failureSummary: summarizeCodexAppServerJsonRpcFailure(error),
+      };
+    }
+    throw error;
+  }
+}
+
+async function maybeReadCodexThreadGoal(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  threadId: string;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
+  if (!options.goal || options.goal.setStatus !== "set") {
+    return options.goal;
+  }
+  if (!options.adapter.capabilities.threadGoalGet.available) {
+    return {
+      ...options.goal,
+      readStatus: "unsupported",
+    };
+  }
+
+  try {
+    const result = await options.adapter.client.request(
+      options.adapter.capabilities.threadGoalGet.method,
+      { threadId: options.threadId },
+    );
+    return codexThreadGoalReadMetadata(options.goal, result);
+  } catch (error) {
+    return {
+      ...options.goal,
+      readStatus: isCodexThreadGoalUnavailableError(error)
+        ? "unavailable"
+        : "failed",
+      failureSummary: summarizeCodexAppServerJsonRpcFailure(error),
+    };
+  }
+}
+
+function initialCodexThreadGoalMetadata(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  threadId: string;
+  tokenBudget?: number | null;
+}): NexusAutomationCodexAppServerGoalMetadata {
+  const getMethodAvailable = options.adapter.capabilities.threadGoalGet.available;
+  return {
+    requested: true,
+    setMethodAvailable: options.adapter.capabilities.threadGoalSet.available,
+    getMethodAvailable,
+    setStatus: options.adapter.capabilities.threadGoalSet.available
+      ? "not_requested"
+      : "unsupported",
+    readStatus: getMethodAvailable ? "not_requested" : "unsupported",
+    goalId: null,
+    threadId: options.threadId,
+    status: null,
+    tokenBudget: options.tokenBudget ?? null,
+    tokensUsed: null,
+    timeUsedSeconds: null,
+    failureSummary: null,
+  };
+}
+
+function codexThreadGoalReadMetadata(
+  existing: NexusAutomationCodexAppServerGoalMetadata,
+  value: unknown,
+): NexusAutomationCodexAppServerGoalMetadata {
+  const goal = codexThreadGoalRecord(value);
+  return {
+    ...existing,
+    readStatus: "read",
+    goalId: firstStringAtPath(goal, ["goalId", "goal_id", "id"]) ?? null,
+    threadId: firstStringAtPath(goal, ["threadId", "thread_id"]) ??
+      existing.threadId,
+    status: firstStringAtPath(goal, ["status", "state"]) ?? existing.status,
+    tokenBudget: optionalNumberAtPath(goal, ["tokenBudget", "token_budget"]),
+    tokensUsed: optionalNumberAtPath(goal, ["tokensUsed", "tokens_used"]),
+    timeUsedSeconds: optionalNumberAtPath(goal, [
+      "timeUsedSeconds",
+      "time_used_seconds",
+    ]),
+    failureSummary: null,
+  };
+}
+
+function codexThreadGoalRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const nestedGoal = value.goal;
+  return isRecord(nestedGoal) ? nestedGoal : value;
+}
+
+function codexThreadGoalSetParams(options: {
+  input: NexusAutomationAgentLaunchInput;
+  threadId: string;
+  tokenBudget?: number | null;
+}): Record<string, unknown> {
+  return compactRecord({
+    threadId: options.threadId,
+    objective: codexThreadGoalObjective(options.input),
+    tokenBudget: options.tokenBudget,
+  });
+}
+
+function codexThreadGoalObjective(
+  input: NexusAutomationAgentLaunchInput,
+): string {
+  const targetId = input.automationConfig.target.id;
+  const targetObjective =
+    input.automationConfig.target.objective?.trim() ||
+    `Advance eligible DevNexus work for ${input.projectConfig.name}.`;
+  const workScope = codexThreadGoalWorkScope(input);
+
+  return [
+    targetId
+      ? `Target ${targetId}: ${targetObjective}`
+      : `Target: ${targetObjective}`,
+    workScope,
+    `Run ${input.runId} starts from context ${input.contextFile}.`,
+    `Write result JSON to ${input.resultFile}. The result must include status and summary; include verification, commitIds, workItems, publicationDecision, and error when relevant.`,
+    "Completion requires concrete evidence from the repository, commands, tests, logs, or generated artifacts.",
+    "Stop and report blocked if human approval, credentials, provider review, unsafe mutation, missing access, or a publication decision is required.",
+    "Preserve DevNexus work-item, worktree, authority, verification, and publication gates.",
+  ].join("\n");
+}
+
+function codexThreadGoalWorkScope(
+  input: NexusAutomationAgentLaunchInput,
+): string {
+  const claim = input.workItemClaim;
+  if (claim?.workItemId) {
+    const title = claim.workItemTitle ? `: ${claim.workItemTitle}` : "";
+    return `Selected work item ${claim.workItemId}${title}.`;
+  }
+
+  const items = input.eligibleWorkItems.slice(0, 5).map((item) =>
+    `${item.id}: ${item.title}`
+  );
+  if (items.length === 0) {
+    return "No specific work item is claimed yet; use the DevNexus context to select the bounded eligible work.";
+  }
+
+  const suffix =
+    input.eligibleWorkItems.length > items.length
+      ? ` plus ${input.eligibleWorkItems.length - items.length} more`
+      : "";
+  return `Eligible work: ${items.join("; ")}${suffix}.`;
+}
+
+function resolveCodexThreadGoalProjection(
+  options: CreateNexusAutomationCodexAppServerLauncherOptions["goal"],
+): { enabled: boolean; tokenBudget?: number | null } {
+  if (options === false || options?.enabled === false) {
+    return { enabled: false };
+  }
+
+  const tokenBudget = normalizeCodexThreadGoalTokenBudget(
+    options?.tokenBudget,
+  );
+  return tokenBudget === undefined
+    ? { enabled: true }
+    : { enabled: true, tokenBudget };
+}
+
+function normalizeCodexThreadGoalTokenBudget(
+  value: number | null | undefined,
+): number | null | undefined {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new NexusAutomationCodexAppServerLaunchError(
+      "goal.tokenBudget must be a positive safe integer when provided",
+    );
+  }
+
+  return value;
+}
+
+function isCodexThreadGoalUnavailableError(error: unknown): boolean {
+  if (!(error instanceof CodexAppServerJsonRpcError)) {
+    return false;
+  }
+  if (!error.method.startsWith("thread/goal/")) {
+    return false;
+  }
+  if (error.code === -32601) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return /goals? feature is disabled/.test(message) ||
+    /goals? (are|is) (disabled|unavailable|unsupported)/.test(message);
+}
+
 function codexExecutionParams(options: {
   input: NexusAutomationAgentLaunchInput;
   profile: NexusAutomationAgentProfilePolicy;
@@ -705,6 +965,7 @@ function codexAppServerMetadata(options: {
   ephemeral: boolean;
   cwd: string;
   failureSummary: string | null;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
 }): NexusAutomationCodexAppServerLaunchMetadata {
   return {
     provider: "codex-app-server",
@@ -723,6 +984,7 @@ function codexAppServerMetadata(options: {
     reasoning: options.profile.reasoning,
     resultFile: options.input.resultFile,
     failureSummary: options.failureSummary,
+    goal: options.goal,
   };
 }
 
@@ -774,6 +1036,23 @@ function firstStringAtPath(
     const candidate = valueAtPath(value, path);
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function optionalNumberAtPath(
+  value: Record<string, unknown>,
+  paths: readonly string[],
+): number | null {
+  for (const path of paths) {
+    const candidate = valueAtPath(value, path);
+    if (candidate === null) {
+      return null;
+    }
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
     }
   }
 

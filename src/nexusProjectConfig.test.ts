@@ -1349,6 +1349,110 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts project and tracker communication policy", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "tracker-policy-project",
+        name: "Tracker Policy Project",
+        workTrackerCommunication: {
+          coordinationHandoffs: "silent",
+        },
+        components: [
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                roles: ["primary", "coordination"],
+                communication: {
+                  coordinationHandoffs: "comment",
+                },
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "core",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      workTrackerCommunication: {
+        coordinationHandoffs: "silent",
+      },
+      components: [
+        {
+          workTrackers: [
+            {
+              id: "github",
+              communication: {
+                coordinationHandoffs: "comment",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("rejects invalid tracker communication policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-tracker-policy-project",
+        name: "Bad Tracker Policy Project",
+        workTrackerCommunication: {
+          coordinationHandoffs: "shout",
+        },
+        components: [],
+      }),
+    ).toThrow(/workTrackerCommunication\.coordinationHandoffs/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-tracker-policy-project",
+        name: "Bad Tracker Policy Project",
+        components: [
+          {
+            id: "core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                roles: ["coordination"],
+                communication: {
+                  coordinationHandoffs: "external",
+                },
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "core",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/workTrackers\[0\]\.communication\.coordinationHandoffs/);
+  });
+
   it("normalizes tracker discovery roles and effective default policy", () => {
     const config = validateProjectConfig({
       version: 1,
@@ -2103,6 +2207,187 @@ describe("workspace config", () => {
         labels: [],
       },
     });
+  });
+
+  it("accepts initiative delivery policy on publication trains", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "initiative-delivery-project",
+      name: "Initiative Delivery Project",
+      automation: {
+        publication: {
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            initiativeDelivery: {
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+              allowedTopologies: ["direct", "stacked", "hybrid"],
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+                allowedIntentPrefixes: ["feat/", "fix", "chore"],
+                integrationBranchPattern: "{intent}/{initiative}",
+                sliceBranchPattern: "{intent}/{initiative}/{slice}",
+              },
+              review: {
+                mode: "slice_pr",
+                finalPullRequest: true,
+                finalPullRequestCreation: "at_review_gate",
+              },
+              provider: {
+                noise: "status_only",
+              },
+              branchPublication: {
+                strategy: "publication_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(
+      config.automation?.publication.publicationTrain?.initiativeDelivery,
+    ).toMatchObject({
+      enabled: true,
+      activeInitiativeId: "codex-goals",
+      defaultTopology: "hybrid",
+      allowedTopologies: ["direct", "stacked", "hybrid"],
+      branchNaming: {
+        defaultIntentPrefix: "feat",
+        allowedIntentPrefixes: ["feat", "fix", "chore"],
+        integrationBranchPattern: "{intent}/{initiative}",
+        sliceBranchPattern: "{intent}/{initiative}/{slice}",
+      },
+      review: {
+        mode: "slice_pr",
+        finalPullRequest: true,
+        finalPullRequestCreation: "at_review_gate",
+      },
+      provider: {
+        noise: "status_only",
+      },
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        fallbackRemote: "fork",
+      },
+    });
+  });
+
+  it("rejects invalid initiative delivery policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                defaultTopology: "hybrid",
+                allowedTopologies: ["direct", "stacked"],
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultTopology must be included in allowedTopologies/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchNaming: {
+                  defaultIntentPrefix: "initiative",
+                  allowedIntentPrefixes: ["feat", "fix"],
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultIntentPrefix must be included in allowedIntentPrefixes/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchNaming: {
+                  integrationBranchPattern: "{intent}/{initiative}/{slice}",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/integrationBranchPattern must not include \{slice\}/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                review: {
+                  finalPullRequestCreation: "always",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/finalPullRequestCreation must be/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchPublication: {
+                  strategy: "fallback_remote",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/fallbackRemote is required/);
   });
 
   it("accepts publication identity and remote guardrails", () => {

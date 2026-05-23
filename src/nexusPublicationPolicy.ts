@@ -625,6 +625,8 @@ export function buildNexusPublicationGitPushPlan(options: {
   credential?: NexusResolvedProviderCredential | null;
   projectRoot?: string;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  remoteOverride?: string | null;
+  preferConfiguredRemote?: boolean;
 }): NexusPublicationGitPushPlan {
   return prepareNexusPublicationGitPush(options).plan;
 }
@@ -639,6 +641,8 @@ export function prepareNexusPublicationGitPush(options: {
   credential?: NexusResolvedProviderCredential | null;
   projectRoot?: string;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  remoteOverride?: string | null;
+  preferConfiguredRemote?: boolean;
 }): NexusPublicationGitPushInvocation {
   const repositoryPath = path.resolve(
     requiredPublicationValue(options.repositoryPath, "repositoryPath"),
@@ -670,6 +674,7 @@ export function prepareNexusPublicationGitPush(options: {
   };
   const credential = options.credential ?? null;
   if (
+    options.preferConfiguredRemote !== true &&
     credential &&
     (credential.secret?.kind === "token" ||
       credential.kind === "github_app" ||
@@ -689,7 +694,9 @@ export function prepareNexusPublicationGitPush(options: {
   }
 
   const remote = requiredPublicationValue(
-    options.policy.remote ?? defaultNexusAutomationConfig.publication.remote,
+    options.remoteOverride ??
+      options.policy.remote ??
+      defaultNexusAutomationConfig.publication.remote,
     "publication remote",
   );
   const args = [
@@ -731,6 +738,8 @@ export function pushNexusPublicationBranch(options: {
   authProfiles?: NexusHostingAuthProfileConfig[];
   baseEnv?: NodeJS.ProcessEnv;
   gitRunner?: NexusPublicationGitPushRunner;
+  remoteOverride?: string | null;
+  preferConfiguredRemote?: boolean;
 }): NexusPublicationGitPushResult {
   const invocation = prepareNexusPublicationGitPush(options);
   const gitRunner = options.gitRunner ?? defaultPublicationGitPushRunner;

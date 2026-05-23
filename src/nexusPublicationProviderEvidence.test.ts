@@ -27,8 +27,10 @@ describe("publication provider evidence facade", () => {
         headSha: "abc123",
         targetBranch: "main",
         intendedCiTier: "remote_smoke",
+        reviewDecision: "APPROVED",
         mergeability: "mergeable",
         branchPolicy: "clear",
+        baseStatus: "behind",
         checks: [
           {
             name: "Node 22 check (ubuntu-latest)",
@@ -54,8 +56,10 @@ describe("publication provider evidence facade", () => {
       headSha: "abc123",
       targetBranch: "main",
       intendedCiTier: "remote_smoke",
+      reviewState: "approved",
       mergeability: "mergeable",
       branchPolicy: "clear",
+      baseStatus: "behind",
       checks: [
         {
           name: "Node 22 check (ubuntu-latest)",

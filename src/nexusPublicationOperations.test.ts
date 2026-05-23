@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main } from "./cli.js";
 import {
   defaultNexusAutomationConfig,
+  defaultNexusInitiativeDeliveryConfig,
+  inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   saveProjectConfig,
@@ -73,6 +75,241 @@ describe("publication operations", () => {
       }),
     ]);
   });
+
+  it("pushes initiative branches through the configured fallback remote", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(projectRoot, initiativeFallbackPublicationProjectConfig(homePath));
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      initiativeId: "codex-goals",
+      branchPublication: {
+        strategy: "fallback_remote",
+        selectedRemote: "fork",
+      },
+    });
+    expect(result.push.plan).toMatchObject({
+      transport: "configured_remote",
+      remote: "fork",
+      refspec: "feat/codex-goals",
+    });
+    expect(calls).toEqual([
+      {
+        args: ["push", "fork", "feat/codex-goals"],
+        token: undefined,
+      },
+    ]);
+  });
+
+  it("selects fallback remotes after publication remote dry-run permission denial", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        if (args.join(" ") === "push --dry-run app feat/codex-goals") {
+          return {
+            args: [...args],
+            stdout: "",
+            stderr: "ERROR: permission denied",
+            exitCode: 1,
+          };
+        }
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        selectedRemote: "fork",
+      },
+      remoteSelection: {
+        status: "fallback_selected",
+        selectedRemote: "fork",
+        probes: [
+          {
+            remote: "app",
+            writable: false,
+          },
+          {
+            remote: "fork",
+            writable: true,
+          },
+        ],
+      },
+    });
+    expect(result.push.plan).toMatchObject({
+      transport: "configured_remote",
+      remote: "fork",
+      refspec: "feat/codex-goals",
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["push", "--dry-run", "app", "feat/codex-goals"],
+      ["push", "--dry-run", "fork", "feat/codex-goals"],
+      ["push", "fork", "feat/codex-goals"],
+    ]);
+  });
+
+  it("keeps initiative branch pushes on the publication remote when the dry-run succeeds", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      remoteSelection: {
+        status: "publication_remote_writable",
+        selectedRemote: "app",
+        probes: [
+          {
+            remote: "app",
+            writable: true,
+          },
+        ],
+      },
+    });
+    expect(result.push.plan.transport).toBe("https_token");
+    expect(calls[0]!.args).toEqual([
+      "push",
+      "--dry-run",
+      "app",
+      "feat/codex-goals",
+    ]);
+    expect(calls[1]!.args).toContain("push");
+    expect(calls[1]!.args).toContain("https://github.com/Evref-BL/DevNexus.git");
+    expect(calls[1]!.args).toContain("feat/codex-goals");
+  });
+
+  it("blocks initiative fallback selection before live push when fallback setup fails", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "feat/codex-goals",
+        initiativeId: "codex-goals",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        }),
+      }),
+    ).rejects.toThrow(/fix remote fork before publishing the initiative branch/u);
+  });
+
+  it("reports manual-only initiative branch publication as a structured blocker", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(homePath, "manual_only", null),
+    );
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "feat/codex-goals",
+        initiativeId: "codex-goals",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: () => {
+          throw new Error("git should not run for manual-only publication");
+        },
+      }),
+    ).rejects.toMatchObject({
+      remoteSelection: {
+        status: "blocked",
+        reasons: ["initiative branch publication is manual-only"],
+      },
+    });
+  });
+
 
   it("pushes review branches through GitHub App user-to-server credentials for human actors", async () => {
     const { projectRoot, sourceRoot } = createHumanUserTokenPublicationProject();
@@ -407,6 +644,106 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("reads pull request evidence through the forge adapter with App API credentials", async () => {
+    const { projectRoot } = createPublicationProject();
+    const requests: Array<{ url: string; method: string; authorization: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add App publication commands",
+            mergeable: true,
+            mergeable_state: "behind",
+            head: {
+              ref: "feat/initiative-delivery-topology",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 22 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const result = await inspectNexusPublicationPullRequestForComponent({
+      projectRoot,
+      number: 191,
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.credential).toMatchObject({
+      profileId: "dev-nexus-app-github",
+      kind: "github_app",
+    });
+    expect(result.evidence).toMatchObject({
+      provider: "github",
+      sourceKind: "pull_request",
+      headBranch: "feat/initiative-delivery-topology",
+      targetBranch: "main",
+      reviewState: "approved",
+      baseStatus: "behind",
+      mergeability: "blocked",
+      checks: [
+        {
+          name: "Node 22 check (ubuntu-latest)",
+          conclusion: "success",
+        },
+      ],
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls/191",
+        "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
+        "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
+      ]);
+    expect(requests.every((request) =>
+      request.authorization === "Bearer installation-token"
+    )).toBe(true);
+  });
+
   it("merges pull requests through the forge adapter with App API credentials", async () => {
     const { projectRoot } = createPublicationProject();
     const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
@@ -536,6 +873,141 @@ describe("publication CLI operations", () => {
     });
     expect(stdout.output()).not.toContain("installation-token");
     expect(calls).toEqual([{ token: "installation-token" }]);
+  });
+
+  it("prints selected initiative branch-push fallback plans as JSON", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const stdout = textWriter();
+    const gitRunner: NexusPublicationGitPushRunner = (args) => {
+      if (args.join(" ") === "push --dry-run app feat/codex-goals") {
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        };
+      }
+      return {
+        args: [...args],
+        stdout: "",
+        stderr: "Everything up-to-date",
+        exitCode: 0,
+      };
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "branch-push",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "feat/codex-goals",
+        "--initiative",
+        "codex-goals",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: gitRunner,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      dryRun: true,
+      initiativeDelivery: {
+        branchPublication: {
+          strategy: "publication_remote_then_fallback",
+          selectedRemote: "fork",
+        },
+        remoteSelection: {
+          status: "fallback_selected",
+          selectedRemote: "fork",
+          reasons: [
+            "publication remote app rejected a dry-run branch push",
+            "fallback remote fork accepted a dry-run branch push",
+          ],
+        },
+      },
+      push: {
+        plan: {
+          transport: "configured_remote",
+          remote: "fork",
+        },
+      },
+    });
+  });
+
+  it("prints blocked initiative branch-push setup actions as JSON", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const stdout = textWriter();
+
+    const exitCode = await main(
+      [
+        "publication",
+        "branch-push",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "feat/codex-goals",
+        "--initiative",
+        "codex-goals",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      error: {
+        code: "initiative_branch_publication_blocked",
+      },
+      initiativeDelivery: {
+        remoteSelection: {
+          status: "blocked",
+          selectedRemote: null,
+          reasons: ["fallback remote fork rejected a dry-run branch push"],
+          setupActions: [
+            "fix remote fork before publishing the initiative branch",
+          ],
+        },
+      },
+    });
   });
 
   it("prints project repository branch-push results through the CLI", async () => {
@@ -680,6 +1152,156 @@ describe("publication CLI operations", () => {
         },
       },
     ]);
+  });
+
+  it("normalizes escaped line breaks in inline pull request bodies", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const escapedLineBreak = `${String.fromCharCode(92)}n`;
+    const requests: Array<{ body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      requests.push({
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return new Response(
+        JSON.stringify({
+          number: 191,
+          html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+          state: "open",
+          title: "Add App publication commands",
+        }),
+        { status: 201 },
+      );
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "upsert",
+        projectRoot,
+        "--head",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        ["Summary.", "", "Verification."].join(escapedLineBreak),
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(requests).toEqual([
+      {
+        body: expect.objectContaining({
+          body: ["Summary.", "", "Verification."].join(String.fromCharCode(10)),
+        }),
+      },
+    ]);
+  });
+
+  it("prints pull request evidence through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add App publication commands",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "feat/initiative-delivery-topology",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 22 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "evidence",
+        projectRoot,
+        "--number",
+        "191",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      pullRequest: {
+        number: 191,
+      },
+      evidence: {
+        provider: "github",
+        reviewState: "approved",
+        baseStatus: "current",
+        mergeability: "mergeable",
+      },
+      providerEvidence: [
+        {
+          sourceKind: "pull_request",
+          headBranch: "feat/initiative-delivery-topology",
+        },
+      ],
+    });
+    expect(stdout.output()).not.toContain("installation-token");
   });
 
   it("merges pull requests through the configured App API credential path", async () => {
@@ -894,6 +1516,61 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
           provider: "github",
           handle: "devnexus-automation",
           id: "dev-nexus-automation-app",
+        },
+      },
+    },
+  };
+}
+
+function initiativeFallbackPublicationProjectConfig(
+  homePath: string,
+  strategy:
+    | "fallback_remote"
+    | "manual_only"
+    | "publication_remote_then_fallback" = "fallback_remote",
+  fallbackRemote: string | null = "fork",
+): NexusProjectConfig {
+  return {
+    ...publicationProjectConfig(homePath),
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        remote: "app",
+        targetBranch: "main",
+        push: false,
+        actor: {
+          kind: "app",
+          provider: "github",
+          handle: "devnexus-automation",
+          id: "dev-nexus-automation-app",
+        },
+        publicationTrain: {
+          enabled: true,
+          activeVersionId: null,
+          branchNaming: {
+            integrationPrefix: "integration",
+            candidatePrefix: "candidate",
+            unscopedName: "manual",
+          },
+          initiativeDelivery: {
+            ...defaultNexusInitiativeDeliveryConfig,
+            enabled: true,
+            activeInitiativeId: "codex-goals",
+            defaultTopology: "hybrid",
+            branchPublication: {
+              strategy,
+              fallbackRemote,
+            },
+          },
+          selector: {
+            statuses: ["ready"],
+            labels: [],
+            milestones: [],
+            assignees: [],
+            providerQuery: null,
+          },
         },
       },
     },

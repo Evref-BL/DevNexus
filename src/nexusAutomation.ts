@@ -14,6 +14,8 @@ import {
   type WorktreeVerificationRecord,
 } from "./worktreeExecutionMetadata.js";
 import type {
+  NexusAutomationCodexAppServerGoalMetadata,
+  NexusAutomationCodexAppServerGoalOperationStatus,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 
@@ -628,6 +630,51 @@ function normalizeCodexAppServerLaunchMetadata(
       "automation run.codexAppServer.resultFile",
     ),
     failureSummary: optionalNullableString(record.failureSummary) ?? null,
+    goal: normalizeCodexAppServerGoalMetadata(record.goal),
+  };
+}
+
+function normalizeCodexAppServerGoalMetadata(
+  value: unknown,
+): NexusAutomationCodexAppServerGoalMetadata | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusAutomationError(
+      "automation run.codexAppServer.goal must be an object",
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    requested: requiredBoolean(
+      record.requested,
+      "automation run.codexAppServer.goal.requested",
+    ),
+    setMethodAvailable: requiredBoolean(
+      record.setMethodAvailable,
+      "automation run.codexAppServer.goal.setMethodAvailable",
+    ),
+    getMethodAvailable: requiredBoolean(
+      record.getMethodAvailable,
+      "automation run.codexAppServer.goal.getMethodAvailable",
+    ),
+    setStatus: normalizeCodexAppServerGoalOperationStatus(
+      record.setStatus,
+      "automation run.codexAppServer.goal.setStatus",
+    ),
+    readStatus: normalizeCodexAppServerGoalOperationStatus(
+      record.readStatus,
+      "automation run.codexAppServer.goal.readStatus",
+    ),
+    goalId: optionalNullableString(record.goalId) ?? null,
+    threadId: optionalNullableString(record.threadId) ?? null,
+    status: optionalNullableString(record.status) ?? null,
+    tokenBudget: optionalNullableNumber(record.tokenBudget),
+    tokensUsed: optionalNullableNumber(record.tokensUsed),
+    timeUsedSeconds: optionalNullableNumber(record.timeUsedSeconds),
+    failureSummary: optionalNullableString(record.failureSummary) ?? null,
   };
 }
 
@@ -725,6 +772,26 @@ function normalizeCodexAppServerThreadPersistence(
   throw new NexusAutomationError(`${name} must be ephemeral or durable`);
 }
 
+function normalizeCodexAppServerGoalOperationStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationCodexAppServerGoalOperationStatus {
+  if (
+    value === "not_requested" ||
+    value === "unsupported" ||
+    value === "set" ||
+    value === "read" ||
+    value === "unavailable" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be not_requested, unsupported, set, read, unavailable, or failed`,
+  );
+}
+
 function requiredLiteral<T extends string>(
   value: unknown,
   expected: T,
@@ -783,6 +850,17 @@ function optionalNullableString(value: unknown): string | null | undefined {
   }
 
   return requiredNonEmptyString(value, "value");
+}
+
+function optionalNullableNumber(value: unknown): number | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  throw new NexusAutomationError("value must be a finite number");
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {
