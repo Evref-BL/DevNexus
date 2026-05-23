@@ -635,33 +635,7 @@ export function normalizeNexusAutomationPublicationConfig(
       ...defaultNexusAutomationGreenMainConfig,
       ...(value.greenMain ?? {}),
     };
-    if (!value.targetBranch) {
-      throw new NexusAutomationConfigError(
-        `${pathName}.targetBranch is required when strategy is green_main`,
-      );
-    }
-    if (
-      greenMain.integrationPreference === "branch" &&
-      !greenMain.integrationBranch
-    ) {
-      throw new NexusAutomationConfigError(
-        `${pathName}.greenMain.integrationBranch is required when integrationPreference is branch`,
-      );
-    }
-    if (
-      greenMain.integrationBranch &&
-      value.targetBranch &&
-      greenMain.integrationBranch === value.targetBranch
-    ) {
-      throw new NexusAutomationConfigError(
-        `${pathName}.greenMain.integrationBranch must not be the targetBranch`,
-      );
-    }
-    if (value.push && greenMain.directTargetPush === "blocked") {
-      throw new NexusAutomationConfigError(
-        `${pathName}.push must be false when greenMain.directTargetPush is blocked`,
-      );
-    }
+    assertGreenMainPublicationConfig(value, greenMain, pathName);
 
     return {
       ...value,
@@ -684,6 +658,75 @@ export function normalizeNexusAutomationPublicationConfig(
     ...withoutGreenMain,
     ...(releaseTrain !== undefined ? { releaseTrain } : {}),
   };
+}
+
+function assertGreenMainPublicationConfig(
+  value: NexusAutomationPublicationConfig,
+  greenMain: NexusAutomationGreenMainConfig,
+  pathName: string,
+): void {
+  for (const message of greenMainPublicationConfigErrors(value, greenMain, pathName)) {
+    throw new NexusAutomationConfigError(message);
+  }
+}
+
+function greenMainPublicationConfigErrors(
+  value: NexusAutomationPublicationConfig,
+  greenMain: NexusAutomationGreenMainConfig,
+  pathName: string,
+): string[] {
+  return [
+    ...missingGreenMainTargetBranchErrors(value, pathName),
+    ...greenMainIntegrationBranchErrors(value, greenMain, pathName),
+    ...greenMainDirectPushErrors(value, greenMain, pathName),
+  ];
+}
+
+function missingGreenMainTargetBranchErrors(
+  value: NexusAutomationPublicationConfig,
+  pathName: string,
+): string[] {
+  return value.targetBranch
+    ? []
+    : [`${pathName}.targetBranch is required when strategy is green_main`];
+}
+
+function greenMainIntegrationBranchErrors(
+  value: NexusAutomationPublicationConfig,
+  greenMain: NexusAutomationGreenMainConfig,
+  pathName: string,
+): string[] {
+  const errors: string[] = [];
+  if (
+    greenMain.integrationPreference === "branch" &&
+    !greenMain.integrationBranch
+  ) {
+    errors.push(
+      `${pathName}.greenMain.integrationBranch is required when integrationPreference is branch`,
+    );
+  }
+  if (
+    greenMain.integrationBranch &&
+    value.targetBranch &&
+    greenMain.integrationBranch === value.targetBranch
+  ) {
+    errors.push(
+      `${pathName}.greenMain.integrationBranch must not be the targetBranch`,
+    );
+  }
+  return errors;
+}
+
+function greenMainDirectPushErrors(
+  value: NexusAutomationPublicationConfig,
+  greenMain: NexusAutomationGreenMainConfig,
+  pathName: string,
+): string[] {
+  return value.push && greenMain.directTargetPush === "blocked"
+    ? [
+        `${pathName}.push must be false when greenMain.directTargetPush is blocked`,
+      ]
+    : [];
 }
 
 function normalizeReleaseTrainConfig(

@@ -1802,34 +1802,47 @@ function directIntegrationPolicyBlocker(
   if (!publication) {
     return "Component publication policy is unavailable; direct integration is blocked.";
   }
+  return (
+    directIntegrationStrategyBlocker(publication) ??
+    publicationScopeBlocker("remote", publication.remote, options.remote) ??
+    publicationScopeBlocker(
+      "target branch",
+      publication.targetBranch,
+      options.targetBranch,
+    )
+  );
+}
+
+function directIntegrationStrategyBlocker(
+  publication: NexusAutomationPublicationConfig,
+): string | null {
   if (publication.strategy === "green_main") {
     const directTargetPush =
       publication.greenMain?.directTargetPush ?? "blocked";
-    if (directTargetPush === "blocked" || !publication.push) {
-      return `Component publication policy is green_main with directTargetPush=${directTargetPush} and push=${publication.push}; direct target-branch push is blocked.`;
-    }
-  } else if (
-    publication.strategy !== "direct_integration" ||
-    !publication.push
-  ) {
-    return `Component publication policy is ${publication.strategy} with push=${publication.push}; direct integration requires direct_integration with push enabled.`;
+    return directTargetPush === "blocked" || !publication.push
+      ? `Component publication policy is green_main with directTargetPush=${directTargetPush} and push=${publication.push}; direct target-branch push is blocked.`
+      : null;
   }
-  if (
-    publication.remote &&
-    options.remote &&
-    !authorityScopeValueMatches(publication.remote, options.remote)
-  ) {
-    return `Requested remote ${options.remote} does not match publication remote ${publication.remote}.`;
-  }
-  if (
-    publication.targetBranch &&
-    options.targetBranch &&
-    !authorityScopeValueMatches(publication.targetBranch, options.targetBranch)
-  ) {
-    return `Requested target branch ${options.targetBranch} does not match publication target branch ${publication.targetBranch}.`;
-  }
+  return publication.strategy !== "direct_integration" || !publication.push
+    ? `Component publication policy is ${publication.strategy} with push=${publication.push}; direct integration requires direct_integration with push enabled.`
+    : null;
+}
 
-  return null;
+function publicationScopeBlocker(
+  label: "remote" | "target branch",
+  configured: string | null | undefined,
+  requested: string | null | undefined,
+): string | null {
+  if (
+    !configured ||
+    !requested ||
+    authorityScopeValueMatches(configured, requested)
+  ) {
+    return null;
+  }
+  return label === "remote"
+    ? `Requested remote ${requested} does not match publication remote ${configured}.`
+    : `Requested target branch ${requested} does not match publication target branch ${configured}.`;
 }
 
 function pullRequestOpenPolicyBlocker(
@@ -1942,45 +1955,20 @@ function pullRequestMergeProviderDecision(
   providerState: NexusAuthorityProviderState | null,
 ): NexusProviderAuthorityDecision {
   const pullRequest = providerState?.pullRequest ?? null;
-  const review = pullRequest?.review ?? "unknown";
-  const checks = pullRequest?.checks ?? "unknown";
-  const mergeability = pullRequest?.mergeability ?? "unknown";
-  const branchPolicy =
-    pullRequest?.branchPolicy ?? providerState?.branchPolicy ?? "unknown";
-  const missingProviderSignals: NexusAuthorityRequiredProviderSignal[] = [];
-  const blockers: string[] = [];
-
-  if (review !== "approved") {
-    missingProviderSignals.push("pull_request_review.approved");
-    if (
-      review === "changes_requested" ||
-      review === "rejected" ||
-      review === "timed_out"
-    ) {
-      blockers.push(`Pull request review state is ${review}.`);
-    }
-  }
-  if (checks !== "checks_passed") {
-    missingProviderSignals.push("checks.passed");
-    if (checks === "checks_failed") {
-      blockers.push("Required checks failed.");
-    }
-    if (checks === "checks_stale") {
-      blockers.push("Required checks are stale.");
-    }
-  }
-  if (mergeability !== "mergeable") {
-    missingProviderSignals.push("mergeable");
-    if (mergeability === "merge_conflict") {
-      blockers.push("Pull request has merge conflicts.");
-    }
-  }
-  if (branchPolicy !== "clear") {
-    missingProviderSignals.push("branch_policy.clear");
-    if (branchPolicy === "branch_policy_blocked") {
-      blockers.push("Provider branch policy blocks merge.");
-    }
-  }
+  const evaluations = [
+    pullRequestReviewProviderEvaluation(pullRequest?.review ?? "unknown"),
+    pullRequestChecksProviderEvaluation(pullRequest?.checks ?? "unknown"),
+    pullRequestMergeabilityProviderEvaluation(
+      pullRequest?.mergeability ?? "unknown",
+    ),
+    branchPolicyProviderEvaluation(
+      pullRequest?.branchPolicy ?? providerState?.branchPolicy ?? "unknown",
+    ),
+  ];
+  const missingProviderSignals = evaluations.flatMap(
+    (evaluation) => evaluation.missingProviderSignals,
+  );
+  const blockers = evaluations.flatMap((evaluation) => evaluation.blockers);
 
   if (blockers.length > 0) {
     return {
@@ -2002,6 +1990,78 @@ function pullRequestMergeProviderDecision(
     missingProviderSignals: [],
     explanation: null,
   };
+}
+
+interface ProviderSignalEvaluation {
+  missingProviderSignals: NexusAuthorityRequiredProviderSignal[];
+  blockers: string[];
+}
+
+function providerSignalSatisfied(): ProviderSignalEvaluation {
+  return { missingProviderSignals: [], blockers: [] };
+}
+
+function providerSignalBlockers<Signal extends string>(
+  signal: Signal,
+  blockersBySignal: Partial<Record<Signal, string>>,
+): string[] {
+  const blocker = blockersBySignal[signal];
+  return blocker ? [blocker] : [];
+}
+
+function pullRequestReviewProviderEvaluation(
+  review: NexusAuthorityPullRequestReviewSignal,
+): ProviderSignalEvaluation {
+  return review === "approved"
+    ? providerSignalSatisfied()
+    : {
+        missingProviderSignals: ["pull_request_review.approved"],
+        blockers: providerSignalBlockers(review, {
+          changes_requested: `Pull request review state is ${review}.`,
+          rejected: `Pull request review state is ${review}.`,
+          timed_out: `Pull request review state is ${review}.`,
+        }),
+      };
+}
+
+function pullRequestChecksProviderEvaluation(
+  checks: NexusAuthorityProviderChecksSignal,
+): ProviderSignalEvaluation {
+  return checks === "checks_passed"
+    ? providerSignalSatisfied()
+    : {
+        missingProviderSignals: ["checks.passed"],
+        blockers: providerSignalBlockers(checks, {
+          checks_failed: "Required checks failed.",
+          checks_stale: "Required checks are stale.",
+        }),
+      };
+}
+
+function pullRequestMergeabilityProviderEvaluation(
+  mergeability: NexusAuthorityMergeabilitySignal,
+): ProviderSignalEvaluation {
+  return mergeability === "mergeable"
+    ? providerSignalSatisfied()
+    : {
+        missingProviderSignals: ["mergeable"],
+        blockers: providerSignalBlockers(mergeability, {
+          merge_conflict: "Pull request has merge conflicts.",
+        }),
+      };
+}
+
+function branchPolicyProviderEvaluation(
+  branchPolicy: NexusAuthorityBranchPolicySignal,
+): ProviderSignalEvaluation {
+  return branchPolicy === "clear"
+    ? providerSignalSatisfied()
+    : {
+        missingProviderSignals: ["branch_policy.clear"],
+        blockers: providerSignalBlockers(branchPolicy, {
+          branch_policy_blocked: "Provider branch policy blocks merge.",
+        }),
+      };
 }
 
 function targetBranchPushProviderDecision(
@@ -2053,50 +2113,56 @@ function authorityFallbackPreferences(
   requestedAction: NexusAuthorityAction,
   missingProviderSignals: NexusAuthorityRequiredProviderSignal[],
 ): NexusAuthorityAction[] {
-  if (missingProviderSignals.includes("pull_request_review.approved")) {
-    return [
+  return missingProviderSignals.includes("pull_request_review.approved")
+    ? authorityFallbackPreferenceGroups.reviewSignal
+    : authorityFallbackPreferenceGroups.byAction[requestedAction] ?? [];
+}
+
+const authorityFallbackPreferenceGroups: {
+  reviewSignal: NexusAuthorityAction[];
+  byAction: Partial<Record<NexusAuthorityAction, NexusAuthorityAction[]>>;
+} = {
+  reviewSignal: [
+    "provider.review.request",
+    "provider.comment",
+    "coordination.handoff",
+  ],
+  byAction: {
+    "git.push_target_branch": [
+      "provider.pull_request.open",
+      "provider.review.request",
+      "coordination.handoff",
+    ],
+    "provider.pull_request.open": ["coordination.handoff"],
+    "provider.pull_request.merge": [
       "provider.review.request",
       "provider.comment",
       "coordination.handoff",
-    ];
-  }
-  switch (requestedAction) {
-    case "git.push_target_branch":
-      return [
-        "provider.pull_request.open",
-        "provider.review.request",
-        "coordination.handoff",
-      ];
-    case "provider.pull_request.open":
-      return ["coordination.handoff"];
-    case "provider.pull_request.merge":
-      return [
-        "provider.review.request",
-        "provider.comment",
-        "coordination.handoff",
-      ];
-    case "provider.review.approve":
-    case "provider.review.reject":
-    case "provider.issue.design_approve":
-    case "provider.issue.design_reject":
-      return ["provider.comment", "coordination.handoff"];
-    case "runtime.mutate":
-    case "package.publish":
-    case "release.publish":
-    case "git.push_branch":
-    case "git.commit":
-    case "provider.comment":
-    case "provider.label":
-    case "provider.assign":
-    case "provider.transition":
-    case "work_item.update":
-    case "work_item.comment":
-    case "work_item.close":
-      return ["coordination.handoff"];
-    default:
-      return [];
-  }
-}
+    ],
+    "provider.review.approve": ["provider.comment", "coordination.handoff"],
+    "provider.review.reject": ["provider.comment", "coordination.handoff"],
+    "provider.issue.design_approve": [
+      "provider.comment",
+      "coordination.handoff",
+    ],
+    "provider.issue.design_reject": [
+      "provider.comment",
+      "coordination.handoff",
+    ],
+    "runtime.mutate": ["coordination.handoff"],
+    "package.publish": ["coordination.handoff"],
+    "release.publish": ["coordination.handoff"],
+    "git.push_branch": ["coordination.handoff"],
+    "git.commit": ["coordination.handoff"],
+    "provider.comment": ["coordination.handoff"],
+    "provider.label": ["coordination.handoff"],
+    "provider.assign": ["coordination.handoff"],
+    "provider.transition": ["coordination.handoff"],
+    "work_item.update": ["coordination.handoff"],
+    "work_item.comment": ["coordination.handoff"],
+    "work_item.close": ["coordination.handoff"],
+  },
+};
 
 function publicationAllowsFallbackAction(
   action: NexusAuthorityAction,

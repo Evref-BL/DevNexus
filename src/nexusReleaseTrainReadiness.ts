@@ -401,69 +401,74 @@ function classifyReadiness(options: {
   hasVersionPlanning: boolean;
   ciTier: NexusCiTierDecision;
 }): ClassifiedReadiness {
-  const reasons: string[] = [];
+  const reasons = readinessReasons(options);
+  const eligibility = readinessEligibility(options);
+
+  return eligibility === "wait" && reasons.length === 0
+    ? { eligibility, reasons: [`source is ${options.source.status}`] }
+    : { eligibility, reasons };
+}
+
+function readinessReasons(options: {
+  source: ReadinessSource;
+  state: NexusReleaseTrainSourceState;
+  version: NexusReleaseTrainVersionScope | null;
+  hasVersionPlanning: boolean;
+  ciTier: NexusCiTierDecision;
+}): string[] {
+  return [
+    options.state.blocked ? "source is blocked" : null,
+    options.state.stale ? "source readiness is stale" : null,
+    sourceInProgress(options.source)
+      ? `source is still ${options.source.status}`
+      : null,
+    options.state.dirty ? "worktree has uncommitted changes" : null,
+    options.state.missingHead ? "head commit is missing" : null,
+    options.state.missingUpstream ? "upstream branch is missing" : null,
+    options.state.pushed === false ? "branch has unpushed commits" : null,
+    options.hasVersionPlanning && !options.version
+      ? "work item is not in version scope"
+      : null,
+    options.ciTier.budgetLimited ? "full matrix CI budget is exhausted" : null,
+  ].filter((reason): reason is string => Boolean(reason));
+}
+
+function readinessEligibility(options: {
+  source: ReadinessSource;
+  state: NexusReleaseTrainSourceState;
+  version: NexusReleaseTrainVersionScope | null;
+  hasVersionPlanning: boolean;
+  ciTier: NexusCiTierDecision;
+}): NexusReleaseTrainCandidateEligibility {
   if (options.state.blocked) {
-    reasons.push("source is blocked");
+    return "blocked";
+  }
+  if (options.ciTier.budgetLimited || sourceInProgress(options.source)) {
+    return "wait";
   }
   if (options.state.stale) {
-    reasons.push("source readiness is stale");
-  }
-  if (options.source.status === "working" || options.source.status === "integrating") {
-    reasons.push(`source is still ${options.source.status}`);
-  }
-  if (options.state.dirty) {
-    reasons.push("worktree has uncommitted changes");
-  }
-  if (options.state.missingHead) {
-    reasons.push("head commit is missing");
-  }
-  if (options.state.missingUpstream) {
-    reasons.push("upstream branch is missing");
-  }
-  if (options.state.pushed === false) {
-    reasons.push("branch has unpushed commits");
+    return "needs_human";
   }
   if (options.hasVersionPlanning && !options.version) {
-    reasons.push("work item is not in version scope");
+    return "needs_scope";
   }
-  if (options.ciTier.budgetLimited) {
-    reasons.push("full matrix CI budget is exhausted");
+  if (needsVerification(options.state)) {
+    return "needs_verification";
   }
+  return options.source.status === "ready" ? "eligible" : "wait";
+}
 
-  if (options.state.blocked) {
-    return { eligibility: "blocked", reasons };
-  }
-  if (options.ciTier.budgetLimited) {
-    return { eligibility: "wait", reasons };
-  }
-  if (options.state.stale) {
-    return { eligibility: "needs_human", reasons };
-  }
-  if (options.hasVersionPlanning && !options.version) {
-    return { eligibility: "needs_scope", reasons };
-  }
-  if (
-    options.source.status === "working" ||
-    options.source.status === "integrating"
-  ) {
-    return { eligibility: "wait", reasons };
-  }
-  if (
-    options.state.dirty ||
-    options.state.missingHead ||
-    options.state.missingUpstream ||
-    options.state.pushed === false
-  ) {
-    return { eligibility: "needs_verification", reasons };
-  }
-  if (options.source.status === "ready") {
-    return { eligibility: "eligible", reasons };
-  }
+function sourceInProgress(source: ReadinessSource): boolean {
+  return source.status === "working" || source.status === "integrating";
+}
 
-  return {
-    eligibility: "wait",
-    reasons: reasons.length > 0 ? reasons : [`source is ${options.source.status}`],
-  };
+function needsVerification(state: NexusReleaseTrainSourceState): boolean {
+  return (
+    state.dirty === true ||
+    state.missingHead ||
+    state.missingUpstream ||
+    state.pushed === false
+  );
 }
 
 function versionScope(options: {

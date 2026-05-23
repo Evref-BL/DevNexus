@@ -1927,27 +1927,48 @@ function expectedSkillEntries(
 }
 
 function isManifest(value: unknown): value is NexusSkillManifest {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isObjectRecord(value)) {
     return false;
   }
 
-  const record = value as Record<string, unknown>;
   return (
-    typeof record.id === "string" &&
-    typeof record.name === "string" &&
-    typeof record.description === "string" &&
-    typeof record.version === "string" &&
-    typeof record.license === "string" &&
-    record.source !== null &&
-    typeof record.source === "object" &&
-    !Array.isArray(record.source) &&
-    Array.isArray(record.supportedAgents) &&
-    record.supportedAgents.every((agent) => typeof agent === "string") &&
-    (record.materialization === "copy" ||
-      record.materialization === "symlink" ||
-      record.materialization === "reference") &&
-    (record.sourceControl === "support" || record.sourceControl === "source")
+    hasStringFields(value, [
+      "id",
+      "name",
+      "description",
+      "version",
+      "license",
+    ]) &&
+    isObjectRecord(value.source) &&
+    isStringArray(value.supportedAgents) &&
+    isSkillMaterialization(value.materialization) &&
+    isSkillSourceControl(value.sourceControl)
   );
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasStringFields(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+): boolean {
+  return fields.every((field) => typeof record[field] === "string");
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isSkillMaterialization(
+  value: unknown,
+): value is NexusSkillMaterializationMode {
+  return value === "copy" || value === "symlink" || value === "reference";
+}
+
+function isSkillSourceControl(value: unknown): value is NexusSkillSourceControl {
+  return value === "support" || value === "source";
 }
 
 interface InstalledSkillEntry {
@@ -2100,26 +2121,7 @@ function expectedSkillStatus(
   if (!manifestsMatch(expected.manifest, installed.manifest)) {
     reasons.push("skill manifest differs from the expected definition");
   }
-
-  if (expected.manifest.materialization === "copy") {
-    for (const [filePath, content] of Object.entries(expected.definition.files)) {
-      const targetPath = path.join(installed.skillRoot, filePath);
-      if (!fs.existsSync(targetPath)) {
-        reasons.push(`skill file is missing: ${filePath}`);
-        continue;
-      }
-      if (fs.readFileSync(targetPath, "utf8") !== content) {
-        reasons.push(`skill file differs from the expected definition: ${filePath}`);
-      }
-    }
-  } else if (expected.manifest.materialization === "symlink") {
-    const skillPath = path.join(installed.skillRoot, nexusSkillMarkdownFileName);
-    if (!fs.existsSync(skillPath)) {
-      reasons.push(`${nexusSkillMarkdownFileName} symlink is missing`);
-    } else if (!fs.lstatSync(skillPath).isSymbolicLink()) {
-      reasons.push(`${nexusSkillMarkdownFileName} is not a symlink`);
-    }
-  }
+  reasons.push(...expectedSkillMaterializationReasons(expected, installed));
 
   return {
     id: expected.manifest.id,
@@ -2136,6 +2138,55 @@ function expectedSkillStatus(
     skillPath: skillPathForManifest(installed.skillRoot, expected.manifest),
     reasons,
   };
+}
+
+function expectedSkillMaterializationReasons(
+  expected: {
+    definition: NexusSkillDefinition;
+    manifest: NexusSkillManifest;
+  },
+  installed: InstalledSkillEntry,
+): string[] {
+  if (expected.manifest.materialization === "copy") {
+    return copiedSkillFileReasons(expected.definition.files, installed.skillRoot);
+  }
+  if (expected.manifest.materialization === "symlink") {
+    return symlinkedSkillFileReasons(installed.skillRoot);
+  }
+  return [];
+}
+
+function copiedSkillFileReasons(
+  files: Record<string, string>,
+  skillRoot: string,
+): string[] {
+  return Object.entries(files).flatMap(([filePath, content]) =>
+    copiedSkillFileReason(skillRoot, filePath, content),
+  );
+}
+
+function copiedSkillFileReason(
+  skillRoot: string,
+  filePath: string,
+  content: string,
+): string[] {
+  const targetPath = path.join(skillRoot, filePath);
+  if (!fs.existsSync(targetPath)) {
+    return [`skill file is missing: ${filePath}`];
+  }
+  return fs.readFileSync(targetPath, "utf8") === content
+    ? []
+    : [`skill file differs from the expected definition: ${filePath}`];
+}
+
+function symlinkedSkillFileReasons(skillRoot: string): string[] {
+  const skillPath = path.join(skillRoot, nexusSkillMarkdownFileName);
+  if (!fs.existsSync(skillPath)) {
+    return [`${nexusSkillMarkdownFileName} symlink is missing`];
+  }
+  return fs.lstatSync(skillPath).isSymbolicLink()
+    ? []
+    : [`${nexusSkillMarkdownFileName} is not a symlink`];
 }
 
 function installedOnlySkillStatus(

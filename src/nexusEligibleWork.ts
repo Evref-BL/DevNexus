@@ -491,43 +491,83 @@ async function recordVisibleExcludedWork(options: {
   }
 
   for (const item of visibleItems) {
-    const keys = observedReferenceKeys(options.tracker, item);
-    if (keys.some((key) => options.matchingKeys.has(key))) {
+    if (hasObservedMatchingReference(options.tracker, item, options.matchingKeys)) {
       continue;
     }
-    let findings = eligibleWorkExclusionFindings({
+    const findings = visibleExcludedWorkFindings({
       item,
       selectorQuery: options.options.selectorQuery,
       automationConfig: options.options.automationConfig,
       policy: options.component.trackerDiscovery,
+      otherwiseSelectableFinding: options.otherwiseSelectableFinding,
     });
-    if (findings.length === 0 && options.otherwiseSelectableFinding) {
-      findings = [options.otherwiseSelectableFinding];
-    }
     if (findings.length === 0) {
       continue;
     }
 
-    const reasons = findings.map((finding) => finding.reason);
-    options.trackerResult.excludedCount += 1;
-    for (const finding of findings) {
-      options.trackerResult.exclusionReasonCounts[finding.reason] =
-        (options.trackerResult.exclusionReasonCounts[finding.reason] ?? 0) + 1;
-      options.trackerResult.exclusionCategoryCounts[finding.category] =
-        (options.trackerResult.exclusionCategoryCounts[finding.category] ?? 0) +
-        1;
-    }
-    if (options.result.excludedWorkItems.length >= 10) {
-      continue;
-    }
-    options.result.excludedWorkItems.push({
-      ...item,
-      componentId: options.component.id,
-      sourceTrackerRef: trackerRef(options.component, options.tracker),
-      reasons,
-      exclusionFindings: findings,
+    recordVisibleExclusion({
+      item,
+      component: options.component,
+      tracker: options.tracker,
+      trackerResult: options.trackerResult,
+      result: options.result,
+      findings,
     });
   }
+}
+
+function hasObservedMatchingReference(
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+  matchingKeys: Set<string>,
+): boolean {
+  return observedReferenceKeys(tracker, item).some((key) => matchingKeys.has(key));
+}
+
+function visibleExcludedWorkFindings(options: {
+  item: WorkItem;
+  selectorQuery: WorkItemQuery;
+  automationConfig: NexusAutomationConfig;
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+  otherwiseSelectableFinding: NexusEligibleWorkExclusionFinding | null;
+}): NexusEligibleWorkExclusionFinding[] {
+  const findings = eligibleWorkExclusionFindings(options);
+  return findings.length > 0 || !options.otherwiseSelectableFinding
+    ? findings
+    : [options.otherwiseSelectableFinding];
+}
+
+function recordVisibleExclusion(options: {
+  item: WorkItem;
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  trackerResult: NexusEligibleWorkTrackerQueryResult;
+  result: NexusEligibleWorkComponentResult;
+  findings: NexusEligibleWorkExclusionFinding[];
+}): void {
+  const reasons = options.findings.map((finding) => finding.reason);
+  options.trackerResult.excludedCount += 1;
+  for (const finding of options.findings) {
+    incrementCount(options.trackerResult.exclusionReasonCounts, finding.reason);
+    incrementCount(
+      options.trackerResult.exclusionCategoryCounts,
+      finding.category,
+    );
+  }
+  if (options.result.excludedWorkItems.length >= 10) {
+    return;
+  }
+  options.result.excludedWorkItems.push({
+    ...options.item,
+    componentId: options.component.id,
+    sourceTrackerRef: trackerRef(options.component, options.tracker),
+    reasons,
+    exclusionFindings: options.findings,
+  });
+}
+
+function incrementCount(counts: Record<string, number>, key: string): void {
+  counts[key] = (counts[key] ?? 0) + 1;
 }
 
 function candidateFromItem(options: {
@@ -1034,80 +1074,106 @@ function eligibleWorkExclusionFindings(options: {
   const findings: NexusEligibleWorkExclusionFinding[] = [];
   const labels = lowerSet(options.item.labels);
   const assignees = lowerSet(options.item.assignees);
+  findings.push(...statusExclusionFindings(options));
+  findings.push(...requiredLabelExclusionFindings(options, labels));
+  findings.push(...excludedLabelFindings(options, labels));
+  findings.push(...assigneeExclusionFindings(options, assignees));
+  findings.push(...milestoneExclusionFindings(options));
+  findings.push(...searchExclusionFindings(options));
+  return uniqueExclusionFindings(findings);
+}
+
+function statusExclusionFindings(options: {
+  item: WorkItem;
+  selectorQuery: WorkItemQuery;
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+}): NexusEligibleWorkExclusionFinding[] {
   const statuses = mergedStatuses(
     options.selectorQuery.status,
     options.policy.statuses,
   );
-  if (statuses.length > 0 && !statuses.includes(options.item.status)) {
-    findings.push({
-      category: "status",
-      reason: `status ${options.item.status} not selected`,
-      value: options.item.status,
-    });
-  }
+  return statuses.length > 0 && !statuses.includes(options.item.status)
+    ? [
+        {
+          category: "status",
+          reason: `status ${options.item.status} not selected`,
+          value: options.item.status,
+        },
+      ]
+    : [];
+}
 
-  for (const label of uniqueStrings([
+function requiredLabelExclusionFindings(
+  options: {
+    selectorQuery: WorkItemQuery;
+    policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+  },
+  labels: Set<string>,
+): NexusEligibleWorkExclusionFinding[] {
+  return uniqueStrings([
     ...(options.selectorQuery.labels ?? []),
     ...options.policy.labels,
-  ])) {
-    if (!labels.has(label.toLowerCase())) {
-      findings.push({
-        category: "required_label",
-        reason: `missing label ${label}`,
-        value: label,
-      });
-    }
-  }
+  ]).flatMap((label) =>
+    labels.has(label.toLowerCase())
+      ? []
+      : [{ category: "required_label", reason: `missing label ${label}`, value: label }],
+  );
+}
 
-  for (const label of options.automationConfig.selector.excludeLabels) {
-    if (labels.has(label.toLowerCase())) {
-      findings.push({
-        category: "excluded_label",
-        reason: `excluded label ${label}`,
-        value: label,
-      });
-    }
-  }
+function excludedLabelFindings(
+  options: { automationConfig: NexusAutomationConfig },
+  labels: Set<string>,
+): NexusEligibleWorkExclusionFinding[] {
+  return options.automationConfig.selector.excludeLabels.flatMap((label) =>
+    labels.has(label.toLowerCase())
+      ? [{ category: "excluded_label", reason: `excluded label ${label}`, value: label }]
+      : [],
+  );
+}
 
-  for (const assignee of uniqueStrings([
+function assigneeExclusionFindings(
+  options: {
+    selectorQuery: WorkItemQuery;
+    policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+  },
+  assignees: Set<string>,
+): NexusEligibleWorkExclusionFinding[] {
+  return uniqueStrings([
     ...(options.selectorQuery.assignees ?? []),
     ...options.policy.assignees,
-  ])) {
-    if (!assignees.has(assignee.toLowerCase())) {
-      findings.push({
-        category: "assignee",
-        reason: `missing assignee ${assignee}`,
-        value: assignee,
-      });
-    }
-  }
+  ]).flatMap((assignee) =>
+    assignees.has(assignee.toLowerCase())
+      ? []
+      : [{ category: "assignee", reason: `missing assignee ${assignee}`, value: assignee }],
+  );
+}
 
-  if (
-    options.policy.milestones.length > 0 &&
-    (!options.item.milestone ||
-      !options.policy.milestones.includes(options.item.milestone))
-  ) {
-    findings.push({
-      category: "milestone",
-      reason: "missing milestone",
-      value: options.item.milestone ?? null,
-    });
-  }
+function milestoneExclusionFindings(options: {
+  item: WorkItem;
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+}): NexusEligibleWorkExclusionFinding[] {
+  const milestone = options.item.milestone ?? null;
+  return options.policy.milestones.length > 0 &&
+    (!milestone || !options.policy.milestones.includes(milestone))
+    ? [{ category: "milestone", reason: "missing milestone", value: milestone }]
+    : [];
+}
 
-  for (const search of uniqueStrings([
+function searchExclusionFindings(options: {
+  item: WorkItem;
+  selectorQuery: WorkItemQuery;
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+}): NexusEligibleWorkExclusionFinding[] {
+  return uniqueStrings([
     options.policy.providerQuery ?? "",
     options.selectorQuery.search ?? "",
-  ]).filter((value) => value.length > 0)) {
-    if (!matchesSearch(options.item, search)) {
-      findings.push({
-        category: "search",
-        reason: `search mismatch ${search}`,
-        value: search,
-      });
-    }
-  }
-
-  return uniqueExclusionFindings(findings);
+  ])
+    .filter((value) => value.length > 0)
+    .flatMap((search) =>
+      matchesSearch(options.item, search)
+        ? []
+        : [{ category: "search", reason: `search mismatch ${search}`, value: search }],
+    );
 }
 
 function matchesSearch(item: WorkItem, search: string): boolean {
