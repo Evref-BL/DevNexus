@@ -1891,6 +1891,116 @@ describe("nexus dashboard", () => {
     });
   });
 
+  it("routes cross-lane git graph links through row corridors", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "merge000000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/corridor"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "merge000000000000000000000000000000000000000",
+                shortHash: "merge00",
+                parents: [
+                  "main20000000000000000000000000000000000000",
+                  "feature000000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge feature branch",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "merge000000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "main20000000000000000000000000000000000000",
+                shortHash: "main200",
+                parents: ["main10000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:58:00.000Z",
+                subject: "Main corridor step",
+                refs: [],
+              },
+              {
+                hash: "main10000000000000000000000000000000000000",
+                shortHash: "main100",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:56:00.000Z",
+                subject: "Main base step",
+                refs: [],
+              },
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Feature branch step",
+                refs: [
+                  {
+                    name: "feat/corridor",
+                    kind: "branch",
+                    remote: null,
+                    hash: "feature000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "base0000000000000000000000000000000000000",
+                shortHash: "base000",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderGitHistory(snapshot);
+
+    expect(rendered).toContain("dn-git-line-shadow");
+    expect(rendered).toMatch(/M 22 15 V 75 C /);
+    expect(rendered).not.toMatch(/M 22 15 C 22 36, 40 84, 40 105/);
+  });
+
   it("filters project git history by branch head ancestors", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
