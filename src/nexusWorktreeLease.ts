@@ -7,6 +7,7 @@ import {
   type GitCommandResult,
   type GitRunner,
 } from "./gitWorktreeService.js";
+import { gitDirectoryFromGitFileLine } from "./nexusGitFile.js";
 import {
   loadProjectConfig,
   projectWorktreesRootPath,
@@ -542,13 +543,19 @@ function projectGitDirectory(projectRoot: string): string | null {
     return null;
   }
 
-  const firstLine = fs.readFileSync(dotGitPath, "utf8").split(/\r?\n/u)[0] ?? "";
-  const match = /^gitdir:\s*(.+)\s*$/iu.exec(firstLine);
-  if (!match?.[1]) {
+  const firstLine = firstContentLine(fs.readFileSync(dotGitPath, "utf8"));
+  const gitDir = gitDirectoryFromGitFileLine(firstLine);
+  if (!gitDir) {
     return null;
   }
 
-  return path.resolve(projectRoot, match[1]);
+  return path.resolve(projectRoot, gitDir);
+}
+
+function firstContentLine(content: string): string {
+  const lineBreak = content.indexOf("\n");
+  const line = lineBreak >= 0 ? content.slice(0, lineBreak) : content;
+  return line.endsWith("\r") ? line.slice(0, -1) : line;
 }
 
 function readNexusWorktreeLeaseStoreFile(

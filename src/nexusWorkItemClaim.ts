@@ -126,8 +126,6 @@ export interface ClaimNexusEligibleWorkItemOptions {
 
 const defaultLeaseDurationMs = 60 * 60 * 1000;
 const claimMarkerName = "dev-nexus-work-item-claim";
-const claimBlockPattern =
-  /<!--\s*dev-nexus-work-item-claim\s*\n([\s\S]*?)\n-->/g;
 
 interface ClaimInspectionCandidate {
   observation: NexusWorkItemClaimObservation;
@@ -1100,7 +1098,7 @@ function descriptionWithClaim(
   description: string | null | undefined,
   owner: NexusWorkItemClaimOwner,
 ): string {
-  const base = (description ?? "").replace(claimBlockPattern, "").trimEnd();
+  const base = removeClaimBlocks(description ?? "").trimEnd();
   const block = [
     `<!-- ${claimMarkerName}`,
     JSON.stringify(owner),
@@ -1138,12 +1136,8 @@ function workItemClaims(
     return [];
   }
   const claims: NexusWorkItemClaimOwner[] = [];
-  for (const match of description.matchAll(claimBlockPattern)) {
-    const raw = match[1];
-    if (!raw) {
-      continue;
-    }
-    const parsed = safeJsonParse(raw);
+  for (const block of claimBlocks(description)) {
+    const parsed = safeJsonParse(block);
     const claim = normalizeClaimOwner(parsed);
     if (claim) {
       claims.push(claim);
@@ -1151,6 +1145,90 @@ function workItemClaims(
   }
 
   return claims;
+}
+
+function removeClaimBlocks(description: string): string {
+  const blocks = claimBlockRanges(description);
+  if (blocks.length === 0) {
+    return description;
+  }
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const block of blocks) {
+    parts.push(description.slice(cursor, block.start));
+    cursor = block.end;
+  }
+  parts.push(description.slice(cursor));
+  return parts.join("");
+}
+
+function claimBlocks(description: string): string[] {
+  return claimBlockRanges(description).map((block) => block.body);
+}
+
+function claimBlockRanges(
+  description: string,
+): Array<{ start: number; end: number; body: string }> {
+  const blocks: Array<{ start: number; end: number; body: string }> = [];
+  let searchFrom = 0;
+  while (searchFrom < description.length) {
+    const opening = description.indexOf("<!--", searchFrom);
+    if (opening < 0) {
+      break;
+    }
+
+    const markerStart = skipWhitespace(description, opening + "<!--".length);
+    if (!description.startsWith(claimMarkerName, markerStart)) {
+      searchFrom = opening + "<!--".length;
+      continue;
+    }
+
+    const bodyStart = lineStartAfterWhitespace(
+      description,
+      markerStart + claimMarkerName.length,
+    );
+    if (bodyStart === null) {
+      searchFrom = markerStart + claimMarkerName.length;
+      continue;
+    }
+
+    const closing = description.indexOf("\n-->", bodyStart);
+    if (closing < 0) {
+      break;
+    }
+
+    blocks.push({
+      start: opening,
+      end: closing + "\n-->".length,
+      body: description.slice(bodyStart, closing),
+    });
+    searchFrom = closing + "\n-->".length;
+  }
+
+  return blocks;
+}
+
+function lineStartAfterWhitespace(value: string, start: number): number | null {
+  for (let index = start; index < value.length; index += 1) {
+    if (value[index] === "\n") {
+      return index + 1;
+    }
+    if (value[index]!.trim().length !== 0) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function skipWhitespace(value: string, start: number): number {
+  let index = start;
+  while (index < value.length && value[index]!.trim().length === 0) {
+    index += 1;
+  }
+
+  return index;
 }
 
 function normalizeClaimOwner(value: unknown): NexusWorkItemClaimOwner | null {

@@ -1749,7 +1749,7 @@ function mergeTreeConflictFiles(result: GitCommandResult | null): string[] {
   const files: string[] = [];
   const lines = nonEmptyLines(result.stdout);
   for (const line of lines) {
-    if (/^[0-9a-f]{40}$/iu.test(line)) {
+    if (isFortyCharacterHexSha(line)) {
       continue;
     }
     if (line.startsWith("Auto-merging ") || line.startsWith("CONFLICT ")) {
@@ -1766,9 +1766,9 @@ function mergeTreeConflictFiles(result: GitCommandResult | null): string[] {
 function conflictFilesFromMessages(messages: string[]): string[] {
   const files: string[] = [];
   for (const message of messages) {
-    const match = /\bin\s+(.+)$/u.exec(message);
-    if (message.startsWith("CONFLICT ") && match?.[1]) {
-      files.push(match[1].trim());
+    const filePath = conflictMessageFilePath(message);
+    if (message.startsWith("CONFLICT ") && filePath) {
+      files.push(filePath);
     }
   }
 
@@ -1781,8 +1781,44 @@ function looksLikeMergeTreePathLine(line: string): boolean {
     !line.includes(" ") &&
     !line.startsWith("CONFLICT") &&
     !line.startsWith("Auto-merging") &&
-    !/^[0-9a-f]{40}$/iu.test(line)
+    !isFortyCharacterHexSha(line)
   );
+}
+
+function conflictMessageFilePath(message: string): string | null {
+  let candidate: string | null = null;
+  for (let index = 0; index < message.length - 2; index += 1) {
+    if (
+      message[index] !== "i" ||
+      message[index + 1] !== "n" ||
+      !isWordBoundaryBefore(message, index) ||
+      !isWhitespace(message[index + 2]!)
+    ) {
+      continue;
+    }
+
+    const start = skipWhitespace(message, index + 2);
+    const filePath = message.slice(start).trim();
+    if (filePath) {
+      candidate = filePath;
+    }
+  }
+
+  return candidate;
+}
+
+function isFortyCharacterHexSha(value: string): boolean {
+  if (value.length !== 40) {
+    return false;
+  }
+
+  for (const character of value) {
+    if (!isHexCharacter(character)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function nonEmptyLines(output: string): string[] {
@@ -2452,8 +2488,8 @@ function parseCoordinationHandoffComment(
     return { record: null, diagnostic: null };
   }
 
-  const match = /```json\s*([\s\S]*?)```/u.exec(body);
-  if (!match) {
+  const jsonBlock = firstJsonCodeBlock(body);
+  if (!jsonBlock) {
     return {
       record: null,
       diagnostic: {
@@ -2466,7 +2502,7 @@ function parseCoordinationHandoffComment(
   }
 
   try {
-    const record = handoffRecordFromUnknown(JSON.parse(match[1]!));
+    const record = handoffRecordFromUnknown(JSON.parse(jsonBlock));
     return record
       ? { record, diagnostic: null }
       : {
@@ -2491,6 +2527,63 @@ function parseCoordinationHandoffComment(
       },
     };
   }
+}
+
+function firstJsonCodeBlock(body: string): string | null {
+  const openingFence = "```json";
+  let searchFrom = 0;
+  while (searchFrom < body.length) {
+    const opening = body.indexOf(openingFence, searchFrom);
+    if (opening < 0) {
+      return null;
+    }
+
+    const afterOpening = opening + openingFence.length;
+    if (afterOpening < body.length && !isWhitespace(body[afterOpening]!)) {
+      searchFrom = afterOpening;
+      continue;
+    }
+
+    const contentStart = skipWhitespace(body, afterOpening);
+    const closing = body.indexOf("```", contentStart);
+    if (closing < 0) {
+      return null;
+    }
+
+    return body.slice(contentStart, closing);
+  }
+
+  return null;
+}
+
+function skipWhitespace(value: string, start: number): number {
+  let index = start;
+  while (index < value.length && isWhitespace(value[index]!)) {
+    index += 1;
+  }
+
+  return index;
+}
+
+function isWhitespace(character: string): boolean {
+  return character.trim().length === 0;
+}
+
+function isWordBoundaryBefore(value: string, index: number): boolean {
+  return index === 0 || !isWordCharacter(value[index - 1]!);
+}
+
+function isWordCharacter(character: string): boolean {
+  return isHexCharacter(character) ||
+    (character >= "g" && character <= "z") ||
+    (character >= "G" && character <= "Z") ||
+    character === "_";
+}
+
+function isHexCharacter(character: string): boolean {
+  return (character >= "0" && character <= "9") ||
+    (character >= "a" && character <= "f") ||
+    (character >= "A" && character <= "F");
 }
 
 function coordinationTrackerReadDiagnostic(options: {

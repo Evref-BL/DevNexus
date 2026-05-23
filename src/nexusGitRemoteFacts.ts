@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { gitDirectoryFromGitFileContent } from "./nexusGitFile.js";
 
 export interface NexusGitRemoteFacts {
   urls: Record<string, string>;
@@ -83,21 +84,12 @@ function gitConfigPath(repositoryPath: string): string | null {
     return null;
   }
 
-  const gitDir = gitDirFromFileContent(fs.readFileSync(gitPath, "utf8"));
+  const gitDir = gitDirectoryFromGitFileContent(
+    fs.readFileSync(gitPath, "utf8"),
+  );
   if (!gitDir) {
     return null;
   }
   const configPath = path.join(path.resolve(repositoryPath, gitDir), "config");
   return fs.existsSync(configPath) ? configPath : null;
-}
-
-function gitDirFromFileContent(text: string): string | null {
-  for (const line of text.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("gitdir:")) {
-      return trimmed.slice("gitdir:".length).trim() || null;
-    }
-  }
-
-  return null;
 }

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { gitDirectoryFromGitFileContent } from "./nexusGitFile.js";
 import type {
   NexusProjectSetupAnswers,
   NexusProjectSetupComponentAnswers,
@@ -297,21 +298,11 @@ function readGitDirectory(sourceRoot: string): string | null {
     return null;
   }
 
-  const gitDir = gitFileDirectoryPath(fs.readFileSync(dotGit, "utf8"));
+  const gitDir = gitDirectoryFromGitFileContent(fs.readFileSync(dotGit, "utf8"));
   if (!gitDir) {
     return null;
   }
   return path.resolve(sourceRoot, gitDir);
-}
-
-function gitFileDirectoryPath(content: string): string | null {
-  const trimmed = content.trim();
-  const prefix = "gitdir:";
-  if (trimmed.slice(0, prefix.length).toLowerCase() !== prefix) {
-    return null;
-  }
-  const gitDir = trimmed.slice(prefix.length).trimStart();
-  return gitDir.length > 0 ? gitDir : null;
 }
 
 function readCurrentBranch(gitDir: string): string | null {

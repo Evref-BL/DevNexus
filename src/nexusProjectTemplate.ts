@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { gitDirectoryFromGitFileContent } from "./nexusGitFile.js";
 import type { NexusProjectMcpConfig } from "./nexusProjectConfig.js";
 import {
   activeNexusProjectMcpAgentTargets,
@@ -529,13 +530,13 @@ function projectGitInfoDirectory(projectRoot: string): string | null {
     return null;
   }
 
-  const gitFile = fs.readFileSync(dotGit, "utf8");
-  const gitDirMatch = gitFile.match(/^gitdir:\s*(.+?)\s*$/imu);
-  if (!gitDirMatch) {
+  const gitDirValue = gitDirectoryFromGitFileContent(
+    fs.readFileSync(dotGit, "utf8"),
+  );
+  if (!gitDirValue) {
     return null;
   }
 
-  const gitDirValue = gitDirMatch[1]!;
   const gitDir = path.isAbsolute(gitDirValue)
     ? path.resolve(gitDirValue)
     : path.resolve(projectRoot, gitDirValue);
