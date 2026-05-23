@@ -1,7 +1,7 @@
 # Review Policy Design
 
-This note records the target design for DevNexus review policy. It is a design
-document, not implemented configuration.
+This note records the DevNexus review policy model and the first implemented
+planner surface.
 
 ## Goal
 
@@ -162,6 +162,48 @@ to the default.
 }
 ```
 
+## Planner Command
+
+Agents should call the review planner instead of inspecting policy and branching
+their own workflow.
+
+```bash
+dev-nexus review plan <workspace-root> \
+  --component api \
+  --path docs/dev/review-policy.md \
+  --requested-action merge \
+  --branch docs/review-policy \
+  --head abc123 \
+  --json
+```
+
+For local VS Code review, the same command can include action-scoped human
+authorization:
+
+```bash
+dev-nexus review plan <workspace-root> \
+  --component api \
+  --path docs/dev/review-policy.md \
+  --requested-action merge \
+  --branch docs/review-policy \
+  --head abc123 \
+  --authorized \
+  --authorization-timestamp 2026-05-23T10:00:00Z \
+  --json
+```
+
+Provider review evidence is read from a provider evidence file, using the same
+normalized evidence shape as publication and release-train planning:
+
+```bash
+dev-nexus review plan <workspace-root> \
+  --component api \
+  --branch-role feature_finalization \
+  --requested-action merge \
+  --evidence-file provider-evidence.json \
+  --json
+```
+
 ## Responsibilities
 
 | Area | Question | Writes durable state? |
@@ -211,16 +253,17 @@ should ask for fresh authorization.
 
 ## Initial DevNexus Behavior
 
-The first implementation should stay small:
+The first implementation is deliberately small:
 
 1. Add component review policy parsing and validation.
 2. Add a review-plan command/API that returns transport, gates, required
    evidence, provider mutations, and blocked actions.
 3. Add evidence readback for local Git facts, current-session human
-   authorization, GitHub PR state, and CI/check state where the provider facade
-   already supports it.
-4. Feed the review result into publication/finalization planning.
-5. Keep provider comments silent unless comment policy explicitly enables them.
+   authorization, provider review state, and provider CI/check state.
+4. Keep provider comments silent unless comment policy explicitly enables them.
+
+Follow-up work should feed the review result into publication and feature
+finalization planning, then expand provider-native readback where needed.
 
 The first implementation should not add committed approval files or a general
 approval ledger. If a later project needs audit-grade local approvals, that

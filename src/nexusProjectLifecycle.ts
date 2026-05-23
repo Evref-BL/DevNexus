@@ -162,6 +162,7 @@ export interface ResolvedNexusProjectComponent {
   workTracking: NexusProjectComponentConfig["workTracking"] | null;
   workTrackingCapabilities: TrackerCapabilities | null;
   workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
+  review: NexusProjectComponentConfig["review"] | null;
   verification: NexusProjectComponentConfig["verification"] | null;
   publication: NexusProjectComponentConfig["publication"] | null;
   relationships: NexusProjectComponentConfig["relationships"];
@@ -250,6 +251,7 @@ export function resolveProjectComponent(
     workTrackingCapabilityReport: defaultWorkTracking
       ? workTrackerCapabilityReportForConfig(defaultWorkTracking)
       : null,
+    review: component.review ?? null,
     verification: component.verification ?? null,
     publication: component.publication ?? null,
     relationships: component.relationships,

@@ -60,6 +60,18 @@ a change is checked and approved; publication decides whether it may be pushed,
 merged, queued, or released. The target review-policy design is recorded in
 [Review policy design](../dev/review-policy.md).
 
+When a component configures review policy, agents can ask DevNexus for the
+current review path:
+
+```bash
+dev-nexus review plan <workspace-root> --component api --path docs/guide.md
+```
+
+The review plan is read-only by default. It reports the transport, gates,
+required evidence, provider mutations, blocked actions, and next action. Local
+human approval is action-scoped: if the branch, head commit, or requested action
+changes, the review plan should ask for fresh authorization.
+
 ## When To Opt Into Advanced Publication
 
 Use a richer publication policy when local handoff is no longer enough.

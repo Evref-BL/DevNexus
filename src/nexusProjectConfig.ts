@@ -83,6 +83,10 @@ import {
   type NexusVersionPlanningConfig,
 } from "./nexusVersionPlanningConfig.js";
 import { validateNexusCiTierPolicyConfig } from "./nexusCiTierPolicy.js";
+import {
+  validateNexusReviewPolicyConfig,
+  type NexusReviewPolicyConfig,
+} from "./nexusReviewPolicy.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -236,6 +240,7 @@ export interface NexusProjectComponentConfig {
   defaultWorkTrackerId?: string;
   workTrackers?: NexusProjectWorkTrackerBindingConfig[];
   trackerDiscovery?: NexusProjectTrackerDiscoveryPolicyConfig;
+  review?: NexusReviewPolicyConfig;
   verification?: Partial<NexusAutomationVerificationConfig>;
   publication?: Partial<NexusAutomationPublicationConfig>;
   relationships: NexusProjectComponentRelationshipConfig[];
@@ -3874,6 +3879,10 @@ function validateProjectComponent(
     record.trackerDiscovery,
     `${pathName}.trackerDiscovery`,
   );
+  const review = validateNexusReviewPolicyConfig(
+    record.review,
+    `${pathName}.review`,
+  );
   const verification = validateComponentVerificationConfig(
     record.verification,
     `${pathName}.verification`,
@@ -3899,6 +3908,7 @@ function validateProjectComponent(
     ...(workTracking ? { workTracking } : {}),
     ...workTrackerBindings,
     ...(trackerDiscovery ? { trackerDiscovery } : {}),
+    ...(review ? { review } : {}),
     ...(verification ? { verification } : {}),
     ...(publication ? { publication } : {}),
     relationships: validateComponentRelationships(

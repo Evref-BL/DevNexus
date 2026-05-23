@@ -408,6 +408,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
     expect(output.output()).toContain("dev-nexus publication green-main plan");
+    expect(output.output()).toContain("dev-nexus review plan");
     expect(output.output()).toContain("dev-nexus quick-fix plan");
     expect(output.output()).toContain("dev-nexus quick-fix start");
     expect(output.output()).toContain("dev-nexus quick-fix finish");
@@ -418,6 +419,85 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("prints review plans from component review policy", async () => {
+    const projectRoot = makeTempDir("dev-nexus-review-plan-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            review: {
+              default: {
+                transport: "pull_request",
+                gates: ["provider_approval_required"],
+              },
+              rules: [
+                {
+                  match: {
+                    paths: ["docs/**"],
+                  },
+                  transport: "local",
+                  gates: ["human_required"],
+                },
+              ],
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const output = captureOutput();
+    await expect(
+      main(
+        [
+          "review",
+          "plan",
+          projectRoot,
+          "--component",
+          "primary",
+          "--path",
+          "docs/dev/review-policy.md",
+          "--requested-action",
+          "merge",
+          "--branch",
+          "docs/review-policy",
+          "--head",
+          "abc123",
+          "--authorized",
+          "--authorization-timestamp",
+          "2026-05-23T10:00:00Z",
+          "--json",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      plan: {
+        componentId: "primary",
+        status: "ready",
+        nextAction: "proceed",
+        transport: "local",
+        matchedRuleIndex: 0,
+        providerMutations: [],
+        context: {
+          requestedAction: "merge",
+          branchName: "docs/review-policy",
+          headSha: "abc123",
+        },
+      },
+    });
   });
 
   it("logs in, reports status, and logs out of GitHub App user auth", async () => {
