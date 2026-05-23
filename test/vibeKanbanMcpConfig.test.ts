@@ -147,6 +147,35 @@ describe("Vibe Kanban MCP config adapter", () => {
     ).toThrow(VibeKanbanMcpConfigError);
   });
 
+  it("validates MCP server string maps", () => {
+    expect(
+      mergeMcpServerConfig({}, "http", {
+        type: "http",
+        url: "http://127.0.0.1:3000/mcp",
+        headers: {
+          authorization: "Bearer token",
+        },
+      }),
+    ).toEqual({
+      http: {
+        type: "http",
+        url: "http://127.0.0.1:3000/mcp",
+        headers: {
+          authorization: "Bearer token",
+        },
+      },
+    });
+
+    expect(() =>
+      mergeMcpServerConfig({}, "bad", {
+        command: "node",
+        env: {
+          PORT: 3000 as unknown as string,
+        },
+      }),
+    ).toThrow(VibeKanbanMcpConfigError);
+  });
+
   it("reads and updates MCP config through the Vibe API", async () => {
     const api = await startFakeVibeKanbanApi();
     try {

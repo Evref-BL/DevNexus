@@ -65,6 +65,46 @@ function optionalStringArray(
   return value;
 }
 
+function optionalNonEmptyString(
+  value: unknown,
+  pathName: string,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new VibeKanbanMcpConfigError(`${pathName} must be a non-empty string`);
+  }
+
+  return value;
+}
+
+function optionalStringRecord(
+  value: unknown,
+  pathName: string,
+): Record<string, string> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return stringRecord(value, pathName);
+}
+
+function stringRecord(value: unknown, pathName: string): Record<string, string> {
+  const record = assertRecord(value, pathName);
+  const normalized: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    if (typeof entry !== "string") {
+      throw new VibeKanbanMcpConfigError(`${pathName}.${key} must be a string`);
+    }
+
+    normalized[key] = entry;
+  }
+
+  return normalized;
+}
+
 export function normalizeVibeKanbanExecutor(
   executor: string,
 ): VibeKanbanExecutor {
@@ -87,76 +127,26 @@ export function validateMcpServerConfig(
   pathName: string,
 ): VibeKanbanMcpServerConfig {
   const record = assertRecord(value, pathName);
-  const commandValue = record.command;
-  const urlValue = record.url;
-  const hasCommand =
-    typeof commandValue === "string" && commandValue.trim().length > 0;
-  const hasUrl = typeof urlValue === "string" && urlValue.trim().length > 0;
-  if (!hasCommand && !hasUrl) {
+  const command = optionalNonEmptyString(record.command, `${pathName}.command`);
+  const url = optionalNonEmptyString(record.url, `${pathName}.url`);
+  if (!command && !url) {
     throw new VibeKanbanMcpConfigError(
       `${pathName}.command or ${pathName}.url must be a non-empty string`,
     );
   }
 
-  if (commandValue !== undefined && !hasCommand) {
-    throw new VibeKanbanMcpConfigError(
-      `${pathName}.command must be a non-empty string`,
-    );
-  }
-
-  if (urlValue !== undefined && !hasUrl) {
-    throw new VibeKanbanMcpConfigError(
-      `${pathName}.url must be a non-empty string`,
-    );
-  }
-
-  const argsValue = record.args;
-  if (
-    argsValue !== undefined &&
-    (!Array.isArray(argsValue) || argsValue.some((arg) => typeof arg !== "string"))
-  ) {
-    throw new VibeKanbanMcpConfigError(`${pathName}.args must be an array of strings`);
-  }
-  const args = argsValue ?? (hasCommand ? [] : undefined);
-
-  const envValue = record.env;
-  let env: Record<string, string> | undefined;
-  if (envValue !== undefined) {
-    const envRecord = assertRecord(envValue, `${pathName}.env`);
-    env = {};
-    for (const [key, valueEntry] of Object.entries(envRecord)) {
-      if (typeof valueEntry !== "string") {
-        throw new VibeKanbanMcpConfigError(
-          `${pathName}.env.${key} must be a string`,
-        );
-      }
-
-      env[key] = valueEntry;
-    }
-  }
-
-  const headersValue = record.headers;
-  let headers: Record<string, string> | undefined;
-  if (headersValue !== undefined) {
-    const headersRecord = assertRecord(headersValue, `${pathName}.headers`);
-    headers = {};
-    for (const [key, valueEntry] of Object.entries(headersRecord)) {
-      if (typeof valueEntry !== "string") {
-        throw new VibeKanbanMcpConfigError(
-          `${pathName}.headers.${key} must be a string`,
-        );
-      }
-
-      headers[key] = valueEntry;
-    }
-  }
+  const args =
+    optionalStringArray(record.args, `${pathName}.args`) ??
+    (command ? [] : undefined);
+  const env = optionalStringRecord(record.env, `${pathName}.env`);
+  const headers = optionalStringRecord(record.headers, `${pathName}.headers`);
 
   return {
     ...record,
-    ...(hasCommand ? { command: commandValue } : {}),
+    ...(command ? { command } : {}),
     ...(args ? { args } : {}),
     ...(env ? { env } : {}),
-    ...(hasUrl ? { url: urlValue } : {}),
+    ...(url ? { url } : {}),
     ...(headers ? { headers } : {}),
   };
 }
