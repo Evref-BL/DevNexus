@@ -2,6 +2,10 @@ import { spawnSync } from "node:child_process";
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import {
+  stripHttpScheme,
+  stripTrailingSlashes,
+} from "./nexusTextNormalization.js";
 import type {
   NexusHostingAuthProfileConfig,
   NexusHostingAuthProfileCredentialKind,
@@ -1631,29 +1635,9 @@ function normalizeGitHubAppApiBaseUrl(hostOrApiBaseUrl?: string | null): string 
   return `https://${stripTrailingSlashes(value)}/api/v3`;
 }
 
-function stripHttpScheme(value: string): string {
-  if (value.startsWith("https://")) {
-    return value.slice("https://".length);
-  }
-  if (value.startsWith("http://")) {
-    return value.slice("http://".length);
-  }
-
-  return value;
-}
-
 function takeBeforeSlash(value: string): string {
   const slash = value.indexOf("/");
   return slash >= 0 ? value.slice(0, slash) : value;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 function requiredGitHubAppPrivateKeyPath(

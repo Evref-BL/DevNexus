@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 import type {
   CreateWorkItemInput,
   ExternalRef,
@@ -628,15 +629,6 @@ export function normalizeGitHubGraphQLApiUrl(
   }
 
   return `${url.protocol}//${url.host}/api/graphql`;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 export function githubCredentialRequest(

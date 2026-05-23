@@ -6,6 +6,11 @@ import {
   type NexusFeatureBranchDeliveryBranchStrategy,
 } from "./nexusAutomationConfig.js";
 import { parseGitHubRemoteUrl } from "./nexusForgeRepositoryResolver.js";
+import {
+  isLowerAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export interface NexusFeatureBranchDeliveryBranchPlanSummary {
   branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
@@ -219,20 +224,37 @@ export function renderFeatureBranchPattern(
     change: string | null;
   },
 ): string {
-  return pattern
+  const rendered = pattern
     .replaceAll("{intent}", values.intent)
     .replaceAll("{feature}", values.feature)
-    .replaceAll("{change}", values.change ?? "{change}")
-    .replace(/\/+$/u, "");
+    .replaceAll("{change}", values.change ?? "{change}");
+  return rendered.slice(0, stripTrailingSlashEnd(rendered));
 }
 
 export function branchSlugFor(value: string): string {
-  const slug = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+  const slug = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isBranchSlugCharacter(character),
+    ),
+  );
   return slug.length > 0 ? slug : "manual";
+}
+
+function stripTrailingSlashEnd(value: string): number {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return end;
+}
+
+function isBranchSlugCharacter(character: string): boolean {
+  return isLowerAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
 }
 
 function mergeFeatureBranchDeliveryDefaults(

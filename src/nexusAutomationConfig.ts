@@ -3,6 +3,7 @@ import {
   validateNexusCiTierPolicyConfig,
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 
 export type NexusAutomationMode = "run_once" | "agent_launch";
 export type NexusAutomationEligibleWorkMode = "default" | "discovery";
@@ -1937,15 +1938,6 @@ function validateFeatureBranchPattern(
     }
   }
   return stripTrailingSlashes(pattern);
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 function optionalBranchSegment(

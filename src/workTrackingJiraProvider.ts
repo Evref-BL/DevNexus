@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 import {
   assertWorkStatus as assertSharedWorkStatus,
   dedupeStrings,
@@ -529,15 +530,6 @@ export function normalizeJiraWebBaseUrl(hostOrApiBaseUrl?: string | null): strin
   }
 
   return `${url.protocol}//${url.host}${normalizedPath}`;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 export function jiraCredentialRequest(

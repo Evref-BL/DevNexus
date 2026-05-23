@@ -33,6 +33,13 @@ import {
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
 import {
+  isAsciiDigit,
+  isLowerAsciiLetterOrDigit,
+  isUpperAsciiLetter,
+  stripHttpScheme,
+  stripTrailingSlashes,
+} from "./nexusTextNormalization.js";
+import {
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
   type WorkItemTrackerReference,
@@ -1825,26 +1832,6 @@ function sanitizeIdPart(value: string): string {
   return sanitized.join("").slice(0, 80);
 }
 
-function stripHttpScheme(value: string): string {
-  if (value.startsWith("https://")) {
-    return value.slice("https://".length);
-  }
-  if (value.startsWith("http://")) {
-    return value.slice("http://".length);
-  }
-
-  return value;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
-}
-
 function allCharacters(
   value: string,
   predicate: (character: string) => boolean,
@@ -1861,20 +1848,8 @@ function allCharacters(
   return true;
 }
 
-function isUpperAsciiLetter(character: string): boolean {
-  return character >= "A" && character <= "Z";
-}
-
-function isAsciiDigit(character: string): boolean {
-  return character >= "0" && character <= "9";
-}
-
 function isUpperAsciiLetterOrDigit(character: string): boolean {
   return isUpperAsciiLetter(character) || isAsciiDigit(character);
-}
-
-function isLowerAsciiLetterOrDigit(character: string): boolean {
-  return (character >= "a" && character <= "z") || isAsciiDigit(character);
 }
 
 function errorDetail(error: unknown): string {

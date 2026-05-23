@@ -10,6 +10,10 @@ import {
 } from "./gitWorktreeService.js";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
+  stripHttpScheme,
+  stripTrailingSlashes,
+} from "./nexusTextNormalization.js";
+import {
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthority,
   type NexusAuthorityAction,
@@ -1816,26 +1820,6 @@ function githubActorHost(target: NexusPublicationTarget): string {
   }
   const normalized = stripTrailingSlashes(stripHttpScheme(host));
   return normalized.startsWith("api.") ? normalized.slice("api.".length) : normalized;
-}
-
-function stripHttpScheme(value: string): string {
-  if (value.startsWith("https://")) {
-    return value.slice("https://".length);
-  }
-  if (value.startsWith("http://")) {
-    return value.slice("http://".length);
-  }
-
-  return value;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 function handlesEqual(left: string, right: string): boolean {

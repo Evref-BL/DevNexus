@@ -9,6 +9,11 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
+import {
+  isAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export interface ProcessLogPaths {
   stdout: string;
@@ -146,8 +151,20 @@ function assertPid(pid: number): void {
 }
 
 function sanitizeLogName(value: string): string {
-  const sanitized = value.trim().replace(/[^A-Za-z0-9._-]+/g, "-");
-  return sanitized.replace(/^-+|-+$/g, "") || "process";
+  const sanitized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim(),
+      (character) => !isSafeLogNameCharacter(character),
+    ),
+  );
+  return sanitized || "process";
+}
+
+function isSafeLogNameCharacter(character: string): boolean {
+  return isAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
 }
 
 function processLogPaths(logDirectory: string, name: string): ProcessLogPaths {

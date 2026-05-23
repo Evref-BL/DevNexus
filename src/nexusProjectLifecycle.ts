@@ -3,6 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
+  isAsciiDigit,
+  isLowerAsciiLetter,
+  isLowerAsciiLetterOrDigit,
+  isUpperAsciiLetter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
+import {
   loadProjectConfig,
   normalizeComponentWorkTrackers,
   normalizeNexusProjectTrackerCommunicationPolicy,
@@ -156,40 +164,6 @@ function shouldInsertAsciiWordBreak(
   );
 }
 
-function replaceRunsWithHyphen(
-  value: string,
-  shouldReplace: (character: string) => boolean,
-): string {
-  const result: string[] = [];
-  let replacing = false;
-  for (const character of value) {
-    if (shouldReplace(character)) {
-      if (!replacing) {
-        result.push("-");
-      }
-      replacing = true;
-    } else {
-      result.push(character);
-      replacing = false;
-    }
-  }
-
-  return result.join("");
-}
-
-function trimHyphens(value: string): string {
-  let start = 0;
-  let end = value.length;
-  while (start < end && value[start] === "-") {
-    start += 1;
-  }
-  while (end > start && value[end - 1] === "-") {
-    end -= 1;
-  }
-
-  return value.slice(start, end);
-}
-
 function isSlugCharacter(character: string): boolean {
   return isLowerAsciiLetterOrDigit(character) ||
     character === "." ||
@@ -203,22 +177,6 @@ function isUnsafeDirectoryNameCharacter(character: string): boolean {
 
 function isWhitespaceCharacter(character: string): boolean {
   return character.trim().length === 0;
-}
-
-function isLowerAsciiLetter(character: string): boolean {
-  return character >= "a" && character <= "z";
-}
-
-function isUpperAsciiLetter(character: string): boolean {
-  return character >= "A" && character <= "Z";
-}
-
-function isAsciiDigit(character: string): boolean {
-  return character >= "0" && character <= "9";
-}
-
-function isLowerAsciiLetterOrDigit(character: string): boolean {
-  return isLowerAsciiLetter(character) || isAsciiDigit(character);
 }
 
 export function directoryExistsAndIsNonEmpty(directoryPath: string): boolean {

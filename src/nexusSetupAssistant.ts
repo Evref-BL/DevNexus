@@ -68,6 +68,12 @@ import {
   nexusSkillsDirectoryName,
 } from "./nexusSkills.js";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
+import {
+  isAsciiLetterOrDigit,
+  isLowerAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export type NexusSetupFlowId =
   | "github-workspace-repository"
@@ -682,10 +688,12 @@ function metaProjectHostingGuide(
 }
 
 function authProfileConfigDirectory(authProfile: string | null): string {
-  const safeProfile = (authProfile ?? "automation-github")
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+  const safeProfile = trimHyphens(
+    replaceRunsWithHyphen(
+      (authProfile ?? "automation-github").trim(),
+      (character) => !isMixedCaseSafeNameCharacter(character),
+    ),
+  );
   return `gh-${safeProfile || "automation-github"}`;
 }
 
@@ -831,11 +839,19 @@ function parseGitHubRemote(
 }
 
 function setupNameSlug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "") || "dev-nexus";
+  return trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isLowerAsciiLetterOrDigit(character),
+    ),
+  ) || "dev-nexus";
+}
+
+function isMixedCaseSafeNameCharacter(character: string): boolean {
+  return isAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
 }
 
 function joinExistingProjectSteps(options: {

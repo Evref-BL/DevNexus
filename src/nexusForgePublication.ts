@@ -4,6 +4,10 @@ import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
 import type { NexusPublicationActorConfig } from "./nexusAutomationConfig.js";
 import type { NexusPublicationProviderEvidenceInput } from "./nexusPublicationProviderEvidence.js";
 import type { NexusResolvedProviderCredential } from "./nexusProviderCredentialBroker.js";
+import {
+  stripHttpScheme,
+  stripTrailingSlashes,
+} from "./nexusTextNormalization.js";
 
 export type NexusForgePublicationCapability =
   | "actor.verify"
@@ -1187,26 +1191,6 @@ function githubCliHost(host?: string | null): string {
   }
   const normalized = stripTrailingSlashes(stripHttpScheme(value));
   return normalized.startsWith("api.") ? normalized.slice("api.".length) : normalized;
-}
-
-function stripHttpScheme(value: string): string {
-  if (value.startsWith("https://")) {
-    return value.slice("https://".length);
-  }
-  if (value.startsWith("http://")) {
-    return value.slice("http://".length);
-  }
-
-  return value;
-}
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end -= 1;
-  }
-
-  return value.slice(0, end);
 }
 
 function normalizeProvider(provider: string): string {
