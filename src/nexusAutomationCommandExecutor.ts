@@ -228,75 +228,150 @@ function safeParseNexusAutomationCommandExpression(command: string):
 // argv expressions, not shell scripts. Unquoted shell control syntax is rejected
 // so callers must choose a shell executable explicitly when they really need one.
 function splitNexusAutomationCommandExpression(command: string): string[] {
-  const words: string[] = [];
-  let current = "";
-  let tokenStarted = false;
-  let quote: "'" | "\"" | null = null;
+  const state: CommandExpressionParserState = {
+    words: [],
+    current: "",
+    tokenStarted: false,
+    quote: null,
+  };
 
   for (let index = 0; index < command.length; index += 1) {
-    const char = command[index]!;
-    if (char === "\r" || char === "\n") {
-      throw new NexusAutomationCommandExecutorError(
-        "command must not contain line breaks",
-      );
-    }
-
-    if (!quote && /\s/u.test(char)) {
-      if (tokenStarted) {
-        words.push(current);
-        current = "";
-        tokenStarted = false;
-      }
-      continue;
-    }
-
-    if (!quote && isUnsupportedShellControlCharacter(char)) {
-      throw new NexusAutomationCommandExecutorError(
-        `command uses unsupported shell control syntax: ${char}`,
-      );
-    }
-
-    if (char === "'" && quote !== "\"") {
-      tokenStarted = true;
-      quote = quote === "'" ? null : "'";
-      continue;
-    }
-
-    if (char === "\"" && quote !== "'") {
-      tokenStarted = true;
-      quote = quote === "\"" ? null : "\"";
-      continue;
-    }
-
-    if (char === "\\" && quote !== "'") {
-      const escaped = command[index + 1];
-      if (!escaped) {
-        throw new NexusAutomationCommandExecutorError(
-          "command must not end with a trailing escape",
-        );
-      }
-      if (shouldEscapeCommandCharacter(escaped, quote)) {
-        current += escaped;
-        tokenStarted = true;
-        index += 1;
-        continue;
-      }
-    }
-
-    current += char;
-    tokenStarted = true;
+    index = readCommandExpressionCharacter(command, index, state);
   }
 
-  if (quote) {
+  return finishCommandExpressionParse(state);
+}
+
+interface CommandExpressionParserState {
+  words: string[];
+  current: string;
+  tokenStarted: boolean;
+  quote: "'" | "\"" | null;
+}
+
+function readCommandExpressionCharacter(
+  command: string,
+  index: number,
+  state: CommandExpressionParserState,
+): number {
+  const char = command[index]!;
+  assertCommandExpressionCharacterAllowed(char, state.quote);
+
+  if (isCommandExpressionWhitespace(char, state.quote)) {
+    flushCommandExpressionToken(state);
+    return index;
+  }
+  if (isCommandExpressionQuoteToggle(char, state.quote)) {
+    toggleCommandExpressionQuote(state, char);
+    return index;
+  }
+  if (isCommandExpressionEscapeStart(char, state.quote)) {
+    return appendCommandExpressionEscape(command, index, state);
+  }
+
+  appendCommandExpressionCharacter(state, char);
+  return index;
+}
+
+function assertCommandExpressionCharacterAllowed(
+  char: string,
+  quote: "'" | "\"" | null,
+): void {
+  if (char === "\r" || char === "\n") {
+    throw new NexusAutomationCommandExecutorError(
+      "command must not contain line breaks",
+    );
+  }
+  if (!quote && isUnsupportedShellControlCharacter(char)) {
+    throw new NexusAutomationCommandExecutorError(
+      `command uses unsupported shell control syntax: ${char}`,
+    );
+  }
+}
+
+function isCommandExpressionWhitespace(
+  char: string,
+  quote: "'" | "\"" | null,
+): boolean {
+  return !quote && /\s/u.test(char);
+}
+
+function isCommandExpressionQuoteToggle(
+  char: string,
+  quote: "'" | "\"" | null,
+): boolean {
+  return (char === "'" && quote !== "\"") ||
+    (char === "\"" && quote !== "'");
+}
+
+function toggleCommandExpressionQuote(
+  state: CommandExpressionParserState,
+  char: string,
+): void {
+  const quote = char === "'" ? "'" : "\"";
+  state.tokenStarted = true;
+  state.quote = state.quote === quote ? null : quote;
+}
+
+function isCommandExpressionEscapeStart(
+  char: string,
+  quote: "'" | "\"" | null,
+): boolean {
+  return char === "\\" && quote !== "'";
+}
+
+function appendCommandExpressionEscape(
+  command: string,
+  index: number,
+  state: CommandExpressionParserState,
+): number {
+  const escaped = command[index + 1];
+  if (!escaped) {
+    throw new NexusAutomationCommandExecutorError(
+      "command must not end with a trailing escape",
+    );
+  }
+
+  if (shouldEscapeCommandCharacter(escaped, state.quote)) {
+    appendCommandExpressionCharacter(state, escaped);
+    return index + 1;
+  }
+
+  appendCommandExpressionCharacter(state, "\\");
+  return index;
+}
+
+function appendCommandExpressionCharacter(
+  state: CommandExpressionParserState,
+  char: string,
+): void {
+  state.current += char;
+  state.tokenStarted = true;
+}
+
+function flushCommandExpressionToken(
+  state: CommandExpressionParserState,
+): void {
+  if (!state.tokenStarted) {
+    return;
+  }
+
+  state.words.push(state.current);
+  state.current = "";
+  state.tokenStarted = false;
+}
+
+function finishCommandExpressionParse(
+  state: CommandExpressionParserState,
+): string[] {
+  if (state.quote) {
     throw new NexusAutomationCommandExecutorError(
       "command contains an unterminated quoted argument",
     );
   }
-  if (tokenStarted) {
-    words.push(current);
-  }
 
-  return words;
+  flushCommandExpressionToken(state);
+  return state.words;
 }
 
 function isUnsupportedShellControlCharacter(char: string): boolean {
