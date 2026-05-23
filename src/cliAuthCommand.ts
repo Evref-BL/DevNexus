@@ -1,5 +1,6 @@
 import process from "node:process";
 import {
+  type TextWriter,
   writeJson,
   writeLine,
 } from "./cliSupport.js";
@@ -24,6 +25,16 @@ interface ParsedAuthCommand {
   json: boolean;
 }
 
+interface AuthCommandContext {
+  parsed: ParsedAuthCommand;
+  dependencies: DevNexusCliDependencies;
+  stdout: TextWriter;
+  homePath: string;
+  profile: NexusHostingAuthProfileConfig;
+}
+
+type AuthActionHandler = (context: AuthCommandContext) => Promise<number>;
+
 export async function handleAuthCommand(
   argv: string[],
   dependencies: DevNexusCliDependencies,
@@ -32,71 +43,99 @@ export async function handleAuthCommand(
   const stdout = dependencies.stdout ?? process.stdout;
   const homePath = resolveNexusHome(parsed.homePath);
   const profile = loadAuthProfile(homePath, parsed.profileId);
-  if (profile.credentialKind !== "github_app_user_token") {
-    throw new Error(`Auth profile ${profile.id} must use credentialKind=github_app_user_token.`);
-  }
+  assertGitHubAppUserAuthProfile(profile);
 
-  if (parsed.action === "status") {
-    const status = nexusGitHubAppUserTokenStatus({
-      homePath,
-      profile,
-      now: nowFromDependencies(dependencies),
-    });
-    if (parsed.json) {
-      writeJson(stdout, { ok: true, status });
-    } else {
-      writeLine(
-        stdout,
-        `GitHub App user auth ${profile.id}: ${status.state}${
-          status.login ? ` as ${status.login}` : ""
-        }`,
-      );
-    }
-    return 0;
-  }
-
-  if (parsed.action === "logout") {
-    const removed = deleteNexusGitHubAppUserToken({
-      homePath,
-      profileId: profile.id,
-    });
-    if (parsed.json) {
-      writeJson(stdout, { ok: true, profileId: profile.id, removed });
-    } else {
-      writeLine(
-        stdout,
-        removed
-          ? `Removed GitHub App user auth token for ${profile.id}.`
-          : `No GitHub App user auth token was stored for ${profile.id}.`,
-      );
-    }
-    return 0;
-  }
-
-  const result = await runNexusGitHubAppUserDeviceLogin({
+  return authActionHandlers[parsed.action]({
+    parsed,
+    dependencies,
+    stdout,
     homePath,
     profile,
-    fetch: dependencies.fetch,
-    now: nowFromDependencies(dependencies),
-    sleep: dependencies.sleep,
-    onDeviceCode: parsed.json
+  });
+}
+
+const authActionHandlers: Record<ParsedAuthCommand["action"], AuthActionHandler> = {
+  login: handleAuthLogin,
+  logout: handleAuthLogout,
+  status: handleAuthStatus,
+};
+
+async function handleAuthStatus(context: AuthCommandContext): Promise<number> {
+  const status = nexusGitHubAppUserTokenStatus({
+    homePath: context.homePath,
+    profile: context.profile,
+    now: nowFromDependencies(context.dependencies),
+  });
+  if (context.parsed.json) {
+    writeJson(context.stdout, { ok: true, status });
+  } else {
+    writeLine(
+      context.stdout,
+      `GitHub App user auth ${context.profile.id}: ${status.state}${
+        status.login ? ` as ${status.login}` : ""
+      }`,
+    );
+  }
+  return 0;
+}
+
+async function handleAuthLogout(context: AuthCommandContext): Promise<number> {
+  const removed = deleteNexusGitHubAppUserToken({
+    homePath: context.homePath,
+    profileId: context.profile.id,
+  });
+  if (context.parsed.json) {
+    writeJson(context.stdout, {
+      ok: true,
+      profileId: context.profile.id,
+      removed,
+    });
+  } else {
+    writeLine(
+      context.stdout,
+      removed
+        ? `Removed GitHub App user auth token for ${context.profile.id}.`
+        : `No GitHub App user auth token was stored for ${context.profile.id}.`,
+    );
+  }
+  return 0;
+}
+
+async function handleAuthLogin(context: AuthCommandContext): Promise<number> {
+  const result = await runNexusGitHubAppUserDeviceLogin({
+    homePath: context.homePath,
+    profile: context.profile,
+    fetch: context.dependencies.fetch,
+    now: nowFromDependencies(context.dependencies),
+    sleep: context.dependencies.sleep,
+    onDeviceCode: context.parsed.json
       ? undefined
       : ({ userCode, verificationUri }) => {
           writeLine(
-            stdout,
+            context.stdout,
             `Open ${verificationUri} and enter code ${userCode}. Waiting for authorization...`,
           );
         },
   });
-  if (parsed.json) {
-    writeJson(stdout, { ok: true, result });
+  if (context.parsed.json) {
+    writeJson(context.stdout, { ok: true, result });
   } else {
     writeLine(
-      stdout,
-      `Authorized ${profile.id} as ${result.login}; token expires ${result.expiresAt ?? "when revoked"}.`,
+      context.stdout,
+      `Authorized ${context.profile.id} as ${result.login}; token expires ${result.expiresAt ?? "when revoked"}.`,
     );
   }
   return 0;
+}
+
+function assertGitHubAppUserAuthProfile(
+  profile: NexusHostingAuthProfileConfig,
+): void {
+  if (profile.credentialKind !== "github_app_user_token") {
+    throw new Error(
+      `Auth profile ${profile.id} must use credentialKind=github_app_user_token.`,
+    );
+  }
 }
 
 function parseAuthCommand(
