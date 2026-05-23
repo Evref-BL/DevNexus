@@ -381,6 +381,7 @@ function hostWorkspace(
 class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];
   closed = false;
+  closeError: Error | null = null;
 
   async send(
     request: CodexAppServerJsonRpcRequest,
@@ -409,6 +410,9 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
 
   close(): void {
     this.closed = true;
+    if (this.closeError) {
+      throw this.closeError;
+    }
   }
 }
 
@@ -4905,6 +4909,30 @@ describe("nexus dashboard", () => {
       await starter.close();
     }
 
+    expect(transport.closed).toBe(true);
+  });
+
+  it("settles synchronous Codex app-server client close failures", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-codex-close-failure-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: appServerAutomationConfig(),
+    }));
+    const transport = new MockCodexAppServerTransport();
+    transport.closeError = new Error("close failed");
+    const starter = createNexusDashboardCodexChatStarter({
+      clientFactory: () =>
+        new CodexAppServerJsonRpcClient({
+          transport,
+        }),
+    });
+
+    await starter.start({
+      projectRoot,
+      prompt: "Review this thread.",
+    });
+
+    await expect(starter.close()).resolves.toBeUndefined();
     expect(transport.closed).toBe(true);
   });
 

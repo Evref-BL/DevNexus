@@ -183,11 +183,13 @@ class NexusDashboardCodexChatStarterImpl
   async close(): Promise<void> {
     const clients = await Promise.allSettled(this.clients.values());
     this.clients.clear();
-    await Promise.allSettled(
-      clients.flatMap((entry) =>
-        entry.status === "fulfilled" ? [entry.value.client.close()] : [],
-      ),
-    );
+    const closeOperations: Promise<void>[] = [];
+    for (const entry of clients) {
+      if (entry.status === "fulfilled") {
+        closeOperations.push(closeCodexChatClient(entry.value.client));
+      }
+    }
+    await Promise.allSettled(closeOperations);
   }
 
   private cachedClient(
@@ -237,6 +239,12 @@ class NexusDashboardCodexChatStarterImpl
       cwd: input.cwd,
     };
   }
+}
+
+async function closeCodexChatClient(
+  client: CodexAppServerJsonRpcClient,
+): Promise<void> {
+  await client.close();
 }
 
 async function dashboardCodexChatClient(
