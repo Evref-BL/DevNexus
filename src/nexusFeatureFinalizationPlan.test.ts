@@ -11,6 +11,7 @@ import {
   saveProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
 
 const tempDirs: string[] = [];
 
@@ -59,7 +60,7 @@ describe("feature finalization plan", () => {
         reasons: ["final pull request is created at the review gate"],
         cliCommand:
           "dev-nexus publication pull-request upsert " +
-          `${projectRoot} --component primary --head feat/codex-goals --base main ` +
+          `${shellQuoteArgument(projectRoot)} --component primary --head feat/codex-goals --base main ` +
           '--title "Finalize feature codex-goals" --body ' +
           '"Finalize feature codex-goals. Head: feat/codex-goals Base: main Review target: main Run feature-finalization with current provider evidence before publication."',
       },

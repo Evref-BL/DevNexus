@@ -31,11 +31,19 @@ import {
 const tempDirs: string[] = [];
 
 function projectedDevNexusMcpToml(): string {
-  return `[mcp_servers.dev_nexus]\ncommand = "node"\nargs = ["${currentNexusCliScriptPath()}", "mcp-stdio"]\n`;
+  return `[mcp_servers.dev_nexus]\ncommand = ${tomlString("node")}\nargs = [${
+    [currentNexusCliScriptPath(), "mcp-stdio"].map(tomlString).join(", ")
+  }]\n`;
 }
 
 function expectedProjectedDevNexusMcpCommandLine(): string {
-  return `"node" "${currentNexusCliScriptPath()}" "mcp-stdio"`;
+  return ["node", currentNexusCliScriptPath(), "mcp-stdio"]
+    .map((part) => JSON.stringify(part))
+    .join(" ");
+}
+
+function tomlString(value: string): string {
+  return JSON.stringify(value);
 }
 
 function runNexusAutomationAgentLaunchOnce(

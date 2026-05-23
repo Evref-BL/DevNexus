@@ -108,7 +108,7 @@ describe("nexus workspace setup wizard", () => {
           role: "primary",
           source: {
             kind: "create_local",
-            path: "components/primary",
+            path: path.join("components", "primary"),
             initializeGit: true,
           },
         },
@@ -227,7 +227,7 @@ describe("nexus workspace setup wizard", () => {
           role: "primary",
           source: {
             kind: "create_local",
-            path: "components/core",
+            path: path.join("components", "core"),
             initializeGit: true,
           },
         },
@@ -285,7 +285,7 @@ describe("nexus workspace setup wizard", () => {
         role: "primary",
         source: {
           kind: "create_local",
-          path: "components/core",
+          path: path.join("components", "core"),
           initializeGit: true,
         },
       },
@@ -295,7 +295,7 @@ describe("nexus workspace setup wizard", () => {
         role: "dependency",
         source: {
           kind: "create_local",
-          path: "packages/api",
+          path: path.join("packages", "api"),
           initializeGit: true,
         },
       },
@@ -305,7 +305,7 @@ describe("nexus workspace setup wizard", () => {
         role: "optional",
         source: {
           kind: "create_local",
-          path: "docs/paper",
+          path: path.join("docs", "paper"),
           initializeGit: true,
         },
       },

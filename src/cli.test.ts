@@ -40,6 +40,10 @@ import {
 const tempDirs: string[] = [];
 const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
 
+function tomlArgs(values: string[]): string {
+  return `args = [${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+}
+
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
@@ -6228,7 +6232,9 @@ describe("dev-nexus cli", () => {
     );
     expect(codexConfig).toContain("[mcp_servers.dev_nexus]");
     expect(codexConfig).toContain("[mcp_servers.dev_nexus_gateway]");
-    expect(codexConfig).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-gateway-stdio"]`);
+    expect(codexConfig).toContain(
+      tomlArgs([currentNexusCliScriptPath(), "mcp-gateway-stdio"]),
+    );
     expect(codexConfig).not.toContain("workflow_mcp");
   });
 
