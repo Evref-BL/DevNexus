@@ -241,6 +241,7 @@ describe("optimistic work item claims", () => {
 
   it("does not fall back to optimistic claims when PostgreSQL authority is configured", async () => {
     const projectRoot = makeTempDir("dev-nexus-claim-");
+    const homePath = makeTempDir("dev-nexus-claim-home-");
     const config = projectConfig();
     const postgresAutomationConfig = {
       ...automationConfig(),
@@ -281,6 +282,7 @@ describe("optimistic work item claims", () => {
         owner: {
           hostId: "host-a",
         },
+        homePath,
         now: () => "2026-05-20T10:00:00.000Z",
       }),
     ).rejects.toThrow(
