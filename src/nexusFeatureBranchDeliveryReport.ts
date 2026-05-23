@@ -346,36 +346,26 @@ function providerEvidenceSummary(
   };
 }
 
-function classifyItem(options: {
+interface ClassifyFeatureBranchDeliveryItemOptions {
   featureFinalPullRequest: boolean;
   finalPullRequestCreation: string;
   providerEvidence: NexusFeatureBranchDeliveryProviderEvidenceSummary;
   ciTier: NexusCiTierDecision;
-}): {
+}
+
+interface ClassifiedFeatureBranchDeliveryItem {
   status: NexusFeatureBranchDeliveryReportItemStatus;
   nextAction: NexusFeatureBranchDeliveryReportNextAction;
   reasons: string[];
-} {
+}
+
+function classifyItem(
+  options: ClassifyFeatureBranchDeliveryItemOptions,
+): ClassifiedFeatureBranchDeliveryItem {
   const evidence = options.providerEvidence;
   const reasons: string[] = [];
   if (!evidence.provider) {
-    if (
-      options.featureFinalPullRequest &&
-      options.finalPullRequestCreation === "at_review_gate"
-    ) {
-      reasons.push("final pull request is created at the review gate");
-      return {
-        status: "needs_final_pull_request",
-        nextAction: "create_pull_request",
-        reasons,
-      };
-    }
-    reasons.push("provider evidence is unavailable");
-    return {
-      status: "needs_provider_evidence",
-      nextAction: "collect_provider_evidence",
-      reasons,
-    };
+    return classifyMissingProvider(options);
   }
   if (evidence.mergeability === "conflicting") {
     reasons.push("review branch has merge conflicts");
@@ -393,7 +383,7 @@ function classifyItem(options: {
       reasons,
     };
   }
-  if (evidence.checksStatus === "failed" || evidence.checksStatus === "missing") {
+  if (isFailedChecksStatus(evidence.checksStatus)) {
     reasons.push(evidence.checksMessage);
     return {
       status: "checks_failed",
@@ -401,11 +391,7 @@ function classifyItem(options: {
       reasons,
     };
   }
-  if (
-    evidence.checksStatus === "pending" ||
-    evidence.checksStatus === "stale" ||
-    evidence.checksStatus === "unavailable"
-  ) {
+  if (isWaitingChecksStatus(evidence.checksStatus)) {
     reasons.push(evidence.checksMessage);
     return {
       status: "checks_pending",
@@ -453,6 +439,44 @@ function classifyItem(options: {
     nextAction: "ready_for_final_publication",
     reasons,
   };
+}
+
+function classifyMissingProvider(
+  options: Pick<
+    ClassifyFeatureBranchDeliveryItemOptions,
+    "featureFinalPullRequest" | "finalPullRequestCreation"
+  >,
+): ClassifiedFeatureBranchDeliveryItem {
+  if (
+    options.featureFinalPullRequest &&
+    options.finalPullRequestCreation === "at_review_gate"
+  ) {
+    return {
+      status: "needs_final_pull_request",
+      nextAction: "create_pull_request",
+      reasons: ["final pull request is created at the review gate"],
+    };
+  }
+
+  return {
+    status: "needs_provider_evidence",
+    nextAction: "collect_provider_evidence",
+    reasons: ["provider evidence is unavailable"],
+  };
+}
+
+function isFailedChecksStatus(
+  status: NexusFeatureBranchDeliveryProviderEvidenceSummary["checksStatus"],
+): boolean {
+  return status === "failed" || status === "missing";
+}
+
+function isWaitingChecksStatus(
+  status: NexusFeatureBranchDeliveryProviderEvidenceSummary["checksStatus"],
+): boolean {
+  return status === "pending" ||
+    status === "stale" ||
+    status === "unavailable";
 }
 
 function booleanMetadata(
