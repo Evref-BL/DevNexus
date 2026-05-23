@@ -2936,42 +2936,66 @@ function componentGitSafetyChecks(
     nextAction: null,
   });
 
-  if (component.remoteUrl) {
-    const actualOrigin = gitRemoteUrl(sourceRoot, "origin");
-    if (actualOrigin === null) {
-      checks.push({
-        id: `component-${component.id}-origin-remote`,
-        title: `${component.name} origin remote`,
-        status: "warning",
-        summary:
-          `Component source root has no origin remote; expected ${component.remoteUrl}.`,
-        nextAction:
-          `Run git -C ${shellPathPlaceholder(sourceRoot)} remote add origin ${component.remoteUrl} or confirm this checkout uses a different remote policy.`,
-      });
-    } else if (actualOrigin !== component.remoteUrl) {
-      checks.push({
-        id: `component-${component.id}-origin-remote`,
-        title: `${component.name} origin remote`,
-        status: "blocked",
-        summary:
-          `Component origin remote is ${actualOrigin}, expected ${component.remoteUrl}.`,
-        nextAction:
-          `Confirm the intended remote before running git -C ${shellPathPlaceholder(sourceRoot)} remote set-url origin ${component.remoteUrl}.`,
-      });
-    } else {
-      checks.push({
-        id: `component-${component.id}-origin-remote`,
-        title: `${component.name} origin remote`,
-        status: "passed",
-        summary: `Component origin remote matches expected URL for ${component.id}.`,
-        nextAction: null,
-      });
-    }
+  const originRemoteCheck = componentOriginRemoteCheck(component, sourceRoot);
+  if (originRemoteCheck) {
+    checks.push(originRemoteCheck);
   }
 
+  return [...checks, componentDirtyStateCheck(component, sourceRoot, options)];
+}
+
+function componentOriginRemoteCheck(
+  component: NexusProjectConfig["components"][number],
+  sourceRoot: string,
+): NexusSetupCheckResult | null {
+  if (!component.remoteUrl) {
+    return null;
+  }
+
+  const actualOrigin = gitRemoteUrl(sourceRoot, "origin");
+  if (actualOrigin === null) {
+    return {
+      id: `component-${component.id}-origin-remote`,
+      title: `${component.name} origin remote`,
+      status: "warning",
+      summary:
+        `Component source root has no origin remote; expected ${component.remoteUrl}.`,
+      nextAction:
+        `Run git -C ${shellPathPlaceholder(sourceRoot)} remote add origin ${component.remoteUrl} or confirm this checkout uses a different remote policy.`,
+    };
+  }
+
+  if (actualOrigin !== component.remoteUrl) {
+    return {
+      id: `component-${component.id}-origin-remote`,
+      title: `${component.name} origin remote`,
+      status: "blocked",
+      summary:
+        `Component origin remote is ${actualOrigin}, expected ${component.remoteUrl}.`,
+      nextAction:
+        `Confirm the intended remote before running git -C ${shellPathPlaceholder(sourceRoot)} remote set-url origin ${component.remoteUrl}.`,
+    };
+  }
+
+  return {
+    id: `component-${component.id}-origin-remote`,
+    title: `${component.name} origin remote`,
+    status: "passed",
+    summary: `Component origin remote matches expected URL for ${component.id}.`,
+    nextAction: null,
+  };
+}
+
+function componentDirtyStateCheck(
+  component: NexusProjectConfig["components"][number],
+  sourceRoot: string,
+  options: {
+    topology?: NexusComponentSourceRootTopology;
+  },
+): NexusSetupCheckResult {
   const dirtyStatus = gitStatusPorcelain(sourceRoot);
   if (dirtyStatus === null) {
-    return [...checks, {
+    return {
       id: `component-${component.id}-dirty-state`,
       title: `${component.name} dirty state`,
       status: "warning",
@@ -2979,7 +3003,7 @@ function componentGitSafetyChecks(
         `Could not inspect Git dirty state for component source root: ${sourceRoot}`,
       nextAction:
         `Run git -C ${shellPathPlaceholder(sourceRoot)} status --short before fetching, pulling, or assigning work.`,
-    }];
+    };
   }
 
   if (dirtyStatus.trim().length > 0) {
@@ -2992,7 +3016,7 @@ function componentGitSafetyChecks(
       dirtyPaths.length > 0 &&
       devNexusSetupDirtyPaths.length === dirtyPaths.length
     ) {
-      return [...checks, {
+      return {
         id: `component-${component.id}-dirty-state`,
         title: `${component.name} dirty state`,
         status: "warning",
@@ -3000,10 +3024,10 @@ function componentGitSafetyChecks(
           `Embedded component source root has only DevNexus setup files with Git changes (${devNexusSetupDirtyPaths.length}): ${summarizeDirtyPaths(devNexusSetupDirtyPaths)}`,
         nextAction:
           "Review and commit the DevNexus setup files when the embedded workspace configuration is correct.",
-      }];
+      };
     }
 
-    return [...checks, {
+    return {
       id: `component-${component.id}-dirty-state`,
       title: `${component.name} dirty state`,
       status: "blocked",
@@ -3011,16 +3035,16 @@ function componentGitSafetyChecks(
         `Component source root has dirty local changes that setup must preserve: ${sourceRoot}`,
       nextAction:
         `Review git -C ${shellPathPlaceholder(sourceRoot)} status --short and commit, stash, or choose another host-local source root before setup fetches or pulls.`,
-    }];
+    };
   }
 
-  return [...checks, {
+  return {
     id: `component-${component.id}-dirty-state`,
     title: `${component.name} dirty state`,
     status: "passed",
     summary: `Component source root has no Git working tree changes: ${sourceRoot}`,
     nextAction: null,
-  }];
+  };
 }
 
 function dirtyStatusPaths(status: string): string[] {
