@@ -3,55 +3,106 @@
 This note records the target design for DevNexus review policy. It is a design
 document, not implemented configuration.
 
-## Decision
+## Goal
 
-DevNexus should model review policy separately from publication policy.
+DevNexus should let each component say how changes are reviewed without making
+agents reason through provider rules by hand.
 
-Review policy answers:
+The practical goal is simple:
 
-- How should this change be reviewed?
-- Who or what must approve it?
-- What counts as reviewed?
-- Should review happen locally, through a provider pull request, through an
-  issue, through an agent review, or not at all?
+- use local review when the human wants to inspect a branch in VS Code;
+- use a pull request or merge request when the provider should hold the review
+  decision;
+- keep GitHub, GitLab, or other providers quiet unless policy says to create a
+  provider object;
+- let publication tools consume review facts without treating review and merge
+  as the same thing.
 
-Publication policy answers:
+## Terms
 
-- May this change be pushed?
-- May it open a pull request or merge request?
-- May it merge, enter a queue, publish a package, or release?
-- Which checks, credentials, and authority gates apply before publication?
+- Review transport: where the review happens. Examples: `local`,
+  `pull_request`, `merge_request`, `issue`, `agent_review`, `none`.
+- Review gates: requirements that must be satisfied before a change may
+  continue. Examples: `human_required`, `provider_approval_required`,
+  `code_owner_required`, `ci_required`, `final_human_approval_required`.
+- Review plan: the read-only answer from DevNexus that tells the agent which
+  transport and gates apply.
+- Review evidence: facts DevNexus can read from Git, CI, a provider, or the
+  current session.
+- Local authorization: the human's permission to take one current action, such
+  as "merge this branch now." It is not a committed approval ledger.
+- Publication policy: the separate policy that decides whether a change may be
+  pushed, opened as a PR/MR, merged, queued, published, or released.
 
-Publication can consume review state, but review is not publication. A local
-VS Code review can satisfy a human review gate without creating a provider pull
-request. A final feature branch pull request can require provider review and CI
-before merge.
+## Prior Art
 
-## Source Model
+Provider and review-tool behavior points to a split between review, gate
+evaluation, and publication.
 
-Provider documentation supports this separation.
+- GitHub pull request reviews let reviewers comment, approve, or request
+  changes. Protected branches can then require approvals, status checks, linear
+  history, and other merge conditions. CODEOWNERS can request or require owners
+  for touched paths. Sources: [GitHub pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews),
+  [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches),
+  [CODEOWNERS](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners).
+- GitLab models merge request approvals and approval rules separately from
+  merge checks such as pipeline status, conflicts, unresolved discussions, and
+  required approvals. Sources: [GitLab merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/),
+  [approval rules](https://docs.gitlab.com/user/project/merge_requests/approvals/rules/),
+  [merge request concepts](https://docs.gitlab.com/development/merge_request_concepts/).
+- Gerrit separates review labels from submit requirements. Labels such as
+  Code-Review and Verified record votes, while submit requirements decide
+  whether a change is submittable. Sources: [Gerrit review labels](https://gerrit-review.googlesource.com/Documentation/config-labels.html),
+  [submit requirements](https://gerrit-review.googlesource.com/Documentation/config-submit-requirements.html).
+- Stacked-change tools such as Graphite and Sapling make small dependent
+  review branches normal, then restack or update them as base branches move.
+  Sources: [Graphite stacked PR review](https://graphite.com/docs/best-practices-for-reviewing-stacks),
+  [Sapling stack](https://sapling-scm.com/docs/git/sapling-stack/).
+- Phabricator's automated landing documentation is a useful warning: review
+  approval is not enough if the tool cannot prove what is actually being landed.
+  Source: [Phabricator automated landing](https://secure.phabricator.com/book/phabricator/article/differential_land/).
 
-GitHub pull request reviews are a collaboration mechanism: reviewers can
-comment, approve, or request changes before merge. Branch protection can then
-turn reviews into merge requirements, and required status checks are a separate
-gate. GitHub also tracks whether an approved diff becomes stale after new
-commits or base-branch changes.
+## Model
 
-Sources:
+Review policy produces a plan. It does not publish the change by itself.
 
-- [GitHub Docs: About pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
-- [GitHub Docs: About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+```mermaid
+flowchart TD
+  A[Agent prepares a change] --> B[DevNexus review plan]
+  B --> C{Review transport}
+  C -->|local| D[Human reviews branch locally]
+  C -->|pull_request or merge_request| E[Provider review object]
+  C -->|agent_review| F[Agent review report]
+  C -->|none| G[No review step]
 
-GitLab makes the split explicit. Merge request approvals can be optional, or
-they can be required and block merge. GitLab also distinguishes approval rules,
-which users interact with, from merge checks, which are pass/fail conditions
-such as conflicts, pipeline success, resolved threads, external status checks,
-and required approvals.
+  D --> H[Current action authorization]
+  E --> I[Provider review evidence]
+  F --> J[Agent review evidence]
+  G --> K[No review evidence required]
 
-Sources:
+  H --> L[DevNexus publication plan]
+  I --> L
+  J --> L
+  K --> L
+  L --> M{Allowed publication action?}
+  M -->|yes| N[Push, open PR/MR, merge, queue, or release]
+  M -->|no| O[Return blocker and next action]
+```
 
-- [GitLab Docs: Merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-- [GitLab Docs: Merge request concepts](https://docs.gitlab.com/development/merge_request_concepts/)
+The important boundary is that local approval authorizes a current action. It
+does not create a durable source approval record in the repository. Provider
+review objects are already durable records, so DevNexus should read them instead
+of copying their state into committed files.
+
+```mermaid
+flowchart LR
+  A[Review policy] --> B[Review plan]
+  B --> C[Transport and gates]
+  C --> D[Review evidence readback]
+  D --> E[Publication or finalization plan]
+  F[Human says approve or merge now] --> G[Action-scoped authorization]
+  G --> E
+```
 
 ## Policy Shape
 
@@ -65,7 +116,7 @@ The review policy should live on the component, separate from publication:
       "review": {
         "default": {
           "transport": "local",
-          "gate": "human_required"
+          "gates": ["human_required"]
         },
         "rules": []
       },
@@ -77,16 +128,15 @@ The review policy should live on the component, separate from publication:
 }
 ```
 
-The component default should be enough for simple projects. Rules should refine
-that default for branch role, paths, change type, work item labels, or provider
-capabilities.
+Rules are ordered. The first matching rule wins, then omitted fields fall back
+to the default.
 
 ```json
 {
   "review": {
     "default": {
       "transport": "local",
-      "gate": "human_required"
+      "gates": ["human_required"]
     },
     "rules": [
       {
@@ -94,91 +144,124 @@ capabilities.
           "branchRole": "feature_finalization"
         },
         "transport": "pull_request",
-        "gate": "human_required"
+        "gates": [
+          "provider_approval_required",
+          "ci_required",
+          "final_human_approval_required"
+        ]
       },
       {
         "match": {
           "paths": ["docs/**", "plugins/**/skills/**"]
         },
         "transport": "local",
-        "gate": "human_required"
+        "gates": ["human_required"]
       }
     ]
   }
 }
 ```
 
-Rules are ordered. The first matching rule wins, then any omitted fields fall
-back to the default.
+## Responsibilities
 
-## Terms
+| Area | Question | Writes durable state? |
+| --- | --- | --- |
+| Review policy | How should this change be reviewed? | No, it returns a plan. |
+| Review evidence | What facts satisfy the gates? | No, it reads Git, CI, providers, or the current session. |
+| Local authorization | Did the human authorize this exact action now? | No committed source file by default. |
+| Publication policy | May this change be pushed, merged, queued, published, or released? | It may write through the selected transport. |
+| Comment policy | Should provider comments be written? | Only when configured. |
 
-- Review transport: where the review happens. Examples: `local`,
-  `pull_request`, `merge_request`, `issue`, `agent_review`, `none`.
-- Review gate: what must happen before the change may proceed. Examples:
-  `none`, `human_required`, `agent_allowed`, `provider_approval_required`,
-  `ci_required`, `final_human_approval_required`.
-- Branch role: why the branch exists in the feature workflow. Examples:
-  `review_branch`, `feature_branch`, `feature_finalization`,
-  `temporary_integration`, `release_candidate`.
-- Local review: a review performed outside the provider, such as in VS Code,
-  while DevNexus records that the gate was satisfied.
-- Provider review: a review performed through a provider object such as a
-  GitHub pull request or GitLab merge request.
+This keeps normal workflows regular. Agents implement, verify, and call the
+review tool. The tool handles policy, provider behavior, and blocked actions.
 
-## Expected Tool Behavior
+## Evidence Sources
 
-Agents should not inspect policy and hand-roll behavior. They should run the
-normal workflow and call a DevNexus review tool. The tool should:
+DevNexus should treat evidence as readback from the place where the review
+happened.
 
-1. Read the component review policy.
-2. Match the current change against ordered rules.
-3. Return the review transport, gate, required evidence, and blocked actions.
-4. Perform only the provider mutations allowed by that result.
-5. Record review evidence without writing noisy provider comments unless policy
-   requires them.
+```mermaid
+flowchart TD
+  A[Review gates] --> B{Evidence source}
+  B -->|provider review| C[PR or MR approval state]
+  B -->|code owner| D[Provider CODEOWNERS or ownership rule]
+  B -->|CI| E[Required check runs or pipeline state]
+  B -->|local review| F[Current human instruction plus branch and head]
+  B -->|agent review| G[Agent review report]
 
-The workflow stays regular:
+  C --> H[Gate result]
+  D --> H
+  E --> H
+  F --> H
+  G --> H
+```
 
-1. Prepare or adopt the worktree.
-2. Implement and verify the change.
-3. Ask DevNexus for the review plan.
-4. Satisfy the review gate through the selected transport.
-5. Ask DevNexus for the publication or finalization plan.
+For local review, the minimum action context is:
+
+- component id;
+- branch name;
+- head commit;
+- requested action;
+- timestamp of the human authorization;
+- verification summary used for the decision.
+
+That context should be compared against the current branch and requested action
+when DevNexus plans publication. If the branch head or action changed, the tool
+should ask for fresh authorization.
+
+## Initial DevNexus Behavior
+
+The first implementation should stay small:
+
+1. Add component review policy parsing and validation.
+2. Add a review-plan command/API that returns transport, gates, required
+   evidence, provider mutations, and blocked actions.
+3. Add evidence readback for local Git facts, current-session human
+   authorization, GitHub PR state, and CI/check state where the provider facade
+   already supports it.
+4. Feed the review result into publication/finalization planning.
+5. Keep provider comments silent unless comment policy explicitly enables them.
+
+The first implementation should not add committed approval files or a general
+approval ledger. If a later project needs audit-grade local approvals, that
+should be a separate opt-in storage policy with its own review.
 
 ## Examples
 
-Docs and generated skills:
+Docs and skills reviewed in VS Code:
 
-- Transport: local.
-- Gate: human required.
-- Evidence: branch name, commit id, verification summary, and human approval in
-  chat or a local DevNexus record.
+- Transport: `local`.
+- Gates: `human_required`.
+- Evidence: branch name, head commit, verification summary, and current human
+  authorization for the requested action.
 - Provider behavior: no branch push, no pull request, no provider comments.
 
 Feature branch finalization:
 
-- Transport: pull request.
-- Gate: human required, provider approval required, and CI required.
+- Transport: `pull_request`.
+- Gates: `provider_approval_required`, `ci_required`,
+  `final_human_approval_required`.
 - Evidence: final feature branch, pull request state, review state, required
   checks, base freshness, and conflict status.
 - Provider behavior: create or update one final pull request when the feature
   is ready for publication review.
 
-Quick local fix:
+Stacked review branch:
 
-- Transport: local.
-- Gate: none or human required, depending on component default.
-- Evidence: commit id and verification summary.
-- Provider behavior: none unless publication policy later asks for a handoff or
-  pull request.
+- Transport: `pull_request` or `local`, depending on component policy.
+- Gates: normally one human review gate and the relevant focused checks.
+- Evidence: stack position, base branch, head commit, restack state, and review
+  state for the current branch.
+- Provider behavior: avoid extra comments; update the provider object only when
+  the policy selected provider review.
 
-## Open Design Points
+## Open Decisions
 
-- Exact schema names for `transport`, `gate`, and `branchRole`.
-- Whether `gate` is one value or a list of requirements.
-- How DevNexus records local human approval without creating noisy provider
-  comments.
-- How review evidence composes with green-main publication evidence.
-- Whether review policy should support CODEOWNERS-like path ownership, or only
-  consume provider-native CODEOWNERS evidence when available.
+- Exact gate names and whether `human_required` and
+  `final_human_approval_required` should be separate gates or the same gate
+  with different actions.
+- How much provider-specific detail belongs in the generic review-plan result.
+- Whether path ownership should be DevNexus-native, provider-native only, or a
+  provider-first model with optional local ownership rules.
+- Which authorization cache, if any, should exist for local review inside a
+  running agent session.
