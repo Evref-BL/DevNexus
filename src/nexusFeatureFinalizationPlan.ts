@@ -648,7 +648,7 @@ function finalPullRequestCliCommand(
 }
 
 function singleLinePullRequestBody(body: string): string {
-  return body.split(/\r?\u000a/u)
+  return body.split(/\r?\n/u)
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .join(" ");

@@ -22,7 +22,7 @@ export function parseNexusGitRemoteFacts(text: string): NexusGitRemoteFacts {
   const pushUrls: Record<string, string> = {};
   let currentRemote: string | null = null;
 
-  for (const line of text.split(/\r?\u000a/u)) {
+  for (const line of text.split(/\r?\n/u)) {
     const section = /^\s*\[remote\s+"([^"]+)"\]\s*$/u.exec(line);
     if (section) {
       currentRemote = section[1]!.trim() || null;

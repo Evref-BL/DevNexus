@@ -959,7 +959,9 @@ function validateNexusAuthorityActors(
     throw new NexusConfigError("workspace config.authority.actors must be an array");
   }
 
-  const actors = value.map(validateNexusAuthorityActor);
+  const actors = value.map((item, index) =>
+    validateNexusAuthorityActor(item, index),
+  );
   const actorIds = new Set<string>();
   for (const actor of actors) {
     if (actorIds.has(actor.id)) {
@@ -1032,7 +1034,9 @@ function validateNexusAuthorityRoles(
     throw new NexusConfigError("workspace config.authority.roles must be an array");
   }
 
-  const roles = value.map(validateNexusAuthorityRoleDefinition);
+  const roles = value.map((item, index) =>
+    validateNexusAuthorityRoleDefinition(item, index),
+  );
   const roleIds = new Set<string>();
   for (const role of roles) {
     if (roleIds.has(role.id)) {
@@ -1259,7 +1263,7 @@ function validateProjectHostsConfig(value: unknown): NexusProjectHostConfig[] {
     throw new NexusConfigError("workspace config.hosts must be an array");
   }
 
-  const hosts = value.map(validateProjectHostConfig);
+  const hosts = value.map((item, index) => validateProjectHostConfig(item, index));
   const ids = new Set<string>();
   for (const host of hosts) {
     if (ids.has(host.id)) {
@@ -1283,7 +1287,9 @@ function validateRunnerProfilesConfig(
     throw new NexusConfigError("workspace config.runnerProfiles must be an array");
   }
 
-  const profiles = value.map(validateRunnerProfileConfig);
+  const profiles = value.map((item, index) =>
+    validateRunnerProfileConfig(item, index),
+  );
   const ids = new Set<string>();
   for (const profile of profiles) {
     if (ids.has(profile.id)) {
@@ -2093,7 +2099,9 @@ function validateProjectAgentTargetsConfig(
     );
   }
 
-  const targets = active.map(validateProjectActiveAgentTargetConfig);
+  const targets = active.map((item, index) =>
+    validateProjectActiveAgentTargetConfig(item, index),
+  );
   const providers = new Set<string>();
   for (const target of targets) {
     if (providers.has(target.provider)) {

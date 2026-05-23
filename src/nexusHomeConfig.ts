@@ -434,7 +434,9 @@ function validateHostingAuthProfiles(
     throw new NexusConfigError("authProfiles must be an array");
   }
 
-  const authProfiles = value.map(validateHostingAuthProfile);
+  const authProfiles = value.map((item, index) =>
+    validateHostingAuthProfile(item, index),
+  );
   const ids = new Set<string>();
   for (const profile of authProfiles) {
     if (ids.has(profile.id)) {
@@ -504,7 +506,9 @@ function validateClaimAuthorityProfiles(
     throw new NexusConfigError("claimAuthorityProfiles must be an array");
   }
 
-  const profiles = value.map(validateClaimAuthorityProfile);
+  const profiles = value.map((item, index) =>
+    validateClaimAuthorityProfile(item, index),
+  );
   const ids = new Set<string>();
   for (const profile of profiles) {
     if (ids.has(profile.id)) {
@@ -604,7 +608,9 @@ function validateHomeHostOverlays(
     throw new NexusConfigError("hostOverlays must be an array");
   }
 
-  const hostOverlays = value.map(validateHomeHostOverlay);
+  const hostOverlays = value.map((item, index) =>
+    validateHomeHostOverlay(item, index),
+  );
   const hostIds = new Set<string>();
   for (const overlay of hostOverlays) {
     if (hostIds.has(overlay.hostId)) {
@@ -645,7 +651,9 @@ function validateNexusProjectReferences(value: unknown): NexusProjectReference[]
     throw new NexusConfigError("projects must be an array");
   }
 
-  const projects = value.map(validateNexusProjectReference);
+  const projects = value.map((item, index) =>
+    validateNexusProjectReference(item, index),
+  );
   const projectIds = new Set<string>();
   for (const project of projects) {
     if (projectIds.has(project.id)) {

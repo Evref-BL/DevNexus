@@ -671,7 +671,7 @@ function validateStore(value: unknown): LocalWorkTrackingStore {
       "nextCommentNumber",
     ),
     updatedAt: requiredNonEmptyString(record.updatedAt, "updatedAt"),
-    items: items.map(validateWorkItem),
+    items: items.map((item, index) => validateWorkItem(item, index)),
     comments: validateComments(record.comments),
   };
 }

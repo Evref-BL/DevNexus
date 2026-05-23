@@ -490,9 +490,7 @@ function candidateFromItem(options: {
     sourceIsDefault ? sourceTrackerRef : defaultReference && defaultTrackerRef
       ? defaultTrackerRef
       : sourceTrackerRef;
-  const logicalItemId = sourceIsDefault
-    ? linkRecord?.logicalItemId ?? defaultLogicalItemId(options.item)
-    : linkRecord?.logicalItemId ?? defaultLogicalItemId(options.item);
+  const logicalItemId = linkRecord?.logicalItemId ?? defaultLogicalItemId(options.item);
   const workItem =
     !sourceIsDefault && defaultReference && defaultTrackerRef
       ? canonicalizedLinkedWorkItem(options.item, defaultTrackerRef, defaultReference)

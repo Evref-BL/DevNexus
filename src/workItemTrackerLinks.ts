@@ -648,7 +648,7 @@ function validateStore(value: unknown): WorkItemTrackerLinkStore {
     version: workItemTrackerLinkStoreVersion,
     nextAuditNumber: positiveInteger(record.nextAuditNumber, "nextAuditNumber"),
     updatedAt: requiredNonEmptyString(record.updatedAt, "updatedAt"),
-    records: records.map(validateLinkRecord),
+    records: records.map((item, index) => validateLinkRecord(item, index)),
   };
 }
 
@@ -677,8 +677,8 @@ function validateLinkRecord(value: unknown, index: number): WorkItemTrackerLinkR
     ),
     createdAt: requiredNonEmptyString(record.createdAt, `records[${index}].createdAt`),
     updatedAt: requiredNonEmptyString(record.updatedAt, `records[${index}].updatedAt`),
-    references: references.map(validateReference),
-    audit: audit.map(validateAuditEntry),
+    references: references.map((item, index) => validateReference(item, index)),
+    audit: audit.map((item, index) => validateAuditEntry(item, index)),
   };
 }
 
