@@ -117,9 +117,14 @@ import {
 import {
   buildNexusFeatureFinalizationPlan,
 } from "./nexusFeatureFinalizationPlan.js";
-import type {
-  NexusPublicationProviderEvidenceInput,
+import {
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
+import {
+  buildNexusReviewPlan,
+  type NexusReviewLocalAuthorization,
+} from "./nexusReviewPolicy.js";
 import {
   adoptNexusAutomationCurrentAgent,
   adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
@@ -603,6 +608,47 @@ const tools: McpTool[] = [
           items: { type: "object", additionalProperties: true },
         },
         fullMatrixBudgetAvailable: { type: "boolean" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "review_plan",
+    description: "Build a read-only component review plan from review policy, local authorization, and optional provider evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        branchRole: { type: "string" },
+        paths: {
+          type: "array",
+          items: { type: "string" },
+        },
+        labels: {
+          type: "array",
+          items: { type: "string" },
+        },
+        requestedAction: { type: "string" },
+        branchName: { type: "string" },
+        headSha: { type: "string" },
+        localAuthorization: {
+          type: "object",
+          properties: {
+            authorized: { type: "boolean" },
+            authorizedAt: { type: "string" },
+            branchName: { type: "string" },
+            headSha: { type: "string" },
+            requestedAction: { type: "string" },
+            summary: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
       },
       required: ["projectRoot"],
       additionalProperties: false,
@@ -1654,6 +1700,11 @@ export async function callDevNexusMcpTool(
             ),
             now: context.now,
           }),
+        });
+      case "review_plan":
+        return toolResult({
+          ok: true,
+          plan: reviewPlanFromArgs(args),
         });
       case "current_agent_adopt": {
         const coordinatorLoop =
@@ -3545,6 +3596,79 @@ function providerEvidenceFromArgs(
       throw new Error(`arguments.providerEvidence[${index}] must be an object`);
     }
     return value as NexusPublicationProviderEvidenceInput;
+  });
+}
+
+function reviewPlanFromArgs(args: Record<string, unknown>) {
+  const projectRoot = projectRootFromArgs(args);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const componentId = optionalString(args, "componentId", "arguments");
+  const component = componentId
+    ? components.find((candidate) => candidate.id === componentId)
+    : resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  if (!component) {
+    throw new Error(`Workspace component is not configured: ${componentId}`);
+  }
+
+  return buildNexusReviewPlan({
+    componentId: component.id,
+    policy: component.review,
+    branchRole: optionalString(args, "branchRole", "arguments"),
+    paths: optionalStringArrayArg(args, "paths", "arguments"),
+    labels: optionalStringArrayArg(args, "labels", "arguments"),
+    requestedAction: optionalString(args, "requestedAction", "arguments"),
+    branchName: optionalString(args, "branchName", "arguments"),
+    headSha: optionalString(args, "headSha", "arguments"),
+    localAuthorization: localAuthorizationFromArgs(args),
+    providerEvidence:
+      normalizeNexusPublicationProviderEvidence(providerEvidenceFromArgs(args))[0] ??
+      null,
+  });
+}
+
+function localAuthorizationFromArgs(
+  args: Record<string, unknown>,
+): Partial<NexusReviewLocalAuthorization> | null {
+  const value = args.localAuthorization;
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const record = asRecord(value, "arguments.localAuthorization");
+  return {
+    authorized: optionalBoolean(record, "authorized", "arguments.localAuthorization") ??
+      false,
+    authorizedAt:
+      optionalString(record, "authorizedAt", "arguments.localAuthorization") ??
+      null,
+    branchName:
+      optionalString(record, "branchName", "arguments.localAuthorization") ?? null,
+    headSha:
+      optionalString(record, "headSha", "arguments.localAuthorization") ?? null,
+    requestedAction:
+      optionalString(record, "requestedAction", "arguments.localAuthorization") ??
+      null,
+    summary: optionalString(record, "summary", "arguments.localAuthorization") ?? null,
+  };
+}
+
+function optionalStringArrayArg(
+  args: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] {
+  const values = args[key];
+  if (values === undefined || values === null) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    throw new Error(`${pathName}.${key} must be an array`);
+  }
+  return values.map((value, index) => {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`${pathName}.${key}[${index}] must be a non-empty string`);
+    }
+    return value.trim();
   });
 }
 

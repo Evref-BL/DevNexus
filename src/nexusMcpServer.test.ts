@@ -289,6 +289,7 @@ describe("DevNexus MCP server", () => {
       "publication_feature_plan",
       "publication_feature_report",
       "publication_feature_finalization",
+      "review_plan",
       "current_agent_adopt",
       "current_agent_heartbeat",
       "current_agent_record",
@@ -578,6 +579,119 @@ describe("DevNexus MCP server", () => {
             },
           },
         ],
+      },
+    });
+  });
+
+  it("exposes read-only review plans through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-review-plan-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "MCP Demo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+            },
+            review: {
+              default: {
+                transport: "pull_request",
+                gates: ["provider_approval_required"],
+              },
+              rules: [
+                {
+                  match: {
+                    paths: ["docs/**"],
+                  },
+                  transport: "local",
+                  gates: ["human_required"],
+                },
+                {
+                  match: {
+                    branchRole: "feature_finalization",
+                  },
+                  transport: "pull_request",
+                  gates: [
+                    "provider_approval_required",
+                    "ci_required",
+                    "final_human_approval_required",
+                  ],
+                },
+              ],
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const localPlan = toolJson(
+      await callDevNexusMcpTool("review_plan", {
+        projectRoot,
+        componentId: "primary",
+        paths: ["docs/dev/review-policy.md"],
+        requestedAction: "merge",
+        branchName: "docs/review-policy",
+        headSha: "abc123",
+        localAuthorization: {
+          authorized: true,
+          authorizedAt: "2026-05-23T10:00:00Z",
+          requestedAction: "merge",
+          branchName: "docs/review-policy",
+          headSha: "abc123",
+        },
+      }),
+    );
+    const providerPlan = toolJson(
+      await callDevNexusMcpTool("review_plan", {
+        projectRoot,
+        componentId: "primary",
+        branchRole: "feature_finalization",
+        requestedAction: "merge",
+        branchName: "feat/review-policy",
+        headSha: "def456",
+        localAuthorization: {
+          authorized: true,
+          requestedAction: "merge",
+          branchName: "feat/review-policy",
+          headSha: "def456",
+        },
+        providerEvidence: [
+          {
+            reviewState: "approved",
+            checks: [
+              { name: "Node 24 check (ubuntu-latest)", conclusion: "success" },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(localPlan).toMatchObject({
+      ok: true,
+      plan: {
+        componentId: "primary",
+        status: "ready",
+        transport: "local",
+        matchedRuleIndex: 0,
+        providerMutations: [],
+      },
+    });
+    expect(providerPlan).toMatchObject({
+      ok: true,
+      plan: {
+        componentId: "primary",
+        status: "ready",
+        transport: "pull_request",
+        matchedRuleIndex: 1,
+        providerMutations: ["create_or_update_pull_request"],
       },
     });
   });
