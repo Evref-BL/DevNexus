@@ -1879,7 +1879,7 @@ function optionalBranchPrefix(
   if (value === undefined) {
     return undefined;
   }
-  const prefix = requiredNonEmptyString(value, pathName).replace(/\/+$/u, "");
+  const prefix = stripTrailingSlashes(requiredNonEmptyString(value, pathName));
   if (prefix.length === 0 || /\s/u.test(prefix) || prefix.startsWith("/")) {
     throw new NexusAutomationConfigError(
       `${pathName} must be a relative Git branch prefix without whitespace`,
@@ -1892,7 +1892,7 @@ function validateBranchIntentPrefix(
   value: unknown,
   pathName: string,
 ): string {
-  const prefix = requiredNonEmptyString(value, pathName).replace(/\/+$/u, "");
+  const prefix = stripTrailingSlashes(requiredNonEmptyString(value, pathName));
   if (
     prefix.length === 0 ||
     prefix.includes("/") ||
@@ -1936,7 +1936,16 @@ function validateFeatureBranchPattern(
       );
     }
   }
-  return pattern.replace(/\/+$/u, "");
+  return stripTrailingSlashes(pattern);
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 function optionalBranchSegment(
