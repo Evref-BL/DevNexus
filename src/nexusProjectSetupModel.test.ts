@@ -201,6 +201,8 @@ describe("workspace setup answer model", () => {
   });
 
   it("keeps raw secrets out of the rendered setup proposal", () => {
+    const rawTokenFixture = "example-token-redaction-fixture";
+    const rawPrivateKeyFixture = "example-private-key-redaction-fixture";
     const unsafeAnswers = {
       ...richAnswers(),
       authProfiles: [
@@ -212,12 +214,12 @@ describe("workspace setup answer model", () => {
             kind: "provider_cli",
             cli: "gh",
           },
-          token: "ghp_0123456789abcdef0123456789abcdef",
+          token: rawTokenFixture,
         },
       ],
       hostingIntent: {
         ...richAnswers().hostingIntent,
-        privateKey: "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
+        privateKey: rawPrivateKeyFixture,
       },
     } as unknown as NexusProjectSetupAnswers;
 
@@ -230,7 +232,7 @@ describe("workspace setup answer model", () => {
         "$.hostingIntent.privateKey",
       ]),
     );
-    expect(JSON.stringify(proposal)).not.toContain("ghp_0123456789");
-    expect(JSON.stringify(proposal)).not.toContain("BEGIN PRIVATE KEY");
+    expect(JSON.stringify(proposal)).not.toContain(rawTokenFixture);
+    expect(JSON.stringify(proposal)).not.toContain(rawPrivateKeyFixture);
   });
 });

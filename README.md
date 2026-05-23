@@ -207,6 +207,14 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
   provider-backed trackers.
 - [Architecture notes](docs/dev/architecture.md) covers internal design.
 
+## Contributing And Security
+
+- [Contributing](CONTRIBUTING.md) explains local setup, checks, and pull request
+  expectations.
+- [Security policy](SECURITY.md) explains how to report vulnerabilities
+  privately.
+- DevNexus is licensed under the [Apache License 2.0](LICENSE).
+
 ## Source Development
 
 ```bash
