@@ -1,11 +1,11 @@
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
-  buildNexusInitiativeDeliveryPlan,
-} from "./nexusInitiativeDeliveryPlan.js";
+  buildNexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
 import type {
-  NexusInitiativeDeliveryBranchPublicationSummary,
-} from "./nexusInitiativeDeliveryPolicy.js";
+  NexusFeatureBranchDeliveryBranchPublicationSummary,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   createNexusForgePublicationAdapter,
   type NexusForgePullRequestChecksResult,
@@ -98,14 +98,14 @@ export interface NexusPublicationBranchPushResult {
   targetBranch: string | null;
   forceWithLease: boolean;
   forceWithLeaseExpectedCommit: string | null;
-  featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary | null;
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary | null;
   credential: NexusPublicationCredentialSummary;
   push: NexusPublicationGitPushResult;
 }
 
-export interface NexusPublicationBranchPushInitiativeSummary {
-  initiativeId: string;
-  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
+export interface NexusPublicationBranchPushFeatureSummary {
+  featureId: string;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationSummary;
   remoteSelection: NexusPublicationBranchPushRemoteSelection;
 }
 
@@ -118,7 +118,7 @@ export type NexusPublicationBranchPushRemoteSelectionStatus =
 export interface NexusPublicationBranchPushRemoteSelection {
   status: NexusPublicationBranchPushRemoteSelectionStatus;
   selectedRemote: string | null;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   fallbackRemote: string | null;
   reasons: string[];
   setupActions: string[];
@@ -133,12 +133,12 @@ export interface NexusPublicationBranchPushRemoteProbe {
 }
 
 export class NexusPublicationBranchPushBlockedError extends Error {
-  readonly featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary;
+  readonly featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
   readonly remoteSelection: NexusPublicationBranchPushRemoteSelection;
 
   constructor(options: {
     message: string;
-    featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary;
+    featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
   }) {
     super(options.message);
     this.name = "NexusPublicationBranchPushBlockedError";
@@ -196,7 +196,7 @@ export interface PushNexusPublicationBranchForComponentOptions
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
-  initiativeId?: string | null;
+  featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   gitRunner?: NexusPublicationGitPushRunner;
@@ -310,9 +310,9 @@ export async function pushNexusPublicationBranchForComponent(
   options: PushNexusPublicationBranchForComponentOptions,
 ): Promise<NexusPublicationBranchPushResult> {
   const context = resolveNexusPublicationTargetContext(options);
-  const featureBranchDeliveryPlan = resolveInitiativeBranchPushPolicy({
+  const featureBranchDeliveryPlan = resolveFeatureBranchPushPolicy({
     context,
-    initiativeId: options.initiativeId ?? null,
+    featureId: options.featureId ?? null,
   });
   assertSafePublicationBranchTarget({
     publication: context.publication,
@@ -326,7 +326,7 @@ export async function pushNexusPublicationBranchForComponent(
     runtime: options,
   });
   const featureBranchDelivery = featureBranchDeliveryPlan
-    ? resolveInitiativeBranchPushRemoteSelection({
+    ? resolveFeatureBranchPushRemoteSelection({
         featureBranchDelivery: featureBranchDeliveryPlan,
         repositoryPath: options.repositoryPath,
         branch: options.branch,
@@ -372,55 +372,55 @@ export async function pushNexusPublicationBranchForComponent(
   };
 }
 
-function resolveInitiativeBranchPushPolicy(options: {
+function resolveFeatureBranchPushPolicy(options: {
   context: NexusPublicationTargetContext;
-  initiativeId: string | null;
-}): NexusPublicationBranchPushInitiativeSummary | null {
-  if (!options.initiativeId) {
+  featureId: string | null;
+}): NexusPublicationBranchPushFeatureSummary | null {
+  if (!options.featureId) {
     return null;
   }
   if (!options.context.component) {
-    throw new Error("Initiative branch publication requires a component target.");
+    throw new Error("Feature branch publication requires a component target.");
   }
-  const plan = buildNexusInitiativeDeliveryPlan({
+  const plan = buildNexusFeatureBranchDeliveryPlan({
     projectRoot: options.context.projectRoot,
     componentId: options.context.component.id,
-    initiativeId: options.initiativeId,
+    featureId: options.featureId,
   });
   const item = plan.items[0];
   if (!item) {
-    throw new Error(`Initiative delivery policy was not found: ${options.initiativeId}`);
+    throw new Error(`Feature branch delivery policy was not found: ${options.featureId}`);
   }
   const summary = {
-    initiativeId: item.initiative.activeScopeId,
-    branchPublication: item.initiative.branchPublication,
+    featureId: item.feature.activeScopeId,
+    branchPublication: item.feature.branchPublication,
     remoteSelection: {
       status: "not_required" as const,
-      selectedRemote: item.initiative.branchPublication.selectedRemote,
-      publicationRemote: item.initiative.branchPublication.publicationRemote,
-      fallbackRemote: item.initiative.branchPublication.fallbackRemote,
+      selectedRemote: item.feature.branchPublication.selectedRemote,
+      pushRemote: item.feature.branchPublication.pushRemote,
+      fallbackRemote: item.feature.branchPublication.fallbackRemote,
       reasons: [],
       setupActions: [],
       probes: [],
     },
   };
-  if (!item.initiative.branchPublication.selectedRemote) {
+  if (!item.feature.branchPublication.selectedRemote) {
     const manualOnly =
-      item.initiative.branchPublication.strategy === "manual_only";
+      item.feature.branchPublication.strategy === "manual_only";
     throw new NexusPublicationBranchPushBlockedError({
       message:
         manualOnly
-          ? `Initiative ${options.initiativeId} branch publication is manual-only; no push remote was selected.`
-          : `Initiative ${options.initiativeId} branch publication has no selected push remote.`,
-      featureBranchDelivery: initiativeRemoteSelection(summary, {
+          ? `Feature ${options.featureId} branch publication is manual-only; no push remote was selected.`
+          : `Feature ${options.featureId} branch publication has no selected push remote.`,
+      featureBranchDelivery: featureRemoteSelection(summary, {
         status: "blocked",
         selectedRemote: null,
-        publicationRemote: item.initiative.branchPublication.publicationRemote,
-        fallbackRemote: item.initiative.branchPublication.fallbackRemote,
+        pushRemote: item.feature.branchPublication.pushRemote,
+        fallbackRemote: item.feature.branchPublication.fallbackRemote,
         reasons: [
           manualOnly
-            ? "initiative branch publication is manual-only"
-            : "initiative branch publication has no selected remote",
+            ? "feature branch publication is manual-only"
+            : "feature branch publication has no selected remote",
         ],
         setupActions: [
           manualOnly
@@ -434,67 +434,67 @@ function resolveInitiativeBranchPushPolicy(options: {
   return summary;
 }
 
-function resolveInitiativeBranchPushRemoteSelection(options: {
-  featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary;
+function resolveFeatureBranchPushRemoteSelection(options: {
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
   repositoryPath: string;
   branch: string;
   baseEnv?: NodeJS.ProcessEnv;
   gitRunner?: NexusPublicationGitPushRunner;
-}): NexusPublicationBranchPushInitiativeSummary {
+}): NexusPublicationBranchPushFeatureSummary {
   const branchPublication = options.featureBranchDelivery.branchPublication;
   if (branchPublication.strategy !== "push_remote_then_fallback") {
     return options.featureBranchDelivery;
   }
 
-  const publicationRemote = branchPublication.publicationRemote;
+  const pushRemote = branchPublication.pushRemote;
   const fallbackRemote = branchPublication.fallbackRemote;
-  if (!publicationRemote) {
+  if (!pushRemote) {
     if (!fallbackRemote) {
-      return blockedInitiativeRemoteSelection(
+      return blockedFeatureRemoteSelection(
         options.featureBranchDelivery,
-        "publication remote is not configured",
+        "push remote is not configured",
         "configure automation.publication.remote or featureBranchDelivery.branchPublication.fallbackRemote",
       );
     }
-    return initiativeRemoteSelection(options.featureBranchDelivery, {
+    return featureRemoteSelection(options.featureBranchDelivery, {
       status: "fallback_selected",
       selectedRemote: fallbackRemote,
-      publicationRemote,
+      pushRemote,
       fallbackRemote,
-      reasons: ["publication remote is not configured"],
+      reasons: ["push remote is not configured"],
       setupActions: [],
       probes: [],
     });
   }
 
-  const publicationProbe = probeInitiativeBranchRemote({
-    remote: publicationRemote,
+  const publicationProbe = probeFeatureBranchRemote({
+    remote: pushRemote,
     repositoryPath: options.repositoryPath,
     branch: options.branch,
     baseEnv: options.baseEnv,
     gitRunner: options.gitRunner,
   });
   if (publicationProbe.writable) {
-    return initiativeRemoteSelection(options.featureBranchDelivery, {
+    return featureRemoteSelection(options.featureBranchDelivery, {
       status: "push_remote_writable",
-      selectedRemote: publicationRemote,
-      publicationRemote,
+      selectedRemote: pushRemote,
+      pushRemote,
       fallbackRemote,
-      reasons: ["publication remote accepted a dry-run branch push"],
+      reasons: ["push remote accepted a dry-run branch push"],
       setupActions: [],
       probes: [publicationProbe],
     });
   }
   if (!fallbackRemote) {
-    return blockedInitiativeRemoteSelection(
+    return blockedFeatureRemoteSelection(
       options.featureBranchDelivery,
-      `publication remote ${publicationRemote} rejected a dry-run branch push`,
+      `push remote ${pushRemote} rejected a dry-run branch push`,
       "configure featureBranchDelivery.branchPublication.fallbackRemote",
       [publicationProbe],
     );
   }
 
-  const fallbackProbe = probeInitiativeBranchRemote({
+  const fallbackProbe = probeFeatureBranchRemote({
     remote: fallbackRemote,
     repositoryPath: options.repositoryPath,
     branch: options.branch,
@@ -502,21 +502,21 @@ function resolveInitiativeBranchPushRemoteSelection(options: {
     gitRunner: options.gitRunner,
   });
   if (!fallbackProbe.writable) {
-    return blockedInitiativeRemoteSelection(
+    return blockedFeatureRemoteSelection(
       options.featureBranchDelivery,
       `fallback remote ${fallbackRemote} rejected a dry-run branch push`,
-      `fix remote ${fallbackRemote} before publishing the initiative branch`,
+      `fix remote ${fallbackRemote} before publishing the feature branch`,
       [publicationProbe, fallbackProbe],
     );
   }
 
-  return initiativeRemoteSelection(options.featureBranchDelivery, {
+  return featureRemoteSelection(options.featureBranchDelivery, {
     status: "fallback_selected",
     selectedRemote: fallbackRemote,
-    publicationRemote,
+    pushRemote,
     fallbackRemote,
     reasons: [
-      `publication remote ${publicationRemote} rejected a dry-run branch push`,
+      `push remote ${pushRemote} rejected a dry-run branch push`,
       `fallback remote ${fallbackRemote} accepted a dry-run branch push`,
     ],
     setupActions: [],
@@ -524,7 +524,7 @@ function resolveInitiativeBranchPushRemoteSelection(options: {
   });
 }
 
-function probeInitiativeBranchRemote(options: {
+function probeFeatureBranchRemote(options: {
   remote: string;
   repositoryPath: string;
   branch: string;
@@ -557,16 +557,16 @@ function probeInitiativeBranchRemote(options: {
   };
 }
 
-function blockedInitiativeRemoteSelection(
-  featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary,
+function blockedFeatureRemoteSelection(
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary,
   reason: string,
   setupAction: string,
   probes: NexusPublicationBranchPushRemoteProbe[] = [],
 ): never {
-  const blocked = initiativeRemoteSelection(featureBranchDelivery, {
+  const blocked = featureRemoteSelection(featureBranchDelivery, {
     status: "blocked",
     selectedRemote: null,
-    publicationRemote: featureBranchDelivery.branchPublication.publicationRemote,
+    pushRemote: featureBranchDelivery.branchPublication.pushRemote,
     fallbackRemote: featureBranchDelivery.branchPublication.fallbackRemote,
     reasons: [reason],
     setupActions: [setupAction],
@@ -574,7 +574,7 @@ function blockedInitiativeRemoteSelection(
   });
   throw new NexusPublicationBranchPushBlockedError({
     message: [
-      "Initiative branch publication is blocked.",
+      "Feature branch publication is blocked.",
       ...blocked.remoteSelection.reasons,
       ...blocked.remoteSelection.setupActions,
     ].join(" "),
@@ -582,10 +582,10 @@ function blockedInitiativeRemoteSelection(
   });
 }
 
-function initiativeRemoteSelection(
-  featureBranchDelivery: NexusPublicationBranchPushInitiativeSummary,
+function featureRemoteSelection(
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary,
   remoteSelection: NexusPublicationBranchPushRemoteSelection,
-): NexusPublicationBranchPushInitiativeSummary {
+): NexusPublicationBranchPushFeatureSummary {
   return {
     ...featureBranchDelivery,
     branchPublication: {

@@ -76,16 +76,16 @@ describe("publication operations", () => {
     ]);
   });
 
-  it("pushes initiative branches through the configured fallback remote", async () => {
+  it("pushes feature branches through the configured fallback remote", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
-    saveProjectConfig(projectRoot, initiativeFallbackPublicationProjectConfig(homePath));
+    saveProjectConfig(projectRoot, featureFallbackPublicationProjectConfig(homePath));
     const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
 
     const result = await pushNexusPublicationBranchForComponent({
       projectRoot,
       repositoryPath: sourceRoot,
       branch: "feat/codex-goals",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       baseEnv: {
         DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
       } as NodeJS.ProcessEnv,
@@ -104,7 +104,7 @@ describe("publication operations", () => {
     });
 
     expect(result.featureBranchDelivery).toMatchObject({
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       branchPublication: {
         strategy: "fallback_remote",
         selectedRemote: "fork",
@@ -123,11 +123,11 @@ describe("publication operations", () => {
     ]);
   });
 
-  it("selects fallback remotes after publication remote dry-run permission denial", async () => {
+  it("selects fallback remotes after push remote dry-run permission denial", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(
+      featureFallbackPublicationProjectConfig(
         homePath,
         "push_remote_then_fallback",
       ),
@@ -138,7 +138,7 @@ describe("publication operations", () => {
       projectRoot,
       repositoryPath: sourceRoot,
       branch: "feat/codex-goals",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       baseEnv: {
         DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
       } as NodeJS.ProcessEnv,
@@ -196,11 +196,11 @@ describe("publication operations", () => {
     ]);
   });
 
-  it("keeps initiative branch pushes on the publication remote when the dry-run succeeds", async () => {
+  it("keeps feature branch pushes on the push remote when the dry-run succeeds", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(
+      featureFallbackPublicationProjectConfig(
         homePath,
         "push_remote_then_fallback",
       ),
@@ -211,7 +211,7 @@ describe("publication operations", () => {
       projectRoot,
       repositoryPath: sourceRoot,
       branch: "feat/codex-goals",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       baseEnv: {
         DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
       } as NodeJS.ProcessEnv,
@@ -253,11 +253,11 @@ describe("publication operations", () => {
     expect(calls[1]!.args).toContain("feat/codex-goals");
   });
 
-  it("blocks initiative fallback selection before live push when fallback setup fails", async () => {
+  it("blocks feature fallback selection before live push when fallback setup fails", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(
+      featureFallbackPublicationProjectConfig(
         homePath,
         "push_remote_then_fallback",
       ),
@@ -268,7 +268,7 @@ describe("publication operations", () => {
         projectRoot,
         repositoryPath: sourceRoot,
         branch: "feat/codex-goals",
-        initiativeId: "codex-goals",
+        featureId: "codex-goals",
         baseEnv: {
           DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
         } as NodeJS.ProcessEnv,
@@ -279,14 +279,14 @@ describe("publication operations", () => {
           exitCode: 1,
         }),
       }),
-    ).rejects.toThrow(/fix remote fork before publishing the initiative branch/u);
+    ).rejects.toThrow(/fix remote fork before publishing the feature branch/u);
   });
 
-  it("reports manual-only initiative branch publication as a structured blocker", async () => {
+  it("reports manual-only feature branch publication as a structured blocker", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(homePath, "manual_only", null),
+      featureFallbackPublicationProjectConfig(homePath, "manual_only", null),
     );
 
     await expect(
@@ -294,7 +294,7 @@ describe("publication operations", () => {
         projectRoot,
         repositoryPath: sourceRoot,
         branch: "feat/codex-goals",
-        initiativeId: "codex-goals",
+        featureId: "codex-goals",
         baseEnv: {
           DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
         } as NodeJS.ProcessEnv,
@@ -305,7 +305,7 @@ describe("publication operations", () => {
     ).rejects.toMatchObject({
       remoteSelection: {
         status: "blocked",
-        reasons: ["initiative branch publication is manual-only"],
+        reasons: ["feature branch publication is manual-only"],
       },
     });
   });
@@ -663,7 +663,7 @@ describe("publication operations", () => {
             mergeable: true,
             mergeable_state: "behind",
             head: {
-              ref: "feat/initiative-delivery-topology",
+              ref: "feat/feature-delivery-branchStrategy",
               sha: "abc123",
             },
             base: {
@@ -721,7 +721,7 @@ describe("publication operations", () => {
     expect(result.evidence).toMatchObject({
       provider: "github",
       sourceKind: "pull_request",
-      headBranch: "feat/initiative-delivery-topology",
+      headBranch: "feat/feature-delivery-branchStrategy",
       targetBranch: "main",
       reviewState: "approved",
       baseStatus: "behind",
@@ -875,11 +875,11 @@ describe("publication CLI operations", () => {
     expect(calls).toEqual([{ token: "installation-token" }]);
   });
 
-  it("prints selected initiative branch-push fallback plans as JSON", async () => {
+  it("prints selected feature branch-push fallback plans as JSON", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(
+      featureFallbackPublicationProjectConfig(
         homePath,
         "push_remote_then_fallback",
       ),
@@ -911,7 +911,7 @@ describe("publication CLI operations", () => {
         sourceRoot,
         "--branch",
         "feat/codex-goals",
-        "--initiative",
+        "--feature",
         "codex-goals",
         "--dry-run",
         "--json",
@@ -938,7 +938,7 @@ describe("publication CLI operations", () => {
           status: "fallback_selected",
           selectedRemote: "fork",
           reasons: [
-            "publication remote app rejected a dry-run branch push",
+            "push remote app rejected a dry-run branch push",
             "fallback remote fork accepted a dry-run branch push",
           ],
         },
@@ -952,11 +952,11 @@ describe("publication CLI operations", () => {
     });
   });
 
-  it("prints blocked initiative branch-push setup actions as JSON", async () => {
+  it("prints blocked feature branch-push setup actions as JSON", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
       projectRoot,
-      initiativeFallbackPublicationProjectConfig(
+      featureFallbackPublicationProjectConfig(
         homePath,
         "push_remote_then_fallback",
       ),
@@ -972,7 +972,7 @@ describe("publication CLI operations", () => {
         sourceRoot,
         "--branch",
         "feat/codex-goals",
-        "--initiative",
+        "--feature",
         "codex-goals",
         "--dry-run",
         "--json",
@@ -995,7 +995,7 @@ describe("publication CLI operations", () => {
     expect(JSON.parse(stdout.output())).toMatchObject({
       ok: false,
       error: {
-        code: "initiative_branch_publication_blocked",
+        code: "feature_branch_publication_blocked",
       },
       featureBranchDelivery: {
         remoteSelection: {
@@ -1003,7 +1003,7 @@ describe("publication CLI operations", () => {
           selectedRemote: null,
           reasons: ["fallback remote fork rejected a dry-run branch push"],
           setupActions: [
-            "fix remote fork before publishing the initiative branch",
+            "fix remote fork before publishing the feature branch",
           ],
         },
       },
@@ -1221,7 +1221,7 @@ describe("publication CLI operations", () => {
             mergeable: true,
             mergeable_state: "clean",
             head: {
-              ref: "feat/initiative-delivery-topology",
+              ref: "feat/feature-delivery-branchStrategy",
               sha: "abc123",
             },
             base: {
@@ -1297,7 +1297,7 @@ describe("publication CLI operations", () => {
       providerEvidence: [
         {
           sourceKind: "pull_request",
-          headBranch: "feat/initiative-delivery-topology",
+          headBranch: "feat/feature-delivery-branchStrategy",
         },
       ],
     });
@@ -1522,7 +1522,7 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
   };
 }
 
-function initiativeFallbackPublicationProjectConfig(
+function featureFallbackPublicationProjectConfig(
   homePath: string,
   strategy:
     | "fallback_remote"

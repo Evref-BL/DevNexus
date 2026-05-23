@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildNexusInitiativeRestackPlan } from "./nexusInitiativeRestackPlan.js";
+import { buildNexusFeatureRestackPlan } from "./nexusFeatureRestackPlan.js";
 
-describe("initiative restack plan", () => {
-  it("does not require restack planning for direct topology", () => {
-    const plan = buildNexusInitiativeRestackPlan({
-      topology: "direct",
+describe("feature restack plan", () => {
+  it("does not require restack planning for direct branchStrategy", () => {
+    const plan = buildNexusFeatureRestackPlan({
+      branchStrategy: "direct",
       finalPublicationTarget: "main",
       branches: [
         {
@@ -29,8 +29,8 @@ describe("initiative restack plan", () => {
   });
 
   it("reports stacked branches that need restack and force-with-lease approval", () => {
-    const plan = buildNexusInitiativeRestackPlan({
-      topology: "stacked",
+    const plan = buildNexusFeatureRestackPlan({
+      branchStrategy: "stacked",
       finalPublicationTarget: "main",
       branches: [
         {
@@ -83,8 +83,8 @@ describe("initiative restack plan", () => {
   });
 
   it("keeps hybrid stacks ready when branch graph facts are current", () => {
-    const plan = buildNexusInitiativeRestackPlan({
-      topology: "hybrid",
+    const plan = buildNexusFeatureRestackPlan({
+      branchStrategy: "hybrid",
       finalPublicationTarget: "main",
       branches: [
         {
@@ -107,9 +107,9 @@ describe("initiative restack plan", () => {
     });
   });
 
-  it("excludes throw-away rehearsal topology from publication restack plans", () => {
-    const plan = buildNexusInitiativeRestackPlan({
-      topology: "throwaway_rehearsal",
+  it("excludes throw-away rehearsal branchStrategy from publication restack plans", () => {
+    const plan = buildNexusFeatureRestackPlan({
+      branchStrategy: "throwaway_rehearsal",
       finalPublicationTarget: "main",
       branches: [
         {

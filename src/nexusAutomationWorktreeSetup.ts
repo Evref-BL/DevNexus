@@ -24,7 +24,7 @@ import {
   type NexusWorkerContextSkillReference,
   type NexusWorkerContextBundleWorktree,
   type NexusWorkerContextAgentTargetPolicy,
-  type NexusWorkerContextInitiativeDelivery,
+  type NexusWorkerContextFeatureBranchDelivery,
 } from "./nexusWorkerContextBundle.js";
 import {
   nexusSkillManifestFileName,
@@ -119,7 +119,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
     root: string;
   };
   ownership: NexusWorkerContextBundleWorktree;
-  featureBranchDelivery?: NexusWorkerContextInitiativeDelivery | null;
+  featureBranchDelivery?: NexusWorkerContextFeatureBranchDelivery | null;
   targetStatePath?: string | null;
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;

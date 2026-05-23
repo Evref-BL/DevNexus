@@ -556,12 +556,12 @@ agent leads the plan; the user decides scope, risk, and approval gates.
    execution.
 3. Map the changed areas before writing tasks. Name the owning component,
    files or artifacts, tracker anchor, expected worktree, command working
-   directory, and selected branch strategy where those are knowable.
+   directory, and selected branchStrategy where those are knowable.
 4. Split the work into bounded vertical changes where possible. Each change needs
    one owner, one scope, dependencies, acceptance criteria, verification
    commands, and handoff notes. Do not make changes smaller than the next real
    review, risk, ownership, or human-in-the-loop gate requires.
-5. For Git-backed plans, choose the branch strategy before the first branch:
+5. For Git-backed plans, choose the branchStrategy before the first branch:
    direct review branch, stacked review branches, feature branch, temporary
    integration rehearsal, or release train policy. Record the base branch,
    review target, and target branch for each change.
@@ -585,7 +585,7 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 Use this shape when writing a saved implementation plan:
 
 1. Goal and done criteria.
-2. Base branch, branch strategy, tracker anchor, and review path.
+2. Base branch, branchStrategy, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
 4. Work items or vertical changes with files, acceptance criteria, steps,
    verification, and handoff.
@@ -630,12 +630,12 @@ skills, planning documents, or another durable project file set.
    worktree for source changes and a workspace/meta worktree for files such as
    \`dev-nexus.project.json\`, \`.dev-nexus/**\`, projected skills,
    \`PLAN.md\`, \`CONTEXT.md\`, target state, or workspace docs.
-5. Use the selected branch strategy to choose the branch name, base ref, and
+5. Use the selected branchStrategy to choose the branch name, base ref, and
    review target. Direct review branches target the final target branch;
    stacked review branches target the branch below them; review branches for a
    long-lived feature target the approved feature branch; temporary integration
    branches are only for compatibility rehearsal and must not become the base for new work.
-   If Git-backed feature work has no selected branch strategy, recommend one and
+   If Git-backed feature work has no selected branchStrategy, recommend one and
    get the needed human-in-the-loop decision before creating branches.
 6. Let configured setup do its job. Prefer projected dependencies, generated
    context bundles, and skill projection over ad hoc package installation.
@@ -681,9 +681,9 @@ handoff, publication, or cleanup.
 4. Read the component publication policy and current authority. Do not silently
    fall back to a human account when policy expects an automation actor.
 5. If publication is allowed, use the configured remote, credential profile,
-   selected branch strategy, target branch, and review path. For green-main policy,
+   selected branchStrategy, target branch, and review path. For green-main policy,
    prefer branch or pull request validation and required checks before merge.
-   A review branch in a feature branch strategy targets the feature branch;
+   A review branch in a feature branchStrategy targets the feature branch;
    final publication happens from the feature branch only
    after the accumulated work is coherent, reviewed, verified, and approved.
 6. If publication authority is blocked, leave a human handoff with branch name,
@@ -716,7 +716,7 @@ handoff, publication, or cleanup.
 - Do not merge, push, open a pull request, delete a branch, or remove a
   worktree without the required policy and approval state.
 - Do not hide provider-auth problems by using the wrong account.
-- Do not retarget a review branch around the selected branch strategy without
+- Do not retarget a review branch around the selected branchStrategy without
   approval and a durable record of the reason.
 - Do not clean up worktrees that another chat or host may still own.
 
@@ -743,7 +743,7 @@ accumulate on one feature, release, or output path.
    ambiguous, unsafe, out of date, missing verification, or split across the
    wrong component, artifact, or publication path.
 3. Confirm the current checkout, branch base, and review target match the
-   intended owned path and branch strategy. If not, use the worktree
+   intended owned path and branchStrategy. If not, use the worktree
    preparation workflow before editing.
 4. Execute one change at a time. Keep status current, follow referenced companion
    skills, and preserve unrelated dirty changes.
@@ -763,7 +763,7 @@ accumulate on one feature, release, or output path.
 - Do not treat a plan as approval for destructive cleanup, live runtime actions,
   provider writes, cost changes, or publication unless it says so explicitly.
 - Do not split one feature into many unrelated final publications.
-- Do not execute a Git-backed feature plan that lacks a branch strategy;
+- Do not execute a Git-backed feature plan that lacks a branchStrategy;
   recommend one and get the needed decision first.
 - Do not continue after verification fails unless the next step is diagnosis.
 
@@ -795,7 +795,7 @@ parallel work is useful instead of waiting for the user to name subagents.
    collisions, useful sidecar work while the coordinator continues, available
    agent or subagent tooling, and a clear review and integration path.
 3. Keep the coordinator local to the feature or release record. The coordinator owns
-   the plan, branch strategy, branch or artifact set, tracker anchor,
+   the plan, branchStrategy, branch or artifact set, tracker anchor,
    integration order, and final verification.
 4. Assign each worker one bounded task with an explicit write scope, expected
    output, verification command, and handoff format. Tell workers they are not
@@ -1137,13 +1137,13 @@ work, not a separate "take the lead" persona or a project-management ceremony.
 The work may accumulate on a Git branch, pull request, artifact directory,
 document set, tracker epic, release train, coordination record, or another
 project-owned place. For Git-backed work, the base branch and target branch
-define the destination; the branch strategy says how review branches get there.
+define the destination; the branchStrategy says how review branches get there.
 
 ## Workflow
 
 1. Establish the frame: objective, reason, owner or coordinator, tracker
    anchor, expected outputs, constraints, non-goals, and done criteria.
-2. Choose the branch strategy before the first change. For Git-backed work,
+2. Choose the branchStrategy before the first change. For Git-backed work,
    choose the base branch, review branch shape, target branch, and review path;
    for non-code work, choose the document set, artifact directory, tracker,
    release train, or coordination record.
@@ -1173,19 +1173,19 @@ define the destination; the branch strategy says how review branches get there.
 
 ## Git Branch Strategy
 
-Use the smallest branch strategy that lets changes stay reviewable without
+Use the smallest branchStrategy that lets changes stay reviewable without
 publishing an incoherent partial state.
 
-- Direct branch strategy is the default for independent changes: short-lived
+- Direct branchStrategy is the default for independent changes: short-lived
   review branches or pull requests target the final target branch, while the
   feature record groups the work.
-- Stacked branch strategy fits dependent changes: each branch or review targets
+- Stacked branchStrategy fits dependent changes: each branch or review targets
   the branch below it, then lands bottom-up or retargets as dependencies land.
-- Feature branch strategy is for broad work that must accumulate before final
+- Feature branchStrategy is for broad work that must accumulate before final
   publication. It requires explicit human-in-the-loop approval; review branches
   target the feature branch, and final publication happens
   from that branch only after coherent review and verification.
-- Temporary integration branch strategy is only for compatibility rehearsal.
+- Temporary integration branchStrategy is only for compatibility rehearsal.
   Do not base new work on it or treat it as a publication source unless the
   user explicitly promotes it.
 - Release train strategy belongs to the workspace release policy. Do not
@@ -1203,8 +1203,8 @@ verification, diagnosis, and handoff skills for the changes themselves.
 - Prefer one final publication path over many unrelated final publications,
   unless the feature explicitly owns multiple coordinated paths.
 - Do not assume a feature or bugfix campaign requires one long-lived Git branch;
-  recommend the branch strategy and get approval when selecting the feature
-  branch strategy.
+  recommend the branchStrategy and get approval when selecting the feature
+  branchStrategy.
 - Do not let the feature hide unrelated work, unresolved blockers, or
   unreviewed risky changes.
 - Do not turn a small direct fix into ceremony.
@@ -1295,9 +1295,9 @@ for an actual time estimate. Use evidence from the codebase and tracker first;
 if the shape is uncertain, perform the next reversible discovery step, then
 revise the routing call.
 
-For Git-backed feature work, choose the Git branch strategy before preparing a
-worktree. Direct branch strategy is the default when changes can land
-independently; stacked branch strategy fits dependent changes; feature branch
+For Git-backed feature work, choose the Git branchStrategy before preparing a
+worktree. Direct branchStrategy is the default when changes can land
+independently; stacked branchStrategy fits dependent changes; feature branch
 strategy needs explicit approval; temporary integration branches are for
 rehearsal only.
 
@@ -1311,7 +1311,7 @@ one decision, or would force workers into the same mutable files.
 - Unclear goal or scope: \`triage\` or \`design-with-user\`.
 - Existing plan that needs pressure: \`grill-me\`; use \`grill-with-docs\` when
   code, glossary terms, docs, or Architecture Decision Records should decide.
-- Feature work: branch strategy decision -> \`write-implementation-plan\`
+- Feature work: branchStrategy decision -> \`write-implementation-plan\`
   -> \`prepare-dev-nexus-worktree\` -> \`tdd\` ->
   \`verify-before-completion\` -> \`request-work-review\` ->
   \`finish-dev-nexus-branch\`.
@@ -1320,10 +1320,10 @@ one decision, or would force workers into the same mutable files.
 - Documentation work: \`documentation\` -> \`humanizer\` ->
   \`verify-before-completion\` -> review and finish.
 - Architecture work: \`zoom-out\` -> \`architecture-review\` ->
-  \`architecture-deepening\` -> branch strategy decision -> planning,
+  \`architecture-deepening\` -> branchStrategy decision -> planning,
   implementation, verification, and review.
 - Version or release work: \`feature-workflow\` -> \`to-prd\` ->
-  \`to-issues\` -> branch strategy decision ->
+  \`to-issues\` -> branchStrategy decision ->
   \`write-implementation-plan\`, then execute and verify each change before
   final approval.
 

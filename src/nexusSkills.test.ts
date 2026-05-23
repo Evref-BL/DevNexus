@@ -311,16 +311,16 @@ describe("nexus skills", () => {
       "Git Branch Strategy",
     );
     expect(skillMarkdown["feature-workflow"]).toContain(
-      "Direct branch strategy",
+      "Direct branchStrategy",
     );
     expect(skillMarkdown["feature-workflow"]).toContain(
-      "Stacked branch strategy",
+      "Stacked branchStrategy",
     );
     expect(skillMarkdown["feature-workflow"]).toContain(
-      "Feature branch strategy",
+      "Feature branchStrategy",
     );
     expect(skillMarkdown["feature-workflow"]).toContain(
-      "Temporary integration branch strategy",
+      "Temporary integration branchStrategy",
     );
     expect(skillMarkdown["feature-workflow"]).toContain(
       "groups related work under one goal",
@@ -371,7 +371,7 @@ describe("nexus skills", () => {
       "recommended next action",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
-      "choose the Git branch strategy before",
+      "choose the Git branchStrategy before",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "parallel-work-dispatch",
@@ -395,7 +395,7 @@ describe("nexus skills", () => {
       "one feature, release, or output path",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
-      "selected branch strategy",
+      "selected branchStrategy",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
       "bounded vertical changes",
@@ -407,7 +407,7 @@ describe("nexus skills", () => {
       "feature, release, or output path",
     );
     expect(skillMarkdown["execute-feature-plan"]).toContain(
-      "lacks a branch strategy",
+      "lacks a branchStrategy",
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
       "worktree_prepare",
@@ -416,7 +416,7 @@ describe("nexus skills", () => {
       "workspace/meta worktree",
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
-      "selected branch strategy",
+      "selected branchStrategy",
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
       "approved feature branch",
@@ -443,10 +443,10 @@ describe("nexus skills", () => {
       "green-main policy",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
-      "selected branch strategy",
+      "selected branchStrategy",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
-      "feature branch strategy",
+      "feature branchStrategy",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "Do not silently",

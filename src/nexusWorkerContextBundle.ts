@@ -156,19 +156,19 @@ export interface NexusWorkerContextBundleWorktree {
   workItem: NexusWorkerContextBundleWorkItem | null;
 }
 
-export interface NexusWorkerContextInitiativeBranchPublication {
+export interface NexusWorkerContextFeatureBranchPublication {
   strategy: string;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   fallbackRemote: string | null;
   selectedRemote: string | null;
   requiresFallbackApproval: boolean;
 }
 
-export interface NexusWorkerContextInitiativeDelivery {
-  initiativeId: string;
-  sliceSlug: string;
-  topology: string;
-  integrationBranch: string | null;
+export interface NexusWorkerContextFeatureBranchDelivery {
+  featureId: string;
+  changeSlug: string;
+  branchStrategy: string;
+  featureBranch: string | null;
   branchTarget: string;
   parentBranch: string | null;
   stackPosition: number | null;
@@ -178,7 +178,7 @@ export interface NexusWorkerContextInitiativeDelivery {
   reviewMode: string;
   finalPullRequestCreation: string;
   commentPolicy: string;
-  branchPublication: NexusWorkerContextInitiativeBranchPublication;
+  branchPublication: NexusWorkerContextFeatureBranchPublication;
   hitlGates: string[];
 }
 
@@ -194,7 +194,7 @@ export interface NexusWorkerContextBundle {
   dependencySupport: NexusWorkerContextDependencySupport;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
-  featureBranchDelivery: NexusWorkerContextInitiativeDelivery | null;
+  featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null;
   publicationScope: NexusWorkerContextPublicationScope;
   publication: NexusAutomationPublicationConfig | null;
   gitIdentity: NexusExpectedGitIdentity | null;
@@ -217,7 +217,7 @@ export interface NexusWorkerContextBundleOptions {
   branchName: string;
   baseRef: string | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
-  featureBranchDelivery?: NexusWorkerContextInitiativeDelivery | null;
+  featureBranchDelivery?: NexusWorkerContextFeatureBranchDelivery | null;
   targetStatePath?: string | null;
   skills?: NexusWorkerContextSkills;
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
@@ -395,7 +395,7 @@ export function renderNexusWorkerBriefing(
     `Work item: ${workItemLine}`,
     `Branch: ${context.worktree.branchName}`,
     `Base ref: ${baseRefLine}`,
-    ...renderInitiativeDeliveryLines(context.featureBranchDelivery),
+    ...renderFeatureDeliveryLines(context.featureBranchDelivery),
     "",
     ...renderAgentTargetPolicyLines(context.agentTargetPolicy),
     "",
@@ -430,23 +430,23 @@ export function renderNexusWorkerBriefing(
   ].join("\n");
 }
 
-function renderInitiativeDeliveryLines(
-  featureBranchDelivery: NexusWorkerContextInitiativeDelivery | null,
+function renderFeatureDeliveryLines(
+  featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null,
 ): string[] {
   if (!featureBranchDelivery) {
     return [];
   }
   return [
-    `Initiative: ${featureBranchDelivery.initiativeId}`,
-    `Initiative slice: ${featureBranchDelivery.sliceSlug}`,
-    `Delivery topology: ${featureBranchDelivery.topology}`,
+    `Feature: ${featureBranchDelivery.featureId}`,
+    `Feature change: ${featureBranchDelivery.changeSlug}`,
+    `Branch strategy: ${featureBranchDelivery.branchStrategy}`,
     `Review target: ${featureBranchDelivery.branchTarget}`,
     `Final publication target: ${featureBranchDelivery.finalPublicationTarget}`,
-    `Integration branch: ${featureBranchDelivery.integrationBranch ?? "none"}`,
+    `Feature branch: ${featureBranchDelivery.featureBranch ?? "none"}`,
     `Parent branch: ${featureBranchDelivery.parentBranch ?? "none"}`,
     `Stack position: ${featureBranchDelivery.stackPosition ?? "none"}`,
     `Final PR creation: ${featureBranchDelivery.finalPullRequestCreation}`,
-    `Branch publication remote: ${
+    `Branch push remote: ${
       featureBranchDelivery.branchPublication.selectedRemote ?? "manual"
     }${
       featureBranchDelivery.branchPublication.fallbackRemote

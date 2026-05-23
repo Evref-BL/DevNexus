@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultNexusCiTierDefinitions,
-  defaultNexusPublicationTrainCiTierPolicy,
+  defaultNexusReleaseTrainCiTierPolicy,
   NexusCiTierPolicyError,
   resolveNexusCiTierDecision,
   validateNexusCiTierPolicyConfig,
@@ -33,7 +33,7 @@ describe("nexus CI tier policy", () => {
 
   it("keeps ordinary source pull requests on cheap remote smoke after opt-in", () => {
     const decision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "feature/source-change",
       changedPaths: ["src/cli.ts"],
@@ -50,7 +50,7 @@ describe("nexus CI tier policy", () => {
 
   it("skips remote checks for documentation-only changes", () => {
     const decision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "feature/docs",
       changedPaths: ["docs/publication-train.md", "README.md"],
@@ -65,7 +65,7 @@ describe("nexus CI tier policy", () => {
 
   it("keeps metadata-only changes on cheap remote smoke", () => {
     const decision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "feature/metadata",
       changedPaths: [".dev-nexus/automation/target-state.md"],
@@ -78,14 +78,14 @@ describe("nexus CI tier policy", () => {
 
   it("escalates cross-platform risk and candidate branches to the matrix tier", () => {
     const crossPlatformDecision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "feature/process-supervisor",
       changeRisk: "cross_platform",
       changedPaths: ["src/processSupervisor.ts"],
     });
     const candidateDecision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "candidate/0.2.0",
       changedPaths: ["src/cli.ts"],
@@ -100,13 +100,13 @@ describe("nexus CI tier policy", () => {
 
   it("keeps merge queue and target branches as protected gates", () => {
     const mergeQueueDecision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "merge_group",
       branchName: "gh-readonly-queue/main/pr-1",
       fullMatrixBudgetAvailable: false,
     });
     const targetDecision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "push",
       branchName: "main",
       targetBranch: "main",
@@ -122,7 +122,7 @@ describe("nexus CI tier policy", () => {
 
   it("falls back to cheap smoke when high-cost candidate budget is exhausted", () => {
     const decision = resolveNexusCiTierDecision({
-      policy: defaultNexusPublicationTrainCiTierPolicy,
+      policy: defaultNexusReleaseTrainCiTierPolicy,
       eventName: "pull_request",
       branchName: "candidate/0.2.0",
       changedPaths: ["src/cli.ts"],

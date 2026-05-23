@@ -2133,7 +2133,7 @@ describe("workspace config", () => {
     });
   });
 
-  it("accepts optional publication train policy without requiring public labels", () => {
+  it("accepts optional release train policy without requiring public labels", () => {
     const ciTiers = {
       defaultTier: "remote_smoke" as const,
       fullMatrixBudget: {
@@ -2212,8 +2212,8 @@ describe("workspace config", () => {
   it("accepts feature branch delivery policy on release trains", () => {
     const config = validateProjectConfig({
       version: 1,
-      id: "initiative-delivery-project",
-      name: "Initiative Delivery Project",
+      id: "feature-delivery-project",
+      name: "Feature Branch Delivery Project",
       automation: {
         publication: {
           strategy: "green_main",
@@ -2282,8 +2282,8 @@ describe("workspace config", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
-        id: "initiative-delivery-project",
-        name: "Initiative Delivery Project",
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
         automation: {
           publication: {
             strategy: "green_main",
@@ -2303,8 +2303,8 @@ describe("workspace config", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
-        id: "initiative-delivery-project",
-        name: "Initiative Delivery Project",
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
         automation: {
           publication: {
             strategy: "green_main",
@@ -2313,7 +2313,7 @@ describe("workspace config", () => {
               enabled: true,
               featureBranchDelivery: {
                 branchNaming: {
-                  defaultIntentPrefix: "initiative",
+                  defaultIntentPrefix: "feature",
                   allowedIntentPrefixes: ["feat", "fix"],
                 },
               },
@@ -2326,8 +2326,8 @@ describe("workspace config", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
-        id: "initiative-delivery-project",
-        name: "Initiative Delivery Project",
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
         automation: {
           publication: {
             strategy: "green_main",
@@ -2348,8 +2348,8 @@ describe("workspace config", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
-        id: "initiative-delivery-project",
-        name: "Initiative Delivery Project",
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
         automation: {
           publication: {
             strategy: "green_main",
@@ -2370,8 +2370,8 @@ describe("workspace config", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
-        id: "initiative-delivery-project",
-        name: "Initiative Delivery Project",
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
         automation: {
           publication: {
             strategy: "green_main",

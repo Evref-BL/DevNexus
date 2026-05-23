@@ -6,7 +6,7 @@ import {
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
-import { buildNexusInitiativeDeliveryPlan } from "./nexusInitiativeDeliveryPlan.js";
+import { buildNexusFeatureBranchDeliveryPlan } from "./nexusFeatureBranchDeliveryPlan.js";
 import {
   saveProjectConfig,
   type NexusProjectConfig,
@@ -26,26 +26,26 @@ afterEach(() => {
   }
 });
 
-describe("initiative delivery plan", () => {
-  it("builds a read-only plan for configured initiative delivery policy", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-plan-");
+describe("feature branch delivery plan", () => {
+  it("builds a read-only plan for configured feature branch delivery policy", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-plan-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const plan = buildNexusInitiativeDeliveryPlan({
+    const plan = buildNexusFeatureBranchDeliveryPlan({
       projectRoot,
       componentId: "primary",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
     });
 
     expect(plan).toMatchObject({
       version: 1,
       projectRoot,
       project: {
-        id: "initiative-plan-demo",
+        id: "feature-plan-demo",
       },
       componentId: "primary",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       itemCount: 1,
       mutatesSource: false,
       items: [
@@ -53,18 +53,18 @@ describe("initiative delivery plan", () => {
           componentId: "primary",
           targetBranch: "main",
           releaseTrainVersionId: "v-next",
-          initiative: {
+          feature: {
             activeScopeId: "codex-goals",
             defaultBranchStrategy: "hybrid",
             branchPlan: {
-              integrationBranch: "feat/codex-goals",
+              featureBranch: "feat/codex-goals",
               reviewBranchPattern: "feat/codex-goals/{change}",
               finalPublicationTarget: "main",
             },
             finalPullRequestCreation: "at_review_gate",
             branchPublication: {
               strategy: "push_remote_then_fallback",
-              publicationRemote: "origin",
+              pushRemote: "origin",
               fallbackRemote: "fork",
               selectedRemote: "origin",
               requiresFallbackApproval: true,
@@ -76,19 +76,19 @@ describe("initiative delivery plan", () => {
     });
   });
 
-  it("reports missing initiative delivery policy without mutating state", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-plan-");
+  it("reports missing feature branch delivery policy without mutating state", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-plan-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, {
       ...projectConfig(),
       automation: defaultNexusAutomationConfig,
     });
 
-    const plan = buildNexusInitiativeDeliveryPlan({ projectRoot });
+    const plan = buildNexusFeatureBranchDeliveryPlan({ projectRoot });
 
     expect(plan.itemCount).toBe(0);
     expect(plan.warnings).toContain(
-      "component primary has no initiative delivery policy configured",
+      "component primary has no feature branch delivery policy configured",
     );
     expect(plan.mutatesSource).toBe(false);
   });
@@ -97,8 +97,8 @@ describe("initiative delivery plan", () => {
 function projectConfig(): NexusProjectConfig {
   return {
     version: 1,
-    id: "initiative-plan-demo",
-    name: "Initiative Plan Demo",
+    id: "feature-plan-demo",
+    name: "Feature Plan Demo",
     home: null,
     repo: {
       kind: "git",

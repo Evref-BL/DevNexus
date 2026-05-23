@@ -1,8 +1,8 @@
 import {
-  buildNexusInitiativeDeliveryReport,
-  type NexusInitiativeDeliveryReport,
-  type NexusInitiativeDeliveryReportItem,
-} from "./nexusInitiativeDeliveryReport.js";
+  buildNexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReportItem,
+} from "./nexusFeatureBranchDeliveryReport.js";
 import {
   buildNexusMergeQueueReadinessReport,
   type NexusMergeQueueReadinessReport,
@@ -13,7 +13,7 @@ import type {
   NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
 
-export type NexusInitiativeFinalizationNextAction =
+export type NexusFeatureFinalizationNextAction =
   | "create_pull_request"
   | "manual_pull_request"
   | "collect_provider_evidence"
@@ -27,7 +27,7 @@ export type NexusInitiativeFinalizationNextAction =
   | "request_publication_approval"
   | "wait";
 
-export type NexusInitiativeReviewReadinessStatus =
+export type NexusFeatureReviewReadinessStatus =
   | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
@@ -37,7 +37,7 @@ export type NexusInitiativeReviewReadinessStatus =
   | "wait"
   | "ready_for_review";
 
-export type NexusInitiativePublicationReadinessStatus =
+export type NexusFeaturePublicationReadinessStatus =
   | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
@@ -49,7 +49,7 @@ export type NexusInitiativePublicationReadinessStatus =
   | "blocked_by_draft"
   | "ready_for_publication";
 
-type NexusInitiativeSharedReadinessStatus =
+type NexusFeatureSharedReadinessStatus =
   | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
@@ -58,21 +58,21 @@ type NexusInitiativeSharedReadinessStatus =
   | "checks_pending"
   | "wait";
 
-export interface NexusInitiativeReadinessDecision<
+export interface NexusFeatureReadinessDecision<
   TStatus extends string = string,
 > {
   status: TStatus;
-  nextAction: NexusInitiativeFinalizationNextAction;
+  nextAction: NexusFeatureFinalizationNextAction;
   reasons: string[];
 }
 
-export interface NexusInitiativePublicationAuthority {
+export interface NexusFeaturePublicationAuthority {
   authorizedToMerge: false;
   humanInTheLoop: true;
   reason: string;
 }
 
-export interface NexusInitiativeMergeQueueFinalizationSummary {
+export interface NexusFeatureMergeQueueFinalizationSummary {
   enabled: boolean;
   nextAction: NexusMergeQueueReadinessReport["nextAction"];
   protectedTargetStatus: NexusMergeQueueReadinessReport["protectedTargetGate"]["status"];
@@ -80,7 +80,7 @@ export interface NexusInitiativeMergeQueueFinalizationSummary {
   warnings: string[];
 }
 
-export type NexusInitiativeFinalPullRequestActionStatus =
+export type NexusFeatureFinalPullRequestActionStatus =
   | "not_required"
   | "already_exists"
   | "create_at_feature_start"
@@ -88,7 +88,7 @@ export type NexusInitiativeFinalPullRequestActionStatus =
   | "manual_only"
   | "blocked";
 
-export interface NexusInitiativeFinalPullRequestProviderAction {
+export interface NexusFeatureFinalPullRequestProviderAction {
   kind: "pull_request_upsert";
   componentId: string;
   head: string;
@@ -98,38 +98,38 @@ export interface NexusInitiativeFinalPullRequestProviderAction {
   draft: boolean;
 }
 
-export interface NexusInitiativeFinalPullRequestAction {
-  status: NexusInitiativeFinalPullRequestActionStatus;
+export interface NexusFeatureFinalPullRequestAction {
+  status: NexusFeatureFinalPullRequestActionStatus;
   humanInTheLoop: boolean;
-  providerAction: NexusInitiativeFinalPullRequestProviderAction | null;
+  providerAction: NexusFeatureFinalPullRequestProviderAction | null;
   cliCommand: string | null;
   reasons: string[];
 }
 
-export interface NexusInitiativeFinalizationPlanItem {
+export interface NexusFeatureFinalizationPlanItem {
   componentId: string;
-  initiativeId: string;
-  integrationBranch: string | null;
-  stack: NexusInitiativeDeliveryReportItem["stack"];
+  featureId: string;
+  featureBranch: string | null;
+  stack: NexusFeatureBranchDeliveryReportItem["stack"];
   finalPublicationTarget: string;
   finalPullRequestCreation: string;
-  finalPullRequestHead: NexusInitiativeDeliveryReportItem["finalPullRequestHead"];
-  finalPullRequestAction: NexusInitiativeFinalPullRequestAction;
-  branchUpdateDecision: NexusInitiativeDeliveryReportItem["branchUpdateDecision"];
+  finalPullRequestHead: NexusFeatureBranchDeliveryReportItem["finalPullRequestHead"];
+  finalPullRequestAction: NexusFeatureFinalPullRequestAction;
+  branchUpdateDecision: NexusFeatureBranchDeliveryReportItem["branchUpdateDecision"];
   reviewTarget: string;
-  providerEvidence: NexusInitiativeDeliveryReportItem["providerEvidence"];
-  reviewReadiness: NexusInitiativeReadinessDecision<NexusInitiativeReviewReadinessStatus> & {
+  providerEvidence: NexusFeatureBranchDeliveryReportItem["providerEvidence"];
+  reviewReadiness: NexusFeatureReadinessDecision<NexusFeatureReviewReadinessStatus> & {
     safeToReview: boolean;
   };
-  publicationReadiness: NexusInitiativeReadinessDecision<NexusInitiativePublicationReadinessStatus> & {
+  publicationReadiness: NexusFeatureReadinessDecision<NexusFeaturePublicationReadinessStatus> & {
     authorizedToMerge: false;
   };
-  publicationAuthority: NexusInitiativePublicationAuthority;
-  mergeQueue: NexusInitiativeMergeQueueFinalizationSummary | null;
+  publicationAuthority: NexusFeaturePublicationAuthority;
+  mergeQueue: NexusFeatureMergeQueueFinalizationSummary | null;
   warnings: string[];
 }
 
-export interface NexusInitiativeFinalizationPlanSummary {
+export interface NexusFeatureFinalizationPlanSummary {
   itemCount: number;
   safeToReviewCount: number;
   readyForPublicationCount: number;
@@ -142,35 +142,35 @@ export interface NexusInitiativeFinalizationPlanSummary {
   needsReviewCount: number;
 }
 
-export interface NexusInitiativeFinalizationPlan {
+export interface NexusFeatureFinalizationPlan {
   version: 1;
   generatedAt: string;
   projectRoot: string;
-  project: NexusInitiativeDeliveryReport["project"];
+  project: NexusFeatureBranchDeliveryReport["project"];
   componentId: string | null;
-  initiativeId: string | null;
-  summary: NexusInitiativeFinalizationPlanSummary;
-  nextAction: NexusInitiativeFinalizationNextAction;
-  deliveryReport: NexusInitiativeDeliveryReport;
-  items: NexusInitiativeFinalizationPlanItem[];
+  featureId: string | null;
+  summary: NexusFeatureFinalizationPlanSummary;
+  nextAction: NexusFeatureFinalizationNextAction;
+  deliveryReport: NexusFeatureBranchDeliveryReport;
+  items: NexusFeatureFinalizationPlanItem[];
   warnings: string[];
   mutatesSource: false;
 }
 
-export function buildNexusInitiativeFinalizationPlan(options: {
+export function buildNexusFeatureFinalizationPlan(options: {
   projectRoot: string;
   componentId?: string;
-  initiativeId?: string | null;
+  featureId?: string | null;
   providerEvidence?: NexusPublicationProviderEvidenceInput[];
   fullMatrixBudgetAvailable?: boolean | null;
   mergeQueueEnabled?: boolean | null;
   workflowTriggers?: NexusMergeQueueWorkflowTriggerInput[];
   now?: Date | string | (() => Date | string);
-}): NexusInitiativeFinalizationPlan {
-  const deliveryReport = buildNexusInitiativeDeliveryReport({
+}): NexusFeatureFinalizationPlan {
+  const deliveryReport = buildNexusFeatureBranchDeliveryReport({
     projectRoot: options.projectRoot,
     componentId: options.componentId,
-    initiativeId: options.initiativeId,
+    featureId: options.featureId,
     providerEvidence: options.providerEvidence,
     fullMatrixBudgetAvailable: options.fullMatrixBudgetAvailable,
     now: options.now,
@@ -192,7 +192,7 @@ export function buildNexusInitiativeFinalizationPlan(options: {
     projectRoot: deliveryReport.projectRoot,
     project: deliveryReport.project,
     componentId: deliveryReport.componentId,
-    initiativeId: deliveryReport.initiativeId,
+    featureId: deliveryReport.featureId,
     summary: summarizeItems(items),
     nextAction: nextAction(items),
     deliveryReport,
@@ -203,13 +203,13 @@ export function buildNexusInitiativeFinalizationPlan(options: {
 }
 
 function finalizationItem(options: {
-  item: NexusInitiativeDeliveryReportItem;
+  item: NexusFeatureBranchDeliveryReportItem;
   projectRoot: string;
   providerEvidence: NexusPublicationProviderEvidenceInput[];
   mergeQueueEnabled?: boolean | null;
   workflowTriggers: NexusMergeQueueWorkflowTriggerInput[];
   now?: Date | string | (() => Date | string);
-}): NexusInitiativeFinalizationPlanItem {
+}): NexusFeatureFinalizationPlanItem {
   const finalPullRequestAction = buildFinalPullRequestAction({
     item: options.item,
     projectRoot: options.projectRoot,
@@ -227,8 +227,8 @@ function finalizationItem(options: {
 
   return {
     componentId: options.item.componentId,
-    initiativeId: options.item.initiativeId,
-    integrationBranch: options.item.integrationBranch,
+    featureId: options.item.featureId,
+    featureBranch: options.item.featureBranch,
     stack: options.item.stack,
     finalPublicationTarget: options.item.finalPublicationTarget,
     finalPullRequestCreation: options.item.finalPullRequestCreation,
@@ -256,9 +256,9 @@ function finalizationItem(options: {
 }
 
 function classifyReviewReadiness(
-  item: NexusInitiativeDeliveryReportItem,
-  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
-): NexusInitiativeReadinessDecision<NexusInitiativeReviewReadinessStatus> {
+  item: NexusFeatureBranchDeliveryReportItem,
+  finalPullRequestAction: NexusFeatureFinalPullRequestAction,
+): NexusFeatureReadinessDecision<NexusFeatureReviewReadinessStatus> {
   const blocker = sharedReadinessBlocker(item, finalPullRequestAction);
   if (blocker) {
     return blocker;
@@ -274,10 +274,10 @@ function classifyReviewReadiness(
 }
 
 function classifyPublicationReadiness(
-  item: NexusInitiativeDeliveryReportItem,
-  mergeQueue: NexusInitiativeMergeQueueFinalizationSummary | null,
-  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
-): NexusInitiativeReadinessDecision<NexusInitiativePublicationReadinessStatus> {
+  item: NexusFeatureBranchDeliveryReportItem,
+  mergeQueue: NexusFeatureMergeQueueFinalizationSummary | null,
+  finalPullRequestAction: NexusFeatureFinalPullRequestAction,
+): NexusFeatureReadinessDecision<NexusFeaturePublicationReadinessStatus> {
   const blocker = sharedReadinessBlocker(item, finalPullRequestAction);
   if (blocker) {
     return blocker;
@@ -329,9 +329,9 @@ function classifyPublicationReadiness(
 }
 
 function sharedReadinessBlocker(
-  item: NexusInitiativeDeliveryReportItem,
-  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
-): NexusInitiativeReadinessDecision<NexusInitiativeSharedReadinessStatus> | null {
+  item: NexusFeatureBranchDeliveryReportItem,
+  finalPullRequestAction: NexusFeatureFinalPullRequestAction,
+): NexusFeatureReadinessDecision<NexusFeatureSharedReadinessStatus> | null {
   const evidence = item.providerEvidence;
   if (finalPullRequestAction.status === "manual_only") {
     return {
@@ -407,9 +407,9 @@ function sharedReadinessBlocker(
 }
 
 function buildFinalPullRequestAction(options: {
-  item: NexusInitiativeDeliveryReportItem;
+  item: NexusFeatureBranchDeliveryReportItem;
   projectRoot: string;
-}): NexusInitiativeFinalPullRequestAction {
+}): NexusFeatureFinalPullRequestAction {
   if (!options.item.finalPullRequest) {
     return {
       status: "not_required",
@@ -454,7 +454,7 @@ function buildFinalPullRequestAction(options: {
   }
 
   const headBranch = options.item.finalPullRequestHead.branch ??
-    options.item.integrationBranch ??
+    options.item.featureBranch ??
     options.item.providerEvidence.headBranch ??
     options.item.providerEvidence.headRef;
   const head = options.item.finalPullRequestHead.displayRef ?? headBranch;
@@ -483,8 +483,8 @@ function buildFinalPullRequestAction(options: {
     };
   }
 
-  const title = `Finalize initiative ${options.item.initiativeId}`;
-  const providerAction: NexusInitiativeFinalPullRequestProviderAction = {
+  const title = `Finalize feature ${options.item.featureId}`;
+  const providerAction: NexusFeatureFinalPullRequestProviderAction = {
     kind: "pull_request_upsert",
     componentId: options.item.componentId,
     head,
@@ -503,7 +503,7 @@ function buildFinalPullRequestAction(options: {
   };
 }
 
-function finalPullRequestExists(item: NexusInitiativeDeliveryReportItem): boolean {
+function finalPullRequestExists(item: NexusFeatureBranchDeliveryReportItem): boolean {
   return Boolean(
     item.providerEvidence.provider &&
       (item.providerEvidence.sourceKind === "pull_request" ||
@@ -527,26 +527,26 @@ function finalPullRequestActionReason(
   status: "create_at_feature_start" | "create_at_review_gate",
 ): string {
   return status === "create_at_feature_start"
-    ? "final pull request should have been created at initiative start"
+    ? "final pull request should have been created at feature start"
     : "final pull request is created at the review gate";
 }
 
 function finalPullRequestBody(
-  item: NexusInitiativeDeliveryReportItem,
+  item: NexusFeatureBranchDeliveryReportItem,
   head: string,
 ): string {
-  return `Finalize initiative ${item.initiativeId}.
+  return `Finalize feature ${item.featureId}.
 
 Head: ${head}
 Base: ${item.finalPublicationTarget}
 Review target: ${item.finalReviewTarget}
 
-Run initiative-finalization with current provider evidence before publication.`;
+Run feature-finalization with current provider evidence before publication.`;
 }
 
 function finalPullRequestCliCommand(
   projectRoot: string,
-  action: NexusInitiativeFinalPullRequestProviderAction,
+  action: NexusFeatureFinalPullRequestProviderAction,
 ): string {
   return [
     "dev-nexus",
@@ -575,13 +575,13 @@ function singleLinePullRequestBody(body: string): string {
 }
 
 function mergeQueueSummary(options: {
-  item: NexusInitiativeDeliveryReportItem;
+  item: NexusFeatureBranchDeliveryReportItem;
   projectRoot: string;
   providerEvidence: NexusPublicationProviderEvidenceInput[];
   mergeQueueEnabled?: boolean | null;
   workflowTriggers: NexusMergeQueueWorkflowTriggerInput[];
   now?: Date | string | (() => Date | string);
-}): NexusInitiativeMergeQueueFinalizationSummary | null {
+}): NexusFeatureMergeQueueFinalizationSummary | null {
   if (options.mergeQueueEnabled !== true) {
     return null;
   }
@@ -603,8 +603,8 @@ function mergeQueueSummary(options: {
 }
 
 function summarizeItems(
-  items: NexusInitiativeFinalizationPlanItem[],
-): NexusInitiativeFinalizationPlanSummary {
+  items: NexusFeatureFinalizationPlanItem[],
+): NexusFeatureFinalizationPlanSummary {
   return {
     itemCount: items.length,
     safeToReviewCount: items.filter((item) => item.reviewReadiness.safeToReview)
@@ -638,8 +638,8 @@ function summarizeItems(
 }
 
 function nextAction(
-  items: NexusInitiativeFinalizationPlanItem[],
-): NexusInitiativeFinalizationNextAction {
+  items: NexusFeatureFinalizationPlanItem[],
+): NexusFeatureFinalizationNextAction {
   const actions = items.flatMap((item) => [
     item.reviewReadiness.nextAction,
     item.publicationReadiness.nextAction,
@@ -657,7 +657,7 @@ function nextAction(
     "request_publication_approval",
     "collect_provider_evidence",
     "wait",
-  ] satisfies NexusInitiativeFinalizationNextAction[]) {
+  ] satisfies NexusFeatureFinalizationNextAction[]) {
     if (actions.includes(action)) {
       return action;
     }

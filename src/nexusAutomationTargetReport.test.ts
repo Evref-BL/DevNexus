@@ -416,7 +416,7 @@ describe("nexus automation target report", () => {
       },
       ciTiers: {
         defaultTier: "remote_smoke",
-        source: "publication_train",
+        source: "release_train",
         fullMatrixBudget: {
           minimumIntervalMinutes: 60,
           minimumChangeCount: 3,

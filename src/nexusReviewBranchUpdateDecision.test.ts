@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildNexusInitiativeBranchUpdateDecision } from "./nexusInitiativeBranchUpdateDecision.js";
+import { buildNexusReviewBranchUpdateDecision } from "./nexusReviewBranchUpdateDecision.js";
 
-describe("initiative branch update decisions", () => {
+describe("feature branch update decisions", () => {
   it("uses the selected Git remote in merge and rebase command hints", () => {
-    const decision = buildNexusInitiativeBranchUpdateDecision({
+    const decision = buildNexusReviewBranchUpdateDecision({
       baseStatus: "behind",
       headBranch: "feat/codex-goals",
       baseBranch: "main",
@@ -38,7 +38,7 @@ describe("initiative branch update decisions", () => {
   });
 
   it("marks stacked branch updates so lower branches can be updated first", () => {
-    const decision = buildNexusInitiativeBranchUpdateDecision({
+    const decision = buildNexusReviewBranchUpdateDecision({
       baseStatus: "behind",
       headBranch: "feat/codex-goals/two",
       baseBranch: "feat/codex-goals/one",
@@ -57,7 +57,7 @@ describe("initiative branch update decisions", () => {
   });
 
   it("keeps rebase as a HITL force-with-lease option for public branches", () => {
-    const decision = buildNexusInitiativeBranchUpdateDecision({
+    const decision = buildNexusReviewBranchUpdateDecision({
       baseStatus: "diverged",
       headBranch: "feat/codex-goals",
       baseBranch: "main",

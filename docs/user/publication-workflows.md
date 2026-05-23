@@ -207,7 +207,7 @@ trains instead of replacing them.
           "enabled": true,
           "activeFeatureId": "codex-goals",
           "defaultBranchStrategy": "hybrid",
-          "allowedBranchStrategies": ["direct", "stacked", "integration_branch", "hybrid"],
+          "allowedBranchStrategies": ["direct", "stacked", "feature_branch", "hybrid"],
           "branchNaming": {
             "defaultIntentPrefix": "feat",
             "allowedIntentPrefixes": [
@@ -282,14 +282,6 @@ remote is missing or does not point at a GitHub repository, finalization blocks
 with a setup action instead of guessing. `branch-push --feature` probes
 `push_remote_then_fallback` with read-only `git push --dry-run` calls and uses
 the fallback only when the push remote rejects the dry run.
-
-Older configs that still use `publicationTrain`, `initiativeDelivery`,
-`defaultTopology`, or branch patterns with `{initiative}` and `{slice}` can be
-updated with:
-
-```bash
-node scripts/update-git-workflow-vocabulary-config.mjs --write dev-nexus.project.json
-```
 
 When provider evidence says the feature review branch is behind or diverged,
 `feature-report` and `feature-finalization` include a branch update

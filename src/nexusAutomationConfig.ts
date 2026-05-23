@@ -187,7 +187,7 @@ export interface NexusAutomationGreenMainConfig {
 export type NexusFeatureBranchDeliveryBranchStrategy =
   | "direct"
   | "stacked"
-  | "integration_branch"
+  | "feature_branch"
   | "hybrid"
   | "throwaway_rehearsal";
 
@@ -447,7 +447,7 @@ export const defaultNexusFeatureBranchDeliveryConfig:
     allowedBranchStrategies: [
       "direct",
       "stacked",
-      "integration_branch",
+      "feature_branch",
       "hybrid",
       "throwaway_rehearsal",
     ],
@@ -2452,7 +2452,7 @@ function validateFeatureBranchDeliveryBranchStrategy(
   if (
     value === "direct" ||
     value === "stacked" ||
-    value === "integration_branch" ||
+    value === "feature_branch" ||
     value === "hybrid" ||
     value === "throwaway_rehearsal"
   ) {
@@ -2460,7 +2460,7 @@ function validateFeatureBranchDeliveryBranchStrategy(
   }
 
   throw new NexusAutomationConfigError(
-    `${pathName} must be direct, stacked, integration_branch, hybrid, or throwaway_rehearsal`,
+    `${pathName} must be direct, stacked, feature_branch, hybrid, or throwaway_rehearsal`,
   );
 }
 

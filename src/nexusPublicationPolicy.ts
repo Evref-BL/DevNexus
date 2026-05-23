@@ -245,11 +245,11 @@ export function resolveNexusPublicationPolicy(
     componentPublication,
     "greenMain",
   );
-  const hasComponentPublicationTrain = Object.prototype.hasOwnProperty.call(
+  const hasComponentReleaseTrain = Object.prototype.hasOwnProperty.call(
     componentPublication,
     "releaseTrain",
   );
-  const hasProjectPublicationTrain = Object.prototype.hasOwnProperty.call(
+  const hasProjectReleaseTrain = Object.prototype.hasOwnProperty.call(
     projectPublication,
     "releaseTrain",
   );
@@ -273,9 +273,9 @@ export function resolveNexusPublicationPolicy(
     greenMain: hasComponentGreenMain
       ? componentPublication.greenMain ?? null
       : projectPublication.greenMain ?? null,
-    ...(hasComponentPublicationTrain
+    ...(hasComponentReleaseTrain
       ? { releaseTrain: componentPublication.releaseTrain ?? null }
-      : hasProjectPublicationTrain
+      : hasProjectReleaseTrain
         ? { releaseTrain: projectPublication.releaseTrain ?? null }
         : {}),
   };

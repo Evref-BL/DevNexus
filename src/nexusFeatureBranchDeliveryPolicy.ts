@@ -7,28 +7,28 @@ import {
 } from "./nexusAutomationConfig.js";
 import { parseGitHubRemoteUrl } from "./nexusForgeRepositoryResolver.js";
 
-export interface NexusInitiativeDeliveryBranchPlanSummary {
-  topology: NexusFeatureBranchDeliveryBranchStrategy;
+export interface NexusFeatureBranchDeliveryBranchPlanSummary {
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
   targetBranch: string;
-  integrationBranch: string | null;
+  featureBranch: string | null;
   reviewBranchPattern: string;
-  defaultSliceBaseBranch: string;
-  defaultSliceReviewTarget: string;
+  defaultChangeBaseBranch: string;
+  defaultChangeReviewTarget: string;
   finalReviewTarget: string;
   finalPublicationTarget: string;
   usesStackParent: boolean;
-  requiresIntegrationBranchApproval: boolean;
-  stack: NexusInitiativeDeliveryStackSummary;
+  requiresFeatureBranchApproval: boolean;
+  stack: NexusFeatureBranchDeliveryStackSummary;
 }
 
-export type NexusInitiativeDeliveryStackStatus =
+export type NexusFeatureBranchDeliveryStackStatus =
   | "not_applicable"
   | "active"
   | "excluded_from_publication";
 
-export interface NexusInitiativeDeliveryStackSliceSummary {
+export interface NexusFeatureBranchDeliveryStackChangeSummary {
   order: number;
-  sliceSlug: string;
+  changeSlug: string;
   branch: string;
   parentBranch: string | null;
   childBranches: string[];
@@ -36,36 +36,36 @@ export interface NexusInitiativeDeliveryStackSliceSummary {
   publicationEligible: boolean;
 }
 
-export interface NexusInitiativeDeliveryStackSummary {
-  status: NexusInitiativeDeliveryStackStatus;
-  topology: NexusFeatureBranchDeliveryBranchStrategy;
+export interface NexusFeatureBranchDeliveryStackSummary {
+  status: NexusFeatureBranchDeliveryStackStatus;
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
   publicationEligible: boolean;
   rootBranch: string | null;
   defaultParentBranch: string | null;
   defaultReviewTarget: string;
   finalPublicationTarget: string;
-  slices: NexusInitiativeDeliveryStackSliceSummary[];
+  changes: NexusFeatureBranchDeliveryStackChangeSummary[];
 }
 
-export interface NexusInitiativeDeliveryBranchPublicationSummary {
+export interface NexusFeatureBranchDeliveryBranchPublicationSummary {
   strategy: NexusFeatureBranchDeliveryBranchPublicationStrategy;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   fallbackRemote: string | null;
   selectedRemote: string | null;
   selectedRemoteUrl: string | null;
   selectedRemotePushUrl: string | null;
   requiresFallbackApproval: boolean;
-  finalPullRequestHead: NexusInitiativeDeliveryPullRequestHeadSummary;
+  finalPullRequestHead: NexusFeatureBranchDeliveryPullRequestHeadSummary;
 }
 
-export type NexusInitiativeDeliveryPullRequestHeadStatus =
+export type NexusFeatureBranchDeliveryPullRequestHeadStatus =
   | "upstream_branch"
   | "fork_branch"
   | "manual_only"
   | "blocked";
 
-export interface NexusInitiativeDeliveryPullRequestHeadSummary {
-  status: NexusInitiativeDeliveryPullRequestHeadStatus;
+export interface NexusFeatureBranchDeliveryPullRequestHeadSummary {
+  status: NexusFeatureBranchDeliveryPullRequestHeadStatus;
   branch: string | null;
   remote: string | null;
   remoteUrl: string | null;
@@ -77,7 +77,7 @@ export interface NexusInitiativeDeliveryPullRequestHeadSummary {
   setupAction: string | null;
 }
 
-export interface NexusInitiativeDeliveryPolicySummary {
+export interface NexusFeatureBranchDeliveryPolicySummary {
   enabled: boolean;
   activeFeatureId: string | null;
   activeScopeId: string;
@@ -90,25 +90,25 @@ export interface NexusInitiativeDeliveryPolicySummary {
   finalPullRequest: boolean;
   finalPullRequestCreation: NexusFeatureBranchDeliveryFinalPullRequestCreationPolicy;
   commentPolicy: string;
-  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
-  branchPlan: NexusInitiativeDeliveryBranchPlanSummary;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationSummary;
+  branchPlan: NexusFeatureBranchDeliveryBranchPlanSummary;
   warnings: string[];
 }
 
-export function summarizeNexusInitiativeDeliveryPolicy(options: {
+export function summarizeNexusFeatureBranchDeliveryPolicy(options: {
   config: NexusFeatureBranchDeliveryConfig;
   fallbackScopeId: string | null;
   unscopedName: string;
   targetBranch: string;
-  publicationRemote?: string | null;
+  pushRemote?: string | null;
   remoteUrls?: Record<string, string | null | undefined>;
   remotePushUrls?: Record<string, string | null | undefined>;
-}): NexusInitiativeDeliveryPolicySummary {
-  const config = mergeInitiativeDeliveryDefaults(options.config);
+}): NexusFeatureBranchDeliveryPolicySummary {
+  const config = mergeFeatureBranchDeliveryDefaults(options.config);
   const activeScopeId =
     config.activeFeatureId ?? options.fallbackScopeId ?? options.unscopedName;
   const branchSlug = branchSlugFor(activeScopeId);
-  const integrationBranch = renderInitiativeBranchPattern(
+  const featureBranch = renderFeatureBranchPattern(
     config.branchNaming.featureBranchPattern,
     {
       intent: config.branchNaming.defaultIntentPrefix,
@@ -116,7 +116,7 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
       change: null,
     },
   );
-  const reviewBranchPattern = renderInitiativeBranchPattern(
+  const reviewBranchPattern = renderFeatureBranchPattern(
     config.branchNaming.reviewBranchPattern,
     {
       intent: config.branchNaming.defaultIntentPrefix,
@@ -124,32 +124,32 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
       change: "{change}",
     },
   );
-  const usesIntegrationBranch = topologyUsesIntegrationBranch(
+  const usesFeatureBranch = branchStrategyUsesFeatureBranch(
     config.defaultBranchStrategy,
   );
   const usesStackParent = config.defaultBranchStrategy === "stacked" ||
     config.defaultBranchStrategy === "hybrid";
-  const defaultSliceBaseBranch = usesIntegrationBranch
-    ? integrationBranch
+  const defaultChangeBaseBranch = usesFeatureBranch
+    ? featureBranch
     : options.targetBranch;
-  const defaultSliceReviewTarget =
+  const defaultChangeReviewTarget =
     config.defaultBranchStrategy === "stacked"
-      ? "parent_slice_or_target"
-      : usesIntegrationBranch
-        ? integrationBranch
+      ? "parent_change_or_target"
+      : usesFeatureBranch
+        ? featureBranch
         : options.targetBranch;
   const warnings = featureBranchDeliveryWarnings({
     config,
     fallbackScopeId: options.fallbackScopeId,
     unscopedName: options.unscopedName,
-    publicationRemote: options.publicationRemote ?? null,
+    pushRemote: options.pushRemote ?? null,
   });
-  const branchPublication = initiativeBranchPublicationSummary({
+  const branchPublication = featureBranchPublicationSummary({
     config,
-    publicationRemote: options.publicationRemote ?? null,
+    pushRemote: options.pushRemote ?? null,
     remoteUrls: options.remoteUrls ?? {},
     remotePushUrls: options.remotePushUrls ?? {},
-    headBranch: usesIntegrationBranch ? integrationBranch : null,
+    headBranch: usesFeatureBranch ? featureBranch : null,
   });
 
   return {
@@ -167,42 +167,42 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
     commentPolicy: config.provider.commentPolicy,
     branchPublication,
     branchPlan: {
-      topology: config.defaultBranchStrategy,
+      branchStrategy: config.defaultBranchStrategy,
       targetBranch: options.targetBranch,
-      integrationBranch: usesIntegrationBranch ? integrationBranch : null,
+      featureBranch: usesFeatureBranch ? featureBranch : null,
       reviewBranchPattern,
-      defaultSliceBaseBranch,
-      defaultSliceReviewTarget,
-      finalReviewTarget: usesIntegrationBranch
+      defaultChangeBaseBranch,
+      defaultChangeReviewTarget,
+      finalReviewTarget: usesFeatureBranch
         ? options.targetBranch
-        : defaultSliceReviewTarget,
+        : defaultChangeReviewTarget,
       finalPublicationTarget: options.targetBranch,
       usesStackParent,
-      requiresIntegrationBranchApproval: usesIntegrationBranch,
+      requiresFeatureBranchApproval: usesFeatureBranch,
       stack: stackSummary({
-        topology: config.defaultBranchStrategy,
+        branchStrategy: config.defaultBranchStrategy,
         usesStackParent,
-        integrationBranch: usesIntegrationBranch ? integrationBranch : null,
+        featureBranch: usesFeatureBranch ? featureBranch : null,
         targetBranch: options.targetBranch,
-        defaultSliceReviewTarget,
+        defaultChangeReviewTarget,
       }),
     },
     warnings,
   };
 }
 
-export function buildNexusInitiativeStackSliceSummary(options: {
+export function buildNexusFeatureStackChangeSummary(options: {
   order: number;
-  sliceSlug: string;
+  changeSlug: string;
   branch: string;
   parentBranch: string | null;
   childBranches?: string[];
   reviewTarget: string;
   publicationEligible: boolean;
-}): NexusInitiativeDeliveryStackSliceSummary {
+}): NexusFeatureBranchDeliveryStackChangeSummary {
   return {
     order: options.order,
-    sliceSlug: options.sliceSlug,
+    changeSlug: options.changeSlug,
     branch: options.branch,
     parentBranch: options.parentBranch,
     childBranches: [...(options.childBranches ?? [])],
@@ -211,7 +211,7 @@ export function buildNexusInitiativeStackSliceSummary(options: {
   };
 }
 
-export function renderInitiativeBranchPattern(
+export function renderFeatureBranchPattern(
   pattern: string,
   values: {
     intent: string;
@@ -235,7 +235,7 @@ export function branchSlugFor(value: string): string {
   return slug.length > 0 ? slug : "manual";
 }
 
-function mergeInitiativeDeliveryDefaults(
+function mergeFeatureBranchDeliveryDefaults(
   config: NexusFeatureBranchDeliveryConfig,
 ): NexusFeatureBranchDeliveryConfig {
   return {
@@ -275,7 +275,7 @@ function featureBranchDeliveryWarnings(options: {
   config: NexusFeatureBranchDeliveryConfig;
   fallbackScopeId: string | null;
   unscopedName: string;
-  publicationRemote: string | null;
+  pushRemote: string | null;
 }): string[] {
   const warnings: string[] = [];
   if (
@@ -284,7 +284,7 @@ function featureBranchDeliveryWarnings(options: {
     !options.fallbackScopeId
   ) {
     warnings.push(
-      `initiative delivery has no active initiative id; using ${options.unscopedName}`,
+      `feature branch delivery has no active feature id; using ${options.unscopedName}`,
     );
   }
   if (
@@ -296,70 +296,70 @@ function featureBranchDeliveryWarnings(options: {
   if (
     options.config.enabled &&
     options.config.branchPublication.strategy === "push_remote" &&
-    !options.publicationRemote
+    !options.pushRemote
   ) {
-    warnings.push("initiative branch publication requires a configured publication remote");
+    warnings.push("feature branch publication requires a configured push remote");
   }
   return warnings;
 }
 
 function stackSummary(options: {
-  topology: NexusFeatureBranchDeliveryBranchStrategy;
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
   usesStackParent: boolean;
-  integrationBranch: string | null;
+  featureBranch: string | null;
   targetBranch: string;
-  defaultSliceReviewTarget: string;
-}): NexusInitiativeDeliveryStackSummary {
-  const publicationEligible = options.topology !== "throwaway_rehearsal";
+  defaultChangeReviewTarget: string;
+}): NexusFeatureBranchDeliveryStackSummary {
+  const publicationEligible = options.branchStrategy !== "throwaway_rehearsal";
   if (!publicationEligible) {
-    const rootBranch = options.integrationBranch ?? options.targetBranch;
+    const rootBranch = options.featureBranch ?? options.targetBranch;
     return {
       status: "excluded_from_publication",
-      topology: options.topology,
+      branchStrategy: options.branchStrategy,
       publicationEligible,
       rootBranch,
       defaultParentBranch: rootBranch,
-      defaultReviewTarget: options.defaultSliceReviewTarget,
+      defaultReviewTarget: options.defaultChangeReviewTarget,
       finalPublicationTarget: options.targetBranch,
-      slices: [],
+      changes: [],
     };
   }
   if (!options.usesStackParent) {
     return {
       status: "not_applicable",
-      topology: options.topology,
+      branchStrategy: options.branchStrategy,
       publicationEligible,
       rootBranch: null,
       defaultParentBranch: null,
-      defaultReviewTarget: options.defaultSliceReviewTarget,
+      defaultReviewTarget: options.defaultChangeReviewTarget,
       finalPublicationTarget: options.targetBranch,
-      slices: [],
+      changes: [],
     };
   }
-  const rootBranch = options.integrationBranch ?? options.targetBranch;
+  const rootBranch = options.featureBranch ?? options.targetBranch;
   return {
     status: publicationEligible ? "active" : "excluded_from_publication",
-    topology: options.topology,
+    branchStrategy: options.branchStrategy,
     publicationEligible,
     rootBranch,
     defaultParentBranch: rootBranch,
-    defaultReviewTarget: options.defaultSliceReviewTarget,
+    defaultReviewTarget: options.defaultChangeReviewTarget,
     finalPublicationTarget: options.targetBranch,
-    slices: [],
+    changes: [],
   };
 }
 
-function initiativeBranchPublicationSummary(options: {
+function featureBranchPublicationSummary(options: {
   config: NexusFeatureBranchDeliveryConfig;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   remoteUrls: Record<string, string | null | undefined>;
   remotePushUrls: Record<string, string | null | undefined>;
   headBranch: string | null;
-}): NexusInitiativeDeliveryBranchPublicationSummary {
+}): NexusFeatureBranchDeliveryBranchPublicationSummary {
   const { strategy, fallbackRemote } = options.config.branchPublication;
-  const selectedRemote = selectedBranchPublicationRemote({
+  const selectedRemote = selectedBranchPushRemote({
     strategy,
-    publicationRemote: options.publicationRemote,
+    pushRemote: options.pushRemote,
     fallbackRemote,
   });
   const selectedRemoteUrl = selectedRemote
@@ -370,7 +370,7 @@ function initiativeBranchPublicationSummary(options: {
     : null;
   return {
     strategy,
-    publicationRemote: options.publicationRemote,
+    pushRemote: options.pushRemote,
     fallbackRemote,
     selectedRemote,
     selectedRemoteUrl,
@@ -379,7 +379,7 @@ function initiativeBranchPublicationSummary(options: {
       strategy === "push_remote_then_fallback" && Boolean(fallbackRemote),
     finalPullRequestHead: pullRequestHeadSummary({
       strategy,
-      publicationRemote: options.publicationRemote,
+      pushRemote: options.pushRemote,
       fallbackRemote,
       selectedRemote,
       selectedRemoteUrl,
@@ -391,13 +391,13 @@ function initiativeBranchPublicationSummary(options: {
 
 function pullRequestHeadSummary(options: {
   strategy: NexusFeatureBranchDeliveryBranchPublicationStrategy;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   fallbackRemote: string | null;
   selectedRemote: string | null;
   selectedRemoteUrl: string | null;
   selectedRemotePushUrl: string | null;
   headBranch: string | null;
-}): NexusInitiativeDeliveryPullRequestHeadSummary {
+}): NexusFeatureBranchDeliveryPullRequestHeadSummary {
   if (options.strategy === "manual_only") {
     return blockedHead("manual_only", options, "branch publication is manual-only");
   }
@@ -405,21 +405,21 @@ function pullRequestHeadSummary(options: {
     return blockedHead(
       "blocked",
       options,
-      "initiative topology has no stable final pull request head branch",
+      "feature branchStrategy has no stable final pull request head branch",
     );
   }
   if (!options.selectedRemote) {
     return blockedHead(
       "blocked",
       options,
-      "initiative branch publication has no selected remote",
+      "feature branch publication has no selected remote",
     );
   }
 
   const remoteUrl = options.selectedRemotePushUrl ?? options.selectedRemoteUrl;
   const parsed = parseGitHubRemoteUrl(remoteUrl);
   const usesFallbackRemote = options.selectedRemote === options.fallbackRemote &&
-    options.selectedRemote !== options.publicationRemote;
+    options.selectedRemote !== options.pushRemote;
   if (usesFallbackRemote && !remoteUrl) {
     return blockedHead(
       "blocked",
@@ -460,7 +460,7 @@ function blockedHead(
     headBranch: string | null;
   },
   setupAction: string,
-): NexusInitiativeDeliveryPullRequestHeadSummary {
+): NexusFeatureBranchDeliveryPullRequestHeadSummary {
   return {
     status,
     branch: options.headBranch,
@@ -480,29 +480,29 @@ function cleanRemoteUrl(value: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
-function selectedBranchPublicationRemote(options: {
+function selectedBranchPushRemote(options: {
   strategy: NexusFeatureBranchDeliveryBranchPublicationStrategy;
-  publicationRemote: string | null;
+  pushRemote: string | null;
   fallbackRemote: string | null;
 }): string | null {
   switch (options.strategy) {
     case "push_remote":
-      return options.publicationRemote;
+      return options.pushRemote;
     case "fallback_remote":
       return options.fallbackRemote;
     case "push_remote_then_fallback":
-      return options.publicationRemote ?? options.fallbackRemote;
+      return options.pushRemote ?? options.fallbackRemote;
     case "manual_only":
       return null;
   }
 }
 
-function topologyUsesIntegrationBranch(
-  topology: NexusFeatureBranchDeliveryBranchStrategy,
+function branchStrategyUsesFeatureBranch(
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy,
 ): boolean {
   return (
-    topology === "integration_branch" ||
-    topology === "hybrid" ||
-    topology === "throwaway_rehearsal"
+    branchStrategy === "feature_branch" ||
+    branchStrategy === "hybrid" ||
+    branchStrategy === "throwaway_rehearsal"
   );
 }

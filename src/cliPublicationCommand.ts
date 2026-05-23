@@ -17,18 +17,18 @@ import {
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
 import {
-  buildNexusInitiativeDeliveryPlan,
-  type NexusInitiativeDeliveryPlan,
-} from "./nexusInitiativeDeliveryPlan.js";
+  buildNexusFeatureBranchDeliveryPlan,
+  type NexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
 import {
-  buildNexusInitiativeDeliveryReport,
-  type NexusInitiativeDeliveryReport,
-  type NexusInitiativeDeliveryReportItem,
-} from "./nexusInitiativeDeliveryReport.js";
+  buildNexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReportItem,
+} from "./nexusFeatureBranchDeliveryReport.js";
 import {
-  buildNexusInitiativeFinalizationPlan,
-  type NexusInitiativeFinalizationPlan,
-} from "./nexusInitiativeFinalizationPlan.js";
+  buildNexusFeatureFinalizationPlan,
+  type NexusFeatureFinalizationPlan,
+} from "./nexusFeatureFinalizationPlan.js";
 import {
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
@@ -48,10 +48,10 @@ import {
   type NexusPublicationProviderEvidenceCheckClassification,
 } from "./nexusPublicationProviderEvidence.js";
 import {
-  buildNexusPublicationTrainReadinessReport,
-  type NexusPublicationTrainProviderEvidenceInput,
-  type NexusPublicationTrainReadinessReport,
-} from "./nexusPublicationTrainReadiness.js";
+  buildNexusReleaseTrainReadinessReport,
+  type NexusReleaseTrainProviderEvidenceInput,
+  type NexusReleaseTrainReadinessReport,
+} from "./nexusReleaseTrainReadiness.js";
 import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCredentialBroker.js";
 import {
   parsePositiveInteger,
@@ -90,7 +90,7 @@ interface ParsedPublicationBranchPushCommand {
   repositoryPath?: string;
   branch: string;
   targetBranch?: string | null;
-  initiativeId?: string | null;
+  featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   dryRun?: boolean;
@@ -128,7 +128,7 @@ interface ParsedPublicationPullRequestEvidenceCommand {
   json?: boolean;
 }
 
-interface ParsedPublicationTrainReadinessCommand {
+interface ParsedReleaseTrainReadinessCommand {
   projectRoot: string;
   versionId?: string | null;
   evidenceFile?: string;
@@ -146,24 +146,24 @@ interface ParsedPublicationCandidatePlanCommand {
   json?: boolean;
 }
 
-interface ParsedPublicationInitiativePlanCommand {
+interface ParsedPublicationFeaturePlanCommand {
   projectRoot: string;
   componentId?: string;
-  initiativeId?: string | null;
+  featureId?: string | null;
   json?: boolean;
 }
 
-interface ParsedPublicationInitiativeReportCommand {
+interface ParsedPublicationFeatureReportCommand {
   projectRoot: string;
   componentId?: string;
-  initiativeId?: string | null;
+  featureId?: string | null;
   evidenceFile?: string;
   fullMatrixBudgetAvailable?: boolean;
   json?: boolean;
 }
 
-interface ParsedPublicationInitiativeFinalizationCommand
-  extends ParsedPublicationInitiativeReportCommand {}
+interface ParsedPublicationFeatureFinalizationCommand
+  extends ParsedPublicationFeatureReportCommand {}
 
 interface ParsedPublicationEvidenceNormalizeCommand {
   evidenceFile: string;
@@ -196,7 +196,7 @@ export async function handlePublicationCommand(
         repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
         branch: parsed.branch,
         targetBranch: parsed.targetBranch,
-        initiativeId: parsed.initiativeId,
+        featureId: parsed.featureId,
         forceWithLease: parsed.forceWithLease,
         forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
         baseEnv: dependencies.env ?? process.env,
@@ -316,7 +316,7 @@ export async function handlePublicationCommand(
   if (argv[1] === "evidence" && argv[2] === "normalize") {
     const parsed = parsePublicationEvidenceNormalizeCommand(argv);
     const evidence = normalizeNexusPublicationProviderEvidence(
-      readPublicationTrainEvidenceInput(parsed.evidenceFile),
+      readReleaseTrainEvidenceInput(parsed.evidenceFile),
     );
     const classifications = parsed.requiredChecks.length > 0
       ? evidence.map((item) =>
@@ -345,7 +345,7 @@ export async function handlePublicationCommand(
         ? readPublicationWorkflowTriggersInput(parsed.workflowTriggersFile)
         : [],
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
@@ -357,18 +357,18 @@ export async function handlePublicationCommand(
     return 0;
   }
 
-  if (argv[1] === "train-readiness") {
-    const parsed = parsePublicationTrainReadinessCommand(argv);
-    const report = buildNexusPublicationTrainReadinessReport({
+  if (argv[1] === "release-train-readiness") {
+    const parsed = parseReleaseTrainReadinessCommand(argv);
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot: parsed.projectRoot,
       versionId: parsed.versionId,
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
-    printPublicationTrainReadinessReport(
+    printReleaseTrainReadinessReport(
       report,
       parsed,
       dependencies.stdout ?? process.stdout,
@@ -385,7 +385,7 @@ export async function handlePublicationCommand(
       candidateBranchName: parsed.candidateBranchName,
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
@@ -397,14 +397,14 @@ export async function handlePublicationCommand(
     return 0;
   }
 
-  if (argv[1] === "initiative-plan") {
-    const parsed = parsePublicationInitiativePlanCommand(argv);
-    const plan = buildNexusInitiativeDeliveryPlan({
+  if (argv[1] === "feature-plan") {
+    const parsed = parsePublicationFeaturePlanCommand(argv);
+    const plan = buildNexusFeatureBranchDeliveryPlan({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
-      initiativeId: parsed.initiativeId,
+      featureId: parsed.featureId,
     });
-    printPublicationInitiativePlan(
+    printPublicationFeaturePlan(
       plan,
       parsed,
       dependencies.stdout ?? process.stdout,
@@ -412,19 +412,19 @@ export async function handlePublicationCommand(
     return 0;
   }
 
-  if (argv[1] === "initiative-report") {
-    const parsed = parsePublicationInitiativeReportCommand(argv);
-    const report = buildNexusInitiativeDeliveryReport({
+  if (argv[1] === "feature-report") {
+    const parsed = parsePublicationFeatureReportCommand(argv);
+    const report = buildNexusFeatureBranchDeliveryReport({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
-      initiativeId: parsed.initiativeId,
+      featureId: parsed.featureId,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       now: dependencies.now,
     });
-    printPublicationInitiativeReport(
+    printPublicationFeatureReport(
       report,
       parsed,
       dependencies.stdout ?? process.stdout,
@@ -432,19 +432,19 @@ export async function handlePublicationCommand(
     return 0;
   }
 
-  if (argv[1] === "initiative-finalization") {
-    const parsed = parsePublicationInitiativeFinalizationCommand(argv);
-    const plan = buildNexusInitiativeFinalizationPlan({
+  if (argv[1] === "feature-finalization") {
+    const parsed = parsePublicationFeatureFinalizationCommand(argv);
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
-      initiativeId: parsed.initiativeId,
+      featureId: parsed.featureId,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       now: dependencies.now,
     });
-    printPublicationInitiativeFinalizationPlan(
+    printPublicationFeatureFinalizationPlan(
       plan,
       parsed,
       dependencies.stdout ?? process.stdout,
@@ -453,7 +453,7 @@ export async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, candidate-plan, initiative-plan, initiative-report, or initiative-finalization",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
   );
 }
 
@@ -565,8 +565,8 @@ function parsePublicationBranchPushCommand(
       case "--target-branch":
         parsed.targetBranch = next();
         break;
-      case "--initiative":
-        parsed.initiativeId = next();
+      case "--feature":
+        parsed.featureId = next();
         break;
       case "--force-with-lease":
         parsed.forceWithLease = true;
@@ -787,18 +787,18 @@ function parsePublicationPullRequestMergeMethod(
   throw new Error(`${optionName} must be merge, squash, or rebase`);
 }
 
-function parsePublicationTrainReadinessCommand(
+function parseReleaseTrainReadinessCommand(
   argv: string[],
-): ParsedPublicationTrainReadinessCommand {
+): ParsedReleaseTrainReadinessCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "train-readiness") {
-    throw new Error("publication requires train-readiness");
+  if (command !== "release-train-readiness") {
+    throw new Error("publication requires release-train-readiness");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication train-readiness requires a workspace root");
+    throw new Error("release-train-readiness requires a workspace root");
   }
 
-  const parsed: ParsedPublicationTrainReadinessCommand = {
+  const parsed: ParsedReleaseTrainReadinessCommand = {
     projectRoot,
   };
   for (let index = 0; index < rest.length; index += 1) {
@@ -828,7 +828,7 @@ function parsePublicationTrainReadinessCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown publication train-readiness option: ${arg}`);
+        throw new Error(`Unknown release-train-readiness option: ${arg}`);
     }
   }
 
@@ -980,18 +980,18 @@ function parsePublicationCandidatePlanCommand(
   return parsed;
 }
 
-function parsePublicationInitiativePlanCommand(
+function parsePublicationFeaturePlanCommand(
   argv: string[],
-): ParsedPublicationInitiativePlanCommand {
+): ParsedPublicationFeaturePlanCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "initiative-plan") {
-    throw new Error("publication requires initiative-plan");
+  if (command !== "feature-plan") {
+    throw new Error("publication requires feature-plan");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication initiative-plan requires a workspace root");
+    throw new Error("publication feature-plan requires a workspace root");
   }
 
-  const parsed: ParsedPublicationInitiativePlanCommand = {
+  const parsed: ParsedPublicationFeaturePlanCommand = {
     projectRoot,
   };
   for (let index = 0; index < rest.length; index += 1) {
@@ -1008,32 +1008,32 @@ function parsePublicationInitiativePlanCommand(
       case "--component":
         parsed.componentId = next();
         break;
-      case "--initiative":
-        parsed.initiativeId = next();
+      case "--feature":
+        parsed.featureId = next();
         break;
       case "--json":
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown publication initiative-plan option: ${arg}`);
+        throw new Error(`Unknown publication feature-plan option: ${arg}`);
     }
   }
 
   return parsed;
 }
 
-function parsePublicationInitiativeReportCommand(
+function parsePublicationFeatureReportCommand(
   argv: string[],
-): ParsedPublicationInitiativeReportCommand {
+): ParsedPublicationFeatureReportCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "initiative-report") {
-    throw new Error("publication requires initiative-report");
+  if (command !== "feature-report") {
+    throw new Error("publication requires feature-report");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication initiative-report requires a workspace root");
+    throw new Error("publication feature-report requires a workspace root");
   }
 
-  const parsed: ParsedPublicationInitiativeReportCommand = {
+  const parsed: ParsedPublicationFeatureReportCommand = {
     projectRoot,
   };
   for (let index = 0; index < rest.length; index += 1) {
@@ -1050,8 +1050,8 @@ function parsePublicationInitiativeReportCommand(
       case "--component":
         parsed.componentId = next();
         break;
-      case "--initiative":
-        parsed.initiativeId = next();
+      case "--feature":
+        parsed.featureId = next();
         break;
       case "--evidence-file":
         parsed.evidenceFile = next();
@@ -1066,25 +1066,25 @@ function parsePublicationInitiativeReportCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown publication initiative-report option: ${arg}`);
+        throw new Error(`Unknown publication feature-report option: ${arg}`);
     }
   }
 
   return parsed;
 }
 
-function parsePublicationInitiativeFinalizationCommand(
+function parsePublicationFeatureFinalizationCommand(
   argv: string[],
-): ParsedPublicationInitiativeFinalizationCommand {
+): ParsedPublicationFeatureFinalizationCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "initiative-finalization") {
-    throw new Error("publication requires initiative-finalization");
+  if (command !== "feature-finalization") {
+    throw new Error("publication requires feature-finalization");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication initiative-finalization requires a workspace root");
+    throw new Error("publication feature-finalization requires a workspace root");
   }
 
-  const parsed: ParsedPublicationInitiativeFinalizationCommand = {
+  const parsed: ParsedPublicationFeatureFinalizationCommand = {
     projectRoot,
   };
   for (let index = 0; index < rest.length; index += 1) {
@@ -1101,8 +1101,8 @@ function parsePublicationInitiativeFinalizationCommand(
       case "--component":
         parsed.componentId = next();
         break;
-      case "--initiative":
-        parsed.initiativeId = next();
+      case "--feature":
+        parsed.featureId = next();
         break;
       case "--evidence-file":
         parsed.evidenceFile = next();
@@ -1117,7 +1117,7 @@ function parsePublicationInitiativeFinalizationCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown publication initiative-finalization option: ${arg}`);
+        throw new Error(`Unknown publication feature-finalization option: ${arg}`);
     }
   }
 
@@ -1178,12 +1178,12 @@ function normalizeInlinePullRequestBody(body: string): string {
     : body;
 }
 
-function readPublicationTrainEvidenceInput(
+function readReleaseTrainEvidenceInput(
   inputPath: string,
-): NexusPublicationTrainProviderEvidenceInput[] {
-  const raw = readCliJsonFile(inputPath, "publication train readiness evidence");
+): NexusReleaseTrainProviderEvidenceInput[] {
+  const raw = readCliJsonFile(inputPath, "release train readiness evidence");
   if (Array.isArray(raw)) {
-    return raw as NexusPublicationTrainProviderEvidenceInput[];
+    return raw as NexusReleaseTrainProviderEvidenceInput[];
   }
   if (raw !== null && typeof raw === "object") {
     const record = raw as {
@@ -1191,15 +1191,15 @@ function readPublicationTrainEvidenceInput(
       providerEvidence?: unknown;
     };
     if (Array.isArray(record.evidence)) {
-      return record.evidence as NexusPublicationTrainProviderEvidenceInput[];
+      return record.evidence as NexusReleaseTrainProviderEvidenceInput[];
     }
     if (Array.isArray(record.providerEvidence)) {
-      return record.providerEvidence as NexusPublicationTrainProviderEvidenceInput[];
+      return record.providerEvidence as NexusReleaseTrainProviderEvidenceInput[];
     }
   }
 
   throw new Error(
-    "publication train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "release train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
   );
 }
 
@@ -1334,14 +1334,14 @@ function printPublicationBranchPushResult(
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branch}`);
   if (result.featureBranchDelivery) {
-    writeLine(stdout, `  Initiative: ${result.featureBranchDelivery.initiativeId}`);
+    writeLine(stdout, `  Feature: ${result.featureBranchDelivery.featureId}`);
     writeLine(
       stdout,
-      `  Initiative remote policy: ${result.featureBranchDelivery.branchPublication.strategy} -> ${result.featureBranchDelivery.branchPublication.selectedRemote}`,
+      `  Feature remote policy: ${result.featureBranchDelivery.branchPublication.strategy} -> ${result.featureBranchDelivery.branchPublication.selectedRemote}`,
     );
     writeLine(
       stdout,
-      `  Initiative remote selection: ${result.featureBranchDelivery.remoteSelection.status}`,
+      `  Feature remote selection: ${result.featureBranchDelivery.remoteSelection.status}`,
     );
   }
   if (result.targetBranch) {
@@ -1371,7 +1371,7 @@ function printPublicationBranchPushBlockedError(
     ok: false,
     dryRun: Boolean(parsed.dryRun),
     error: {
-      code: "initiative_branch_publication_blocked",
+      code: "feature_branch_publication_blocked",
       message: error.message,
     },
     featureBranchDelivery: error.featureBranchDelivery,
@@ -1490,9 +1490,9 @@ function formatPublicationTarget(
   return `component ${target.componentId ?? target.id}`;
 }
 
-function printPublicationTrainReadinessReport(
-  report: NexusPublicationTrainReadinessReport,
-  parsed: ParsedPublicationTrainReadinessCommand,
+function printReleaseTrainReadinessReport(
+  report: NexusReleaseTrainReadinessReport,
+  parsed: ParsedReleaseTrainReadinessCommand,
   stdout: TextWriter,
 ): void {
   if (parsed.json) {
@@ -1505,7 +1505,7 @@ function printPublicationTrainReadinessReport(
     return;
   }
 
-  writeLine(stdout, "DevNexus publication train readiness.");
+  writeLine(stdout, "DevNexus release train readiness.");
   writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
   writeLine(stdout, `  Next action: ${report.nextAction}`);
   writeLine(
@@ -1666,9 +1666,9 @@ function printPublicationCandidatePlan(
   }
 }
 
-function printPublicationInitiativePlan(
-  plan: NexusInitiativeDeliveryPlan,
-  parsed: ParsedPublicationInitiativePlanCommand,
+function printPublicationFeaturePlan(
+  plan: NexusFeatureBranchDeliveryPlan,
+  parsed: ParsedPublicationFeaturePlanCommand,
   stdout: TextWriter,
 ): void {
   if (parsed.json) {
@@ -1679,34 +1679,34 @@ function printPublicationInitiativePlan(
     return;
   }
 
-  writeLine(stdout, "DevNexus initiative delivery plan.");
+  writeLine(stdout, "DevNexus feature branch delivery plan.");
   writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
-  writeLine(stdout, `  Initiatives: ${plan.itemCount}`);
+  writeLine(stdout, `  Features: ${plan.itemCount}`);
   for (const item of plan.items) {
-    const initiative = item.initiative;
-    const branchPlan = initiative.branchPlan;
+    const feature = item.feature;
+    const branchPlan = feature.branchPlan;
     writeLine(
       stdout,
-      `  ${item.componentId}: active=${initiative.activeScopeId} topology=${initiative.defaultBranchStrategy}`,
+      `  ${item.componentId}: active=${feature.activeScopeId} branchStrategy=${feature.defaultBranchStrategy}`,
     );
     writeLine(
       stdout,
-      `    integration=${branchPlan.integrationBranch ?? "none"} slices=${branchPlan.reviewBranchPattern}`,
+      `    feature=${branchPlan.featureBranch ?? "none"} changes=${branchPlan.reviewBranchPattern}`,
     );
     writeLine(
       stdout,
-      `    base=${branchPlan.defaultSliceBaseBranch} reviewTarget=${branchPlan.defaultSliceReviewTarget} final=${branchPlan.finalPublicationTarget}`,
+      `    base=${branchPlan.defaultChangeBaseBranch} reviewTarget=${branchPlan.defaultChangeReviewTarget} final=${branchPlan.finalPublicationTarget}`,
     );
     writeLine(
       stdout,
-      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} finalPRCreation=${initiative.finalPullRequestCreation} commentPolicy=${initiative.commentPolicy}`,
+      `    review=${feature.reviewMode} finalPR=${feature.finalPullRequest} finalPRCreation=${feature.finalPullRequestCreation} commentPolicy=${feature.commentPolicy}`,
     );
     writeLine(
       stdout,
-      `    branchPublication=${initiative.branchPublication.strategy} remote=${initiative.branchPublication.selectedRemote ?? "manual"} fallback=${initiative.branchPublication.fallbackRemote ?? "none"}`,
+      `    branchPublication=${feature.branchPublication.strategy} remote=${feature.branchPublication.selectedRemote ?? "manual"} fallback=${feature.branchPublication.fallbackRemote ?? "none"}`,
     );
-    if (branchPlan.requiresIntegrationBranchApproval) {
-      writeLine(stdout, "    HITL: integration branch approval required");
+    if (branchPlan.requiresFeatureBranchApproval) {
+      writeLine(stdout, "    HITL: feature branch approval required");
     }
   }
   for (const warning of plan.warnings) {
@@ -1714,9 +1714,9 @@ function printPublicationInitiativePlan(
   }
 }
 
-function printPublicationInitiativeReport(
-  report: NexusInitiativeDeliveryReport,
-  parsed: ParsedPublicationInitiativeReportCommand,
+function printPublicationFeatureReport(
+  report: NexusFeatureBranchDeliveryReport,
+  parsed: ParsedPublicationFeatureReportCommand,
   stdout: TextWriter,
 ): void {
   if (parsed.json) {
@@ -1729,22 +1729,22 @@ function printPublicationInitiativeReport(
     return;
   }
 
-  writeLine(stdout, "DevNexus initiative delivery report.");
+  writeLine(stdout, "DevNexus feature branch delivery report.");
   writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
   writeLine(stdout, `  Next action: ${report.nextAction}`);
   writeLine(
     stdout,
-    `  Initiatives: ${report.summary.itemCount}; ready=${report.summary.readyCount}; needsUpdate=${report.summary.needsUpdateCount}; blocked=${report.summary.blockedCount}; reviewNeeded=${report.summary.reviewNeededCount}`,
+    `  Features: ${report.summary.itemCount}; ready=${report.summary.readyCount}; needsUpdate=${report.summary.needsUpdateCount}; blocked=${report.summary.blockedCount}; reviewNeeded=${report.summary.reviewNeededCount}`,
   );
   for (const item of report.items) {
     const evidence = item.providerEvidence;
     writeLine(
       stdout,
-      `  ${item.componentId}: active=${item.initiativeId} topology=${item.topology} -> ${item.status}`,
+      `  ${item.componentId}: active=${item.featureId} branchStrategy=${item.branchStrategy} -> ${item.status}`,
     );
     writeLine(
       stdout,
-      `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} ci=${item.ciTier.tier.id}`,
+      `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} ci=${item.ciTier.tier.id}`,
     );
     writeLine(
       stdout,
@@ -1781,9 +1781,9 @@ function printPublicationInitiativeReport(
   }
 }
 
-function printPublicationInitiativeFinalizationPlan(
-  plan: NexusInitiativeFinalizationPlan,
-  parsed: ParsedPublicationInitiativeFinalizationCommand,
+function printPublicationFeatureFinalizationPlan(
+  plan: NexusFeatureFinalizationPlan,
+  parsed: ParsedPublicationFeatureFinalizationCommand,
   stdout: TextWriter,
 ): void {
   if (parsed.json) {
@@ -1796,21 +1796,21 @@ function printPublicationInitiativeFinalizationPlan(
     return;
   }
 
-  writeLine(stdout, "DevNexus initiative finalization plan.");
+  writeLine(stdout, "DevNexus feature finalization plan.");
   writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
   writeLine(stdout, `  Next action: ${plan.nextAction}`);
   writeLine(
     stdout,
-    `  Initiatives: ${plan.summary.itemCount}; safeToReview=${plan.summary.safeToReviewCount}; readyForPublication=${plan.summary.readyForPublicationCount}; needsReview=${plan.summary.needsReviewCount}; blocked=${plan.summary.blockedCount}`,
+    `  Features: ${plan.summary.itemCount}; safeToReview=${plan.summary.safeToReviewCount}; readyForPublication=${plan.summary.readyForPublicationCount}; needsReview=${plan.summary.needsReviewCount}; blocked=${plan.summary.blockedCount}`,
   );
   for (const item of plan.items) {
     writeLine(
       stdout,
-      `  ${item.componentId}: active=${item.initiativeId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
+      `  ${item.componentId}: active=${item.featureId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
     );
     writeLine(
       stdout,
-      `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
+      `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
     );
     writeLine(
       stdout,
@@ -1861,14 +1861,14 @@ function printPublicationInitiativeFinalizationPlan(
 }
 
 function formatReviewTarget(
-  target: NonNullable<NexusInitiativeDeliveryReportItem["providerEvidence"]["reviewTarget"]>,
+  target: NonNullable<NexusFeatureBranchDeliveryReportItem["providerEvidence"]["reviewTarget"]>,
 ): string {
   const label = target.number ? `#${target.number}` : target.id ?? target.kind;
   return target.url ? `${label} ${target.url}` : label;
 }
 
 function recommendedBranchUpdateCommand(
-  item: Pick<NexusInitiativeDeliveryReportItem, "branchUpdateDecision">,
+  item: Pick<NexusFeatureBranchDeliveryReportItem, "branchUpdateDecision">,
 ): string | null {
   const recommendation = item.branchUpdateDecision.recommendation;
   const choice = item.branchUpdateDecision.choices.find((candidate) =>
