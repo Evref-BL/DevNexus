@@ -5,7 +5,9 @@ workflows. It contributes generic DevNexus plugin capabilities, placeholder
 research guidance, and artifact conventions. It does not add research-specific
 behavior to DevNexus core.
 
-The baseline package is intentionally no-network and no-runtime:
+The baseline package is intentionally no-network and no-runtime. It is managed
+as an npm workspace from the DevNexus repository root rather than as an
+independently locked package.
 
 - projected skill: `research-workflow-router`
 - setup obligation: declared source and citation policy
@@ -31,7 +33,7 @@ adds research-domain context for projects that opt into it.
 Run package checks from the repository root:
 
 ```bash
-npm --prefix plugins/dev-nexus-research run check
+npm --workspace @evref-bl/dev-nexus-research run check
 ```
 
 The package also ships a static fixture at

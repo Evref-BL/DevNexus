@@ -25,6 +25,9 @@
     "scripts/first-workspace-onboarding-smoke.mjs",
     "scripts/postgres-claim-authority-container-canary.mjs"
   ],
+  "workspaces": [
+    "plugins/dev-nexus-research"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -45,7 +48,7 @@
     "check": "npm run build && npm test && npm run smoke:onboarding && npm run check:plugins",
     "smoke:onboarding": "node scripts/first-workspace-onboarding-smoke.mjs",
     "smoke:postgres-containers": "node scripts/postgres-claim-authority-container-canary.mjs",
-    "check:plugins": "npm --prefix plugins/dev-nexus-research run check"
+    "check:plugins": "npm --workspace @evref-bl/dev-nexus-research run check"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
