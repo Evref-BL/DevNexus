@@ -65,8 +65,8 @@ async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ index: number }>,
   ) => string;
   renderFeatureOverview: (snapshot: unknown, selectedId?: string | null) => string;
-  renderGitHistory: (snapshot: unknown, selectedId?: string | null) => string;
-  gitHistoryRows: (snapshot: unknown) => {
+  renderGitHistory: (snapshot: unknown, selectedId?: string | null, filter?: string | null) => string;
+  gitHistoryRows: (snapshot: unknown, filter?: string | null) => {
     repository: unknown;
     rows: Array<{ commit: { hash: string }; lane: number; selectId: string }>;
     paths: Array<{ fromLane: number; toLane: number }>;
@@ -1889,6 +1889,130 @@ describe("nexus dashboard", () => {
         ["Parents", "1"],
       ]),
     });
+  });
+
+  it("filters project git history by branch head ancestors", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      features: {
+        records: [
+          {
+            id: "feature:primary:feat-cockpit-graph",
+            title: "Cockpit graph",
+            featureBranch: "feat/cockpit-graph",
+          },
+        ],
+      },
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "merge000000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/cockpit-graph", "feat/other-work"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "merge000000000000000000000000000000000000000",
+                shortHash: "merge00",
+                parents: [
+                  "main10000000000000000000000000000000000000",
+                  "feature000000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge feature graph",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "merge000000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Add graph data",
+                refs: [
+                  {
+                    name: "feat/cockpit-graph",
+                    kind: "branch",
+                    remote: null,
+                    hash: "feature000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "other0000000000000000000000000000000000000",
+                shortHash: "other00",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:53:00.000Z",
+                subject: "Other feature work",
+                refs: [
+                  {
+                    name: "feat/other-work",
+                    kind: "branch",
+                    remote: null,
+                    hash: "other0000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "base0000000000000000000000000000000000000",
+                shortHash: "base000",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Prepare base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rows = hooks.gitHistoryRows(snapshot, "branch:feat/cockpit-graph");
+    const rendered = hooks.renderGitHistory(snapshot, null, "branch:feat/cockpit-graph");
+
+    expect(rows?.rows.map((row) => row.commit.hash)).toEqual([
+      "feature000000000000000000000000000000000000",
+      "base0000000000000000000000000000000000000",
+    ]);
+    expect(rendered).toContain("data-git-history-filter=\"branch:feat/cockpit-graph\"");
+    expect(rendered).toContain("aria-pressed=\"true\"");
+    expect(rendered).toContain("Add graph data");
+    expect(rendered).toContain("Prepare base");
+    expect(rendered).not.toContain("Merge feature graph");
+    expect(rendered).not.toContain("Other feature work");
   });
 
   it("renders compact provider chips with provider and external-link affordances", async () => {
