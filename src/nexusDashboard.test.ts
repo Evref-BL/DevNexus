@@ -65,6 +65,12 @@ async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ index: number }>,
   ) => string;
   renderFeatureOverview: (snapshot: unknown, selectedId?: string | null) => string;
+  renderGitHistory: (snapshot: unknown, selectedId?: string | null) => string;
+  gitHistoryRows: (snapshot: unknown) => {
+    repository: unknown;
+    rows: Array<{ commit: { hash: string }; lane: number; selectId: string }>;
+    paths: Array<{ fromLane: number; toLane: number }>;
+  } | null;
   renderActionStrip: (
     actions: Array<{
       href: string;
@@ -120,7 +126,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, gitHistoryRows, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1768,6 +1774,119 @@ describe("nexus dashboard", () => {
         ["Branch strategy", "hybrid"],
         ["Feature branch", "feat/codex-goals"],
         ["Target branch", "main"],
+      ]),
+    });
+  });
+
+  it("renders project git history as a graph with selectable commits", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        totalCommitCount: 3,
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "merge000000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/cockpit-graph"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "merge000000000000000000000000000000000000000",
+                shortHash: "merge00",
+                parents: [
+                  "main10000000000000000000000000000000000000",
+                  "feature000000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge feature graph",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "merge000000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: ["main00000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Add graph data",
+                refs: [
+                  {
+                    name: "feat/cockpit-graph",
+                    kind: "branch",
+                    remote: null,
+                    hash: "feature000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "main10000000000000000000000000000000000000",
+                shortHash: "main100",
+                parents: ["main00000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Prepare base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      events: [],
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rows = hooks.gitHistoryRows(snapshot);
+    const rendered = hooks.renderGitHistory(
+      snapshot,
+      "history:primary:feature000000000000000000000000000000000000",
+    );
+    const detail = hooks.selectedDetail(
+      snapshot,
+      "history:primary:feature000000000000000000000000000000000000",
+    );
+
+    expect(rows?.rows).toHaveLength(3);
+    expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
+    expect(rendered).toContain("Project History");
+    expect(rendered).toContain("<svg");
+    expect(rendered).toContain("feat/cockpit-graph");
+    expect(rendered).toContain("Add graph data");
+    expect(rendered).toContain("data-select-id=\"history:primary:feature000000000000000000000000000000000000\"");
+    expect(detail).toMatchObject({
+      title: "Add graph data",
+      facts: expect.arrayContaining([
+        ["Type", "commit"],
+        ["Component", "DevNexus"],
+        ["Commit", "feature"],
+        ["Parents", "1"],
       ]),
     });
   });
