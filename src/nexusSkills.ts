@@ -463,7 +463,7 @@ scope, and risk decisions.
 ## Workflow
 
 1. Read the relevant project context first: existing docs, tracker item, current
-   files, recent decisions, and any active initiative surface.
+   files, recent decisions, and any active feature or release record.
 2. Decide whether the request is small enough to execute directly. If it is not,
    keep designing before implementation.
 3. Ask only the questions needed to remove real ambiguity. Prefer one focused
@@ -476,7 +476,7 @@ scope, and risk decisions.
    behavior, scope, publication, cost, safety, or long-lived project direction.
 7. Record the durable design only when it needs to survive the chat. In a
    DevNexus workspace, prefer the configured tracker, a Product Requirements
-   Document (PRD), target-cycle facts, or initiative notes over ad hoc files.
+   Document (PRD), target-cycle facts, or feature notes over ad hoc files.
 8. Hand off to planning or execution with the approved scope and open decisions
    clearly separated.
 
@@ -538,7 +538,7 @@ decides.
 const writeImplementationPlanSkill = adaptedSuperpowersSkill(
   "write-implementation-plan",
   "write-implementation-plan",
-  "Implementation planning workflow for turning approved requirements into owned slices, DevNexus component or artifact scope, acceptance criteria, and verification.",
+  "Implementation planning workflow for turning approved requirements into owned changes, DevNexus component or artifact scope, acceptance criteria, and verification.",
   ["skills/writing-plans/SKILL.md"],
   `
 # Write Implementation Plan
@@ -549,22 +549,22 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 ## Workflow
 
 1. Read the source requirements first: tracker issue, Product Requirements
-   Document (PRD), initiative notes, relevant code, existing docs, and recent
+   Document (PRD), feature notes, relevant code, existing docs, and recent
    decisions.
-2. Confirm the work belongs to one initiative or delivery surface. If the
+2. Confirm the work belongs to one feature, release, or output path. If the
    request covers independent objectives, propose separate plans before
    execution.
-3. Map the changed surfaces before writing tasks. Name the owning component,
+3. Map the changed areas before writing tasks. Name the owning component,
    files or artifacts, tracker anchor, expected worktree, command working
-   directory, and selected delivery topology where those are knowable.
-4. Split the work into bounded vertical slices where possible. Each slice needs
+   directory, and selected branch strategy where those are knowable.
+4. Split the work into bounded vertical changes where possible. Each change needs
    one owner, one scope, dependencies, acceptance criteria, verification
-   commands, and handoff notes. Do not make slices smaller than the next real
+   commands, and handoff notes. Do not make changes smaller than the next real
    review, risk, ownership, or human-in-the-loop gate requires.
-5. For Git-backed plans, choose the delivery topology before the first branch:
-   direct slice, stacked slice, initiative integration branch, throw-away
-   integration rehearsal, or release/version policy. Record the base branch,
-   review target, and publication target for each slice.
+5. For Git-backed plans, choose the branch strategy before the first branch:
+   direct review branch, stacked review branches, feature branch, temporary
+   integration rehearsal, or release train policy. Record the base branch,
+   review target, and target branch for each change.
 6. Prefer Test-Driven Development (TDD) for behavior changes that can be tested
    cleanly. Include the focused failing test target, minimal implementation
    target, and nearest broader check.
@@ -574,10 +574,10 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 8. Mark human-in-the-loop gates for publication, destructive cleanup, external
    provider writes, product decisions, cost, security, or live runtime actions.
 9. Save a durable plan only when it needs to survive the chat. In a DevNexus
-   workspace, prefer the configured tracker, issue comment, PRD, initiative
+   workspace, prefer the configured tracker, issue comment, PRD, feature
    notes, or target-cycle facts over an ad hoc file.
 10. End with the recommended execution mode: subagents for independent disjoint
-   slices, inline execution for tightly coupled work, or blocked with the
+   changes, inline execution for tightly coupled work, or blocked with the
    smallest decision needed.
 
 ## Plan Shape
@@ -585,9 +585,9 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 Use this shape when writing a saved implementation plan:
 
 1. Goal and done criteria.
-2. Integration surface, delivery topology, tracker anchor, and review path.
+2. Base branch, branch strategy, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
-4. Work-item or vertical slices with files, acceptance criteria, steps,
+4. Work items or vertical changes with files, acceptance criteria, steps,
    verification, and handoff.
 5. Human approval gates and publication path.
 6. Open questions and blockers.
@@ -597,7 +597,7 @@ Use this shape when writing a saved implementation plan:
 - Do not plan implementation before design approval when the design changes
   behavior, scope, publication, cost, safety, or long-lived direction.
 - Do not hide unresolved product or architecture decisions inside a task list.
-- Do not create many unrelated final publications for one initiative.
+- Do not create many unrelated final publications for one feature.
 - Do not make the plan programming-centric when the work is documentation,
   research, operations, or another artifact workflow.
 
@@ -607,19 +607,19 @@ Use this shape when writing a saved implementation plan:
 const prepareDevNexusWorktreeSkill = adaptedSuperpowersSkill(
   "prepare-dev-nexus-worktree",
   "prepare-dev-nexus-worktree",
-  "DevNexus worktree preparation workflow. Use before mutating component source or workspace metadata so work happens in an owned isolated surface with preserved context and verification.",
+  "DevNexus worktree preparation workflow. Use before mutating component source or workspace metadata so work happens in an owned isolated worktree or artifact with preserved context and verification.",
   ["skills/using-git-worktrees/SKILL.md"],
   `
 # Prepare DevNexus Worktree
 
 Use this skill before mutating component source, workspace metadata, generated
-skills, planning documents, or another durable project surface.
+skills, planning documents, or another durable project file set.
 
 ## Workflow
 
-1. Identify the owning surface: component source, workspace metadata, docs,
-   tracker state, or another artifact. Confirm the tracker anchor or initiative
-   surface when one exists.
+1. Identify the owning area: component source, workspace metadata, docs,
+   tracker state, or another artifact. Confirm the tracker anchor or feature
+   record when one exists.
 2. Inspect Git status, branch, remotes, upstream, and ahead/behind state before
    editing. Preserve unrelated dirty changes and report blockers instead of
    reverting them.
@@ -630,20 +630,20 @@ skills, planning documents, or another durable project surface.
    worktree for source changes and a workspace/meta worktree for files such as
    \`dev-nexus.project.json\`, \`.dev-nexus/**\`, projected skills,
    \`PLAN.md\`, \`CONTEXT.md\`, target state, or workspace docs.
-5. Use the selected delivery topology to choose the branch name, base ref, and
-   review target. Direct slices target the final integration branch;
-   stacked slices target the branch below them; initiative slices target the
-   approved initiative integration branch; throw-away integration branches are
-   only for compatibility rehearsal and must not become the base for new work.
-   If Git-backed initiative work has no selected topology, recommend one and
+5. Use the selected branch strategy to choose the branch name, base ref, and
+   review target. Direct review branches target the final target branch;
+   stacked review branches target the branch below them; review branches for a
+   long-lived feature target the approved feature branch; temporary integration
+   branches are only for compatibility rehearsal and must not become the base for new work.
+   If Git-backed feature work has no selected branch strategy, recommend one and
    get the needed human-in-the-loop decision before creating branches.
 6. Let configured setup do its job. Prefer projected dependencies, generated
    context bundles, and skill projection over ad hoc package installation.
 7. Run the smallest useful baseline verification for the planned work. If the
-   baseline fails, record the failure and decide whether the current slice owns
+   baseline fails, record the failure and decide whether the current change owns
    the fix before proceeding.
-8. Record the prepared surface where the workspace can find it: work-item
-   comment, coordination handoff, target-cycle facts, or initiative notes.
+8. Record the prepared worktree or artifact where the workspace can find it: work-item
+   comment, coordination handoff, target-cycle facts, or feature notes.
 
 ## Guardrails
 
@@ -667,7 +667,7 @@ const finishDevNexusBranchSkill = adaptedSuperpowersSkill(
   `
 # Finish DevNexus Branch
 
-Use this skill when a slice or initiative branch is ready for verification,
+Use this skill when a review branch or feature branch is ready for verification,
 handoff, publication, or cleanup.
 
 ## Workflow
@@ -676,15 +676,15 @@ handoff, publication, or cleanup.
    check. Read the output before making any completion claim.
 2. Inspect Git status, diff, commits ahead of the base branch, remotes, and
    upstream. Separate owned changes from unrelated dirty state.
-3. Confirm durable records are current: work item status or comment, initiative
+3. Confirm durable records are current: work item status or comment, feature
    notes, coordination handoff, target-cycle facts, and verification summary.
 4. Read the component publication policy and current authority. Do not silently
    fall back to a human account when policy expects an automation actor.
 5. If publication is allowed, use the configured remote, credential profile,
-   topology-selected target branch, and review path. For green-main policy,
+   selected branch strategy, target branch, and review path. For green-main policy,
    prefer branch or pull request validation and required checks before merge.
-   A slice branch in an initiative integration branch topology targets the
-   initiative branch; final publication happens from the initiative branch only
+   A review branch in a feature branch strategy targets the feature branch;
+   final publication happens from the feature branch only
    after the accumulated work is coherent, reviewed, verified, and approved.
 6. If publication authority is blocked, leave a human handoff with branch name,
    commit ids, verification commands and outcomes, target branch, and the exact
@@ -702,8 +702,8 @@ handoff, publication, or cleanup.
 ## Handoff Checklist
 
 - Branch and worktree path.
-- Tracker anchor and initiative surface.
-- Delivery topology, target branch, and review path.
+- Tracker anchor and feature record.
+- Branch strategy, target branch, and review path.
 - Commit ids and changed areas.
 - Verification commands with pass, fail, or not-run status.
 - Publication decision: direct integration, review handoff, local only,
@@ -716,45 +716,45 @@ handoff, publication, or cleanup.
 - Do not merge, push, open a pull request, delete a branch, or remove a
   worktree without the required policy and approval state.
 - Do not hide provider-auth problems by using the wrong account.
-- Do not retarget a slice branch around the selected delivery topology without
+- Do not retarget a review branch around the selected branch strategy without
   approval and a durable record of the reason.
 - Do not clean up worktrees that another chat or host may still own.
 
 `,
 );
 
-const executeInitiativePlanSkill = adaptedSuperpowersSkill(
-  "execute-initiative-plan",
-  "execute-initiative-plan",
+const executeFeaturePlanSkill = adaptedSuperpowersSkill(
+  "execute-feature-plan",
+  "execute-feature-plan",
   "Plan execution workflow. Use when an approved plan should be carried through in the current session with checkpoints, verification, and DevNexus records.",
   ["skills/executing-plans/SKILL.md"],
   `
-# Execute Initiative Plan
+# Execute Feature Plan
 
 Use this skill when an approved plan is ready to execute and the work should
-accumulate on one initiative or delivery surface.
+accumulate on one feature, release, or output path.
 
 ## Workflow
 
-1. Load the plan and its durable context: tracker anchor, initiative notes,
-   Product Requirements Document (PRD), design record, selected delivery
-   topology, current branch, and relevant workspace state.
+1. Load the plan and its durable context: tracker anchor, feature notes,
+   Product Requirements Document (PRD), design record, selected branch
+   strategy, current branch, and relevant workspace state.
 2. Review the plan before acting. Stop and raise concerns when tasks are
    ambiguous, unsafe, out of date, missing verification, or split across the
-   wrong component, artifact, or publication surface.
+   wrong component, artifact, or publication path.
 3. Confirm the current checkout, branch base, and review target match the
-   intended owned surface and delivery topology. If not, use the worktree
+   intended owned path and branch strategy. If not, use the worktree
    preparation workflow before editing.
-4. Execute one slice at a time. Keep status current, follow referenced companion
+4. Execute one change at a time. Keep status current, follow referenced companion
    skills, and preserve unrelated dirty changes.
-5. Run the verification named by the slice before marking it complete. If the
+5. Run the verification named by the change before marking it complete. If the
    named check is unavailable, record why and choose the nearest useful check
    only when the plan permits that substitution.
-6. Record progress through the configured DevNexus surface: work-item comment,
-   target-cycle fact, coordination handoff, initiative note, or pull request.
+6. Record progress through the configured DevNexus record: work-item comment,
+   target-cycle fact, coordination handoff, feature note, or pull request.
 7. Stop instead of guessing when a blocker, repeated verification failure,
    unclear requirement, unsafe action, or publication authority issue appears.
-8. When all slices are complete, use the branch finishing workflow to verify,
+8. When all changes are complete, use the branch finishing workflow to verify,
    publish or hand off, and clean up according to policy.
 
 ## Guardrails
@@ -762,8 +762,8 @@ accumulate on one initiative or delivery surface.
 - Do not start implementation from a plan you have not read critically.
 - Do not treat a plan as approval for destructive cleanup, live runtime actions,
   provider writes, cost changes, or publication unless it says so explicitly.
-- Do not split one initiative into many unrelated final publications.
-- Do not execute a Git-backed initiative plan that lacks a delivery topology;
+- Do not split one feature into many unrelated final publications.
+- Do not execute a Git-backed feature plan that lacks a branch strategy;
   recommend one and get the needed decision first.
 - Do not continue after verification fails unless the next step is diagnosis.
 
@@ -773,7 +773,7 @@ accumulate on one initiative or delivery surface.
 const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   "parallel-work-dispatch",
   "parallel-work-dispatch",
-  "Parallel work coordination workflow. Use when independent slices can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
+  "Parallel work coordination workflow. Use when independent changes can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
   [
     "skills/dispatching-parallel-agents/SKILL.md",
     "skills/subagent-driven-development/SKILL.md",
@@ -794,8 +794,8 @@ parallel work is useful instead of waiting for the user to name subagents.
 2. Check delegation fit: enough context to brief a worker, no likely shared-file
    collisions, useful sidecar work while the coordinator continues, available
    agent or subagent tooling, and a clear review and integration path.
-3. Keep the coordinator local to the initiative surface. The coordinator owns
-   the plan, delivery topology, branch or artifact set, tracker anchor,
+3. Keep the coordinator local to the feature or release record. The coordinator owns
+   the plan, branch strategy, branch or artifact set, tracker anchor,
    integration order, and final verification.
 4. Assign each worker one bounded task with an explicit write scope, expected
    output, verification command, and handoff format. Tell workers they are not
@@ -807,11 +807,11 @@ parallel work is useful instead of waiting for the user to name subagents.
    useful non-overlapping work. Keep immediate blockers local when waiting would
    stall the critical path.
 7. Review returned work before integration: spec fit first, then implementation
-   quality, then conflict risk. Ask the worker to fix its own slice when review
+   quality, then conflict risk. Ask the worker to fix its own change when review
    finds issues.
 8. Integrate deliberately. Use DevNexus coordination status or integration
    planning when multiple branches or handoffs exist, then run focused and
-   broader verification from the integration surface.
+   broader verification from the base branch or artifact path.
 9. Record the result in the tracker, target-cycle facts, coordination handoff,
    or pull request so the parallel work does not vanish into chat history.
 
@@ -837,12 +837,12 @@ parallel work is useful instead of waiting for the user to name subagents.
 const requestWorkReviewSkill = adaptedSuperpowersSkill(
   "request-work-review",
   "request-work-review",
-  "Review-request workflow. Use before merging, publishing, or proceeding past a meaningful slice to verify requirements, risks, and implementation quality.",
+  "Review-request workflow. Use before merging, publishing, or proceeding past a meaningful change to verify requirements, risks, and implementation quality.",
   ["skills/requesting-code-review/SKILL.md"],
   `
 # Request Work Review
 
-Use this skill when a slice, artifact, or branch needs independent review
+Use this skill when a change, artifact, or branch needs independent review
 before it becomes the basis for more work, publication, or cleanup.
 
 ## Workflow
@@ -850,7 +850,7 @@ before it becomes the basis for more work, publication, or cleanup.
 1. Define the review target: branch range, changed files, document, artifact,
    tracker item, or decision record.
 2. Gather review context without dumping history: objective, requirements,
-   plan slice, acceptance criteria, base revision, head revision, verification
+   planned change, acceptance criteria, base revision, head revision, verification
    already run, and known concerns.
 3. Choose the reviewer path that fits the workspace: subagent review when the
    user has asked for subagents, human review when approval is required, or
@@ -896,7 +896,7 @@ request, issue comment, external reviewer, or automated check.
    decisions, and current requirements. External feedback is input to evaluate,
    not an order to follow blindly.
 4. Push back with evidence when a suggestion is wrong, harmful, out of scope,
-   violates the initiative decision, or adds unused complexity.
+   violates the feature decision, or adds unused complexity.
 5. Implement accepted feedback in a safe order: blockers first, simple fixes,
    then complex changes. Keep unrelated improvements out of the feedback patch.
 6. Test each meaningful fix with the smallest relevant verification, then run
@@ -1097,7 +1097,7 @@ export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "dev-nexus",
     "dev-nexus",
-    "DevNexus-managed workspace workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus workspace, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
+    "DevNexus-managed workspace workflow for using DevNexus infrastructure to plan, triage, split, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus workspace, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
     `
 # DevNexus
 
@@ -1105,7 +1105,7 @@ Use this skill when working inside a DevNexus-managed workspace.
 
 1. Read project instructions first: agent context file when set, \`AGENTS.md\` or equivalent, durable workspace context, plan, and target state.
 2. Use DevNexus MCP or CLI surfaces for workspace status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
-3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue slicing, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
+3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue breakdown, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
 4. Work through configured component work-item services. Prefer component-qualified work-item ids when a workspace has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
 5. Run a Git freshness preflight before editing a checkout: inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, fast-forward clean branches with an upstream, and record blockers.
 6. Preserve unrelated changes. Treat a shared checkout as read-mostly context unless the task is clearly read-only or already owns that checkout.
@@ -1121,44 +1121,43 @@ Use this skill when working inside a DevNexus-managed workspace.
 `,
   ),
   curatedCoreSkill(
-    "initiative-workflow",
-    "initiative-workflow",
-    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, planning, or coordination where slices should accumulate under one durable objective, tracker anchor, and integration or publication surface. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid scattered pull requests, artifacts, or status threads.",
+    "feature-workflow",
+    "feature-workflow",
+    "Long-lived feature workflow for multi-step work across code, docs, research, operations, planning, or coordination where changes should accumulate under one long-running goal, tracker anchor, and review or publication path. Use when the user says feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid scattered pull requests, artifacts, or status threads.",
     `
-# Initiative Workflow
+# Feature Workflow
 
-Use this skill when work should continue across multiple slices, turns,
-agents, artifacts, approvals, or review surfaces before final delivery. Do not
+Use this skill when work should continue across multiple changes, turns,
+agents, artifacts, approvals, or review paths before final delivery. Do not
 use it for small one-turn tasks that can be finished and verified directly.
 
-An initiative is a durable work frame with one objective, one tracker anchor,
-one integration surface, and explicit done criteria. It is the outer frame for
-coherent long-running work, not a separate "take the lead" persona or a
-project-management ceremony. The surface may be a Git branch, pull request,
-artifact directory, document set, tracker epic, release train, coordination
-record, or another project-owned place where slices accumulate. For Git-backed
-work, the integration surface is the final destination and review path; the
-delivery topology says how slice branches reach it.
+A feature groups related work under one goal, one tracker anchor, one review
+path, and explicit done criteria. It is the container for coherent long-running
+work, not a separate "take the lead" persona or a project-management ceremony.
+The work may accumulate on a Git branch, pull request, artifact directory,
+document set, tracker epic, release train, coordination record, or another
+project-owned place. For Git-backed work, the base branch and target branch
+define the destination; the branch strategy says how review branches get there.
 
 ## Workflow
 
 1. Establish the frame: objective, reason, owner or coordinator, tracker
    anchor, expected outputs, constraints, non-goals, and done criteria.
-2. Choose the integration surface and delivery topology before the first slice.
-   For Git-backed work, choose how branches and reviews flow; for non-code work,
-   choose the document set, artifact directory, tracker, release train, or
-   coordination record.
+2. Choose the branch strategy before the first change. For Git-backed work,
+   choose the base branch, review branch shape, target branch, and review path;
+   for non-code work, choose the document set, artifact directory, tracker,
+   release train, or coordination record.
 3. Inventory current state: prior decisions, active branches or artifacts,
    verification already run, blockers, and unrelated work that must be
    preserved.
-4. Slice by independently reviewable vertical progress where possible. Each
-   slice needs one owner, one scope, one verification path, and a clear
-   contribution to the initiative surface. Do not make slices smaller than the
+4. Split by independently reviewable vertical progress where possible. Each
+   change needs one owner, one scope, one verification path, and a clear
+   contribution to the feature. Do not make changes smaller than the
    next real review, risk, ownership, or human-in-the-loop gate requires.
-5. Route every slice back to the initiative surface. If a slice wants a new
-   surface or objective, decide whether it belongs here or should become a
-   separate initiative.
-6. Keep a compact initiative log: decisions, blockers, provenance, review
+5. Route every change back to the feature. If a change wants a new review path
+   or objective, decide whether it belongs here or should become a separate
+   feature.
+6. Keep a compact feature log: decisions, blockers, provenance, review
    state, verification, publication status, and handoffs. In a DevNexus
    workspace, prefer work items, target-cycle facts, coordination handoffs, and
    publication policy over ad hoc notes.
@@ -1166,47 +1165,47 @@ delivery topology says how slice branches reach it.
    the user decides. Do not infer approval from silence or unrelated status
    changes.
 8. Reassess periodically. If the objective, risk, or done criteria changed,
-   update the frame, split the work, or stop before more slices accumulate.
-9. Publish or close only when the initiative is coherent, reviewed, verified,
+   update the frame, split the work, or stop before more changes accumulate.
+9. Publish or close only when the feature is coherent, reviewed, verified,
    approved where required, and meets its done criteria.
 10. Close with a compact handoff: what shipped, what was verified, what remains,
     and where the durable record lives.
 
-## Git Delivery Topology
+## Git Branch Strategy
 
-Use the smallest topology that lets slices stay reviewable without publishing
-an incoherent partial state.
+Use the smallest branch strategy that lets changes stay reviewable without
+publishing an incoherent partial state.
 
-- Direct slice topology is the default for independent slices: short-lived
-  slice branches or pull requests target the final integration branch, while the
-  initiative record groups the work.
-- Stacked slice topology fits dependent slices: each branch or review targets
+- Direct branch strategy is the default for independent changes: short-lived
+  review branches or pull requests target the final target branch, while the
+  feature record groups the work.
+- Stacked branch strategy fits dependent changes: each branch or review targets
   the branch below it, then lands bottom-up or retargets as dependencies land.
-- Initiative integration branch topology is for broad work that must accumulate
-  before final publication. It requires explicit human-in-the-loop approval;
-  slice branches target the initiative branch, and final publication happens
+- Feature branch strategy is for broad work that must accumulate before final
+  publication. It requires explicit human-in-the-loop approval; review branches
+  target the feature branch, and final publication happens
   from that branch only after coherent review and verification.
-- Throw-away integration branch topology is only for compatibility rehearsal.
+- Temporary integration branch strategy is only for compatibility rehearsal.
   Do not base new work on it or treat it as a publication source unless the
   user explicitly promotes it.
-- Release or version topology belongs to the workspace release policy. Do not
+- Release train strategy belongs to the workspace release policy. Do not
   use "release train" language as a shortcut for batching unrelated work into
   one branch.
 
 ## Companion Skills
 
-Use this as the outer frame. Use design, planning, worktree, execution, review,
-verification, diagnosis, and handoff skills for the slices themselves.
+Use this as the long-running work context. Use design, planning, worktree, execution, review,
+verification, diagnosis, and handoff skills for the changes themselves.
 
 ## Guardrails
 
-- Keep the initiative generic; do not force all work into a programming model.
+- Keep the workflow generic; do not force all work into a programming model.
 - Prefer one final publication path over many unrelated final publications,
-  unless the initiative explicitly owns multiple coordinated surfaces.
-- Do not assume a feature, bugfix campaign, or initiative requires one
-  long-lived Git branch; recommend the delivery topology and get approval when
-  selecting the initiative integration branch topology.
-- Do not let the initiative hide unrelated work, unresolved blockers, or
+  unless the feature explicitly owns multiple coordinated paths.
+- Do not assume a feature or bugfix campaign requires one long-lived Git branch;
+  recommend the branch strategy and get approval when selecting the feature
+  branch strategy.
+- Do not let the feature hide unrelated work, unresolved blockers, or
   unreviewed risky changes.
 - Do not turn a small direct fix into ceremony.
 - Do not couple the workflow to a generic "take the lead" skill; normal
@@ -1234,13 +1233,13 @@ constraints, approvals, and final direction.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
 4. Before routing substantial work, make a sizing and routing call: classify
-   the work shape, choose the largest coherent vertical slice that can be
+   the work shape, choose the largest coherent vertical change that can be
    completed and verified before the next human-in-the-loop gate, and explain
    the tradeoff briefly.
 5. Route through the relevant skill chain and invoke the next skill in that
    chain. In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the
    routing map for substantial led work when it is available. For work large
-   enough to plan or slice, check whether \`parallel-work-dispatch\` would
+   enough to plan or split, check whether \`parallel-work-dispatch\` would
    accelerate safe independent progress.
 6. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
@@ -1278,15 +1277,15 @@ understandable across tools:
 - Direct answer: no durable work item is needed.
 - Task: one narrow technical action or support step.
 - Bug: a defect to reproduce, diagnose, fix, and verify.
-- Product Backlog Item or story: one independently useful vertical slice that
+- Product Backlog Item or story: one independently useful vertical change that
   can reach Definition of Done in one led pass.
 - Epic: a larger outcome that must be split into related stories or Product
   Backlog Items.
-- Initiative: a durable objective spanning multiple epics, components,
-  surfaces, or decision cycles.
+- Feature: a long-running goal spanning multiple epics, components, review
+  paths, or decision cycles.
 
-Do not equate "lead" with "make tiny slices." Prefer the largest coherent
-vertical slice that can be implemented, reviewed, verified, and handed off
+Do not equate "lead" with "make tiny changes." Prefer the largest coherent
+vertical change that can be implemented, reviewed, verified, and handed off
 before the next real human-in-the-loop gate. Split only when scope uncertainty,
 review boundaries, ownership, risk, verification cost, provider mutation,
 credentials, or live-runtime safety make a smaller gate necessary.
@@ -1296,11 +1295,11 @@ for an actual time estimate. Use evidence from the codebase and tracker first;
 if the shape is uncertain, perform the next reversible discovery step, then
 revise the routing call.
 
-For Git-backed initiative work, choose the Git delivery topology before
-preparing a worktree. Direct slice topology is the default when slices can land
-independently; stacked topology fits dependent slices; initiative integration
-branch topology needs explicit approval; throw-away integration branches are
-for rehearsal only.
+For Git-backed feature work, choose the Git branch strategy before preparing a
+worktree. Direct branch strategy is the default when changes can land
+independently; stacked branch strategy fits dependent changes; feature branch
+strategy needs explicit approval; temporary integration branches are for
+rehearsal only.
 
 Treat \`parallel-work-dispatch\` as an optional branch in every substantial
 chain, not only in version work. Evaluate it after triage, design, planning,
@@ -1312,7 +1311,7 @@ one decision, or would force workers into the same mutable files.
 - Unclear goal or scope: \`triage\` or \`design-with-user\`.
 - Existing plan that needs pressure: \`grill-me\`; use \`grill-with-docs\` when
   code, glossary terms, docs, or Architecture Decision Records should decide.
-- Feature work: delivery topology decision -> \`write-implementation-plan\`
+- Feature work: branch strategy decision -> \`write-implementation-plan\`
   -> \`prepare-dev-nexus-worktree\` -> \`tdd\` ->
   \`verify-before-completion\` -> \`request-work-review\` ->
   \`finish-dev-nexus-branch\`.
@@ -1321,11 +1320,11 @@ one decision, or would force workers into the same mutable files.
 - Documentation work: \`documentation\` -> \`humanizer\` ->
   \`verify-before-completion\` -> review and finish.
 - Architecture work: \`zoom-out\` -> \`architecture-review\` ->
-  \`architecture-deepening\` -> delivery topology decision -> planning,
+  \`architecture-deepening\` -> branch strategy decision -> planning,
   implementation, verification, and review.
-- Version or release work: \`initiative-workflow\` -> \`to-prd\` ->
-  \`to-issues\` -> delivery topology decision ->
-  \`write-implementation-plan\`, then execute and verify each slice before
+- Version or release work: \`feature-workflow\` -> \`to-prd\` ->
+  \`to-issues\` -> branch strategy decision ->
+  \`write-implementation-plan\`, then execute and verify each change before
   final approval.
 
 ## Delegation Decision
@@ -1345,7 +1344,7 @@ next skill chosen.
 
 ## Pairing
 
-- Use \`initiative-workflow\` when the led work spans multiple slices or surfaces.
+- Use \`feature-workflow\` when the led work spans multiple changes or review paths.
 - Use design, planning, diagnosis, review, verification, and handoff skills for
   the actual work mode.
 - In a DevNexus workspace, record durable facts through work items,
@@ -1366,7 +1365,7 @@ next skill chosen.
   designWithUserSkill,
   grillMeSkill,
   writeImplementationPlanSkill,
-  executeInitiativePlanSkill,
+  executeFeaturePlanSkill,
   prepareDevNexusWorktreeSkill,
   parallelWorkDispatchSkill,
   requestWorkReviewSkill,
@@ -1404,7 +1403,7 @@ Use this skill when a request, issue, or finding needs to become actionable work
 1. Identify the owning workspace component, source root, and work-item service.
 2. Separate symptoms, suspected causes, acceptance criteria, and constraints.
 3. Check for duplicate or related existing work before creating new items.
-4. Slice work so each item has one owner, one verification path, and a clear done state.
+4. Split work so each item has one owner, one verification path, and a clear done state.
 5. Record blockers with the smallest prerequisite that can remove them.
 6. Prefer updating the owning item over creating a duplicate status report.
 `,
@@ -1423,7 +1422,7 @@ Use this skill when a change touches module boundaries, ownership, or long-lived
 3. Preserve working behavior while moving one boundary at a time.
 4. Add or update tests that prove the intended ownership split.
 5. Avoid introducing compatibility paths that are not part of the target state.
-6. Record the remaining boundary work separately from the completed slice.
+6. Record the remaining boundary work separately from the completed change.
 `,
   ),
   curatedCoreSkill(
@@ -1543,7 +1542,7 @@ support, or project vocabulary.
   curatedCoreSkill(
     "to-issues",
     "to-issues",
-    "Issue-slicing workflow for converting a plan or product requirements document into independently verifiable tracker issues.",
+    "Issue breakdown workflow for converting a plan or product requirements document into independently verifiable tracker issues.",
     `
 # To Issues
 
@@ -1551,11 +1550,11 @@ Use this skill when a plan, specification, or Product Requirements Document (PRD
 
 1. Gather the source plan, existing issue context, tracker conventions, and relevant domain glossary or Architecture Decision Records.
 2. Explore enough code to understand the current implementation state before proposing issue boundaries.
-3. Split the work into vertical slices: each issue should deliver an end-to-end
+3. Split the work into independently reviewable changes: each issue should deliver an end-to-end
    behavior or result that can be demonstrated or verified on its own. Use a
    technical task only when the work cannot honestly be framed as user-visible
    or end-to-end progress.
-4. Mark each proposed slice as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
+4. Mark each proposed issue as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
 5. Present the proposed issue list for review with title, type, blockers, user stories covered, and acceptance criteria.
 6. After approval, create or update tracker issues in dependency order. Do not close or rewrite the parent issue unless explicitly asked.
 7. Keep issue bodies stable: describe behavior and acceptance criteria, avoid fragile file-path instructions, and include prototype snippets only when they encode a decision more precisely than prose.
@@ -1576,7 +1575,7 @@ Use this skill when the current conversation, notes, or exploratory findings nee
 4. Use explicit product and domain vocabulary. Expand acronyms on first use, for example "Product Requirements Document (PRD)".
 5. Avoid file paths and code snippets unless a prototype produced a small decision-bearing shape that prose would obscure.
 6. Publish or attach the document through the configured tracker when available, using the project's normal ready-for-planning or ready-for-agent labeling policy.
-7. Hand off to the issue-slicing workflow when the Product Requirements Document is ready to become implementation issues.
+7. Hand off to the issue breakdown workflow when the Product Requirements Document is ready to become implementation issues.
 `,
   ),
   curatedCoreSkill(

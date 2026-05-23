@@ -72,8 +72,8 @@ state under Git metadata and can still read the old
 ## Work Item
 
 A work item is the neutral DevNexus tracker record owned by a component. It can
-represent a task, bug, story, Product Backlog Item, epic, initiative,
-impediment, or follow-up, depending on the component's tracker conventions.
+represent a task, bug, story, Product Backlog Item, epic, feature, impediment,
+or follow-up, depending on the component's tracker conventions.
 
 DevNexus supports a lightweight local tracker for immediate use. Components can
 also use provider-backed trackers such as GitHub Issues, GitLab issues, or
@@ -87,23 +87,23 @@ component to use the same tracker type hierarchy:
 
 - Task: a narrow technical action, support step, or checklist item.
 - Bug: a defect to reproduce, diagnose, fix, and verify.
-- Story or Product Backlog Item: an independently useful slice of work with
+- Story or Product Backlog Item: an independently useful change with
   acceptance criteria and a verification path.
 - Epic: a larger outcome that groups related stories, Product Backlog Items, or
   tasks.
-- Initiative: a durable objective that spans multiple work items, components,
-  review surfaces, or decision cycles.
-- Slice or vertical slice: an independently reviewable end-to-end increment. A
-  slice should be as large as can be implemented, verified, reviewed, and handed
-  off before the next real human-in-the-loop gate; it is not automatically the
-  smallest possible task.
+- Feature: a long-running goal that spans multiple work items, components,
+  review branches, artifacts, or decision cycles.
+- Change: an independently reviewable end-to-end increment. A change should be
+  as large as can be implemented, verified, reviewed, and handed off before the
+  next real human-in-the-loop gate; it is not automatically the smallest
+  possible task.
 - Done criteria: the local acceptance and verification conditions for a work
-  item or slice. When a component follows Scrum terminology, the Definition of
+  item or change. When a component follows Scrum terminology, the Definition of
   Done is the shared quality bar for increments, while item-specific acceptance
   criteria describe the behavior or result expected for that item.
-- Delivery topology: the Git and review route used by slice branches. It
+- Branch strategy: the Git and review route used by review branches. It
   describes how branches flow, not whether the work is a task, story, epic, or
-  initiative.
+  feature.
 
 Terminology references:
 
@@ -111,12 +111,8 @@ Terminology references:
   Backlog Items, Increments, Sprint Goals, and Definition of Done.
 - [Agile Alliance glossary](https://agilealliance.org/agile101/agile-glossary/),
   for common Agile planning and estimation terms.
-- [Atlassian Agile Coach on epics, stories, themes, and initiatives](https://www.atlassian.com/agile/project-management/epics-stories-themes),
-  for the widely used story, epic, and initiative hierarchy.
 - [Microsoft Engineering Fundamentals Playbook on work items](https://microsoft.github.io/code-with-engineering-playbook/documentation/guidance/work-items/),
   for work-item hierarchy and tracker field conventions.
-- [Ministry of Testing glossary on vertical slice](https://www.ministryoftesting.com/software-testing-glossary/vertical-slice),
-  for the end-to-end vertical-slice meaning used in testing and delivery.
 
 ## Agent Files
 
