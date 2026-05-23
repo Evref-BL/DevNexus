@@ -297,12 +297,21 @@ function readGitDirectory(sourceRoot: string): string | null {
     return null;
   }
 
-  const content = fs.readFileSync(dotGit, "utf8").trim();
-  const match = /^gitdir:\s*(.+)$/iu.exec(content);
-  if (!match) {
+  const gitDir = gitFileDirectoryPath(fs.readFileSync(dotGit, "utf8"));
+  if (!gitDir) {
     return null;
   }
-  return path.resolve(sourceRoot, match[1]!);
+  return path.resolve(sourceRoot, gitDir);
+}
+
+function gitFileDirectoryPath(content: string): string | null {
+  const trimmed = content.trim();
+  const prefix = "gitdir:";
+  if (trimmed.slice(0, prefix.length).toLowerCase() !== prefix) {
+    return null;
+  }
+  const gitDir = trimmed.slice(prefix.length).trimStart();
+  return gitDir.length > 0 ? gitDir : null;
 }
 
 function readCurrentBranch(gitDir: string): string | null {
@@ -311,8 +320,8 @@ function readCurrentBranch(gitDir: string): string | null {
     return null;
   }
   const head = fs.readFileSync(headPath, "utf8").trim();
-  const match = /^ref:\s*refs\/heads\/(.+)$/u.exec(head);
-  return match ? match[1]! : null;
+  const branch = valueAfterPrefix(head, "ref:", "refs/heads/");
+  return branch && branch.length > 0 ? branch : null;
 }
 
 function readGitRemotes(gitDir: string): Record<string, string> {
@@ -323,23 +332,58 @@ function readGitRemotes(gitDir: string): Record<string, string> {
   const remotes: Record<string, string> = {};
   let currentRemote: string | null = null;
   for (const rawLine of fs.readFileSync(configPath, "utf8").split(/\r?\n/u)) {
-    const remoteMatch = /^\s*\[remote "([^"]+)"\]\s*$/u.exec(rawLine);
-    if (remoteMatch) {
-      currentRemote = remoteMatch[1]!;
+    const line = rawLine.trim();
+    const remoteName = remoteSectionName(line);
+    if (remoteName) {
+      currentRemote = remoteName;
       continue;
     }
-    const sectionMatch = /^\s*\[.+\]\s*$/u.exec(rawLine);
-    if (sectionMatch) {
+    if (isGitConfigSection(line)) {
       currentRemote = null;
       continue;
     }
-    const urlMatch = /^\s*url\s*=\s*(.+?)\s*$/u.exec(rawLine);
-    if (currentRemote && urlMatch) {
-      remotes[currentRemote] = urlMatch[1]!;
+    const url = gitConfigAssignmentValue(line, "url");
+    if (currentRemote && url) {
+      remotes[currentRemote] = url;
     }
   }
 
   return remotes;
+}
+
+function valueAfterPrefix(
+  value: string,
+  firstPrefix: string,
+  secondPrefix: string,
+): string | null {
+  if (!value.startsWith(firstPrefix)) {
+    return null;
+  }
+  const remainder = value.slice(firstPrefix.length).trimStart();
+  return remainder.startsWith(secondPrefix)
+    ? remainder.slice(secondPrefix.length)
+    : null;
+}
+
+function remoteSectionName(line: string): string | null {
+  const prefix = '[remote "';
+  const suffix = '"]';
+  return line.startsWith(prefix) && line.endsWith(suffix)
+    ? line.slice(prefix.length, -suffix.length)
+    : null;
+}
+
+function isGitConfigSection(line: string): boolean {
+  return line.startsWith("[") && line.endsWith("]") && line.length > 2;
+}
+
+function gitConfigAssignmentValue(line: string, key: string): string | null {
+  const separator = line.indexOf("=");
+  if (separator < 0 || line.slice(0, separator).trim() !== key) {
+    return null;
+  }
+  const value = line.slice(separator + 1).trim();
+  return value.length > 0 ? value : null;
 }
 
 function visitNestedRepositories(

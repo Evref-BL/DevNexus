@@ -69,6 +69,7 @@ import {
 } from "./nexusSkills.js";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
+  isAsciiDigit,
   isAsciiLetterOrDigit,
   isLowerAsciiLetterOrDigit,
   replaceRunsWithHyphen,
@@ -2654,13 +2655,68 @@ function listPosixMcpRuntimeProcesses(
 
   return result.stdout
     .split(/\r?\n/u)
-    .flatMap((line) => {
-      const match = /^\s*(\d+)\s+(.+)$/u.exec(line);
-      if (!match?.[1] || !match[2] || !/\bmcp\b|mcp-stdio/u.test(match[2])) {
-        return [];
-      }
-      return runtimeProcessRecord(Number(match[1]), match[2]);
-    });
+    .flatMap(posixRuntimeProcessRecord);
+}
+
+function posixRuntimeProcessRecord(line: string): NexusMcpRuntimeProcess[] {
+  const trimmed = line.trimStart();
+  const separator = firstWhitespaceIndex(trimmed);
+  if (separator <= 0) {
+    return [];
+  }
+  const processId = trimmed.slice(0, separator);
+  const commandLine = trimmed.slice(separator).trimStart();
+  if (!allCharacters(processId, isAsciiDigit) || !isMcpCommandLine(commandLine)) {
+    return [];
+  }
+
+  return runtimeProcessRecord(Number(processId), commandLine);
+}
+
+function firstWhitespaceIndex(value: string): number {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index]!.trim().length === 0) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function isMcpCommandLine(value: string): boolean {
+  return value.includes("mcp-stdio") || hasWhitespaceDelimitedToken(value, "mcp");
+}
+
+function hasWhitespaceDelimitedToken(value: string, token: string): boolean {
+  let start = 0;
+  for (let index = 0; index <= value.length; index += 1) {
+    const atEnd = index === value.length;
+    if (!atEnd && value[index]!.trim().length > 0) {
+      continue;
+    }
+    if (index > start && value.slice(start, index) === token) {
+      return true;
+    }
+    start = index + 1;
+  }
+
+  return false;
+}
+
+function allCharacters(
+  value: string,
+  predicate: (character: string) => boolean,
+): boolean {
+  if (value.length === 0) {
+    return false;
+  }
+  for (const character of value) {
+    if (!predicate(character)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function runtimeProcessRecord(

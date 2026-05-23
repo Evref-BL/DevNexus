@@ -2,6 +2,12 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
+import {
+  asciiWordBreaks,
+  isAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export interface GitCommandResult {
   args: string[];
@@ -185,12 +191,12 @@ export function normalizeBranchName(value: string): string {
 }
 
 export function safeDirectoryName(value: string): string {
-  const sanitized = value
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
+  const sanitized = trimHyphens(
+    replaceRunsWithHyphen(
+      asciiWordBreaks(value.trim()),
+      (character) => !isWorktreeDirectoryNameCharacter(character),
+    ),
+  ).toLowerCase();
 
   if (!sanitized) {
     throw new GitWorktreeServiceError(
@@ -202,6 +208,13 @@ export function safeDirectoryName(value: string): string {
   }
 
   return sanitized;
+}
+
+function isWorktreeDirectoryNameCharacter(character: string): boolean {
+  return isAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
 }
 
 export function normalizeWorktreeName(value: string): string {

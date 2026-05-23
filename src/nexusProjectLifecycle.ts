@@ -3,10 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
-  isAsciiDigit,
-  isLowerAsciiLetter,
+  asciiWordBreaks,
   isLowerAsciiLetterOrDigit,
-  isUpperAsciiLetter,
   replaceRunsWithHyphen,
   trimHyphens,
 } from "./nexusTextNormalization.js";
@@ -129,39 +127,6 @@ export function safeProjectDirectoryName(value: string): string {
   );
 
   return sanitized || slugify(value);
-}
-
-function asciiWordBreaks(value: string): string {
-  const characters = [...value];
-  const result: string[] = [];
-  for (let index = 0; index < characters.length; index += 1) {
-    const current = characters[index]!;
-    const previous = characters[index - 1];
-    const next = characters[index + 1];
-    if (previous && shouldInsertAsciiWordBreak(previous, current, next)) {
-      result.push("-");
-    }
-    result.push(current);
-  }
-
-  return result.join("");
-}
-
-function shouldInsertAsciiWordBreak(
-  previous: string,
-  current: string,
-  next: string | undefined,
-): boolean {
-  if (isLowerAsciiLetterOrDigit(previous) && isUpperAsciiLetter(current)) {
-    return true;
-  }
-
-  return Boolean(
-    next &&
-      isUpperAsciiLetter(previous) &&
-      isUpperAsciiLetter(current) &&
-      isLowerAsciiLetter(next),
-  );
 }
 
 function isSlugCharacter(character: string): boolean {
