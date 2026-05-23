@@ -94,12 +94,23 @@ async function main() {
       projectKey,
       token,
     );
+    const securityHotspots = args.writeResults
+      ? await sonarGet(
+        hostUrl,
+        `/api/hotspots/search?projectKey=${encodeURIComponent(projectKey)}&ps=500`,
+        token,
+      )
+      : null;
     const result = evaluateQualityGate({ measures, issues });
 
     if (args.writeResults) {
       run("mkdir", ["-p", tempRoot]);
       writeFileSync(path.join(tempRoot, "measures.json"), JSON.stringify(measures, null, 2));
       writeFileSync(path.join(tempRoot, "issues.json"), JSON.stringify(issues, null, 2));
+      writeFileSync(
+        path.join(tempRoot, "security-hotspots.json"),
+        JSON.stringify(securityHotspots, null, 2),
+      );
       writeFileSync(path.join(tempRoot, "quality-gate.json"), JSON.stringify(result, null, 2));
       console.error(`Wrote Sonar audit API results to ${tempRoot}`);
     }
