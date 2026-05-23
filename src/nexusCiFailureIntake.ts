@@ -417,7 +417,7 @@ function ciFailureDedupeKey(failure: NexusCiFailureReplay): string {
 }
 
 function ciFailureDedupeLabel(dedupeKey: string): string {
-  const digest = createHash("sha1").update(dedupeKey).digest("hex").slice(0, 12);
+  const digest = createHash("sha256").update(dedupeKey).digest("hex").slice(0, 12);
   return `ci-dedupe-${digest}`;
 }
 
