@@ -85,6 +85,7 @@ export interface NexusAutomationWorkItemClaimAuthorityConfig {
 export interface NexusAutomationWorkItemClaimConfig {
   enabled: boolean;
   leaseDurationMs: number;
+  heartbeatIntervalMs: number;
   staleClaimPolicy: NexusAutomationWorkItemClaimStalePolicy;
   authority: NexusAutomationWorkItemClaimAuthorityConfig;
 }
@@ -312,6 +313,7 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   workItemClaims: {
     enabled: true,
     leaseDurationMs: 60 * 60 * 1000,
+    heartbeatIntervalMs: 20 * 60 * 1000,
     staleClaimPolicy: "report",
     authority: {
       backend: "optimistic_tracker",
@@ -437,7 +439,9 @@ export function validateNexusAutomationConfig(
   const verification = validateVerificationConfig(record.verification);
   const ledger = validateLedgerConfig(record.ledger);
   const lock = validateLockConfig(record.lock);
-  const workItemClaims = validateWorkItemClaimConfig(record.workItemClaims);
+  const workItemClaims = resolvedWorkItemClaimConfig(
+    validateWorkItemClaimConfig(record.workItemClaims),
+  );
   const backoff = validateBackoffConfig(record.backoff);
   const schedule = validateScheduleConfig(record.schedule);
   const setup = validateSetupConfig(record.setup);
@@ -471,18 +475,7 @@ export function validateNexusAutomationConfig(
       ...defaultNexusAutomationConfig.lock,
       ...lock,
     },
-    workItemClaims: {
-      ...defaultNexusAutomationConfig.workItemClaims,
-      ...workItemClaims,
-      authority: {
-        ...defaultNexusAutomationConfig.workItemClaims.authority,
-        ...workItemClaims.authority,
-        postgres: {
-          ...defaultNexusAutomationConfig.workItemClaims.authority.postgres,
-          ...workItemClaims.authority?.postgres,
-        },
-      },
-    },
+    workItemClaims,
     backoff: {
       ...defaultNexusAutomationConfig.backoff,
       ...backoff,
@@ -839,6 +832,7 @@ function validateWorkItemClaimConfig(
   return {
     ...optionalBooleanField(record, "enabled", pathName),
     ...optionalPositiveIntegerField(record, "leaseDurationMs", pathName),
+    ...optionalPositiveIntegerField(record, "heartbeatIntervalMs", pathName),
     ...optionalWorkItemClaimStalePolicyField(
       record,
       "staleClaimPolicy",
@@ -846,6 +840,30 @@ function validateWorkItemClaimConfig(
     ),
     ...(Object.keys(authority).length > 0 ? { authority } : {}),
   };
+}
+
+function resolvedWorkItemClaimConfig(
+  partial: PartialNexusAutomationWorkItemClaimConfig,
+): NexusAutomationWorkItemClaimConfig {
+  const resolved: NexusAutomationWorkItemClaimConfig = {
+    ...defaultNexusAutomationConfig.workItemClaims,
+    ...partial,
+    authority: {
+      ...defaultNexusAutomationConfig.workItemClaims.authority,
+      ...partial.authority,
+      postgres: {
+        ...defaultNexusAutomationConfig.workItemClaims.authority.postgres,
+        ...partial.authority?.postgres,
+      },
+    },
+  };
+  if (resolved.heartbeatIntervalMs > resolved.leaseDurationMs / 2) {
+    throw new NexusAutomationConfigError(
+      "project config.automation.workItemClaims.heartbeatIntervalMs must be no more than half leaseDurationMs",
+    );
+  }
+
+  return resolved;
 }
 
 function validateWorkItemClaimAuthorityConfig(

@@ -65,6 +65,10 @@ describe("nexus automation", () => {
   });
 
   it("normalizes work item claim authority backend config", () => {
+    expect(automationConfig({}).workItemClaims).toMatchObject({
+      leaseDurationMs: 60 * 60 * 1000,
+      heartbeatIntervalMs: 20 * 60 * 1000,
+    });
     expect(automationConfig({}).workItemClaims.authority).toEqual({
       backend: "optimistic_tracker",
       postgres: {
@@ -101,6 +105,14 @@ describe("nexus automation", () => {
     ).toThrow(
       /project config\.automation\.workItemClaims\.authority\.backend/,
     );
+    expect(() =>
+      automationConfig({
+        workItemClaims: {
+          leaseDurationMs: 60000,
+          heartbeatIntervalMs: 45000,
+        },
+      }),
+    ).toThrow(/heartbeatIntervalMs must be no more than half leaseDurationMs/);
   });
 
   it("builds a bounded tracker query and selects the first eligible work item", () => {

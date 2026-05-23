@@ -2017,6 +2017,7 @@ describe("workspace config", () => {
       workItemClaims: {
         enabled: true,
         leaseDurationMs: 3600000,
+        heartbeatIntervalMs: 1200000,
         staleClaimPolicy: "report",
         authority: {
           backend: "optimistic_tracker",

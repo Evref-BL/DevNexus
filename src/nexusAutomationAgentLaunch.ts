@@ -1173,6 +1173,7 @@ function preflightNexusAutomationAgentPolicy(
       `Agent subagent cap is ${policy.maxConcurrentSubagents}`,
       "automation.agent.maxConcurrentSubagents must be a positive integer",
     ),
+    workItemClaimLeaseCoversAgentTimeoutCheck(automationConfig, policy),
   ];
 
   if (!policy.coordinatorProfileId) {
@@ -1229,6 +1230,51 @@ function preflightNexusAutomationAgentPolicy(
   }
 
   return checks;
+}
+
+function workItemClaimLeaseCoversAgentTimeoutCheck(
+  automationConfig: NexusAutomationConfig,
+  policy: NexusAutomationAgentPolicy,
+): NexusAutomationPreflightCheck {
+  const leaseDurationMs = automationConfig.workItemClaims.leaseDurationMs;
+  const timeoutMs = automationConfig.agent.timeoutMs;
+  const hasConfiguredSynchronousCommand =
+    automationConfig.agent.command !== null ||
+    (
+      policy.coordinatorProfile !== null &&
+      policy.coordinatorProfile.executorMode !== "app_server"
+    );
+  if (!automationConfig.workItemClaims.enabled) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "passed",
+      message: "Work-item claims are disabled; lease coverage is not required",
+    };
+  }
+  if (timeoutMs === null && !hasConfiguredSynchronousCommand) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "passed",
+      message:
+        "No configured synchronous agent timeout; launcher-specific claim lease coverage applies",
+    };
+  }
+  if (timeoutMs === null) {
+    return {
+      name: "workItemClaim:leaseCoversAgentTimeout",
+      status: "failed",
+      message:
+        "automation.agent.timeoutMs must be set and less than automation.workItemClaims.leaseDurationMs because synchronous agent commands cannot heartbeat while running",
+    };
+  }
+
+  const covered = timeoutMs < leaseDurationMs;
+  return check(
+    "workItemClaim:leaseCoversAgentTimeout",
+    covered,
+    `Work-item claim lease ${leaseDurationMs}ms exceeds agent timeout ${timeoutMs}ms`,
+    "automation.agent.timeoutMs must be less than automation.workItemClaims.leaseDurationMs because synchronous agent commands cannot heartbeat while running",
+  );
 }
 
 export function generateNexusAutomationAgentRunId(
@@ -1617,6 +1663,10 @@ function agentLaunchEnvironment(
     DEV_NEXUS_CLAIMED_WORK_ITEM_ID: input.workItemClaim?.workItemId ?? "",
     DEV_NEXUS_CLAIM_COMPONENT_ID: input.workItemClaim?.componentId ?? "",
     DEV_NEXUS_CLAIM_TRACKER_ID: input.workItemClaim?.trackerId ?? "",
+    DEV_NEXUS_CLAIM_LEASE_DURATION_MS:
+      input.automationConfig.workItemClaims.leaseDurationMs.toString(),
+    DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS:
+      input.automationConfig.workItemClaims.heartbeatIntervalMs.toString(),
     DEV_NEXUS_CLAIM_LEASE_TOKEN: input.workItemClaim?.owner?.leaseToken ?? "",
     DEV_NEXUS_CLAIM_HOST_ID: input.workItemClaim?.owner?.hostId ?? "",
     DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",

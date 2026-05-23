@@ -207,6 +207,11 @@ Current config shape:
 
 - `automation.workItemClaims.authority.backend`: `optimistic_tracker` or
   `postgres`.
+- `automation.workItemClaims.leaseDurationMs`: lease TTL for one authority claim.
+  Defaults to 60 minutes.
+- `automation.workItemClaims.heartbeatIntervalMs`: expected renewal cadence for
+  active long-running owners. Defaults to 20 minutes and must be no more than
+  half of `leaseDurationMs`.
 - `automation.workItemClaims.authority.postgres.connectionProfileId`: host-local
   credential/profile binding reference. Portable project config must not store
   the raw connection string.
@@ -359,6 +364,11 @@ Progress:
   core guard helper, CLI `automation current-agent heartbeat`, and MCP
   `current_agent_heartbeat`. Long-running authority-backed current agents can
   now renew their lease without recording a terminal result.
+- 2026-05-23: Slice 6D made the lease policy explicit: 60 minute default lease,
+  20 minute default heartbeat interval, config validation that rejects heartbeat
+  intervals over half the lease, environment projection of both values, and a
+  preflight guard that blocks configured synchronous agent commands whose
+  timeout is not lower than the claim lease.
 
 ## Human Gates
 
@@ -379,5 +389,6 @@ Progress:
 - Whether completed, blocked, and failed worker records should synchronously
   release database claims, rely on lease expiry, or use an explicit separate
   release command.
-- Whether spawned command workers should run an automatic heartbeat sidecar, or
-  require the worker command to call the explicit heartbeat surface itself.
+- Whether async/app-server command workers should run an automatic heartbeat
+  sidecar. The synchronous command launcher is guarded by timeout < lease
+  because the runner blocks while the child command executes.

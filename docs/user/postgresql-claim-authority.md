@@ -42,6 +42,8 @@ host-local profile id:
   "automation": {
     "workItemClaims": {
       "enabled": true,
+      "leaseDurationMs": 3600000,
+      "heartbeatIntervalMs": 1200000,
       "authority": {
         "backend": "postgres",
         "postgres": {
@@ -55,6 +57,35 @@ host-local profile id:
 
 Do not put a database URL in `dev-nexus.project.json`. Project config is meant
 to be portable across hosts.
+
+`leaseDurationMs` defaults to 60 minutes. `heartbeatIntervalMs` defaults to
+20 minutes and must be no more than half of `leaseDurationMs`.
+
+The lease is the maximum time an abandoned claim can block another coordinator
+from reclaiming the same work item. The heartbeat interval is how often a
+long-running owner should renew the claim before expiry. The defaults are tuned
+for agent work rather than low-latency service failover: they keep abandoned
+work bounded at one hour, leave room for long local verification, and still
+renew well before expiry.
+
+The policy follows the same shape as common coordination systems:
+
+- Kubernetes Lease-based leader election treats `leaseDuration` as the time
+  another candidate waits before taking over, requires the renew deadline to be
+  less than or equal to the lease duration, and documents renewal before expiry,
+  for example around half the lease duration.
+- Consul sessions recommend the lowest practical TTL and warn against long TTLs
+  above one hour because force-expired sessions may take up to double the TTL to
+  reap.
+- RabbitMQ heartbeats separate the timeout from the interval and send heartbeat
+  frames at about half the timeout.
+
+References:
+
+- [Kubernetes coordinated leader election](https://kubernetes.io/docs/concepts/cluster-administration/coordinated-leader-election/)
+- [Kubernetes leader election configuration](https://kubernetes.io/docs/reference/config-api/kube-scheduler-config.v1/#leaderelectionconfiguration)
+- [Consul session API TTL](https://developer.hashicorp.com/consul/api-docs/session)
+- [RabbitMQ heartbeats](https://www.rabbitmq.com/docs/heartbeats)
 
 ## Configure each host
 
@@ -122,6 +153,8 @@ When an automation launch obtains an authority-backed claim, the launch context
 includes the authority claim record and fencing token. The command environment
 also includes:
 
+- `DEV_NEXUS_CLAIM_LEASE_DURATION_MS`
+- `DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS`
 - `DEV_NEXUS_CLAIM_AUTHORITY_KIND`
 - `DEV_NEXUS_CLAIM_FENCING_TOKEN`
 - `DEV_NEXUS_CLAIM_AUTHORITY_STATE`
@@ -138,12 +171,24 @@ Long-running current-agent workers can renew an authority-backed claim without
 recording a terminal result:
 
 ```bash
-dev-nexus automation current-agent heartbeat <workspace-root> --lease-duration-ms 3600000 --json
+dev-nexus automation current-agent heartbeat <workspace-root> --json
 ```
 
 The matching MCP tool is `current_agent_heartbeat`. Both surfaces read the
 current launch context, use the selected authority backend, and return the
 updated claim record.
+
+For current-agent adoption, run the heartbeat before
+`DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS` elapses, and again at that cadence while
+the work stays active. The command renews the claim for the configured lease
+duration unless `--lease-duration-ms` is provided.
+
+Spawned synchronous agent commands cannot heartbeat while the command runner is
+blocked waiting for the child process. DevNexus therefore requires configured
+synchronous agent launches to have `automation.agent.timeoutMs` lower than
+`automation.workItemClaims.leaseDurationMs`. A future async launch runtime can
+add a background heartbeat sidecar; the current safe rule is that a spawned
+command must finish or time out before its claim expires.
 
 Blocked or failed current-agent outcomes are still allowed so a stale worker can
 report that it stopped.

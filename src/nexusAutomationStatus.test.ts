@@ -252,6 +252,7 @@ describe("nexus automation status", () => {
       env: {
         DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
       },
+      postgresClaimAdapterStatus: "missing",
     });
 
     expect(missingAdapter.workItemClaimAuthority).toMatchObject({
@@ -316,6 +317,7 @@ describe("nexus automation status", () => {
           agent: {
             ...projectConfig().automation!.agent,
             coordinatorProfileId: "codex-deep",
+            timeoutMs: 120000,
             maxConcurrentSubagents: 2,
             profiles: [
               {

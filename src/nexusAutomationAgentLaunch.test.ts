@@ -845,6 +845,8 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_CLAIMED_WORK_ITEM_ID).toBe("local-1");
       expect(options.env.DEV_NEXUS_CLAIM_COMPONENT_ID).toBe("primary");
       expect(options.env.DEV_NEXUS_CLAIM_TRACKER_ID).toBe("default");
+      expect(options.env.DEV_NEXUS_CLAIM_LEASE_DURATION_MS).toBe("3600000");
+      expect(options.env.DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS).toBe("1200000");
       expect(options.env.DEV_NEXUS_CLAIM_LEASE_TOKEN).toBe("lease-agent-1");
       expect(options.env.DEV_NEXUS_CLAIM_HOST_ID).toBe("host-a");
       expect(options.env.DEV_NEXUS_CLAIM_AGENT_ID).toBe("agent-claim-1");
@@ -1308,6 +1310,79 @@ describe("nexus automation agent launch", () => {
       preflight: expect.arrayContaining([
         expect.objectContaining({
           name: "workItemClaim",
+          status: "failed",
+        }),
+      ]),
+    });
+  });
+
+  it("blocks synchronous agent launches that can outlive the claim lease", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          timeoutMs: 60 * 60 * 1000,
+        },
+        workItemClaims: {
+          ...projectConfig().automation!.workItemClaims,
+          leaseDurationMs: 30 * 60 * 1000,
+          heartbeatIntervalMs: 10 * 60 * 1000,
+        },
+      },
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-lease-timeout-block",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      preflight: expect.arrayContaining([
+        expect.objectContaining({
+          name: "workItemClaim:leaseCoversAgentTimeout",
+          status: "failed",
+        }),
+      ]),
+    });
+  });
+
+  it("blocks synchronous agent launches without a claim-bounded timeout", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          timeoutMs: null,
+        },
+      },
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-lease-timeout-missing-block",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      preflight: expect.arrayContaining([
+        expect.objectContaining({
+          name: "workItemClaim:leaseCoversAgentTimeout",
           status: "failed",
         }),
       ]),

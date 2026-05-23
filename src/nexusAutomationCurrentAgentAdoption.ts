@@ -1641,6 +1641,10 @@ function currentAgentAdoptionEnvironment(
     DEV_NEXUS_CLAIMED_WORK_ITEM_ID: input.workItemClaim?.workItemId ?? "",
     DEV_NEXUS_CLAIM_COMPONENT_ID: input.workItemClaim?.componentId ?? "",
     DEV_NEXUS_CLAIM_TRACKER_ID: input.workItemClaim?.trackerId ?? "",
+    DEV_NEXUS_CLAIM_LEASE_DURATION_MS:
+      input.automationConfig.workItemClaims.leaseDurationMs.toString(),
+    DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS:
+      input.automationConfig.workItemClaims.heartbeatIntervalMs.toString(),
     DEV_NEXUS_CLAIM_LEASE_TOKEN: input.workItemClaim?.owner?.leaseToken ?? "",
     DEV_NEXUS_CLAIM_HOST_ID: input.workItemClaim?.owner?.hostId ?? "",
     DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",
