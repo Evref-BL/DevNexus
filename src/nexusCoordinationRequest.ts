@@ -591,81 +591,88 @@ function parseNexusCoordinationRequestTarget(
   }
   const target = requiredNonEmptyString(value, "target");
   const targetSpecs: Array<{
-    pattern: RegExp;
+    value: string | null;
     kind: NexusCoordinationRequestTargetKind;
     provider: NexusCoordinationRequestProviderName;
   }> = [
     {
-      pattern: /^(?:github|gh)[-_:/]issue[:#/,-]*(.+)$/iu,
+      value: providerTargetValue(target, ["github", "gh"], ["issue"]),
       kind: "github_issue",
       provider: "github",
     },
     {
-      pattern: /^(?:github|gh)[-_:/](?:pr|pull-request|pull_request)[:#/,-]*(.+)$/iu,
+      value: providerTargetValue(
+        target,
+        ["github", "gh"],
+        ["pr", "pull-request", "pull_request"],
+      ),
       kind: "github_pull_request",
       provider: "github",
     },
     {
-      pattern: /^(?:gitlab|gl)[-_:/]issue[:#/,-]*(.+)$/iu,
+      value: providerTargetValue(target, ["gitlab", "gl"], ["issue"]),
       kind: "gitlab_issue",
       provider: "gitlab",
     },
     {
-      pattern: /^(?:gitlab|gl)[-_:/](?:mr|merge-request|merge_request)[:#/,-]*(.+)$/iu,
+      value: providerTargetValue(
+        target,
+        ["gitlab", "gl"],
+        ["mr", "merge-request", "merge_request"],
+      ),
       kind: "gitlab_merge_request",
       provider: "gitlab",
     },
     {
-      pattern: /^(?:jira|jira-issue)[:#/,-]*(.+)$/iu,
+      value: prefixedTargetValue(target, ["jira-issue", "jira"], ":#/,-"),
       kind: "jira_issue",
       provider: "jira",
     },
   ];
 
   for (const spec of targetSpecs) {
-    const match = spec.pattern.exec(target);
-    if (match?.[1]) {
+    if (spec.value) {
       return requestTarget({
         kind: spec.kind,
         provider: spec.provider,
-        value: match[1],
+        value: spec.value,
         context,
         requestTracker,
       });
     }
   }
 
-  const workItemMatch = /^work-item[:#/,-]*(.+)$/iu.exec(target);
-  if (workItemMatch?.[1]) {
+  const workItemValue = prefixedTargetValue(target, ["work-item"], ":#/,-");
+  if (workItemValue) {
     return requestTarget({
       kind: "work_item",
       provider: "dev-nexus",
-      value: workItemMatch[1],
+      value: workItemValue,
       context,
       requestTracker,
     });
   }
-  const branchMatch = /^branch[:#,-]*(.+)$/iu.exec(target);
-  if (branchMatch?.[1]) {
+  const branchValue = prefixedTargetValue(target, ["branch"], ":#,-");
+  if (branchValue) {
     return requestTarget({
       kind: "branch",
       provider: "dev-nexus",
-      value: branchMatch[1],
+      value: branchValue,
       context,
       requestTracker,
     });
   }
-  const reviewerMatch = /^reviewer[:#,-]*(.+)$/iu.exec(target);
-  if (reviewerMatch?.[1]) {
+  const reviewerValue = prefixedTargetValue(target, ["reviewer"], ":#,-");
+  if (reviewerValue) {
     return requestTarget({
       kind: "reviewer",
       provider: "dev-nexus",
-      value: reviewerMatch[1],
+      value: reviewerValue,
       context,
       requestTracker,
     });
   }
-  if (/^[A-Z][A-Z0-9]+-\d+$/u.test(target)) {
+  if (isJiraIssueKey(target)) {
     return requestTarget({
       kind: "jira_issue",
       provider: "jira",
@@ -682,6 +689,86 @@ function parseNexusCoordinationRequestTarget(
     context,
     requestTracker,
   });
+}
+
+function providerTargetValue(
+  target: string,
+  providerAliases: readonly string[],
+  surfaceAliases: readonly string[],
+): string | null {
+  for (const providerPrefix of providerTargetPrefixes(providerAliases)) {
+    const afterProvider = valueAfterCaseInsensitivePrefix(target, providerPrefix);
+    if (afterProvider === null) {
+      continue;
+    }
+    const value = surfaceTargetValue(afterProvider, surfaceAliases);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function providerTargetPrefixes(providerAliases: readonly string[]): string[] {
+  return providerAliases.flatMap((providerAlias) =>
+    ["-", "_", ":", "/"].map((separator) => `${providerAlias}${separator}`),
+  );
+}
+
+function surfaceTargetValue(
+  value: string,
+  surfaceAliases: readonly string[],
+): string | null {
+  for (const surfaceAlias of surfaceAliases) {
+    const afterSurface = valueAfterCaseInsensitivePrefix(value, surfaceAlias);
+    if (afterSurface === null) {
+      continue;
+    }
+    const targetValue = trimLeadingCharacters(afterSurface, ":#/,-");
+    if (targetValue.length > 0) {
+      return targetValue;
+    }
+  }
+
+  return null;
+}
+
+function prefixedTargetValue(
+  target: string,
+  prefixes: readonly string[],
+  delimiters: string,
+): string | null {
+  for (const prefix of prefixes) {
+    const value = valueAfterCaseInsensitivePrefix(target, prefix);
+    if (value === null) {
+      continue;
+    }
+    const trimmed = trimLeadingCharacters(value, delimiters);
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+function valueAfterCaseInsensitivePrefix(
+  value: string,
+  prefix: string,
+): string | null {
+  return value.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase()
+    ? value.slice(prefix.length)
+    : null;
+}
+
+function trimLeadingCharacters(value: string, characters: string): string {
+  let start = 0;
+  while (start < value.length && characters.includes(value[start]!)) {
+    start += 1;
+  }
+
+  return value.slice(start);
 }
 
 function requestTarget(options: {
@@ -1688,8 +1775,21 @@ function positiveIntegerOrNull(value: string): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function isJiraIssueKey(value: string): boolean {
+  const separator = value.indexOf("-");
+  if (separator < 2 || separator === value.length - 1) {
+    return false;
+  }
+
+  const projectKey = value.slice(0, separator);
+  const issueNumber = value.slice(separator + 1);
+  return isUpperAsciiLetter(projectKey[0]!) &&
+    allCharacters(projectKey.slice(1), isUpperAsciiLetterOrDigit) &&
+    allCharacters(issueNumber, isAsciiDigit);
+}
+
 function githubWebHost(host: string | null | undefined): string {
-  const value = host?.replace(/^https?:\/\//u, "").replace(/\/+$/u, "");
+  const value = stripTrailingSlashes(stripHttpScheme(host ?? ""));
   if (!value || value === "api.github.com") {
     return "github.com";
   }
@@ -1698,7 +1798,7 @@ function githubWebHost(host: string | null | undefined): string {
 }
 
 function gitlabWebHost(host: string | null | undefined): string {
-  const value = host?.replace(/^https?:\/\//u, "").replace(/\/+$/u, "");
+  const value = stripTrailingSlashes(stripHttpScheme(host ?? ""));
   if (!value || value === "gitlab.com" || value.endsWith("/api/v4")) {
     return "gitlab.com";
   }
@@ -1707,11 +1807,74 @@ function gitlabWebHost(host: string | null | undefined): string {
 }
 
 function sanitizeIdPart(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .slice(0, 80);
+  const sanitized: string[] = [];
+  let previousWasSeparator = true;
+  for (const character of value.toLowerCase()) {
+    if (isLowerAsciiLetterOrDigit(character)) {
+      sanitized.push(character);
+      previousWasSeparator = false;
+    } else if (!previousWasSeparator) {
+      sanitized.push("-");
+      previousWasSeparator = true;
+    }
+  }
+  if (sanitized.at(-1) === "-") {
+    sanitized.pop();
+  }
+
+  return sanitized.join("").slice(0, 80);
+}
+
+function stripHttpScheme(value: string): string {
+  if (value.startsWith("https://")) {
+    return value.slice("https://".length);
+  }
+  if (value.startsWith("http://")) {
+    return value.slice("http://".length);
+  }
+
+  return value;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+}
+
+function allCharacters(
+  value: string,
+  predicate: (character: string) => boolean,
+): boolean {
+  if (value.length === 0) {
+    return false;
+  }
+  for (const character of value) {
+    if (!predicate(character)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isUpperAsciiLetter(character: string): boolean {
+  return character >= "A" && character <= "Z";
+}
+
+function isAsciiDigit(character: string): boolean {
+  return character >= "0" && character <= "9";
+}
+
+function isUpperAsciiLetterOrDigit(character: string): boolean {
+  return isUpperAsciiLetter(character) || isAsciiDigit(character);
+}
+
+function isLowerAsciiLetterOrDigit(character: string): boolean {
+  return (character >= "a" && character <= "z") || isAsciiDigit(character);
 }
 
 function errorDetail(error: unknown): string {
