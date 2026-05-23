@@ -513,7 +513,7 @@ export class JiraWorkTrackerProvider implements WorkTrackerProvider {
 
 export function normalizeJiraApiBaseUrl(hostOrApiBaseUrl?: string | null): string {
   const url = jiraUrl(hostOrApiBaseUrl);
-  const normalizedPath = url.pathname.replace(/\/+$/, "");
+  const normalizedPath = stripTrailingSlashes(url.pathname);
   if (normalizedPath.endsWith(jiraRestApiPath)) {
     return `${url.protocol}//${url.host}${normalizedPath}`;
   }
@@ -523,12 +523,21 @@ export function normalizeJiraApiBaseUrl(hostOrApiBaseUrl?: string | null): strin
 
 export function normalizeJiraWebBaseUrl(hostOrApiBaseUrl?: string | null): string {
   const url = jiraUrl(hostOrApiBaseUrl);
-  let normalizedPath = url.pathname.replace(/\/+$/, "");
+  let normalizedPath = stripTrailingSlashes(url.pathname);
   if (normalizedPath.endsWith(jiraRestApiPath)) {
     normalizedPath = normalizedPath.slice(0, -jiraRestApiPath.length);
   }
 
   return `${url.protocol}//${url.host}${normalizedPath}`;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 export function jiraCredentialRequest(

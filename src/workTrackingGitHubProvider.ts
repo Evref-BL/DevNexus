@@ -597,10 +597,10 @@ export function normalizeGitHubApiBaseUrl(hostOrApiBaseUrl?: string | null): str
     return defaultGitHubApiBaseUrl;
   }
   if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value.replace(/\/+$/, "");
+    return stripTrailingSlashes(value);
   }
 
-  return `https://${value.replace(/\/+$/, "")}/api/v3`;
+  return `https://${stripTrailingSlashes(value)}/api/v3`;
 }
 
 export function normalizeGitHubGraphQLApiUrl(
@@ -624,10 +624,19 @@ export function normalizeGitHubGraphQLApiUrl(
     return "https://api.github.com/graphql";
   }
   if (url.pathname.endsWith("/api/graphql") || url.pathname.endsWith("/graphql")) {
-    return url.toString().replace(/\/+$/, "");
+    return stripTrailingSlashes(url.toString());
   }
 
   return `${url.protocol}//${url.host}/api/graphql`;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 export function githubCredentialRequest(

@@ -404,12 +404,21 @@ export function normalizeGitLabApiBaseUrl(hostOrApiBaseUrl?: string | null): str
   const url = value.startsWith("http://") || value.startsWith("https://")
     ? new URL(value)
     : new URL(`https://${value}`);
-  const normalizedPath = url.pathname.replace(/\/+$/, "");
+  const normalizedPath = stripTrailingSlashes(url.pathname);
   if (normalizedPath.endsWith("/api/v4")) {
     return `${url.protocol}//${url.host}${normalizedPath}`;
   }
 
   return `${url.protocol}//${url.host}${normalizedPath}/api/v4`;
+}
+
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
 }
 
 export function gitLabCredentialRequest(
