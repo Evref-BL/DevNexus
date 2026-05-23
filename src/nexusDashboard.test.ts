@@ -1247,6 +1247,7 @@ describe("nexus dashboard", () => {
         expect.objectContaining({ id: "branch-accents", status: "passed" }),
         expect.objectContaining({ id: "host-smart-cards", status: "passed" }),
         expect.objectContaining({ id: "text-fitting", status: "passed" }),
+        expect.objectContaining({ id: "neutral-surfaces", status: "passed" }),
         expect.objectContaining({ id: "lane-labels", status: "passed" }),
         expect.objectContaining({ id: "selected-details", status: "passed" }),
         expect.objectContaining({ id: "action-buttons", status: "passed" }),
