@@ -8,6 +8,10 @@ import type { NexusPublicationGitPushRunner } from "./nexusPublicationPolicy.js"
 import type { NexusProjectHostingProviderAdapter } from "./nexusProjectHosting.js";
 import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
 import type {
+  NexusDashboardServerHandle,
+  startNexusDashboardServer,
+} from "./nexusDashboardServer.js";
+import type {
   NexusEligibleWorkClaimProviderFactory,
   NexusWorkItemClaimAuthority,
 } from "./nexusWorkItemClaim.js";
@@ -31,6 +35,10 @@ export interface DevNexusCliDependencies {
   projectGitRunner?: ProjectGitRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
+  dashboardServerStarter?: (
+    options: Parameters<typeof startNexusDashboardServer>[0],
+  ) => Promise<NexusDashboardServerHandle>;
+  dashboardServerWaiter?: (handle: NexusDashboardServerHandle) => Promise<void>;
   now?: () => Date | string;
   sleep?: (milliseconds: number) => Promise<void>;
   sharedCheckoutGuard?: "enforce" | "disabled";

@@ -278,11 +278,11 @@ describe("optimistic work item claims", () => {
           automation: postgresAutomationConfig,
         }),
         automationConfig: postgresAutomationConfig,
+        homePath,
         providerFactory: providerFactory(provider),
         owner: {
           hostId: "host-a",
         },
-        homePath,
         now: () => "2026-05-20T10:00:00.000Z",
       }),
     ).rejects.toThrow(

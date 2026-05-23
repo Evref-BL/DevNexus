@@ -1588,10 +1588,15 @@ function isGitHubAppCredentialProfile(
   profile: NexusHostingAuthProfileConfig,
   request: NexusProviderCredentialRequest,
 ): boolean {
+  const githubApp = profile.githubApp;
   return (
     normalizeProviderName(profile.provider) === "github" &&
     normalizeProviderName(request.provider) === "github" &&
-    Boolean(profile.githubApp)
+    profile.credentialKind !== "github_app_user_token" &&
+    Boolean(githubApp) &&
+    (profile.kind === "app" ||
+      profile.credentialKind === "github_app" ||
+      Boolean(githubApp?.privateKeyPath))
   );
 }
 
@@ -1672,7 +1677,7 @@ function createGitHubAppJwt(
   let privateKey: string;
   try {
     if (!config.privateKeyPath) {
-      throw new Error("private key path is not configured");
+      throw new Error("githubApp.privateKeyPath is not configured");
     }
     privateKey = readFile(config.privateKeyPath);
   } catch (error) {

@@ -246,6 +246,56 @@ describe("home config primitives", () => {
     ).toThrow(/githubApp\.appId or authProfiles\[0\]\.githubApp\.clientId/);
   });
 
+  it("allows GitHub App user-token profiles to carry app metadata without a private key", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
+
+    expect(
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        authProfiles: [
+          {
+            id: "alice-devnexus-app-user",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "alice",
+            host: "github.com",
+            command: path.join(homePath, "github-app-user-token.mjs"),
+            purposes: ["api", "git"],
+            githubApp: {
+              clientId: "Iv23example",
+              slug: "devnexus-automation",
+              installationAccount: "Evref-BL",
+              repositories: ["DevNexus"],
+              tokenRefreshBufferSeconds: 300,
+            },
+          },
+        ],
+        projects: [],
+      }).authProfiles?.[0],
+    ).toEqual({
+      id: "alice-devnexus-app-user",
+      provider: "github",
+      kind: "human",
+      credentialKind: "github_app_user_token",
+      account: "alice",
+      host: "github.com",
+      command: path.join(homePath, "github-app-user-token.mjs"),
+      purposes: ["api", "git"],
+      githubApp: {
+        clientId: "Iv23example",
+        slug: "devnexus-automation",
+        installationAccount: "Evref-BL",
+        repositories: ["DevNexus"],
+        tokenRefreshBufferSeconds: 300,
+      },
+    });
+  });
+
   it("validates host-local claim authority profiles without storing database secrets", () => {
     const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
 

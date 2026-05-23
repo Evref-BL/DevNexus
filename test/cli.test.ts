@@ -35,10 +35,12 @@ import {
   type WorkItemRef,
   type WorkTrackerProvider,
   type NexusWorktreeLeaseRecord,
+  type NexusDashboardServerHandle,
 } from "../src/index.js";
 
 const tempDirs: string[] = [];
 const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
+const originalCwd = process.cwd();
 
 function tomlArgs(values: string[]): string {
   return `args = [${values.map((value) => JSON.stringify(value)).join(", ")}]`;
@@ -256,6 +258,35 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
   };
 }
 
+function cleanDashboardGitRunner(): GitRunner {
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    const joined = argsArray.join(" ");
+    if (joined === "rev-parse --show-toplevel") {
+      return ok(argsArray, `${cwd ?? ""}\n`);
+    }
+    if (joined === "rev-parse --abbrev-ref HEAD") {
+      return ok(argsArray, "main\n");
+    }
+    if (joined === "rev-parse HEAD") {
+      return ok(argsArray, "abc1234567890\n");
+    }
+    if (joined === "status --porcelain=v1") {
+      return ok(argsArray, "");
+    }
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return ok(argsArray, "origin/main\n");
+    }
+    if (joined === "rev-list --left-right --count HEAD...@{u}") {
+      return ok(argsArray, "0\t0\n");
+    }
+    if (argsArray[0] === "config") {
+      return ok(argsArray, "");
+    }
+    return ok(argsArray, "");
+  };
+}
+
 function fakeProjectGitRunner(
   calls: string[][],
   options: { branch?: string; remoteUrl?: string | null } = {},
@@ -375,6 +406,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 afterEach(() => {
+  process.chdir(originalCwd);
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -413,6 +445,8 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus quick-fix start");
     expect(output.output()).toContain("dev-nexus quick-fix finish");
     expect(output.output()).toContain("dev-nexus work-item create");
+    expect(output.output()).toContain("dev-nexus dashboard snapshot");
+    expect(output.output()).toContain("dev-nexus dashboard serve");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
     expect(output.output()).toContain("dev-nexus automation target-report");
@@ -693,6 +727,197 @@ describe("dev-nexus cli", () => {
       error: {
         code: "cli_error",
         message: "Unknown workspace init option: --bad-option",
+      },
+    });
+  });
+
+  it("prints a dashboard snapshot as JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await expect(
+      main(["dashboard", "snapshot", projectRoot, "--json"], {
+        stdout: output.writer,
+        gitRunner: cleanDashboardGitRunner(),
+        now: () => "2026-05-21T10:00:00.000Z",
+      }),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      snapshot: {
+        generatedAt: "2026-05-21T10:00:00.000Z",
+        project: {
+          id: "demo-project",
+        },
+        weave: {
+          version: 1,
+        },
+      },
+    });
+  });
+
+  it("starts the dashboard server through injectable CLI dependencies", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+    let waited = false;
+    let receivedProjectRoot: string | null = null;
+
+    await expect(
+      main(
+        [
+          "dashboard",
+          "serve",
+          projectRoot,
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "0",
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          dashboardServerStarter: async (options) => {
+            receivedProjectRoot = options.projectRoot ?? null;
+            return {
+              projectRoot: path.resolve(options.projectRoot!),
+              host: options.host ?? "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              server: {} as NexusDashboardServerHandle["server"],
+              close: async () => {},
+            };
+          },
+          dashboardServerWaiter: async () => {
+            waited = true;
+          },
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(receivedProjectRoot).toBe(projectRoot);
+    expect(waited).toBe(true);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      dashboard: {
+        port: 4242,
+        url: "http://127.0.0.1:4242/",
+      },
+    });
+  });
+
+  it("starts the dashboard server in host scope without a workspace root", async () => {
+    process.chdir(makeTempDir("dev-nexus-cli-dashboard-cwd-"));
+    const output = captureOutput();
+    let receivedProjectRoot: string | null = "unexpected";
+    let receivedCurrentProjectRoot: string | null = "unexpected";
+    let waited = false;
+
+    await expect(
+      main(
+        [
+          "dashboard",
+          "serve",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "0",
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          dashboardServerStarter: async (options) => {
+            receivedProjectRoot = options.projectRoot ?? null;
+            receivedCurrentProjectRoot = options.currentProjectRoot ?? null;
+            return {
+              projectRoot: null,
+              host: options.host ?? "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              server: {} as NexusDashboardServerHandle["server"],
+              close: async () => {},
+            };
+          },
+          dashboardServerWaiter: async () => {
+            waited = true;
+          },
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(receivedProjectRoot).toBeNull();
+    expect(receivedCurrentProjectRoot).toBeNull();
+    expect(waited).toBe(true);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      dashboard: {
+        projectRoot: null,
+        scope: "host",
+        port: 4242,
+        url: "http://127.0.0.1:4242/",
+      },
+    });
+  });
+
+  it("discovers the current workspace from cwd while serving the host cockpit", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-current-");
+    const nestedWorktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus",
+      "feature-worktree",
+    );
+    fs.mkdirSync(nestedWorktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      id: "current-host-project",
+      name: "Current Host Project",
+    }));
+    process.chdir(nestedWorktreePath);
+    const output = captureOutput();
+    let receivedProjectRoot: string | null = "unexpected";
+    let receivedCurrentProjectRoot: string | null = "unexpected";
+
+    await expect(
+      main(
+        [
+          "dashboard",
+          "serve",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "0",
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          dashboardServerStarter: async (options) => {
+            receivedProjectRoot = options.projectRoot ?? null;
+            receivedCurrentProjectRoot = options.currentProjectRoot ?? null;
+            return {
+              projectRoot: null,
+              host: options.host ?? "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              server: {} as NexusDashboardServerHandle["server"],
+              close: async () => {},
+            };
+          },
+          dashboardServerWaiter: async () => {},
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(receivedProjectRoot).toBeNull();
+    expect(receivedCurrentProjectRoot).toBe(fs.realpathSync(projectRoot));
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      dashboard: {
+        projectRoot: null,
+        scope: "host",
       },
     });
   });

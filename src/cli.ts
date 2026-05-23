@@ -123,6 +123,14 @@ import {
   type NexusEligibleWorkSummary,
 } from "./nexusEligibleWorkSummary.js";
 import {
+  buildNexusDashboardSnapshot,
+  type NexusDashboardSnapshot,
+} from "./nexusDashboard.js";
+import {
+  startNexusDashboardServer,
+  type NexusDashboardServerHandle,
+} from "./nexusDashboardServer.js";
+import {
   defaultNexusAutomationConfig,
 } from "./nexusAutomationConfig.js";
 import type {
@@ -737,6 +745,15 @@ interface ParsedAutomationEligibleWorkCommand {
   json?: boolean;
 }
 
+interface ParsedDashboardCommand {
+  projectRoot?: string;
+  host?: string;
+  port?: number;
+  homePath?: string;
+  mode?: NexusEligibleWorkMode;
+  json?: boolean;
+}
+
 interface ParsedAutomationAgentProfilesCommand {
   projectRoot: string;
   json?: boolean;
@@ -1008,6 +1025,9 @@ async function mainUnchecked(
   if (argv[0] === "ci-failure-intake") {
     return handleCiFailureIntakeCommand(argv, dependencies);
   }
+  if (argv[0] === "dashboard") {
+    return handleDashboardCommand(argv, dependencies);
+  }
   if (argv[0] === "automation") {
     return handleAutomationCommand(argv, dependencies);
   }
@@ -1021,8 +1041,97 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
+}
+
+async function handleDashboardCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "snapshot") {
+    const parsed = parseDashboardCommand(argv, "dashboard snapshot", {
+      requireProjectRoot: true,
+    });
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot: parsed.projectRoot!,
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardSnapshotResult(
+      snapshot,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "weave") {
+    const parsed = parseDashboardCommand(argv, "dashboard weave", {
+      requireProjectRoot: true,
+    });
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot: parsed.projectRoot!,
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardWeaveResult(
+      snapshot,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "serve") {
+    const parsed = parseDashboardCommand(argv, "dashboard serve", {
+      requireProjectRoot: false,
+    });
+    const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
+    const currentProjectRoot =
+      parsed.projectRoot ?? discoverDashboardCurrentProjectRoot(process.cwd());
+    const handle = await starter({
+      ...(parsed.projectRoot ? { projectRoot: parsed.projectRoot } : {}),
+      ...(currentProjectRoot ? { currentProjectRoot } : {}),
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      host: parsed.host,
+      port: parsed.port,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardServeResult(
+      handle,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    await (dependencies.dashboardServerWaiter ?? waitForDashboardServer)(handle);
+    return 0;
+  }
+
+  throw new Error("dashboard requires snapshot, weave, or serve");
+}
+
+async function waitForDashboardServer(
+  handle: NexusDashboardServerHandle,
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const stop = (): void => {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+      void handle.close().then(
+        () => resolve(),
+        () => resolve(),
+      );
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
 }
 
 async function handleHomeCommand(
@@ -5614,6 +5723,74 @@ function parseEligibleWorkMode(
   throw new Error(`${optionName} must be default or discovery`);
 }
 
+function parseDashboardCommand(
+  argv: string[],
+  commandName: string,
+  options: { requireProjectRoot?: boolean } = {},
+): ParsedDashboardCommand {
+  const requireProjectRoot = options.requireProjectRoot ?? true;
+  const [, , maybeProjectRoot, ...tail] = argv;
+  const projectRoot =
+    maybeProjectRoot && !maybeProjectRoot.startsWith("--")
+      ? maybeProjectRoot
+      : undefined;
+  const rest = projectRoot ? tail : argv.slice(2);
+  if (!projectRoot && requireProjectRoot) {
+    throw new Error(`${commandName} requires a workspace root`);
+  }
+
+  const parsed: ParsedDashboardCommand = projectRoot ? { projectRoot } : {};
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--host":
+        parsed.host = next();
+        break;
+      case "--port":
+        parsed.port = parseNonNegativeInteger(next(), arg);
+        break;
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--mode":
+        parsed.mode = parseEligibleWorkMode(next(), arg);
+        break;
+      case "--discovery":
+        parsed.mode = "discovery";
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown ${commandName} option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function discoverDashboardCurrentProjectRoot(startPath: string): string | null {
+  let current = path.resolve(startPath);
+  while (true) {
+    if (fs.existsSync(path.join(current, "dev-nexus.project.json"))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
 function parseAutomationAgentProfilesCommand(
   argv: string[],
 ): ParsedAutomationAgentProfilesCommand {
@@ -7173,6 +7350,79 @@ function printWorktreePrepareResult(
   for (const action of result.nextActions) {
     writeLine(stdout, `  Next: ${action}`);
   }
+}
+
+function printDashboardSnapshotResult(
+  snapshot: NexusDashboardSnapshot,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, snapshot };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus dashboard snapshot: ${snapshot.project.name}`);
+  writeLine(stdout, `  Root: ${snapshot.project.root}`);
+  writeLine(stdout, `  Summary: ${snapshot.summary}`);
+  writeLine(stdout, `  Components: ${snapshot.components.length}`);
+  writeLine(stdout, `  Signals: ${snapshot.signals.length}`);
+  writeLine(stdout, `  Weave nodes: ${snapshot.weave.nodes.length}`);
+  writeLine(stdout, `  Weave edges: ${snapshot.weave.edges.length}`);
+  if (snapshot.blockers.length > 0) {
+    writeLine(stdout, "  Blockers:");
+    for (const blocker of snapshot.blockers.slice(0, 5)) {
+      writeLine(stdout, `    ${blocker}`);
+    }
+  }
+}
+
+function printDashboardWeaveResult(
+  snapshot: NexusDashboardSnapshot,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, weave: snapshot.weave };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus dashboard weave: ${snapshot.project.name}`);
+  writeLine(stdout, `  Lanes: ${snapshot.weave.lanes.length}`);
+  writeLine(stdout, `  Nodes: ${snapshot.weave.nodes.length}`);
+  writeLine(stdout, `  Edges: ${snapshot.weave.edges.length}`);
+}
+
+function printDashboardServeResult(
+  handle: NexusDashboardServerHandle,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    dashboard: {
+      projectRoot: handle.projectRoot,
+      scope: handle.projectRoot ? "workspace" : "host",
+      host: handle.host,
+      port: handle.port,
+      url: handle.url,
+    },
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus dashboard server started.");
+  if (handle.projectRoot) {
+    writeLine(stdout, `  Project root: ${handle.projectRoot}`);
+  } else {
+    writeLine(stdout, "  Scope: host");
+  }
+  writeLine(stdout, `  URL: ${handle.url}`);
+  writeLine(stdout, "  Press Ctrl+C to stop.");
 }
 
 function printWorkItemCreateResult(
