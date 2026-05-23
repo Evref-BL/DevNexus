@@ -9,7 +9,11 @@ import { normalizeNexusAutomationAgentPolicy } from "./nexusAutomationAgentProfi
 import {
   getNexusAutomationStatus,
   type GetNexusAutomationStatusOptions,
+  type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import type {
+  NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationEligibleWorkItems.js";
 import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
@@ -122,6 +126,12 @@ export interface NexusAutomationAgentProfileSummary {
   pluginCapabilities: NexusPluginCapabilityProjection[];
 }
 
+type NexusStaleInProgressWorkItem = NonNullable<
+  NonNullable<
+    ReturnType<typeof buildNexusAutomationTargetReport>["workItemSummary"]
+  >["progress"]["staleInProgressWork"]
+>[number];
+
 export async function getNexusAutomationEligibleWorkSummary(
   options: GetNexusAutomationStatusOptions,
 ): Promise<NexusAutomationEligibleWorkSummary> {
@@ -129,16 +139,7 @@ export async function getNexusAutomationEligibleWorkSummary(
   const componentById = new Map(
     status.components.map((component) => [component.id, component]),
   );
-  const grouped =
-    status.componentEligibleWorkItems ??
-    (status.selectedWorkItem
-      ? [
-          {
-            componentId: status.components[0]?.id ?? "primary",
-            workItems: [status.selectedWorkItem],
-          },
-        ]
-      : []);
+  const grouped = groupedEligibleWorkItems(status);
   const targetReport = buildNexusAutomationTargetReport({
     projectRoot: status.projectRoot,
   });
@@ -148,71 +149,19 @@ export async function getNexusAutomationEligibleWorkSummary(
     string,
     NexusAutomationEligibleWorkComponentSummary
   >();
-  const ensureComponentSummary = (
-    componentId: string,
-  ): NexusAutomationEligibleWorkComponentSummary => {
-    const existing = summariesByComponent.get(componentId);
-    if (existing) {
-      return existing;
-    }
+  addGroupedEligibleWorkItems({
+    summariesByComponent,
+    componentById,
+    grouped,
+  });
+  addStaleInProgressWorkItems({
+    summariesByComponent,
+    componentById,
+    staleInProgressWorkItems,
+    fallbackComponentId: status.components[0]?.id ?? "primary",
+  });
 
-    const resolved = componentById.get(componentId);
-    const summary = {
-      componentId,
-      componentName: resolved?.name ?? componentId,
-      role: resolved?.role ?? "primary",
-      sourceRoot: resolved?.sourceRoot ?? null,
-      workTrackingProvider: resolved?.workTracking?.provider ?? null,
-      defaultTrackerId: resolved?.defaultTrackerId ?? null,
-      workTrackers: resolved
-        ? summarizeNexusAutomationWorkTrackers(resolved)
-        : [],
-      workItems: [],
-      staleInProgressWorkItems: [],
-    };
-    summariesByComponent.set(componentId, summary);
-    return summary;
-  };
-
-  for (const component of grouped) {
-    if (component.workItems.length === 0) {
-      continue;
-    }
-    ensureComponentSummary(component.componentId).workItems.push(
-      ...component.workItems.map((item) =>
-        summarizeEligibleWorkItem(component.componentId, item),
-      ),
-    );
-  }
-
-  for (const item of staleInProgressWorkItems) {
-    const componentId = item.componentId ?? status.components[0]?.id ?? "primary";
-    ensureComponentSummary(componentId).staleInProgressWorkItems.push({
-      componentId,
-      id: item.id,
-      title: item.title ?? item.id,
-      status: item.status ?? "in_progress",
-      labels: [],
-      assignees: [],
-      milestone: null,
-      updatedAt: null,
-      webUrl: null,
-      logicalItemId: item.id,
-      trackerRef:
-        item.trackerId && item.trackerProvider
-          ? {
-              trackerId: item.trackerId,
-              provider: item.trackerProvider,
-            }
-          : null,
-    });
-  }
-
-  const components = [...summariesByComponent.values()].filter(
-    (component) =>
-      component.workItems.length > 0 ||
-      component.staleInProgressWorkItems.length > 0,
-  );
+  const components = eligibleWorkComponents(summariesByComponent);
   const versionPlanning = buildNexusVersionPlanningSurface({
     projectConfig: status.projectConfig,
     components: status.components,
@@ -224,24 +173,7 @@ export async function getNexusAutomationEligibleWorkSummary(
     includeWorkItems: true,
     includeUnrelatedWorkItems: true,
   });
-  if (versionPlanning?.workItems) {
-    const scopesByWorkItem = new Map(
-      versionPlanning.workItems.map((item) => [
-        `${item.componentId}\0${item.id}`,
-        item.scopes,
-      ]),
-    );
-    for (const component of components) {
-      for (const item of component.workItems) {
-        const scopes = scopesByWorkItem.get(
-          `${component.componentId}\0${item.id}`,
-        );
-        if (scopes) {
-          item.versionScopes = scopes;
-        }
-      }
-    }
-  }
+  attachVersionScopes(components, versionPlanning);
 
   return {
     projectRoot: status.projectRoot,
@@ -269,6 +201,138 @@ export async function getNexusAutomationEligibleWorkSummary(
     components,
     ...(versionPlanning ? { versionPlanning } : {}),
   };
+}
+
+function groupedEligibleWorkItems(
+  status: NexusAutomationStatus,
+): NexusAutomationComponentEligibleWorkItems[] {
+  if (status.componentEligibleWorkItems) {
+    return status.componentEligibleWorkItems;
+  }
+  if (!status.selectedWorkItem) {
+    return [];
+  }
+  return [
+    {
+      componentId: status.components[0]?.id ?? "primary",
+      workItems: [status.selectedWorkItem],
+    },
+  ];
+}
+
+function addGroupedEligibleWorkItems(options: {
+  summariesByComponent: Map<
+    string,
+    NexusAutomationEligibleWorkComponentSummary
+  >;
+  componentById: Map<string, NexusAutomationStatus["components"][number]>;
+  grouped: NexusAutomationComponentEligibleWorkItems[];
+}): void {
+  for (const component of options.grouped) {
+    if (component.workItems.length === 0) {
+      continue;
+    }
+    ensureComponentSummary(
+      options.summariesByComponent,
+      options.componentById,
+      component.componentId,
+    ).workItems.push(
+      ...component.workItems.map((item) =>
+        summarizeEligibleWorkItem(component.componentId, item),
+      ),
+    );
+  }
+}
+
+function addStaleInProgressWorkItems(options: {
+  summariesByComponent: Map<
+    string,
+    NexusAutomationEligibleWorkComponentSummary
+  >;
+  componentById: Map<string, NexusAutomationStatus["components"][number]>;
+  staleInProgressWorkItems: NexusStaleInProgressWorkItem[];
+  fallbackComponentId: string;
+}): void {
+  for (const item of options.staleInProgressWorkItems) {
+    const componentId = item.componentId ?? options.fallbackComponentId;
+    ensureComponentSummary(
+      options.summariesByComponent,
+      options.componentById,
+      componentId,
+    ).staleInProgressWorkItems.push(
+      summarizeStaleInProgressWorkItem(componentId, item),
+    );
+  }
+}
+
+function ensureComponentSummary(
+  summariesByComponent: Map<
+    string,
+    NexusAutomationEligibleWorkComponentSummary
+  >,
+  componentById: Map<string, NexusAutomationStatus["components"][number]>,
+  componentId: string,
+): NexusAutomationEligibleWorkComponentSummary {
+  const existing = summariesByComponent.get(componentId);
+  if (existing) {
+    return existing;
+  }
+
+  const resolved = componentById.get(componentId);
+  const summary = {
+    componentId,
+    componentName: resolved?.name ?? componentId,
+    role: resolved?.role ?? "primary",
+    sourceRoot: resolved?.sourceRoot ?? null,
+    workTrackingProvider: resolved?.workTracking?.provider ?? null,
+    defaultTrackerId: resolved?.defaultTrackerId ?? null,
+    workTrackers: resolved
+      ? summarizeNexusAutomationWorkTrackers(resolved)
+      : [],
+    workItems: [],
+    staleInProgressWorkItems: [],
+  };
+  summariesByComponent.set(componentId, summary);
+  return summary;
+}
+
+function eligibleWorkComponents(
+  summariesByComponent: Map<
+    string,
+    NexusAutomationEligibleWorkComponentSummary
+  >,
+): NexusAutomationEligibleWorkComponentSummary[] {
+  return [...summariesByComponent.values()].filter(
+    (component) =>
+      component.workItems.length > 0 ||
+      component.staleInProgressWorkItems.length > 0,
+  );
+}
+
+function attachVersionScopes(
+  components: NexusAutomationEligibleWorkComponentSummary[],
+  versionPlanning: NexusVersionPlanningSurface | undefined,
+): void {
+  if (!versionPlanning?.workItems) {
+    return;
+  }
+
+  const scopesByWorkItem = new Map(
+    versionPlanning.workItems.map((item) => [
+      `${item.componentId}\0${item.id}`,
+      item.scopes,
+    ]),
+  );
+  for (const component of components) {
+    for (const item of component.workItems) {
+      const scopes = scopesByWorkItem.get(
+        `${component.componentId}\0${item.id}`,
+      );
+      if (scopes) {
+        item.versionScopes = scopes;
+      }
+    }
+  }
 }
 
 export function getNexusAutomationAgentProfileSummary(
@@ -357,6 +421,31 @@ function summarizeEligibleWorkItem(
     updatedAt: item.updatedAt ?? null,
     webUrl: item.webUrl ?? null,
     trackerRef: item.trackerRef ?? null,
+  };
+}
+
+function summarizeStaleInProgressWorkItem(
+  componentId: string,
+  item: NexusStaleInProgressWorkItem,
+): NexusAutomationEligibleWorkItemSummary {
+  return {
+    componentId,
+    id: item.id,
+    title: item.title ?? item.id,
+    status: item.status ?? "in_progress",
+    labels: [],
+    assignees: [],
+    milestone: null,
+    updatedAt: null,
+    webUrl: null,
+    logicalItemId: item.id,
+    trackerRef:
+      item.trackerId && item.trackerProvider
+        ? {
+            trackerId: item.trackerId,
+            provider: item.trackerProvider,
+          }
+        : null,
   };
 }
 
