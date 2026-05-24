@@ -210,6 +210,7 @@ export function usage(): string {
     "  --decision <text>          repeatable",
     "  --verification <text>",
     "  --integration-preference <text>",
+    "  --quality-delta <json-file>  local quality delta JSON to summarize",
     "  --note <text>",
     "  --worktree <path>         git worktree or source checkout used for status",
     "  --json",

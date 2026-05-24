@@ -3299,6 +3299,35 @@ describe("DevNexus MCP server", () => {
           decisions: ["Use advisory records."],
           verificationSummary: "focused tests passed",
           integrationPreference: "direct_integration",
+          qualityDelta: {
+            producer: "static-analysis",
+            readOnly: true,
+            status: "regressed",
+            touchedFiles: ["src/nexusCoordination.ts"],
+            summary: {
+              newFindingCount: 1,
+              resolvedFindingCount: 0,
+              touchedNewFindingCount: 1,
+              touchedResolvedFindingCount: 0,
+              newCriticalOrBlockerCount: 0,
+              newBugCount: 0,
+              newVulnerabilityCount: 1,
+              newSecurityHotspotCount: 0,
+              qualityGateRegressed: false,
+            },
+            attention: [
+              {
+                id: "sonar-issue:vulnerability",
+                source: "sonar_issue",
+                category: "vulnerability",
+                severity: "major",
+                filePath: "src/nexusCoordination.ts",
+                line: 12,
+                rule: "security:S4036",
+                message: "Review PATH trust.",
+              },
+            ],
+          },
           currentPath: worktreePath,
         },
         {
@@ -3328,6 +3357,21 @@ describe("DevNexus MCP server", () => {
         status: "ready",
         branch: "codex/shared-coordination",
         pushed: true,
+        qualityDelta: {
+          producer: "static-analysis",
+          status: "regressed",
+          summary: {
+            newFindingCount: 1,
+            touchedNewFindingCount: 1,
+            newVulnerabilityCount: 1,
+          },
+          attention: [
+            {
+              category: "vulnerability",
+              rule: "security:S4036",
+            },
+          ],
+        },
       },
       comment: {
         id: "local-comment-1",
