@@ -36,6 +36,12 @@ export interface NexusWorkerContextFileReference {
   access: "read_only";
 }
 
+export interface NexusWorkerContextMissingFileReference {
+  relativePath: string;
+  projectPath: string;
+  componentPath: string;
+}
+
 export interface NexusWorkerContextProject {
   id: string | null;
   name: string | null;
@@ -61,6 +67,7 @@ export interface NexusWorkerProjectContextReferences {
   planPath: string;
   targetStatePath: string;
   referencedFiles: NexusWorkerContextFileReference[];
+  missingReferencedFiles: NexusWorkerContextMissingFileReference[];
   files: NexusWorkerContextFileReference[];
 }
 
@@ -410,6 +417,9 @@ export function renderNexusWorkerBriefing(
     `- PLAN.md: ${context.projectContext.planPath}`,
     `- target-state: ${context.projectContext.targetStatePath}`,
     ...renderReferencedProjectFileLines(context.projectContext.referencedFiles),
+    ...renderMissingReferencedProjectFileLines(
+      context.projectContext.missingReferencedFiles,
+    ),
     "",
     "Skills:",
     `Workspace-managed skills: ${context.skills.projectManagedRoot}`,
@@ -522,7 +532,7 @@ function projectContextReferences(options: {
     { id: "plan", path: planPath, access: "read_only" },
     { id: "target-state", path: targetStatePath, access: "read_only" },
   ];
-  const referencedFiles = referencedProjectFiles({
+  const referencedContext = referencedProjectFiles({
     projectRoot: options.projectRoot,
     sourceRoot: options.sourceRoot,
     textSources: [
@@ -536,8 +546,9 @@ function projectContextReferences(options: {
     contextPath,
     planPath,
     targetStatePath,
-    referencedFiles,
-    files: [...defaultFiles, ...referencedFiles],
+    referencedFiles: referencedContext.files,
+    missingReferencedFiles: referencedContext.missingFiles,
+    files: [...defaultFiles, ...referencedContext.files],
   };
 }
 
@@ -545,11 +556,15 @@ function referencedProjectFiles(options: {
   projectRoot: string;
   sourceRoot: string;
   textSources: string[];
-}): NexusWorkerContextFileReference[] {
+}): {
+  files: NexusWorkerContextFileReference[];
+  missingFiles: NexusWorkerContextMissingFileReference[];
+} {
   const references = new Map<string, NexusWorkerContextFileReference>();
+  const missingReferences = new Map<string, NexusWorkerContextMissingFileReference>();
   for (const text of options.textSources) {
     for (const relativePath of extractRootRelativeProjectDocReferences(text)) {
-      if (references.has(relativePath)) {
+      if (references.has(relativePath) || missingReferences.has(relativePath)) {
         continue;
       }
       const projectPath = resolveInsideRoot(
@@ -582,14 +597,18 @@ function referencedProjectFiles(options: {
         continue;
       }
 
-      throw new NexusWorkerContextBundleError(
-        `Referenced context file is missing: ${relativePath} ` +
-          `(projectRoot: ${projectPath}; sourceRoot: ${componentPath})`,
-      );
+      missingReferences.set(relativePath, {
+        relativePath,
+        projectPath,
+        componentPath,
+      });
     }
   }
 
-  return [...references.values()];
+  return {
+    files: [...references.values()],
+    missingFiles: [...missingReferences.values()],
+  };
 }
 
 function extractRootRelativeProjectDocReferences(text: string): string[] {
@@ -645,6 +664,24 @@ function renderReferencedFileGroup(
     "",
     title,
     ...files.map((file) => `- ${referencedFileRelativePath(file)}: ${file.path}`),
+  ];
+}
+
+function renderMissingReferencedProjectFileLines(
+  files: NexusWorkerContextMissingFileReference[],
+): string[] {
+  if (files.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Skipped missing referenced docs:",
+    ...files.map(
+      (file) =>
+        `- ${file.relativePath}: not found under project root or component source root ` +
+        `(project: ${file.projectPath}; component: ${file.componentPath})`,
+    ),
   ];
 }
 

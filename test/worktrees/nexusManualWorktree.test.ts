@@ -220,6 +220,39 @@ describe("nexus manual worktree worker target preparation", () => {
     expect(result.setup.context!.briefingMarkdown).not.toContain("Claude Note");
   });
 
+  it("prepares a worktree when work item text references a missing doc", () => {
+    const { projectRoot, calls } = prepareProject();
+    const relativePath = "docs/dev/source-quality.md";
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "missing doc reference",
+      branchName: "codex/primary/missing-doc-reference",
+      worktreeName: "missing-doc-reference",
+      workItemId: "30",
+      workItemTitle: "Audit source quality",
+      workItemDescription: `See \`${relativePath}\` for the local audit notes.`,
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(fs.existsSync(result.worktree.worktreePath)).toBe(true);
+    expect(context.projectContext.referencedFiles).toEqual([]);
+    expect(context.projectContext.missingReferencedFiles).toEqual([
+      {
+        relativePath,
+        projectPath: path.join(projectRoot, relativePath),
+        componentPath: path.join(projectRoot, "source", relativePath),
+      },
+    ]);
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Skipped missing referenced docs:",
+    );
+  });
+
   it("prepares distinct worker contexts for different active providers", () => {
     const { projectRoot, calls } = prepareProject({
       agentTargets: {
