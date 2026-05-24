@@ -47,7 +47,10 @@ import {
   type NexusProjectConfig,
 } from "../project/nexusProjectConfig.js";
 import {
+  listDevNexusPluginCatalogue,
+  nexusPluginCatalogueRefreshCommand,
   projectPluginCapabilityProjections,
+  type NexusPluginCatalogueEntry,
   type NexusPluginCapabilityProjection,
 } from "../project/nexusPluginCapabilities.js";
 import {
@@ -571,9 +574,12 @@ export interface NexusDashboardPluginRecord {
   version: string | null;
   enabled: boolean;
   state: "enabled" | "disabled" | "available";
-  source: "configured" | "local";
+  source: "configured" | "catalogue";
   packageName: string | null;
   sourcePath: string | null;
+  repositoryUrl: string | null;
+  configExportName: string | null;
+  installCommand: string | null;
   refreshCommand: string | null;
   detail: string;
   capabilityCount: number;
@@ -908,7 +914,7 @@ export async function buildNexusDashboardSnapshot(
     componentSummaries,
     worktreeCollection.value,
   );
-  const plugins = summarizePlugins(projectRoot, projectConfig, components);
+  const plugins = summarizePlugins(projectRoot, projectConfig);
   const cleanupPlan = capture(() =>
     buildNexusCleanupPlan({
       projectRoot,
@@ -1104,7 +1110,7 @@ export async function buildNexusDashboardWorkspaceSection(
       section,
       patch: {
         ...basePatch,
-        plugins: summarizePlugins(projectRoot, projectConfig, components),
+        plugins: summarizePlugins(projectRoot, projectConfig),
       },
     };
   }
@@ -1566,7 +1572,7 @@ async function dashboardHostWorkspaceRecord(options: {
       runs,
       threadResolutions,
     );
-    const plugins = summarizePlugins(root, projectConfig, components);
+    const plugins = summarizePlugins(root, projectConfig);
     const dirtyComponentCount = componentSummaries.filter((component) =>
       Boolean(component.git?.dirty),
     ).length;
@@ -4377,18 +4383,17 @@ type DashboardPluginCapability =
 function summarizePlugins(
   projectRoot: string,
   projectConfig: NexusProjectConfig,
-  components: ResolvedNexusProjectComponent[],
 ): NexusDashboardPluginSummary {
   const configured = summarizeConfiguredPlugins(projectConfig);
   const configuredRecords = configured.records;
   const configuredKeys = new Set(
     configuredRecords.flatMap((record) => pluginRecordKeys(record)),
   );
-  const availableRecords = localPluginCandidates(projectRoot, components)
+  const availableRecords = listDevNexusPluginCatalogue()
     .filter((candidate) =>
       pluginRecordKeys(candidate).every((key) => !configuredKeys.has(key))
     )
-    .map((candidate) => localPluginDashboardRecord(projectRoot, candidate));
+    .map((candidate) => cataloguePluginDashboardRecord(projectRoot, candidate));
   const records = [...configuredRecords, ...availableRecords];
   return {
     totalCount: records.length,
@@ -4432,6 +4437,9 @@ function pluginDashboardRecord(
     source: "configured",
     packageName: null,
     sourcePath: null,
+    repositoryUrl: null,
+    configExportName: null,
+    installCommand: null,
     refreshCommand: null,
     detail: plugin.enabled !== false ? "Configured for this workspace." : "Configured but disabled.",
     capabilityCount: capabilities.length,
@@ -4466,120 +4474,24 @@ function pluginDashboardRecord(
   };
 }
 
-interface LocalPluginCandidate {
-  id: string;
-  name: string;
-  version: string | null;
-  packageName: string | null;
-  sourcePath: string;
-  detail: string;
-}
-
-function localPluginCandidates(
+function cataloguePluginDashboardRecord(
   projectRoot: string,
-  components: ResolvedNexusProjectComponent[],
-): LocalPluginCandidate[] {
-  const seenPaths = new Set<string>();
-  return components
-    .flatMap((component) =>
-      localPluginCandidatesForComponent(projectRoot, component, seenPaths),
-    )
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function localPluginCandidatesForComponent(
-  projectRoot: string,
-  component: ResolvedNexusProjectComponent,
-  seenPaths: Set<string>,
-): LocalPluginCandidate[] {
-  if (!component.sourceRootExists) {
-    return [];
-  }
-  const pluginsRoot = path.join(component.sourceRoot, "plugins");
-  if (!isDirectory(pluginsRoot)) {
-    return [];
-  }
-
-  const candidates: LocalPluginCandidate[] = [];
-  for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true })) {
-    const candidate = localPluginCandidateFromEntry({
-      projectRoot,
-      pluginsRoot,
-      entry,
-      seenPaths,
-    });
-    if (candidate) {
-      candidates.push(candidate);
-    }
-  }
-  return candidates;
-}
-
-function localPluginCandidateFromEntry(options: {
-  projectRoot: string;
-  pluginsRoot: string;
-  entry: fs.Dirent;
-  seenPaths: Set<string>;
-}): LocalPluginCandidate | null {
-  if (!options.entry.isDirectory()) {
-    return null;
-  }
-  const pluginRoot = path.resolve(options.pluginsRoot, options.entry.name);
-  if (options.seenPaths.has(pluginRoot) || samePath(pluginRoot, options.projectRoot)) {
-    return null;
-  }
-  options.seenPaths.add(pluginRoot);
-  return readLocalPluginCandidate(pluginRoot, options.entry.name);
-}
-
-function readLocalPluginCandidate(
-  pluginRoot: string,
-  fallbackId: string,
-): LocalPluginCandidate | null {
-  const packagePath = path.join(pluginRoot, "package.json");
-  if (!fs.existsSync(packagePath)) {
-    return null;
-  }
-  try {
-    const raw = JSON.parse(fs.readFileSync(packagePath, "utf8")) as Record<string, unknown>;
-    const packageName = typeof raw.name === "string" && raw.name.trim()
-      ? raw.name.trim()
-      : null;
-    const id = pluginIdFromPackageName(packageName, fallbackId);
-    const description = typeof raw.description === "string" && raw.description.trim()
-      ? raw.description.trim()
-      : "Local DevNexus plugin package.";
-    return {
-      id,
-      name: titleCasePluginId(id),
-      version: typeof raw.version === "string" && raw.version.trim()
-        ? raw.version.trim()
-        : null,
-      packageName,
-      sourcePath: pluginRoot,
-      detail: description,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function localPluginDashboardRecord(
-  projectRoot: string,
-  candidate: LocalPluginCandidate,
+  entry: NexusPluginCatalogueEntry,
 ): NexusDashboardPluginRecord {
   return {
-    id: candidate.id,
-    name: candidate.name,
-    version: candidate.version,
+    id: entry.id,
+    name: entry.name,
+    version: entry.version,
     enabled: false,
     state: "available",
-    source: "local",
-    packageName: candidate.packageName,
-    sourcePath: candidate.sourcePath,
-    refreshCommand:
-      `dev-nexus workspace plugin refresh ${shellQuote(projectRoot)} --from ${shellQuote(candidate.sourcePath)}`,
-    detail: candidate.detail,
+    source: "catalogue",
+    packageName: entry.packageName,
+    sourcePath: entry.sourcePath,
+    repositoryUrl: entry.repositoryUrl,
+    configExportName: entry.configExportName,
+    installCommand: entry.installCommand,
+    refreshCommand: nexusPluginCatalogueRefreshCommand(projectRoot, entry),
+    detail: entry.description,
     capabilityCount: 0,
     projectedSkillCount: 0,
     mcpServerCount: 0,
@@ -4593,7 +4505,7 @@ function localPluginDashboardRecord(
 }
 
 function pluginRecordKeys(
-  record: Pick<NexusDashboardPluginRecord, "id" | "name" | "packageName"> | LocalPluginCandidate,
+  record: Pick<NexusDashboardPluginRecord, "id" | "name" | "packageName"> | NexusPluginCatalogueEntry,
 ): string[] {
   const values = [record.id, record.name, record.packageName ?? null]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
@@ -4602,36 +4514,6 @@ function pluginRecordKeys(
 
 function normalizePluginKey(value: string): string {
   return value.trim().toLowerCase().replace(/^@[^/]+\//u, "");
-}
-
-function pluginIdFromPackageName(packageName: string | null, fallbackId: string): string {
-  return normalizePluginKey(packageName ?? fallbackId);
-}
-
-function titleCasePluginId(id: string): string {
-  const words = id.split(/[-_]+/u).filter(Boolean).map((word) => {
-    const lower = word.toLowerCase();
-    if (lower === "dev") {
-      return "Dev";
-    }
-    if (lower === "nexus") {
-      return "Nexus";
-    }
-    return `${lower.slice(0, 1).toUpperCase()}${lower.slice(1)}`;
-  });
-  return words.join(" ").replace(/^Dev Nexus/u, "DevNexus");
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/gu, "'\\''")}'`;
-}
-
-function isDirectory(directoryPath: string): boolean {
-  try {
-    return fs.statSync(directoryPath).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 function pluginSetupHint(capability: DashboardPluginCapability): string {

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main, usage } from "../../src/cli.js";
 import {
+  createOrRefreshNexusWorktreeLease,
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
@@ -707,6 +708,55 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--json");
     expect(output.output()).not.toContain("--yes");
     expect(output.output()).toContain("Provider mutations are not part of component add.");
+  });
+
+  it("prints focused work-item create help before positional validation", async () => {
+    const outputWithoutRoot = captureOutput();
+    const outputWithRoot = captureOutput();
+
+    await expect(
+      main(["work-item", "create", "--help"], { stdout: outputWithoutRoot.writer }),
+    ).resolves.toBe(0);
+    await expect(
+      main(["work-item", "create", "/tmp/demo-workspace", "--help"], {
+        stdout: outputWithRoot.writer,
+      }),
+    ).resolves.toBe(0);
+
+    for (const text of [outputWithoutRoot.output(), outputWithRoot.output()]) {
+      expect(text).toContain("Usage:");
+      expect(text).toContain(
+        "dev-nexus work-item create <workspace-root> --title <title> [options]",
+      );
+      expect(text).toContain("Options for work-item create:");
+      expect(text).toContain("--title <title>");
+      expect(text).toContain("--component <id>");
+      expect(text).toContain("--tracker <id>");
+      expect(text).not.toContain("Options for work-item update:");
+    }
+  });
+
+  it("still rejects unknown non-help options for nested work-item commands", async () => {
+    await expect(
+      main(["work-item", "create", "/tmp/demo-workspace", "--bad-option"]),
+    ).rejects.toThrow("Unknown work-item create option: --bad-option");
+  });
+
+  it("prints focused help for nested publication commands before positional validation", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["publication", "review-handoff", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain(
+      "dev-nexus publication review-handoff <workspace-root> --branch <branch> --title <title> [options]",
+    );
+    expect(output.output()).toContain("Options for publication review-handoff:");
+    expect(output.output()).toContain("--branch <branch>");
+    expect(output.output()).toContain("--title <text>");
+    expect(output.output()).not.toContain("Options for publication pull-request merge:");
   });
 
   it("prints JSON errors when --json is present", async () => {
@@ -5404,6 +5454,147 @@ describe("dev-nexus cli", () => {
         ],
       },
     });
+  });
+
+  it("executes safe coordination cleanup through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-cleanup-execute-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "merged");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      components: [
+        {
+          id: "primary",
+          name: "Primary",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/primary.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          worktreesRoot: "worktrees/primary",
+          relationships: [],
+        },
+      ],
+    }));
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "primary",
+      branchName: "codex/primary/merged",
+      worktreePath,
+      status: "merged",
+      gitFacts: { headCommit: "branch123", dirty: false, pushed: true },
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      const joined = argsArray.join(" ");
+      if (joined === "worktree list --porcelain") {
+        return {
+          args: argsArray,
+          stdout: [
+            `worktree ${sourceRoot}`,
+            "HEAD target123",
+            "branch refs/heads/main",
+            "",
+            `worktree ${worktreePath}`,
+            "HEAD branch123",
+            "branch refs/heads/codex/primary/merged",
+            "",
+          ].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
+        return {
+          args: argsArray,
+          stdout: "codex/primary/merged\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-parse --verify main") {
+        return { args: argsArray, stdout: "target123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse codex/primary/merged") {
+        return { args: argsArray, stdout: "branch123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "merge-base --is-ancestor codex/primary/merged main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (
+        joined ===
+        "rev-parse --abbrev-ref --symbolic-full-name codex/primary/merged@{u}"
+      ) {
+        return {
+          args: argsArray,
+          stdout: "origin/codex/primary/merged\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        joined ===
+        "rev-list --left-right --count codex/primary/merged...origin/codex/primary/merged"
+      ) {
+        return { args: argsArray, stdout: "0\t0\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --is-inside-work-tree") {
+        return { args: argsArray, stdout: "true\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "symbolic-ref --short HEAD") {
+        return {
+          args: argsArray,
+          stdout: cwd === worktreePath ? "codex/primary/merged\n" : "",
+          stderr: "",
+          exitCode: cwd === worktreePath ? 0 : 1,
+        };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+    const output = captureOutput();
+
+    await main(
+      [
+        "coordination",
+        "cleanup-execute",
+        projectRoot,
+        "--component",
+        "primary",
+        "--candidate",
+        "component:primary:worktree:merged",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-18T10:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      result: {
+        mutatesSource: true,
+        actions: {
+          removedWorktree: worktreePath,
+          deletedBranch: "codex/primary/merged",
+          updatedLeaseIds: [lease.id],
+        },
+      },
+    });
+    expect(calls.filter(({ args }) =>
+      args[0] === "branch" ||
+      (args[0] === "worktree" && args[1] === "remove"),
+    )).toEqual([
+      { cwd: sourceRoot, args: ["worktree", "remove", worktreePath] },
+      { cwd: sourceRoot, args: ["branch", "-d", "codex/primary/merged"] },
+    ]);
   });
 
   it("returns actionable JSON when coordination integration cannot parse a local tracker store", async () => {

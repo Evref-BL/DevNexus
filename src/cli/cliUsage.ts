@@ -33,6 +33,7 @@ export function usage(): string {
     "  dev-nexus coordination handoff <workspace-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <workspace-root> [options]",
     "  dev-nexus coordination cleanup-plan <workspace-root> [options]",
+    "  dev-nexus coordination cleanup-execute <workspace-root> --candidate <id> [options]",
     "  dev-nexus coordination request <workspace-root> --intent <intent> (--question <text>|--note <text>) [options]",
     "  dev-nexus remote-execution request create <workspace-root> [options]",
     "  dev-nexus remote-execution result record <workspace-root> <request-id> [options]",
@@ -226,6 +227,16 @@ export function usage(): string {
     "  --component <id>          defaults to the primary component",
     "  --include-workspace-meta  also scan workspace-meta worktrees and branches",
     "  --target-branch <branch>  defaults to component or workspace publication target",
+    "  --json",
+    "",
+    "Options for coordination cleanup-execute:",
+    "  --component <id>          defaults to the primary component",
+    "  --candidate <id>          candidate id from coordination cleanup-plan",
+    "  --include-workspace-meta  also scan workspace-meta worktrees and branches",
+    "  --target-branch <branch>  defaults to component or workspace publication target",
+    "  --keep-branch            remove the worktree without deleting the merged local branch",
+    "  --force                  allow force cleanup for forceable unsafe candidates",
+    "  --force-reason <text>    required with --force for unsafe candidates",
     "  --json",
     "",
     "Options for coordination request:",
@@ -726,6 +737,95 @@ export function usage(): string {
     "  --error <text>",
     "  --json",
   ].join("\n");
+}
+
+export function focusedCommandUsageForArgv(argv: string[]): string | null {
+  if (!argvRequestsHelp(argv)) {
+    return null;
+  }
+
+  const commandTokens = argv.filter((token) => token !== "--help" && token !== "-h");
+  const commandPath = usageCommandPaths()
+    .filter((path) => !usesCustomFocusedUsage(path))
+    .sort((left, right) => right.split(" ").length - left.split(" ").length)
+    .find((path) => commandPathMatches(path, commandTokens));
+  return commandPath ? focusedCommandUsage(commandPath) : null;
+}
+
+function focusedCommandUsage(commandPath: string): string {
+  const lines = usage().split("\n");
+  const usageLine = lines.find((line) =>
+    line.trimStart().startsWith(`dev-nexus ${commandPath}`)
+  );
+  const optionBlock = commandOptionBlock(lines, `Options for ${commandPath}:`);
+  return [
+    "Usage:",
+    usageLine ?? `  dev-nexus ${commandPath} [options]`,
+    ...(optionBlock.length > 0 ? ["", ...optionBlock] : []),
+  ].join("\n");
+}
+
+function usageCommandPaths(): string[] {
+  return usage()
+    .split("\n")
+    .filter((line) => line.startsWith("  dev-nexus "))
+    .map(commandPathFromUsageLine)
+    .filter((path): path is string => path !== null);
+}
+
+function commandPathFromUsageLine(line: string): string | null {
+  const tokens = line.trim().slice("dev-nexus ".length).split(/\s+/u);
+  const commandTokens: string[] = [];
+  for (const token of tokens) {
+    if (
+      token.startsWith("<") ||
+      token.startsWith("[") ||
+      token.startsWith("--") ||
+      token.startsWith("(")
+    ) {
+      break;
+    }
+    commandTokens.push(token);
+  }
+  return commandTokens.length > 0 ? commandTokens.join(" ") : null;
+}
+
+function commandOptionBlock(lines: string[], header: string): string[] {
+  const start = lines.indexOf(header);
+  if (start < 0) {
+    return [];
+  }
+
+  const block: string[] = [];
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    if (index > start && line.startsWith("Options for ")) {
+      break;
+    }
+    block.push(line);
+  }
+  return trimTrailingBlankLines(block);
+}
+
+function trimTrailingBlankLines(lines: string[]): string[] {
+  const trimmed = [...lines];
+  while (trimmed.at(-1) === "") {
+    trimmed.pop();
+  }
+  return trimmed;
+}
+
+function commandPathMatches(commandPath: string, tokens: string[]): boolean {
+  const commandTokens = commandPath.split(" ");
+  return commandTokens.every((token, index) => tokens[index] === token);
+}
+
+function usesCustomFocusedUsage(commandPath: string): boolean {
+  return commandPath === "workspace init" || commandPath === "workspace component add";
+}
+
+function argvRequestsHelp(argv: string[]): boolean {
+  return argv.includes("--help") || argv.includes("-h");
 }
 
 export function projectSetupUsage(): string {

@@ -1370,6 +1370,65 @@ describe("publication CLI operations", () => {
     expect(stdout.output()).not.toContain("installation-token");
   });
 
+  it("reports setup actions when project repository PR handoff has only Git push auth", async () => {
+    const { projectRoot } = createProjectRepositorySshOnlyPublicationProject();
+    const repositoryPath = initProjectRepositoryWorktree(projectRoot, "codex/dogfood/meta");
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("missing PR credential should fail before provider calls");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--project-repository",
+        "--repository-path",
+        repositoryPath,
+        "--branch",
+        "codex/dogfood/meta",
+        "--title",
+        "Refresh dogfood metadata",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {} as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      branchPush: {
+        ok: true,
+        componentId: null,
+        target: {
+          kind: "project",
+          id: "publication-project",
+        },
+        credential: {
+          profileId: "dogfood-bot-github",
+        },
+      },
+      pullRequest: {
+        ok: false,
+        error: {
+          code: "pull_request_credential_unavailable",
+          credentialCode: "missing_secret",
+          profileId: "dogfood-bot-github",
+        },
+        setupActions: [
+          expect.stringContaining("dogfood-bot-github"),
+          expect.stringContaining("pull request API operations"),
+        ],
+      },
+    });
+  });
+
   it("rejects publication commands that select a component and the project repository", async () => {
     const { projectRoot } = createMultiComponentPublicationProject();
     const stdout = textWriter();
@@ -1994,6 +2053,107 @@ function createMultiComponentPublicationProject(): {
     ],
   });
   return { projectRoot, homePath, sourceRoot };
+}
+
+function createProjectRepositorySshOnlyPublicationProject(): {
+  projectRoot: string;
+  homePath: string;
+} {
+  const projectRoot = makeTempDir("dev-nexus-publication-project-ssh-only-");
+  const homePath = path.join(projectRoot, "home");
+  saveNexusHomeConfigFile(
+    homePath,
+    {
+      version: 1,
+      paths: {
+        projectsRoot: path.join(homePath, "projects"),
+        workspacesRoot: path.join(homePath, "workspaces"),
+      },
+      authProfiles: [
+        {
+          id: "dogfood-bot-github",
+          actorId: "dogfood-gabot-automation-bot",
+          provider: "github",
+          kind: "automation",
+          account: "Gabot-Darbot",
+          host: "github.com",
+          sshHost: "github.com-bot",
+          purposes: ["api", "git", "cli"],
+          gitUserName: "Gabot-Darbot",
+          gitUserEmail: "285409735+Gabot-Darbot@users.noreply.github.com",
+        },
+      ],
+      projects: [],
+    },
+    validateNexusHomeConfigBase,
+  );
+  saveProjectConfig(projectRoot, {
+    ...publicationProjectConfig(homePath),
+    repo: {
+      kind: "git",
+      remoteUrl: "git@github.com:Gabot-Darbot/dev-nexus-dogfood.git",
+      defaultBranch: "main",
+    },
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "direct_integration",
+        remote: "bot",
+        targetBranch: "main",
+        push: true,
+        sshHostAlias: "github.com-bot",
+        actor: {
+          kind: "machine_user",
+          provider: "github",
+          handle: "Gabot-Darbot",
+          id: "dogfood-gabot-automation-bot",
+        },
+        gitIdentity: {
+          name: "Gabot-Darbot",
+          email: "285409735+Gabot-Darbot@users.noreply.github.com",
+        },
+      },
+    },
+    hosting: {
+      provider: "github",
+      namespace: "Gabot-Darbot",
+      repository: {
+        name: "dev-nexus-dogfood",
+        visibility: "private",
+        defaultBranch: "main",
+      },
+      authProfile: "dogfood-bot-github",
+      remotes: [
+        {
+          name: "bot",
+          role: "automation",
+          protocol: "ssh",
+          authProfile: "dogfood-bot-github",
+        },
+      ],
+    },
+    components: [
+      {
+        id: "dev-nexus",
+        name: "DevNexus",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+        defaultBranch: "main",
+        sourceRoot: "sources/dev-nexus",
+        workTracking: {
+          provider: "github",
+          repository: {
+            owner: "Evref-BL",
+            name: "DevNexus",
+          },
+        },
+        relationships: [],
+      },
+    ],
+  });
+  return { projectRoot, homePath };
 }
 
 function savePublicationHomeConfig(homePath: string): void {

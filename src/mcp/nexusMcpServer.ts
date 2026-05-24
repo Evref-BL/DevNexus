@@ -146,6 +146,10 @@ import {
   parseNexusCoordinationRequestStatus,
 } from "../coordination/nexusCoordinationRequest.js";
 import {
+  executeNexusCleanup,
+  selectNexusCleanupCandidate,
+} from "../operations/nexusCleanupExecution.js";
+import {
   createNexusRemoteExecutionRequest,
   getNexusRemoteExecutionRecord,
   maxNexusRemoteExecutionOutputTailLength,
@@ -860,6 +864,27 @@ const tools: McpTool[] = [
         targetBranch: { type: "string" },
         fetch: { type: "boolean" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_cleanup_execute",
+    description: "Remove one safe DevNexus cleanup-plan candidate and update matching worktree lease metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        candidateId: { type: "string" },
+        includeProjectMeta: { type: "boolean" },
+        targetBranch: { type: "string" },
+        keepBranch: { type: "boolean" },
+        force: { type: "boolean" },
+        forceReason: { type: ["string", "null"], maxLength: 500 },
+      },
+      required: ["candidateId"],
       additionalProperties: false,
     },
   },
@@ -1940,6 +1965,53 @@ export async function callDevNexusMcpTool(
             now: context.now,
           }),
         });
+      case "coordination_cleanup_execute": {
+        const projectRoot = projectRootFromArgs(args);
+        const componentId = optionalString(args, "componentId", "arguments");
+        const selected = selectNexusCleanupCandidate({
+          projectRoot,
+          componentId,
+          includeProjectMeta: optionalBoolean(
+            args,
+            "includeProjectMeta",
+            "arguments",
+          ),
+          targetBranch: optionalString(args, "targetBranch", "arguments"),
+          candidateId: requiredString(args, "candidateId", "arguments"),
+          gitRunner: context.gitRunner,
+          now: context.now,
+        });
+        assertMcpMutationAllowed(args, context, {
+          command: "coordination_cleanup_execute",
+          mutationClass: "cleanup_execution",
+          targetPath:
+            selected.candidate.worktreePath ??
+            selected.candidate.git.repositoryPath ??
+            projectRoot,
+          componentId: selected.candidate.componentId,
+        });
+        return toolResult({
+          ok: true,
+          result: executeNexusCleanup({
+            projectRoot,
+            componentId,
+            includeProjectMeta: optionalBoolean(
+              args,
+              "includeProjectMeta",
+              "arguments",
+            ),
+            targetBranch: optionalString(args, "targetBranch", "arguments"),
+            candidateId: requiredString(args, "candidateId", "arguments"),
+            deleteBranch: optionalBoolean(args, "keepBranch", "arguments")
+              ? false
+              : undefined,
+            force: optionalBoolean(args, "force", "arguments"),
+            forceReason: optionalNullableString(args, "forceReason", "arguments"),
+            gitRunner: context.gitRunner,
+            now: context.now,
+          }),
+        });
+      }
       case "coordination_request":
         assertMcpMutationAllowed(args, context, {
           command: "coordination_request",

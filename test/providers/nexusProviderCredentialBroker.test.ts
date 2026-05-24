@@ -776,8 +776,9 @@ describe("provider credential broker", () => {
     },
   );
 
-  it("mints and caches GitHub App installation tokens with repository and permission metadata", async () => {
+  it("mints, caches, and refreshes GitHub App installation tokens with repository and permission metadata", async () => {
     const privateKey = testPrivateKey();
+    let now = "2026-05-21T12:00:00.000Z";
     const calls: Array<{
       url: string;
       method: string;
@@ -798,7 +799,7 @@ describe("provider credential broker", () => {
           },
         }),
       ],
-      now: "2026-05-21T12:00:00.000Z",
+      now: () => new Date(now),
       readFile: (filePath) => {
         expect(filePath).toBe("/secrets/app.private-key.pem");
         return privateKey;
@@ -818,6 +819,28 @@ describe("provider credential broker", () => {
           body: {
             token: "installation-token",
             expires_at: "2026-05-21T13:00:00.000Z",
+            repository_selection: "selected",
+            permissions: {
+              contents: "write",
+              issues: "write",
+            },
+            repositories: [{ name: "DevNexus" }],
+          },
+        },
+        {
+          body: [
+            {
+              id: 987,
+              account: { login: "Evref-BL" },
+              repository_selection: "selected",
+            },
+          ],
+        },
+        {
+          status: 201,
+          body: {
+            token: "refreshed-installation-token",
+            expires_at: "2026-05-21T14:00:00.000Z",
             repository_selection: "selected",
             permissions: {
               contents: "write",
@@ -865,8 +888,17 @@ describe("provider credential broker", () => {
         value: "installation-token",
       },
     });
+    now = "2026-05-21T12:56:00.000Z";
+    await expect(resolveProviderCredential(broker, request)).resolves.toMatchObject({
+      authorizationHeader: "Bearer refreshed-installation-token",
+      expiresAt: "2026-05-21T14:00:00.000Z",
+      secret: {
+        kind: "token",
+        value: "refreshed-installation-token",
+      },
+    });
 
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
     expect(calls[0]).toMatchObject({
       url: "https://api.github.com/app/installations?per_page=100",
       method: "GET",
@@ -882,6 +914,114 @@ describe("provider credential broker", () => {
         repositories: ["DevNexus"],
       },
     });
+    expect(calls[3]).toMatchObject({
+      url: "https://api.github.com/app/installations/987/access_tokens",
+      method: "POST",
+      body: {
+        repositories: ["DevNexus"],
+      },
+    });
+  });
+
+  it("does not reuse a GitHub App installation token for broader required permissions", async () => {
+    const privateKey = testPrivateKey();
+    const calls: Array<{
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+      body?: unknown;
+    }> = [];
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        appProfile({
+          githubApp: {
+            appId: "12345",
+            slug: "devnexus-automation",
+            privateKeyPath: "/secrets/app.private-key.pem",
+            installationAccount: "Evref-BL",
+            repositories: ["DevNexus"],
+          },
+        }),
+      ],
+      now: "2026-05-21T12:00:00.000Z",
+      readFile: () => privateKey,
+      fetch: queuedFetch(calls, [
+        {
+          body: [
+            {
+              id: 987,
+              account: { login: "Evref-BL" },
+              repository_selection: "selected",
+            },
+          ],
+        },
+        {
+          status: 201,
+          body: {
+            token: "read-token",
+            expires_at: "2026-05-21T13:00:00.000Z",
+            repository_selection: "selected",
+            permissions: {
+              contents: "read",
+            },
+            repositories: [{ name: "DevNexus" }],
+          },
+        },
+        {
+          body: [
+            {
+              id: 987,
+              account: { login: "Evref-BL" },
+              repository_selection: "selected",
+            },
+          ],
+        },
+        {
+          status: 201,
+          body: {
+            token: "write-token",
+            expires_at: "2026-05-21T13:00:00.000Z",
+            repository_selection: "selected",
+            permissions: {
+              contents: "write",
+            },
+            repositories: [{ name: "DevNexus" }],
+          },
+        },
+      ]),
+    });
+
+    const request = {
+      provider: "github",
+      purpose: "api" as const,
+      profileId: "dev-nexus-app",
+      repository: {
+        owner: "Evref-BL",
+        name: "DevNexus",
+      },
+    };
+    await expect(
+      resolveProviderCredential(broker, {
+        ...request,
+        requiredPermissions: {
+          contents: "read",
+        },
+      }),
+    ).resolves.toMatchObject({
+      authorizationHeader: "Bearer read-token",
+    });
+    await expect(
+      resolveProviderCredential(broker, {
+        ...request,
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+    ).resolves.toMatchObject({
+      authorizationHeader: "Bearer write-token",
+    });
+
+    expect(calls).toHaveLength(4);
   });
 
   it("surfaces actionable GitHub App credential failures without leaking tokens", async () => {

@@ -26,7 +26,9 @@ import {
   type NexusAutomationWorkTrackerSummary,
 } from "./nexusAutomationWorkTrackerSummary.js";
 import {
+  listDevNexusPluginCatalogue,
   projectPluginCapabilityProjections,
+  type NexusPluginCatalogueEntry,
   type NexusPluginCapabilityProjection,
 } from "../project/nexusPluginCapabilities.js";
 import { loadProjectConfig } from "../project/nexusProjectConfig.js";
@@ -123,6 +125,7 @@ export interface NexusAutomationAgentProfileSummary {
   safety: NexusAutomationConfig["safety"] | null;
   profiles: NexusAutomationAgentProfilePolicySummary[];
   runnerProfiles: NexusRunnerProfilePolicySummary[];
+  pluginCatalogue: NexusPluginCatalogueEntry[];
   pluginCapabilities: NexusPluginCapabilityProjection[];
 }
 
@@ -391,6 +394,7 @@ export function getNexusAutomationAgentProfileSummary(
       projectConfig.runnerProfiles,
       projectConfig.hosts,
     ),
+    pluginCatalogue: listDevNexusPluginCatalogue(),
     pluginCapabilities: projectPluginCapabilityProjections(projectConfig),
   };
 }

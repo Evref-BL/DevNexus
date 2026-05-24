@@ -34,9 +34,10 @@ actions, and assistant behavior. A full public marketplace should wait for:
 
 ## Current small step
 
-The cockpit can safely surface local plugin packages from component source
-roots and copy a `dev-nexus workspace plugin refresh ... --from ...` command.
-It does not run install or setup from the browser.
+The cockpit can surface curated DevNexus plugin catalogue entries and copy a
+`dev-nexus workspace plugin refresh ... --from ... --export ...` command. It
+does not scan component source roots for plugin packages, run package installs,
+or run setup from the browser.
 
 ## Sources
 
