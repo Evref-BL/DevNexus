@@ -2725,6 +2725,12 @@ describe("nexus dashboard", () => {
     expect(rendered).toContain('width="148"');
     expect(rendered).toContain('height="120"');
     expect(rendered).toContain('viewBox="0 0 148 120"');
+    expect(rendered).toContain('data-history-row-count="4"');
+    expect(rendered).toContain('data-history-lane-count="1"');
+    expect(rendered).toContain('data-history-event-class="write"');
+    expect(rendered).toContain(
+      'data-history-write-event-id="history:primary:head000000000000000000000000000000000000"',
+    );
   });
 
   it("filters project git history by branch head ancestors", async () => {

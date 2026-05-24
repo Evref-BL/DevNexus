@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { buildWriteHistoryLayout } from "../../dashboard/nexusDashboardHistoryLayout.js";
+import { renderNexusCockpitHistoryGraphSvg } from "./history/nexusCockpitHistoryGraphSvg.js";
 
 export interface DevNexusDashboardMountOptions {
   actionToken?: string;
@@ -1155,43 +1156,9 @@ function gitHistoryRows(snapshot, filter = 'all') {
 }
 
 function renderGitHistorySvg(graph) {
-  const rowHeight = 30;
-  const laneGap = 22;
-  const offsetX = 28;
-  const offsetY = rowHeight / 2;
-  const width = Math.max(148, offsetX * 2 + graph.maxLane * laneGap);
-  const height = Math.max(rowHeight, graph.rows.length * rowHeight);
-  const x = (lane) => offsetX + lane * laneGap;
-  const y = (index) => offsetY + index * rowHeight;
-  const paths = graph.paths.map((path) => {
-    const points = gitHistoryPathPoints(path).map((point) => ({ x: x(point.lane), y: y(point.index) }));
-    const color = `var(--dn-branch-${(path.colorLane ?? path.fromLane ?? 0) % 7})`;
-    const d = gitHistoryPathD(points, rowHeight);
-    return `<path class="dn-git-line-shadow" d="${d}" /><path class="dn-git-line" d="${d}" stroke="${color}" />`;
-  }).join('');
-  const dots = graph.rows.map((row) => `<circle cx="${x(row.lane)}" cy="${y(row.index)}" r="5.2" fill="var(--dn-surface)" stroke="var(--dn-branch-${(row.colorLane ?? row.lane) % 7})" stroke-width="3" />`).join('');
-  return `<svg class="dn-git-graph" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Git commit graph">${paths}${dots}</svg>`;
-}
-
-function gitHistoryPathPoints(path) {
-  if (path.points?.length) return path.points;
-  return [{ lane: path.fromLane, index: path.fromIndex }, { lane: path.toLane, index: path.toIndex }];
-}
-
-function gitHistoryPathD(points, rowHeight) {
-  if (!points.length) return '';
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let index = 1; index < points.length; index++) {
-    const from = points[index - 1];
-    const to = points[index];
-    if (from.x === to.x) d += ` V ${to.y}`;
-    else if (from.y === to.y) d += ` H ${to.x}`;
-    else {
-      const curve = Math.min(rowHeight * 0.7, Math.max(8, Math.abs(to.y - from.y) * 0.58));
-      d += ` C ${from.x} ${from.y + curve}, ${to.x} ${to.y - curve}, ${to.x} ${to.y}`;
-    }
-  }
-  return d;
+  return renderNexusCockpitHistoryGraphSvg(graph, {
+    ariaLabel: 'Git write history graph',
+  });
 }
 
 function renderGitHistoryRow(snapshot, row, selectedId) {
