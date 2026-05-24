@@ -581,7 +581,7 @@ describe("nexus automation worktree setup", () => {
     );
     expect(
       fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
-    ).toBe(".dev-nexus/context/\n");
+    ).toBe(".dev-nexus/guardrails/\n.dev-nexus/context/\n");
   });
 
   it("fails preflight and materialization for required missing plugin projections", () => {
@@ -827,6 +827,18 @@ describe("nexus automation worktree setup", () => {
       contextJsonPath,
       briefingPath,
     });
+    expect(result.guardrails).toHaveLength(1);
+    expect(result.guardrails?.[0]).toMatchObject({
+      id: "publication-command-guard",
+      status: "materialized",
+      rootDirectoryPath: path.join(worktreePath, ".dev-nexus", "guardrails"),
+      binDirectoryPath: path.join(
+        worktreePath,
+        ".dev-nexus",
+        "guardrails",
+        "bin",
+      ),
+    });
     expect(JSON.parse(fs.readFileSync(contextJsonPath, "utf8"))).toMatchObject({
       project: {
         id: "demo-project",
@@ -840,8 +852,12 @@ describe("nexus automation worktree setup", () => {
     );
     expect(
       fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
-    ).toBe(".dev-nexus/context/\n");
+    ).toBe(".dev-nexus/guardrails/\n.dev-nexus/context/\n");
     expect(gitCalls).toEqual([
+      {
+        args: ["rev-parse", "--git-path", "info/exclude"],
+        cwd: worktreePath,
+      },
       {
         args: ["rev-parse", "--git-path", "info/exclude"],
         cwd: worktreePath,
