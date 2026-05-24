@@ -7486,7 +7486,19 @@ function printWorktreePrepareResult(
   writeLine(stdout, `  Branch: ${result.worktree.branchName}`);
   writeLine(stdout, `  Lease: ${result.lease.id}`);
   if (result.worktree.baseRef) {
-    writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
+    writeLine(
+      stdout,
+      `  Base ref: ${result.worktree.baseRef} (${result.worktree.baseRefKind})`,
+    );
+  }
+  if (result.worktree.resolvedBaseCommit) {
+    writeLine(
+      stdout,
+      `  Resolved base commit: ${result.worktree.resolvedBaseCommit}`,
+    );
+  }
+  for (const warning of result.worktree.baseRefFreshness.warnings) {
+    writeLine(stdout, `  Base warning: ${warning}`);
   }
   if (result.setup.context?.context.featureBranchDelivery) {
     const feature = result.setup.context.context.featureBranchDelivery;

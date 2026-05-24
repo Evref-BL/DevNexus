@@ -1964,6 +1964,72 @@ describe("nexus coordination", () => {
     });
   }, 15000);
 
+  it("warns when a handoff was based on the default branch for a non-default integration target", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initCoordinationProjectFixture("coordination-base-mismatch");
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Feature target integration",
+    );
+    const mainCommit = "1111111111111111111111111111111111111111";
+    const featureTargetCommit = "2222222222222222222222222222222222222222";
+    const workerCommit = "3333333333333333333333333333333333333333";
+    const branches = {
+      "codex/default-based-worker": {
+        head: workerCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["src/feature-target.ts"],
+        mergeStatus: "clean" as const,
+      },
+      "feature/target": {
+        head: featureTargetCommit,
+        mergeBase: mainCommit,
+        changedFiles: [],
+        mergeStatus: "clean" as const,
+      },
+    };
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      status: "ready",
+      changedAreas: ["src/feature-target.ts"],
+      currentPath: sourceRoot,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/default-based-worker",
+        currentHead: workerCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      targetBranch: "feature/target",
+      currentPath: sourceRoot,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "feature/target",
+        currentHead: featureTargetCommit,
+        mainHead: mainCommit,
+        branches,
+      }),
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          "based on default branch main while integration target is feature/target",
+        ),
+      ]),
+    );
+  });
+
   it("reports concise textual conflicts from merge-tree", async () => {
     const { projectRoot, sourceRoot, storePath } =
       initCoordinationProjectFixture("coordination-conflict");

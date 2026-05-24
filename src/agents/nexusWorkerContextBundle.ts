@@ -21,6 +21,7 @@ import type {
 } from "../project/nexusPluginCapabilities.js";
 import type { NexusRunnerProfilePolicySummary } from "../remote-execution/nexusRunnerProfile.js";
 import type { NexusExpectedGitIdentity } from "../git/nexusGitIdentity.js";
+import type { PreparedGitWorktreeBaseRefKind } from "../worktrees/gitWorktreeService.js";
 
 export type NexusWorkerContextFileId =
   | "agents"
@@ -160,6 +161,9 @@ export interface NexusWorkerContextBundleWorktree {
   worktreePath: string;
   branchName: string;
   baseRef: string | null;
+  requestedBaseRef?: string | null;
+  resolvedBaseCommit?: string | null;
+  baseRefKind?: PreparedGitWorktreeBaseRefKind | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
 }
 
@@ -224,6 +228,9 @@ export interface NexusWorkerContextBundleOptions {
   worktreePath: string;
   branchName: string;
   baseRef: string | null;
+  requestedBaseRef?: string | null;
+  resolvedBaseCommit?: string | null;
+  baseRefKind?: PreparedGitWorktreeBaseRefKind | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
   featureBranchDelivery?: NexusWorkerContextFeatureBranchDelivery | null;
   targetStatePath?: string | null;
@@ -318,6 +325,13 @@ export function buildNexusWorkerContextBundle(
   );
   const branchName = requiredNonEmptyString(options.branchName, "branchName");
   const baseRef = optionalNullableString(options.baseRef, "baseRef") ?? null;
+  const requestedBaseRef =
+    optionalNullableString(options.requestedBaseRef, "requestedBaseRef") ??
+    baseRef;
+  const resolvedBaseCommit =
+    optionalNullableString(options.resolvedBaseCommit, "resolvedBaseCommit") ??
+    null;
+  const baseRefKind = normalizeWorkerContextBaseRefKind(options.baseRefKind);
   const workItem = normalizeWorkerContextWorkItem(options.workItem);
   const projectContext = projectContextReferences({
     projectRoot,
@@ -350,6 +364,9 @@ export function buildNexusWorkerContextBundle(
     worktreePath,
     branchName,
     baseRef,
+    requestedBaseRef,
+    resolvedBaseCommit,
+    baseRefKind,
     workItem,
   };
   const featureBranchDelivery = options.featureBranchDelivery ?? null;
@@ -409,6 +426,9 @@ export function renderNexusWorkerBriefing(
     ? `${context.worktree.workItem.id}: ${context.worktree.workItem.title}`
     : "none";
   const baseRefLine = context.worktree.baseRef ?? "none";
+  const baseRefKindSuffix = context.worktree.baseRefKind
+    ? ` (${context.worktree.baseRefKind})`
+    : "";
 
   return [
     "# DevNexus Worker Context",
@@ -416,7 +436,8 @@ export function renderNexusWorkerBriefing(
     `Component: ${context.component.id}`,
     `Work item: ${workItemLine}`,
     `Branch: ${context.worktree.branchName}`,
-    `Base ref: ${baseRefLine}`,
+    `Base ref: ${baseRefLine}${baseRefKindSuffix}`,
+    ...renderBaseRefDetailLines(context.worktree),
     ...renderFeatureDeliveryLines(context.featureBranchDelivery),
     "",
     ...renderAgentTargetPolicyLines(context.agentTargetPolicy),
@@ -455,6 +476,20 @@ export function renderNexusWorkerBriefing(
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
+}
+
+function renderBaseRefDetailLines(
+  worktree: NexusWorkerContextBundleWorktree,
+): string[] {
+  const lines: string[] = [];
+  if (worktree.requestedBaseRef && worktree.requestedBaseRef !== worktree.baseRef) {
+    lines.push(`Requested base ref: ${worktree.requestedBaseRef}`);
+  }
+  if (worktree.resolvedBaseCommit) {
+    lines.push(`Resolved base commit: ${worktree.resolvedBaseCommit}`);
+  }
+
+  return lines;
 }
 
 function renderFeatureDeliveryLines(
@@ -1248,6 +1283,28 @@ function normalizeWorkerContextWorkItem(
     ...(workItem.labels ? { labels: [...workItem.labels] } : {}),
     ...(workItem.assignees ? { assignees: [...workItem.assignees] } : {}),
   };
+}
+
+function normalizeWorkerContextBaseRefKind(
+  value: PreparedGitWorktreeBaseRefKind | null | undefined,
+): PreparedGitWorktreeBaseRefKind | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    value === "none" ||
+    value === "branch" ||
+    value === "remote_branch" ||
+    value === "tag" ||
+    value === "commit" ||
+    value === "other"
+  ) {
+    return value;
+  }
+
+  throw new NexusWorkerContextBundleError(
+    "baseRefKind must be none, branch, remote_branch, tag, commit, or other",
+  );
 }
 
 function normalizeWorkerPluginFragments(

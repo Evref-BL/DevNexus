@@ -6,6 +6,7 @@ import {
   defaultGitRunner,
   type GitCommandResult,
   type GitRunner,
+  type PreparedGitWorktreeBaseRefKind,
 } from "./gitWorktreeService.js";
 import { gitDirectoryFromGitFileLine } from "../git/nexusGitFile.js";
 import {
@@ -99,6 +100,9 @@ export interface NexusWorktreeLeaseRecord {
   workItemId: string | null;
   branchName: string | null;
   baseRef: string | null;
+  requestedBaseRef: string | null;
+  resolvedBaseCommit: string | null;
+  baseRefKind: PreparedGitWorktreeBaseRefKind | null;
   worktree: NexusWorktreeLeaseLocation;
   writeScope: string[];
   status: NexusWorktreeLeaseStatus;
@@ -143,6 +147,9 @@ export interface CreateOrRefreshNexusWorktreeLeaseOptions {
   workItemId?: string | null;
   branchName?: string | null;
   baseRef?: string | null;
+  requestedBaseRef?: string | null;
+  resolvedBaseCommit?: string | null;
+  baseRefKind?: PreparedGitWorktreeBaseRefKind | null;
   worktreePath?: string | null;
   writeScope?: string[];
   status?: NexusWorktreeLeaseStatus;
@@ -277,6 +284,11 @@ export function createOrRefreshNexusWorktreeLease(
     optionalNullableTrimmedString(options.branchName) ??
     null;
   const baseRef = optionalNullableTrimmedString(options.baseRef) ?? null;
+  const requestedBaseRef =
+    optionalNullableTrimmedString(options.requestedBaseRef) ?? baseRef;
+  const resolvedBaseCommit =
+    optionalNullableTrimmedString(options.resolvedBaseCommit) ?? null;
+  const baseRefKind = parsePreparedBaseRefKind(options.baseRefKind);
   const worktree = classifyLeaseLocation({
     context,
     value: worktreePath,
@@ -315,6 +327,9 @@ export function createOrRefreshNexusWorktreeLease(
     workItemId,
     branchName,
     baseRef,
+    requestedBaseRef,
+    resolvedBaseCommit,
+    baseRefKind,
     worktree,
     writeScope,
     status,
@@ -401,6 +416,28 @@ export function parseNexusWorktreeLeaseStatus(
 
   throw new NexusWorktreeLeaseError(
     `${pathName} must be working, ready, blocked, integrating, merged, abandoned, or stale`,
+  );
+}
+
+function parsePreparedBaseRefKind(
+  value: PreparedGitWorktreeBaseRefKind | null | undefined,
+): PreparedGitWorktreeBaseRefKind | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    value === "none" ||
+    value === "branch" ||
+    value === "remote_branch" ||
+    value === "tag" ||
+    value === "commit" ||
+    value === "other"
+  ) {
+    return value;
+  }
+
+  throw new NexusWorktreeLeaseError(
+    "baseRefKind must be none, branch, remote_branch, tag, commit, or other",
   );
 }
 
@@ -741,6 +778,15 @@ function normalizeLeaseRecord(value: unknown): NexusWorktreeLeaseRecord {
     workItemId: optionalNullableTrimmedString(record.workItemId) ?? null,
     branchName: optionalNullableTrimmedString(record.branchName) ?? null,
     baseRef: optionalNullableTrimmedString(record.baseRef) ?? null,
+    requestedBaseRef:
+      optionalNullableTrimmedString(record.requestedBaseRef) ??
+      optionalNullableTrimmedString(record.baseRef) ??
+      null,
+    resolvedBaseCommit:
+      optionalNullableTrimmedString(record.resolvedBaseCommit) ?? null,
+    baseRefKind: parsePreparedBaseRefKind(
+      record.baseRefKind as PreparedGitWorktreeBaseRefKind | null | undefined,
+    ),
     worktree: normalizeLeaseLocation(record.worktree, "lease.worktree"),
     writeScope: normalizedStringArray(record.writeScope, "lease.writeScope"),
     status: parseNexusWorktreeLeaseStatus(

@@ -13,6 +13,7 @@ import {
 } from "../../src/worktrees/gitWorktreeService.js";
 
 const tempDirs: string[] = [];
+const defaultBaseCommit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -26,6 +27,44 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
     calls.push({ args: argsArray, cwd });
     if (argsArray[0] === "for-each-ref") {
       return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet" &&
+      argsArray[3]?.endsWith("^{commit}")
+    ) {
+      const ref = argsArray[3].slice(0, -"^{commit}".length);
+      const commit = /^[0-9a-f]{40}$/iu.test(ref) ? ref : defaultBaseCommit;
+      return { args: argsArray, stdout: `${commit}\n`, stderr: "", exitCode: 0 };
+    }
+    if (
+      argsArray[0] === "show-ref" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet"
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode:
+          argsArray[3] === "refs/heads/main" ||
+          argsArray[3] === "refs/heads/feature/parent"
+            ? 0
+            : 1,
+      };
+    }
+    if (
+      argsArray.join(" ") ===
+      "rev-parse --abbrev-ref --symbolic-full-name main@{upstream}"
+    ) {
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 1 };
+    }
+    if (
+      argsArray.join(" ") ===
+      "rev-parse --abbrev-ref --symbolic-full-name feature/parent@{upstream}"
+    ) {
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 1 };
     }
     if (argsArray[0] === "worktree" && argsArray[1] === "add") {
       const pathArgument = argsArray[2] === "-b" ? argsArray[4] : argsArray[2];
@@ -74,6 +113,9 @@ describe("git worktree service", () => {
       componentId: "core",
       branchName: "codex/demo/FCD-1",
       baseRef: "main",
+      requestedBaseRef: "main",
+      resolvedBaseCommit: defaultBaseCommit,
+      baseRefKind: "branch",
       workItem: {
         id: "local-7",
         title: "Support component-scoped parallel worktree records",
@@ -90,6 +132,23 @@ describe("git worktree service", () => {
       },
       {
         cwd: sourceRoot,
+        args: ["show-ref", "--verify", "--quiet", "refs/heads/main"],
+      },
+      {
+        cwd: sourceRoot,
+        args: [
+          "rev-parse",
+          "--abbrev-ref",
+          "--symbolic-full-name",
+          "main@{upstream}",
+        ],
+      },
+      {
+        cwd: sourceRoot,
+        args: ["rev-parse", "--verify", "--quiet", "main^{commit}"],
+      },
+      {
+        cwd: sourceRoot,
         args: [
           "worktree",
           "add",
@@ -100,6 +159,129 @@ describe("git worktree service", () => {
         ],
       },
     ]);
+  });
+
+  it("records an explicit branch base and resolved commit before creating the worktree", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = prepareGitWorktree({
+      componentId: "core",
+      sourceRoot,
+      worktreesRoot,
+      branchName: "codex/demo/child",
+      baseRef: "feature/parent",
+      gitRunner: fakeGitRunner(calls),
+    });
+
+    expect(result).toMatchObject({
+      baseRef: "feature/parent",
+      requestedBaseRef: "feature/parent",
+      resolvedBaseCommit: defaultBaseCommit,
+      baseRefKind: "branch",
+      baseRefFreshness: {
+        status: "unchecked",
+        comparedRef: null,
+        comparedCommit: null,
+      },
+    });
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: ["rev-parse", "--verify", "--quiet", "feature/parent^{commit}"],
+    });
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/demo/child",
+        result.worktreePath,
+        "feature/parent",
+      ],
+    });
+  });
+
+  it("records a pinned commit base without mutable-ref freshness checks", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const baseCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    const result = prepareGitWorktree({
+      componentId: "core",
+      sourceRoot,
+      worktreesRoot,
+      branchName: "codex/demo/pinned-base",
+      baseRef: baseCommit,
+      gitRunner: fakeGitRunner(calls),
+    });
+
+    expect(result).toMatchObject({
+      baseRef: baseCommit,
+      requestedBaseRef: baseCommit,
+      resolvedBaseCommit: baseCommit,
+      baseRefKind: "commit",
+      baseRefFreshness: {
+        status: "immutable",
+        comparedRef: null,
+        comparedCommit: null,
+      },
+    });
+    expect(calls.some((call) => call.args[0] === "fetch")).toBe(false);
+    expect(calls.some((call) => call.args[0] === "show-ref")).toBe(false);
+  });
+
+  it("blocks a stale local branch base before creating the worktree", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const localMain = "1111111111111111111111111111111111111111";
+    const remoteMain = "2222222222222222222222222222222222222222";
+
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      const joined = argsArray.join(" ");
+      if (argsArray[0] === "for-each-ref") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/heads/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name main@{upstream}") {
+        return { args: argsArray, stdout: "origin/main\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "fetch --prune origin refs/heads/main:refs/remotes/origin/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --verify --quiet main^{commit}") {
+        return { args: argsArray, stdout: `${localMain}\n`, stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --verify --quiet origin/main^{commit}") {
+        return { args: argsArray, stdout: `${remoteMain}\n`, stderr: "", exitCode: 0 };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+
+    expect(() =>
+      prepareGitWorktree({
+        componentId: "core",
+        sourceRoot,
+        worktreesRoot,
+        branchName: "codex/demo/stale-base",
+        baseRef: "main",
+        gitRunner,
+      }),
+    ).toThrow(/Base ref main is stale relative to origin\/main/u);
+    expect(calls.some((call) =>
+      call.args[0] === "worktree" && call.args[1] === "add"
+    )).toBe(false);
   });
 
   it("adopts an existing local branch when it is not checked out", () => {

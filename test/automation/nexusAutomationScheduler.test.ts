@@ -43,6 +43,44 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
     if (argsArray[0] === "worktree" && argsArray[1] === "add") {
       fs.mkdirSync(argsArray[4]!, { recursive: true });
     }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet" &&
+      argsArray[3]?.endsWith("^{commit}")
+    ) {
+      return {
+        args: argsArray,
+        stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+    if (
+      argsArray[0] === "show-ref" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet"
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode: argsArray[3]?.startsWith("refs/heads/") ? 0 : 1,
+      };
+    }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--abbrev-ref" &&
+      argsArray[2] === "--symbolic-full-name" &&
+      argsArray[3]?.endsWith("@{upstream}")
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+      };
+    }
     if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
       return {
         args: argsArray,

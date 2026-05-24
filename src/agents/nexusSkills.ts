@@ -811,16 +811,20 @@ parallel work is useful instead of waiting for the user to name subagents.
 5. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
    paths for mutating work. Avoid parallel edits to the same file unless one
    agent is explicitly the integrator.
-6. Dispatch only sidecar work that can progress while the coordinator continues
+6. For feature, integration, stacked, or other non-default review flows, prepare
+   each worker from the intended parent branch, tag, or pinned commit. Do not
+   let workers implicitly branch from the component default branch when the
+   review target is another branch.
+7. Dispatch only sidecar work that can progress while the coordinator continues
    useful non-overlapping work. Keep immediate blockers local when waiting would
    stall the critical path.
-7. Review returned work before integration: spec fit first, then implementation
+8. Review returned work before integration: spec fit first, then implementation
    quality, then conflict risk. Ask the worker to fix its own change when review
    finds issues.
-8. Integrate deliberately. Use DevNexus coordination status or integration
+9. Integrate deliberately. Use DevNexus coordination status or integration
    planning when multiple branches or handoffs exist, then run focused and
    broader verification from the base branch or artifact path.
-9. Record the result in the tracker, target-cycle facts, coordination handoff,
+10. Record the result in the tracker, target-cycle facts, coordination handoff,
    or pull request so the parallel work does not vanish into chat history.
 
 ## Guardrails

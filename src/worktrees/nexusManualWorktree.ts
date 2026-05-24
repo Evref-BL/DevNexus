@@ -131,6 +131,10 @@ export interface NexusPreparedWorktreeSummary {
     worktreePath: string;
     branchName: string;
     baseRef: string | null;
+    requestedBaseRef: string | null;
+    resolvedBaseCommit: string | null;
+    baseRefKind: PrepareGitWorktreeResult["baseRefKind"];
+    baseRefFreshness: PrepareGitWorktreeResult["baseRefFreshness"];
     workItem: PrepareGitWorktreeResult["workItem"];
     gitIdentity: PrepareGitWorktreeResult["gitIdentity"];
     featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null;
@@ -145,6 +149,9 @@ export interface NexusPreparedWorktreeSummary {
     workItemId: string | null;
     branchName: string | null;
     baseRef: string | null;
+    requestedBaseRef: string | null;
+    resolvedBaseCommit: string | null;
+    baseRefKind: NexusWorktreeLeaseRecord["baseRefKind"];
     worktree: NexusWorktreeLeaseRecord["worktree"];
     writeScope: string[];
     notes: string[];
@@ -409,6 +416,9 @@ export function prepareNexusManualWorktree(
         worktreePath: worktree.worktreePath,
         branchName: worktree.branchName,
         baseRef: worktree.baseRef,
+        requestedBaseRef: worktree.requestedBaseRef,
+        resolvedBaseCommit: worktree.resolvedBaseCommit,
+        baseRefKind: worktree.baseRefKind,
         workItem: contextWorkItem,
       },
       featureBranchDelivery: featureBranchDelivery?.context ?? null,
@@ -438,6 +448,9 @@ export function prepareNexusManualWorktree(
     workItemId,
     branchName: worktree.branchName,
     baseRef: worktree.baseRef,
+    requestedBaseRef: worktree.requestedBaseRef,
+    resolvedBaseCommit: worktree.resolvedBaseCommit,
+    baseRefKind: worktree.baseRefKind,
     worktreePath: worktree.worktreePath,
     writeScope: options.writeScope,
     status: "working",
@@ -517,6 +530,10 @@ export function summarizeNexusManualWorktreeResult(
       worktreePath: result.worktree.worktreePath,
       branchName: result.worktree.branchName,
       baseRef: result.worktree.baseRef,
+      requestedBaseRef: result.worktree.requestedBaseRef,
+      resolvedBaseCommit: result.worktree.resolvedBaseCommit,
+      baseRefKind: result.worktree.baseRefKind,
+      baseRefFreshness: result.worktree.baseRefFreshness,
       workItem: result.worktree.workItem,
       gitIdentity: result.worktree.gitIdentity,
       featureBranchDelivery: result.setup.context?.context.featureBranchDelivery ?? null,
@@ -531,6 +548,9 @@ export function summarizeNexusManualWorktreeResult(
       workItemId: result.lease.workItemId,
       branchName: result.lease.branchName,
       baseRef: result.lease.baseRef,
+      requestedBaseRef: result.lease.requestedBaseRef,
+      resolvedBaseCommit: result.lease.resolvedBaseCommit,
+      baseRefKind: result.lease.baseRefKind,
       worktree: result.lease.worktree,
       writeScope: result.lease.writeScope,
       notes: result.lease.notes,
