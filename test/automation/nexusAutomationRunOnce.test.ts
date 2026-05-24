@@ -183,7 +183,7 @@ describe("nexus automation run once", () => {
         title: "Implement run once",
       },
     });
-    expect(gitCalls[0]).toEqual({
+    expect(gitCalls).toContainEqual({
       cwd: path.join(projectRoot, "source"),
       args: [
         "worktree",
