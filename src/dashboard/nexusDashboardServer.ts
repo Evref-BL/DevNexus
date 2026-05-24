@@ -50,6 +50,18 @@ import {
   type NexusDashboardServerRecord,
 } from "./nexusDashboardServerRegistry.js";
 import {
+  cachedDashboardValue,
+  createDashboardServerCache,
+  dashboardCachePolicies,
+  dashboardHostCacheKey,
+  dashboardWorkspaceCacheKey,
+  invalidateDashboardCache,
+} from "./nexusDashboardServerCache.js";
+import type {
+  NexusDashboardServerCache,
+  DashboardWorkspaceCacheSelection,
+} from "./nexusDashboardServerCache.js";
+import {
   providerOptionsWithFreshnessCache,
 } from "../providers/nexusProviderFreshness.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
@@ -82,7 +94,7 @@ export interface NexusDashboardServerHandle {
   close: () => Promise<void>;
 }
 
-interface DashboardWorkspaceSelection {
+interface DashboardWorkspaceSelection extends DashboardWorkspaceCacheSelection {
   readonly snapshotOptions: BuildNexusDashboardSnapshotOptions;
   readonly baseHost?: NexusDashboardHostSnapshot;
   readonly workspaceId: string | null;
@@ -138,30 +150,6 @@ type DashboardThreadRecord = NexusDashboardSnapshot["threads"]["records"][number
 type DashboardTrackedWorkItem = NexusDashboardSnapshot["trackedWork"]["records"][number];
 type DashboardWorktreeRecord = NexusDashboardSnapshot["worktrees"]["records"][number];
 
-interface DashboardCachePolicy {
-  readonly freshMs: number;
-  readonly staleMs: number;
-}
-
-interface DashboardCacheEntry<T> {
-  readonly value?: T;
-  readonly freshUntil: number;
-  readonly staleUntil: number;
-  pending?: Promise<T>;
-}
-
-interface NexusDashboardServerCache {
-  readonly entries: Map<string, DashboardCacheEntry<unknown>>;
-}
-
-const dashboardCachePolicies = {
-  host: { freshMs: 60_000, staleMs: 300_000 },
-  projectIndex: { freshMs: 15_000, staleMs: 120_000 },
-  workspace: { freshMs: 60_000, staleMs: 300_000 },
-  shell: { freshMs: 10_000, staleMs: 60_000 },
-  section: { freshMs: 30_000, staleMs: 180_000 },
-} satisfies Record<string, DashboardCachePolicy>;
-
 interface NexusDashboardLocalAppIcon {
   readonly body: Buffer | string;
   readonly contentType: string;
@@ -176,137 +164,6 @@ class NexusDashboardRouteError extends Error {
     super(message);
     this.name = "NexusDashboardRouteError";
   }
-}
-
-function createDashboardServerCache(): NexusDashboardServerCache {
-  return { entries: new Map() };
-}
-
-function invalidateDashboardCache(cache: NexusDashboardServerCache): void {
-  cache.entries.clear();
-}
-
-async function cachedDashboardValue<T>(
-  cache: NexusDashboardServerCache,
-  key: string,
-  policy: DashboardCachePolicy,
-  load: () => Promise<T>,
-): Promise<T> {
-  const now = Date.now();
-  const entry = cache.entries.get(key) as DashboardCacheEntry<T> | undefined;
-
-  if (entry?.value !== undefined && now < entry.freshUntil) {
-    return entry.value;
-  }
-
-  if (entry?.value !== undefined && now < entry.staleUntil) {
-    if (!entry.pending) {
-      entry.pending = load()
-        .then((value) => {
-          cache.entries.set(
-            key,
-            dashboardCacheEntry(value, policy) as DashboardCacheEntry<unknown>,
-          );
-          return value;
-        })
-        .catch(() => entry.value as T)
-        .finally(() => {
-          const latest = cache.entries.get(key);
-          if (latest === entry) {
-            delete entry.pending;
-          }
-        });
-    }
-    return entry.value;
-  }
-
-  if (entry?.pending) {
-    return entry.pending;
-  }
-
-  const pending = load()
-    .then((value) => {
-      cache.entries.set(
-        key,
-        dashboardCacheEntry(value, policy) as DashboardCacheEntry<unknown>,
-      );
-      return value;
-    })
-    .catch((error: unknown) => {
-      if (entry?.value !== undefined) {
-        cache.entries.set(
-          key,
-          dashboardCacheEntry(entry.value, {
-            freshMs: 0,
-            staleMs: policy.staleMs,
-          }) as DashboardCacheEntry<unknown>,
-        );
-        return entry.value;
-      }
-      cache.entries.delete(key);
-      throw error;
-    });
-  cache.entries.set(key, {
-    value: entry?.value,
-    freshUntil: 0,
-    staleUntil: entry?.staleUntil ?? 0,
-    pending,
-  } as DashboardCacheEntry<unknown>);
-  return pending;
-}
-
-function dashboardCacheEntry<T>(
-  value: T,
-  policy: DashboardCachePolicy,
-): DashboardCacheEntry<T> {
-  const now = Date.now();
-  return {
-    value,
-    freshUntil: now + policy.freshMs,
-    staleUntil: now + policy.staleMs,
-  };
-}
-
-function dashboardWorkspaceCacheKey(
-  kind: string,
-  selection: DashboardWorkspaceSelection,
-): string {
-  return [
-    "workspace",
-    kind,
-    selection.workspaceId ?? "",
-    path.resolve(selection.snapshotOptions.projectRoot),
-    dashboardSnapshotOptionsCacheKey(selection.snapshotOptions),
-  ].join(":");
-}
-
-function dashboardHostCacheKey(
-  kind: string,
-  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
-  workspaceId: string | null,
-): string {
-  return [
-    "host",
-    kind,
-    workspaceId ?? "",
-    dashboardSnapshotOptionsCacheKey(snapshotOptions),
-  ].join(":");
-}
-
-function dashboardSnapshotOptionsCacheKey(
-  options: BuildNexusDashboardHostSnapshotOptions,
-): string {
-  return JSON.stringify({
-    projectRoot: options.projectRoot ? path.resolve(options.projectRoot) : null,
-    currentProjectRoot:
-      options.currentProjectRoot === undefined
-        ? undefined
-        : options.currentProjectRoot
-          ? path.resolve(options.currentProjectRoot)
-          : null,
-    homePath: options.homePath ? path.resolve(options.homePath) : null,
-    eligibleWorkMode: options.eligibleWorkMode ?? null,
-  });
 }
 
 export async function startNexusDashboardServer(
