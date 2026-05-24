@@ -12,6 +12,7 @@ import {
 } from "../mcp/nexusMcpExposurePolicy.js";
 import type {
   NexusPluginMcpServerCapability,
+  NexusPluginMcpServerTransport,
   NexusPluginProjectedSkillCapability,
   NexusProjectPluginConfig,
 } from "./nexusPluginCapabilities.js";
@@ -48,7 +49,9 @@ export interface NexusProjectPluginRefreshSkippedMcpServer {
     | "missing_command"
     | "no_matching_targets"
     | "hidden_exposure"
-    | "gateway_pending";
+    | "gateway_pending"
+    | "unsupported_transport";
+  transport?: NexusPluginMcpServerTransport;
   exposureMode?: NexusResolvedMcpExposureMode;
 }
 
@@ -108,8 +111,10 @@ interface ResolvedPluginModule {
 
 interface PluginMcpServerProjection {
   serverName: string;
+  transport: NexusPluginMcpServerTransport | null;
   command: string | null;
   args: string[];
+  url: string | null;
   targetAgents: string[] | null;
   exposure?: NexusPluginMcpServerCapability["exposure"];
   capabilityIds: string[];
@@ -175,15 +180,6 @@ export async function refreshNexusProjectPlugin(
 
     if (nextPlugin.enabled !== false) {
       for (const server of mcpProjectionPlan) {
-        if (!server.command) {
-          skippedMcpServers.push({
-            serverName: server.serverName,
-            capabilityIds: server.capabilityIds,
-            reason: "missing_command",
-          });
-          continue;
-        }
-
         const matchingTargets = mcpTargetsForProjection(mcpTargets, server);
         if (matchingTargets.length === 0) {
           skippedMcpServers.push({
@@ -203,6 +199,24 @@ export async function refreshNexusProjectPlugin(
           skippedMcpServers.push(skipForExposure(server, nextConfig, nextPlugin, matchingTargets[0]!));
           continue;
         }
+        if (pluginMcpProjectionTransport(server) !== "stdio") {
+          skippedMcpServers.push({
+            serverName: server.serverName,
+            capabilityIds: server.capabilityIds,
+            reason: "unsupported_transport",
+            transport: pluginMcpProjectionTransport(server),
+          });
+          continue;
+        }
+        if (!server.command) {
+          skippedMcpServers.push({
+            serverName: server.serverName,
+            capabilityIds: server.capabilityIds,
+            reason: "missing_command",
+          });
+          continue;
+        }
+        const command = server.command;
 
         mcpProjectionResults.push(
           materializeNexusProjectAgentMcpConfig({
@@ -211,7 +225,7 @@ export async function refreshNexusProjectPlugin(
             agentTargets: directTargets.map((target) => ({
               ...target,
               serverName: server.serverName,
-              command: server.command!,
+              command,
               args: server.args,
             })),
           }),
@@ -220,14 +234,6 @@ export async function refreshNexusProjectPlugin(
     }
   } else {
     for (const server of mcpProjectionPlan) {
-      if (!server.command) {
-        skippedMcpServers.push({
-          serverName: server.serverName,
-          capabilityIds: server.capabilityIds,
-          reason: "missing_command",
-        });
-        continue;
-      }
       const matchingTargets = mcpTargetsForProjection(mcpTargets, server);
       if (matchingTargets.length === 0) {
         skippedMcpServers.push({
@@ -246,6 +252,23 @@ export async function refreshNexusProjectPlugin(
         ).length === 0
       ) {
         skippedMcpServers.push(skipForExposure(server, nextConfig, nextPlugin, matchingTargets[0]!));
+        continue;
+      }
+      if (pluginMcpProjectionTransport(server) !== "stdio") {
+        skippedMcpServers.push({
+          serverName: server.serverName,
+          capabilityIds: server.capabilityIds,
+          reason: "unsupported_transport",
+          transport: pluginMcpProjectionTransport(server),
+        });
+        continue;
+      }
+      if (!server.command) {
+        skippedMcpServers.push({
+          serverName: server.serverName,
+          capabilityIds: server.capabilityIds,
+          reason: "missing_command",
+        });
       }
     }
   }
@@ -993,12 +1016,25 @@ function pluginMcpServerProjections(
   )) {
     const existing = projections.get(capability.serverName) ?? {
       serverName: capability.serverName,
+      transport: null,
       command: null,
       args: [],
+      url: null,
       targetAgents: null,
       exposure: undefined,
       capabilityIds: [],
     };
+    const declaredTransport = declaredPluginMcpServerTransport(capability);
+    if (
+      existing.transport &&
+      declaredTransport &&
+      existing.transport !== declaredTransport
+    ) {
+      throw new Error(
+        `Plugin MCP server ${capability.serverName} declares conflicting transports`,
+      );
+    }
+    existing.transport = existing.transport ?? declaredTransport ?? null;
     if (capability.command) {
       if (
         existing.command &&
@@ -1011,6 +1047,14 @@ function pluginMcpServerProjections(
       }
       existing.command = capability.command;
       existing.args = capability.args ?? [];
+    }
+    if (capability.url) {
+      if (existing.url && existing.url !== capability.url) {
+        throw new Error(
+          `Plugin MCP server ${capability.serverName} declares conflicting URLs`,
+        );
+      }
+      existing.url = capability.url;
     }
     existing.targetAgents = mergeTargetAgentSelectors(
       existing.targetAgents,
@@ -1101,15 +1145,33 @@ function skipForExposure(
 function projectionToMcpServerCapability(
   projection: PluginMcpServerProjection,
 ): NexusPluginMcpServerCapability {
+  const transport = pluginMcpProjectionTransport(projection);
   return {
     kind: "mcp_server",
     id: projection.capabilityIds[0] ?? projection.serverName,
     serverName: projection.serverName,
-    ...(projection.command ? { command: projection.command } : {}),
-    args: projection.args,
+    transport,
+    ...(transport === "stdio" && projection.command
+      ? { command: projection.command }
+      : {}),
+    ...(transport === "stdio" ? { args: projection.args } : {}),
+    ...(projection.url ? { url: projection.url } : {}),
     ...(projection.targetAgents ? { targetAgents: projection.targetAgents } : {}),
     ...(projection.exposure ? { exposure: projection.exposure } : {}),
   };
+}
+
+function declaredPluginMcpServerTransport(
+  capability: NexusPluginMcpServerCapability,
+): NexusPluginMcpServerTransport | null {
+  return capability.transport ??
+    (capability.url ? "http" : capability.command ? "stdio" : null);
+}
+
+function pluginMcpProjectionTransport(
+  projection: PluginMcpServerProjection,
+): NexusPluginMcpServerTransport {
+  return projection.transport ?? (projection.url ? "http" : "stdio");
 }
 
 function normalizedSelection(values: readonly string[]): Set<string> {

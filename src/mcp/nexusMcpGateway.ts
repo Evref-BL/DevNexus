@@ -41,6 +41,7 @@ export {
 } from "./nexusMcpGatewayProjection.js";
 
 export type NexusMcpGatewayServerSource = "core" | "plugin";
+export type NexusMcpGatewayTransport = "stdio" | "http";
 export type NexusMcpGatewayToolSchemaStatus =
   | "known"
   | "declared_name_only"
@@ -54,8 +55,10 @@ export interface NexusMcpGatewayServerRecord {
   serverName: string;
   pluginId: string | null;
   capabilityId: string | null;
+  transport: NexusMcpGatewayTransport;
   command: string | null;
   args: string[];
+  url: string | null;
   toolCount: number;
   effectiveExposure: NexusResolvedMcpExposureMode;
   exposureSource: NexusMcpExposureSource;
@@ -117,8 +120,10 @@ export interface NexusMcpGatewayDiscoveryRecord {
   createdAt: string;
   serverId: string;
   serverName: string;
-  command: string;
+  transport: NexusMcpGatewayTransport;
+  command: string | null;
   args: string[];
+  url: string | null;
   tools: NexusMcpGatewayDiscoveryTool[];
 }
 
@@ -137,8 +142,10 @@ export interface NexusMcpGatewayResultRecord {
   serverId: string;
   serverName: string;
   toolName: string;
-  command: string;
+  transport: NexusMcpGatewayTransport;
+  command: string | null;
   args: string[];
+  url: string | null;
   argumentBytes: number;
   resultBytes: number;
   stored: true;
@@ -203,7 +210,7 @@ const gatewayTools: McpTool[] = [
   {
     name: "mcp_gateway_call",
     description:
-      "Invoke one gateway-routed command-based MCP tool by toolId and return a bounded result with an audit id.",
+      "Invoke one gateway-routed upstream MCP tool by toolId and return a bounded result with an audit id.",
     inputSchema: {
       type: "object",
       properties: {
@@ -535,18 +542,17 @@ export async function callDevNexusMcpGatewayTool(
         const server = index.servers.find(
           (candidate) => candidate.serverId === tool.serverId,
         );
-        if (!server?.command) {
+        if (!server || !gatewayServerHasCallableUpstream(server)) {
           return toolResult({
             ok: false,
-            error: `Gateway server ${tool.serverName} does not declare a command.`,
+            error: `Gateway server ${tool.serverName} does not declare a callable upstream.`,
             toolId,
           }, true);
         }
         const toolArguments = optionalRecord(args, "arguments", "arguments") ?? {};
-        const response = await callCommandMcpTool({
+        const response = await callGatewayMcpTool({
           projectRoot: index.projectRoot,
-          command: server.command,
-          args: server.args,
+          server,
           toolName: tool.toolName,
           toolArguments,
         });
@@ -660,8 +666,10 @@ function coreGatewayRecords(
       serverName: target.serverName,
       pluginId: null,
       capabilityId: null,
+      transport: "stdio",
       command: target.command,
       args: target.args,
+      url: null,
       toolCount: coreTools.length,
       effectiveExposure: target.effectiveExposure,
       exposureSource: target.exposureSource,
@@ -732,13 +740,21 @@ function pluginGatewayRecords(
           capabilityId: capability.id,
           serverName: capability.serverName,
         });
+        const transport = pluginMcpServerTransport(capability);
+        const command = transport === "stdio" ? capability.command ?? null : null;
+        const args = transport === "stdio" ? [...(capability.args ?? [])] : [];
+        const url = transport === "http" ? capability.url ?? null : null;
         const declaredTools = capability.tools ?? [];
-        const discovered = capability.command
+        const discovered = command || url
           ? readNexusMcpGatewayDiscoveryRecord(projectRoot, serverId)
           : null;
         const discoveredCacheIsCurrent = discovered
-          ? discovered.command === capability.command &&
-            sameStringArray(discovered.args, capability.args ?? [])
+          ? gatewayDiscoveryCacheMatches(discovered, {
+            transport,
+            command,
+            args,
+            url,
+          })
           : false;
         const discoveredTools = discovered && discoveredCacheIsCurrent
           ? discovered.tools
@@ -754,8 +770,10 @@ function pluginGatewayRecords(
           serverName: capability.serverName,
           pluginId: plugin.id,
           capabilityId: capability.id,
-          command: capability.command ?? null,
-          args: [...(capability.args ?? [])],
+          transport,
+          command,
+          args,
+          url,
           toolCount: declaredTools.length > 0
             ? declaredTools.length
             : discoveredTools.length,
@@ -763,20 +781,26 @@ function pluginGatewayRecords(
           exposureSource: exposure.source,
           exposureReason: exposure.reason,
         });
-        if (!capability.command) {
+        if (transport === "stdio" && !command) {
           warnings.push(
             `Gateway-routed plugin MCP server ${plugin.id}/${capability.serverName} has no command declaration.`,
           );
         }
+        if (transport === "http" && !url) {
+          warnings.push(
+            `Gateway-routed plugin MCP server ${plugin.id}/${capability.serverName} has no URL declaration.`,
+          );
+        }
         if (discovered && !discoveredCacheIsCurrent) {
           warnings.push(
-            `Gateway discovery cache for plugin MCP server ${plugin.id}/${capability.serverName} is stale because its command or args changed.`,
+            `Gateway discovery cache for plugin MCP server ${plugin.id}/${capability.serverName} is stale because its upstream transport or endpoint changed.`,
           );
         }
         if (
           declaredTools.length === 0 &&
           discoveredTools.length === 0 &&
-          !capability.command
+          !command &&
+          !url
         ) {
           warnings.push(
             `Gateway-routed plugin MCP server ${plugin.id}/${capability.serverName} declares no tool metadata.`,
@@ -820,6 +844,33 @@ function pluginGatewayRecords(
   }
 
   return { servers, tools, warnings };
+}
+
+function pluginMcpServerTransport(
+  capability: NexusPluginMcpServerCapability,
+): NexusMcpGatewayTransport {
+  return capability.transport ?? (capability.url ? "http" : "stdio");
+}
+
+function gatewayDiscoveryCacheMatches(
+  discovered: NexusMcpGatewayDiscoveryRecord,
+  upstream: {
+    transport: NexusMcpGatewayTransport;
+    command: string | null;
+    args: readonly string[];
+    url: string | null;
+  },
+): boolean {
+  const discoveredTransport = discovered.transport ?? "stdio";
+  if (discoveredTransport !== upstream.transport) {
+    return false;
+  }
+  if (upstream.transport === "http") {
+    return discovered.url === upstream.url;
+  }
+
+  return discovered.command === upstream.command &&
+    sameStringArray(discovered.args, upstream.args);
 }
 
 function pluginToolRecord(options: {
@@ -880,25 +931,26 @@ async function discoverMissingGatewayMetadata(
     const existingTools = toolsByServer.get(server.serverId) ?? [];
     if (
       server.source !== "plugin" ||
-      !server.command ||
+      !gatewayServerHasCallableUpstream(server) ||
       !gatewayServerNeedsDiscovery(existingTools)
     ) {
       continue;
     }
 
     try {
-      const discoveredTools = await discoverCommandMcpTools({
+      const discoveredTools = await discoverGatewayMcpTools({
         projectRoot: index.projectRoot,
-        command: server.command,
-        args: server.args,
+        server,
       });
       writeNexusMcpGatewayDiscoveryRecord(index.projectRoot, {
         version: 1,
         createdAt: new Date().toISOString(),
         serverId: server.serverId,
         serverName: server.serverName,
+        transport: server.transport,
         command: server.command,
         args: server.args,
+        url: server.url,
         tools: discoveredTools,
       });
       server.toolCount = discoveredTools.length;
@@ -969,6 +1021,34 @@ function mergeDiscoveredGatewayToolMetadata(
   }
 }
 
+function gatewayServerHasCallableUpstream(
+  server: NexusMcpGatewayServerRecord,
+): boolean {
+  return (server.transport === "stdio" && !!server.command) ||
+    (server.transport === "http" && !!server.url);
+}
+
+async function discoverGatewayMcpTools(options: {
+  projectRoot: string;
+  server: NexusMcpGatewayServerRecord;
+}): Promise<NexusMcpGatewayDiscoveryTool[]> {
+  if (options.server.transport === "http" && options.server.url) {
+    return discoverHttpMcpTools({
+      url: options.server.url,
+      timeoutMs: gatewayCallTimeoutMs,
+    });
+  }
+  if (options.server.command) {
+    return discoverCommandMcpTools({
+      projectRoot: options.projectRoot,
+      command: options.server.command,
+      args: options.server.args,
+    });
+  }
+
+  throw new Error(`MCP gateway server ${options.server.serverName} has no callable upstream`);
+}
+
 async function discoverCommandMcpTools(options: {
   projectRoot: string;
   command: string;
@@ -982,53 +1062,107 @@ async function discoverCommandMcpTools(options: {
   });
   try {
     await client.start();
-    await client.request("initialize", {
-      protocolVersion: devNexusMcpProtocolVersion,
-      capabilities: {},
-      clientInfo: {
-        name: "dev-nexus-mcp-gateway",
-        version: "0.1.0",
-      },
-    });
-    client.notify("notifications/initialized", {});
-
-    const tools: NexusMcpGatewayDiscoveryTool[] = [];
-    let cursor: string | undefined;
-    do {
-      const result = asRecord(
-        await client.request("tools/list", cursor ? { cursor } : {}),
-        "tools/list result",
-      );
-      const resultTools = result.tools;
-      if (!Array.isArray(resultTools)) {
-        throw new Error("tools/list result.tools must be an array");
-      }
-      for (const toolValue of resultTools) {
-        const tool = asRecord(toolValue, "tools/list result.tools[]");
-        const name = requiredString(tool, "name", "tools/list result.tools[]");
-        const description = optionalString(
-          tool,
-          "description",
-          "tools/list result.tools[]",
-        );
-        const inputSchema = optionalRecord(
-          tool,
-          "inputSchema",
-          "tools/list result.tools[]",
-        );
-        tools.push({
-          name,
-          ...(description !== undefined ? { description } : {}),
-          ...(inputSchema !== undefined ? { inputSchema } : {}),
-        });
-      }
-      cursor = optionalString(result, "nextCursor", "tools/list result");
-    } while (cursor);
-
-    return tools;
+    await initializeMcpClient(client);
+    return listMcpClientTools(client);
   } finally {
     await client.stop();
   }
+}
+
+async function discoverHttpMcpTools(options: {
+  url: string;
+  timeoutMs: number;
+}): Promise<NexusMcpGatewayDiscoveryTool[]> {
+  const client = new HttpMcpClient(options);
+  try {
+    await initializeMcpClient(client);
+    return listMcpClientTools(client);
+  } finally {
+    await client.stop();
+  }
+}
+
+async function initializeMcpClient(client: McpGatewayClient): Promise<void> {
+  await client.request("initialize", {
+    protocolVersion: devNexusMcpProtocolVersion,
+    capabilities: {},
+    clientInfo: {
+      name: "dev-nexus-mcp-gateway",
+      version: "0.1.0",
+    },
+  });
+  await client.notify("notifications/initialized", {});
+}
+
+async function listMcpClientTools(
+  client: McpGatewayClient,
+): Promise<NexusMcpGatewayDiscoveryTool[]> {
+  const tools: NexusMcpGatewayDiscoveryTool[] = [];
+  let cursor: string | undefined;
+  do {
+    const result = asRecord(
+      await client.request("tools/list", cursor ? { cursor } : {}),
+      "tools/list result",
+    );
+    const resultTools = result.tools;
+    if (!Array.isArray(resultTools)) {
+      throw new Error("tools/list result.tools must be an array");
+    }
+    for (const toolValue of resultTools) {
+      const tool = asRecord(toolValue, "tools/list result.tools[]");
+      const name = requiredString(tool, "name", "tools/list result.tools[]");
+      const description = optionalString(
+        tool,
+        "description",
+        "tools/list result.tools[]",
+      );
+      const inputSchema = optionalRecord(
+        tool,
+        "inputSchema",
+        "tools/list result.tools[]",
+      );
+      tools.push({
+        name,
+        ...(description !== undefined ? { description } : {}),
+        ...(inputSchema !== undefined ? { inputSchema } : {}),
+      });
+    }
+    cursor = optionalString(result, "nextCursor", "tools/list result");
+  } while (cursor);
+
+  return tools;
+}
+
+interface McpGatewayClient {
+  request(method: string, params: unknown): Promise<unknown>;
+  notify(method: string, params: unknown): Promise<void> | void;
+  stop(): Promise<void>;
+}
+
+async function callGatewayMcpTool(options: {
+  projectRoot: string;
+  server: NexusMcpGatewayServerRecord;
+  toolName: string;
+  toolArguments: Record<string, unknown>;
+}): Promise<unknown> {
+  if (options.server.transport === "http" && options.server.url) {
+    return callHttpMcpTool({
+      url: options.server.url,
+      toolName: options.toolName,
+      toolArguments: options.toolArguments,
+    });
+  }
+  if (options.server.command) {
+    return callCommandMcpTool({
+      projectRoot: options.projectRoot,
+      command: options.server.command,
+      args: options.server.args,
+      toolName: options.toolName,
+      toolArguments: options.toolArguments,
+    });
+  }
+
+  throw new Error(`MCP gateway server ${options.server.serverName} has no callable upstream`);
 }
 
 async function callCommandMcpTool(options: {
@@ -1055,6 +1189,26 @@ async function callCommandMcpTool(options: {
       },
     });
     client.notify("notifications/initialized", {});
+    return await client.request("tools/call", {
+      name: options.toolName,
+      arguments: options.toolArguments,
+    });
+  } finally {
+    await client.stop();
+  }
+}
+
+async function callHttpMcpTool(options: {
+  url: string;
+  toolName: string;
+  toolArguments: Record<string, unknown>;
+}): Promise<unknown> {
+  const client = new HttpMcpClient({
+    url: options.url,
+    timeoutMs: gatewayCallTimeoutMs,
+  });
+  try {
+    await initializeMcpClient(client);
     return await client.request("tools/call", {
       name: options.toolName,
       arguments: options.toolArguments,
@@ -1205,6 +1359,198 @@ class StdioMcpClient {
   }
 }
 
+class HttpMcpClient {
+  private nextId = 1;
+  private sessionId: string | null = null;
+  private protocolVersion = devNexusMcpProtocolVersion;
+
+  constructor(
+    private readonly options: {
+      url: string;
+      timeoutMs: number;
+    },
+  ) {}
+
+  async request(method: string, params: unknown): Promise<unknown> {
+    const id = this.nextId++;
+    const result = await this.postJsonRpc({
+      jsonrpc: "2.0",
+      id,
+      method,
+      params,
+    }, id, method);
+    if (method === "initialize") {
+      this.updateProtocolVersion(result);
+    }
+    return result;
+  }
+
+  async notify(method: string, params: unknown): Promise<void> {
+    await this.postJsonRpc({
+      jsonrpc: "2.0",
+      method,
+      params,
+    }, null, method);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.sessionId) {
+      return;
+    }
+    try {
+      await fetchWithTimeout(this.options.url, {
+        method: "DELETE",
+        headers: this.httpHeaders("text/event-stream"),
+      }, this.options.timeoutMs);
+    } catch {
+      // Session termination is advisory; callers should not fail after a
+      // successful tool call because an upstream ignores DELETE.
+    } finally {
+      this.sessionId = null;
+    }
+  }
+
+  private async postJsonRpc(
+    message: Record<string, unknown>,
+    expectedId: number | null,
+    method: string,
+  ): Promise<unknown> {
+    const response = await fetchWithTimeout(this.options.url, {
+      method: "POST",
+      headers: this.httpHeaders("application/json, text/event-stream", {
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(message),
+    }, this.options.timeoutMs);
+    const responseSessionId = response.headers.get("mcp-session-id");
+    if (responseSessionId) {
+      this.sessionId = responseSessionId;
+    }
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(
+        `HTTP MCP upstream request ${method} failed with status ${response.status}: ${responseText.slice(0, 500)}`,
+      );
+    }
+    if (expectedId === null) {
+      return undefined;
+    }
+    if (response.status === 202 || responseText.trim().length === 0) {
+      throw new Error(`HTTP MCP upstream request ${method} returned no JSON-RPC response`);
+    }
+
+    const messageValue = httpMcpJsonRpcResponseMessage(
+      response.headers.get("content-type"),
+      responseText,
+      expectedId,
+    );
+    return jsonRpcResponseResult(messageValue, expectedId, method);
+  }
+
+  private httpHeaders(
+    accept: string,
+    extra: Record<string, string> = {},
+  ): Record<string, string> {
+    return {
+      Accept: accept,
+      "MCP-Protocol-Version": this.protocolVersion,
+      ...(this.sessionId ? { "Mcp-Session-Id": this.sessionId } : {}),
+      ...extra,
+    };
+  }
+
+  private updateProtocolVersion(result: unknown): void {
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      return;
+    }
+    const protocolVersion = (result as Record<string, unknown>).protocolVersion;
+    if (typeof protocolVersion === "string" && protocolVersion.trim()) {
+      this.protocolVersion = protocolVersion.trim();
+    }
+  }
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`HTTP MCP upstream request timed out: ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function httpMcpJsonRpcResponseMessage(
+  contentType: string | null,
+  responseText: string,
+  expectedId: number,
+): unknown {
+  if (contentType?.toLowerCase().includes("text/event-stream")) {
+    const messages = parseServerSentJsonRpcMessages(responseText);
+    const response = messages.find((message) =>
+      jsonRpcMessageId(message) === expectedId
+    );
+    if (!response) {
+      throw new Error(
+        `HTTP MCP upstream SSE response did not include JSON-RPC id ${expectedId}`,
+      );
+    }
+    return response;
+  }
+
+  return JSON.parse(responseText);
+}
+
+function parseServerSentJsonRpcMessages(responseText: string): unknown[] {
+  return responseText
+    .replace(/\r\n/gu, "\n")
+    .split(/\n\n+/u)
+    .flatMap((eventBlock) => {
+      const data = eventBlock
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(line.startsWith("data: ") ? 6 : 5))
+        .join("\n")
+        .trim();
+      return data ? [JSON.parse(data)] : [];
+    });
+}
+
+function jsonRpcResponseResult(
+  message: unknown,
+  expectedId: number,
+  method: string,
+): unknown {
+  const record = asRecord(message, `${method} response`);
+  if (jsonRpcMessageId(record) !== expectedId) {
+    throw new Error(`HTTP MCP upstream response id mismatch for ${method}`);
+  }
+  if (record.error) {
+    throw new Error(JSON.stringify(record.error));
+  }
+  return record.result;
+}
+
+function jsonRpcMessageId(message: unknown): number | string | null {
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return null;
+  }
+  const id = (message as Record<string, unknown>).id;
+  return typeof id === "number" || typeof id === "string" ? id : null;
+}
+
 function writeGatewayResultRecord(options: {
   projectRoot: string;
   tool: NexusMcpGatewayToolRecord;
@@ -1223,15 +1569,17 @@ function writeGatewayResultRecord(options: {
     serverId: options.server.serverId,
     serverName: options.server.serverName,
     toolName: options.tool.toolName,
-    command: options.server.command ?? "",
+    transport: options.server.transport,
+    command: options.server.command,
     args: options.server.args,
+    url: options.server.url,
     argumentBytes: Buffer.byteLength(JSON.stringify(options.toolArguments), "utf8"),
     resultBytes: Buffer.byteLength(responseText, "utf8"),
     stored: true,
     truncated: false,
     policy: {
       decision: "allowed",
-      reason: "Gateway MVP allows configured command-based upstream MCP tools.",
+      reason: "Gateway allows configured upstream MCP tools.",
     },
     response: options.response,
   };

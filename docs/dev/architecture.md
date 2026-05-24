@@ -89,10 +89,10 @@ The MCP gateway is the low-context routing surface for large tool sets. It is a
 small MCP server that exposes status, search, describe, call, and result-fetch
 tools. Configured upstream MCP servers remain explicit workspace/plugin
 capabilities; the gateway does not auto-run arbitrary local commands. For
-command-based plugin MCP servers without declared tool metadata, the gateway can
-initialize the upstream server, call `tools/list`, and cache discovered metadata
-under `.dev-nexus/runtime/mcp-gateway/`. Workspace and agent-level gateway groups filter
-which configured servers and tools are searchable or callable.
+plugin MCP servers without declared tool metadata, the gateway can initialize
+stdio or HTTP upstream servers, call `tools/list`, and cache discovered metadata
+under `.dev-nexus/runtime/mcp-gateway/`. Workspace and agent-level gateway
+groups filter which configured servers and tools are searchable or callable.
 
 ## Plugin Capabilities
 
@@ -122,11 +122,11 @@ Supported capability kinds include:
 
 DevNexus validates and projects these records into agent context and setup
 results. A plugin MCP server capability may declare its expected tool names as
-metadata; if it omits them and the server has a command, the MCP gateway can
-discover them dynamically through `tools/list`. DevNexus rejects any declared
-tool name that overlaps a core `dev_nexus` MCP tool. Plugin-specific packages
-own the provider-specific commands that materialize or start specialized runtime
-surfaces.
+metadata; if it omits them and the server has a callable `stdio` command or
+`http` URL, the MCP gateway can discover them dynamically through `tools/list`.
+DevNexus rejects any declared tool name that overlaps a core `dev_nexus` MCP
+tool. Plugin-specific packages own the provider-specific commands or endpoints
+that materialize or start specialized runtime surfaces.
 
 For the Codex and Claude adapter split, see
 [Agent-client plugin compatibility](agent-client-plugin-compatibility.md).
