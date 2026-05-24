@@ -8617,38 +8617,62 @@ function printAutomationAgentProfilesResult(
     );
   }
   writeLine(stdout, `  Profiles: ${result.profiles.length}`);
-  for (const profile of result.profiles) {
-    const appServerSummary = profile.appServer
-      ? [
-          `appServer=${profile.appServer.mode}`,
-          `appServerCommand=${profile.appServer.commandConfigured ? "yes" : "no"}`,
-          `appServerArgs=${profile.appServer.argsCount}`,
-          `endpoint=${profile.appServer.endpointScope}`,
-          `ephemeralThread=${profile.appServer.ephemeralThreadDefault ? "yes" : "no"}`,
-          `hostLocalHints=${profile.appServer.hostLocalSafetyHints.length}`,
-        ].join(" ")
-      : "";
-    writeLine(
-      stdout,
-      [
-        `    ${profile.id}`,
-        `executor=${profile.executor}`,
-        `mode=${profile.executorMode ?? "none"}`,
-        `model=${profile.model ?? "none"}`,
-        `version=${profile.version ?? "none"}`,
-        `variant=${profile.variant ?? "none"}`,
-        `reasoning=${profile.reasoning ?? "none"}`,
-        `intelligence=${profile.intelligence ?? "none"}`,
-        `intendedUse=${profile.intendedUse}`,
-        `safety=${profile.safety.profile}`,
-        `command=${profile.commandConfigured ? "yes" : "no"}`,
-        `args=${profile.argsCount}`,
-        appServerSummary,
-      ].filter(Boolean).join(" "),
-    );
+  printAutomationAgentProfileRows(result.profiles, stdout);
+  printAutomationAgentPluginCapabilities(result.pluginCapabilities, stdout);
+}
+
+function printAutomationAgentProfileRows(
+  profiles: NexusAutomationAgentProfileSummary["profiles"],
+  stdout: TextWriter,
+): void {
+  for (const profile of profiles) {
+    writeLine(stdout, formatAutomationAgentProfileRow(profile));
   }
-  writeLine(stdout, `  Plugin capabilities: ${result.pluginCapabilities.length}`);
-  for (const plugin of result.pluginCapabilities) {
+}
+
+function formatAutomationAgentProfileRow(
+  profile: NexusAutomationAgentProfileSummary["profiles"][number],
+): string {
+  return [
+    `    ${profile.id}`,
+    `executor=${profile.executor}`,
+    `mode=${profile.executorMode ?? "none"}`,
+    `model=${profile.model ?? "none"}`,
+    `version=${profile.version ?? "none"}`,
+    `variant=${profile.variant ?? "none"}`,
+    `reasoning=${profile.reasoning ?? "none"}`,
+    `intelligence=${profile.intelligence ?? "none"}`,
+    `intendedUse=${profile.intendedUse}`,
+    `safety=${profile.safety.profile}`,
+    `command=${profile.commandConfigured ? "yes" : "no"}`,
+    `args=${profile.argsCount}`,
+    formatAutomationAgentAppServerSummary(profile),
+  ].filter(Boolean).join(" ");
+}
+
+function formatAutomationAgentAppServerSummary(
+  profile: NexusAutomationAgentProfileSummary["profiles"][number],
+): string {
+  if (!profile.appServer) {
+    return "";
+  }
+
+  return [
+    `appServer=${profile.appServer.mode}`,
+    `appServerCommand=${profile.appServer.commandConfigured ? "yes" : "no"}`,
+    `appServerArgs=${profile.appServer.argsCount}`,
+    `endpoint=${profile.appServer.endpointScope}`,
+    `ephemeralThread=${profile.appServer.ephemeralThreadDefault ? "yes" : "no"}`,
+    `hostLocalHints=${profile.appServer.hostLocalSafetyHints.length}`,
+  ].join(" ");
+}
+
+function printAutomationAgentPluginCapabilities(
+  pluginCapabilities: NexusAutomationAgentProfileSummary["pluginCapabilities"],
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  Plugin capabilities: ${pluginCapabilities.length}`);
+  for (const plugin of pluginCapabilities) {
     writeLine(
       stdout,
       `    ${plugin.pluginId} capabilities=${plugin.capabilityCount}`,
