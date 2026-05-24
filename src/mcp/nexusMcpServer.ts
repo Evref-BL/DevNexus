@@ -83,6 +83,7 @@ import {
 import {
   loadNexusPublicationAuthProfiles,
   resolveNexusPublicationPolicy,
+  type NexusPublicationGitPushRunner,
 } from "../publication/nexusPublicationPolicy.js";
 import {
   getNexusEligibleWorkSummary,
@@ -212,6 +213,11 @@ import {
 } from "../work-items/workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "../worktrees/gitWorktreeService.js";
+import {
+  callNexusPublicationMcpTool,
+  isNexusPublicationMcpToolName,
+  nexusPublicationMcpTools,
+} from "./nexusMcpPublicationTools.js";
 import type {
   WorkItem,
   WorkItemPatch,
@@ -241,6 +247,10 @@ export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
   commandRunner?: NexusAutomationCommandRunner;
+  publicationFetch?: typeof fetch;
+  publicationCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
+  publicationGitPushRunner?: NexusPublicationGitPushRunner;
+  publicationRemoteProbeRunner?: NexusPublicationGitPushRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
   mcpRuntimeStartedAt?: Date | string;
@@ -613,6 +623,7 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  ...nexusPublicationMcpTools,
   {
     name: "review_plan",
     description: "Build a read-only component review plan from review policy, local authorization, and optional provider evidence.",
@@ -1468,6 +1479,9 @@ export async function callDevNexusMcpTool(
 ): Promise<DevNexusMcpToolResult> {
   try {
     const args = argsValue === undefined ? {} : asRecord(argsValue, "arguments");
+    if (isNexusPublicationMcpToolName(name)) {
+      return toolResult(await callNexusPublicationMcpTool(name, args, context));
+    }
     switch (name) {
       case "project_status": {
         const detail = mcpDetailFromArgs(args);
