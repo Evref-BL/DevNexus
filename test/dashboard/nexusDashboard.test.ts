@@ -3258,6 +3258,57 @@ describe("nexus dashboard", () => {
     });
   });
 
+  it("renders compact next-action labels for HITL thread decisions", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      events: [],
+      weave: {
+        nodes: [],
+      },
+      threads: {
+        records: [
+          {
+            id: "archive-thread",
+            title: "Archive completed notes",
+            decision: "archive",
+            decisionLabel: "Archive",
+            decisionDetail: "Notes were captured elsewhere.",
+            updatedAt: "2026-05-21T10:00:00.000Z",
+          },
+          {
+            id: "rescue-thread",
+            title: "Rescue local branch",
+            decision: "rescue",
+            decisionLabel: "Rescue",
+            decisionDetail: "Local changes need inspection.",
+            updatedAt: "2026-05-21T09:00:00.000Z",
+          },
+          {
+            id: "blocked-thread",
+            title: "Resolve provider permission",
+            decision: "blocked",
+            decisionLabel: "Blocked",
+            decisionDetail: "Provider approval is required.",
+            updatedAt: "2026-05-21T08:00:00.000Z",
+          },
+        ],
+        needsDecisionCount: 3,
+        incomplete: false,
+      },
+    };
+
+    const html = hooks.renderThreadInbox(snapshot, "thread:rescue-thread");
+
+    expect(html).toContain("dn-thread-next");
+    expect(html).toContain("Archive local record");
+    expect(html).toContain("Inspect before cleanup");
+    expect(html).toContain("Resolve blocker");
+  });
+
   it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
