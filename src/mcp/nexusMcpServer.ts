@@ -2098,15 +2098,16 @@ export async function callDevNexusMcpTool(
           }),
         });
       case "work_item_create":
+        const createProvider = workItemTrackerProviderFromArgs(args);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_create",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForProvider(createProvider),
           componentId: optionalString(args, "componentId", "arguments"),
         });
         assertMcpWorkItemAuthorityAllowed(args, [
           ...workItemCreateAuthorityActions(
             args,
-            workItemTrackerProviderFromArgs(args),
+            createProvider,
           ),
         ]);
         return toolResult({
@@ -2675,6 +2676,10 @@ function workItemAuthorityProvider(
   trackerProvider: string,
 ): string | null {
   return requestedAction.startsWith("provider.") ? trackerProvider : null;
+}
+
+function workItemMutationClassForProvider(provider: string): NexusCheckoutMutationClass {
+  return provider === "local" ? "local_tracker" : "provider_work_item";
 }
 
 function workItemTrackerProviderFromArgs(

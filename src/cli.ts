@@ -222,6 +222,7 @@ import {
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./worktrees/nexusManualWorktree.js";
+import type { NexusCheckoutMutationClass } from "./worktrees/nexusSharedCheckoutGuard.js";
 import {
   heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,
@@ -1950,10 +1951,15 @@ async function handleWorkItemCommand(
   const command = argv[1];
   if (command === "create") {
     const parsed = parseWorkItemCreateCommand(argv);
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+    );
     assertCliMutationAllowed(dependencies, {
       projectRoot: path.resolve(parsed.projectRoot),
       command: "work-item create",
-      mutationClass: "local_tracker",
+      mutationClass: workItemMutationClassForProvider(provider),
       componentId: parsed.componentId,
     });
     const authorityBlock = cliWorkItemAuthorityBlock(
@@ -1969,11 +1975,7 @@ async function handleWorkItemCommand(
             parsed.assignees.length > 0 ? parsed.assignees : undefined,
           milestone: parsed.milestone,
         },
-        cliWorkItemTrackerProvider(
-          parsed.projectRoot,
-          parsed.componentId,
-          parsed.trackerId,
-        ),
+        provider,
       ),
     );
     if (authorityBlock) {
@@ -3006,6 +3008,10 @@ function cliWorkItemAuthorityProvider(
   trackerProvider: string,
 ): string | null {
   return requestedAction.startsWith("provider.") ? trackerProvider : null;
+}
+
+function workItemMutationClassForProvider(provider: string): NexusCheckoutMutationClass {
+  return provider === "local" ? "local_tracker" : "provider_work_item";
 }
 
 function cliWorkItemTrackerProvider(
