@@ -6725,20 +6725,7 @@ function printProjectMcpRefreshResult(
   );
   writeLine(stdout, `  Agent targets: ${result.agentTargets.length}`);
   for (const target of result.agentTargets) {
-    writeLine(
-      stdout,
-      `    ${target.agent}/${target.provider}: ${target.configPath} (${target.serverName}, ${target.configStatus}, ${target.configFormat}/${target.configSchema})`,
-    );
-    if (target.commandResolution.strategy !== "unchanged") {
-      writeLine(stdout, `      Command: ${target.commandResolution.summary}`);
-    }
-    for (const note of target.activationNotes) {
-      writeLine(stdout, `      Session: ${note}`);
-    }
-    writeLine(stdout, `      Trust: ${target.trustSemantics.summary}`);
-    for (const gap of target.capabilityGaps) {
-      writeLine(stdout, `      Gap: ${gap.severity} ${gap.summary}`);
-    }
+    printProjectMcpRefreshTarget(target, stdout);
   }
   if (result.capabilityGaps.length > 0) {
     writeLine(stdout, `  Capability gaps: ${result.capabilityGaps.length}`);
@@ -6747,19 +6734,46 @@ function printProjectMcpRefreshResult(
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
   }
   if ("exposurePlan" in result) {
-    writeLine(stdout, "  Exposure plan:");
-    for (const target of result.exposurePlan.directTargets) {
-      writeLine(
-        stdout,
-        `    direct ${target.agent}/${target.serverName}: ${target.mode} (${target.source})`,
-      );
-    }
-    for (const server of result.exposurePlan.pluginServers) {
-      writeLine(
-        stdout,
-        `    plugin ${server.pluginId}/${server.serverName}: ${server.mode} (${server.source})`,
-      );
-    }
+    printProjectMcpRefreshExposurePlan(result.exposurePlan, stdout);
+  }
+}
+
+function printProjectMcpRefreshTarget(
+  target: MaterializeNexusProjectAgentMcpConfigResult["agentTargets"][number],
+  stdout: TextWriter,
+): void {
+  writeLine(
+    stdout,
+    `    ${target.agent}/${target.provider}: ${target.configPath} (${target.serverName}, ${target.configStatus}, ${target.configFormat}/${target.configSchema})`,
+  );
+  if (target.commandResolution.strategy !== "unchanged") {
+    writeLine(stdout, `      Command: ${target.commandResolution.summary}`);
+  }
+  for (const note of target.activationNotes) {
+    writeLine(stdout, `      Session: ${note}`);
+  }
+  writeLine(stdout, `      Trust: ${target.trustSemantics.summary}`);
+  for (const gap of target.capabilityGaps) {
+    writeLine(stdout, `      Gap: ${gap.severity} ${gap.summary}`);
+  }
+}
+
+function printProjectMcpRefreshExposurePlan(
+  exposurePlan: ProjectMcpRefreshExposurePlan,
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, "  Exposure plan:");
+  for (const target of exposurePlan.directTargets) {
+    writeLine(
+      stdout,
+      `    direct ${target.agent}/${target.serverName}: ${target.mode} (${target.source})`,
+    );
+  }
+  for (const server of exposurePlan.pluginServers) {
+    writeLine(
+      stdout,
+      `    plugin ${server.pluginId}/${server.serverName}: ${server.mode} (${server.source})`,
+    );
   }
 }
 
