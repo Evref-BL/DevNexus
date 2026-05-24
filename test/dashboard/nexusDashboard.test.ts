@@ -19,6 +19,7 @@ import {
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
+  stopVerifiedNexusDashboardServerRecord,
   validateNexusHomeConfigBase,
   writeNexusWorktreeLeaseStore,
   type CodexAppServerJsonRpcRequest,
@@ -30,8 +31,10 @@ import {
   type NexusDashboardCodexChatStartResult,
   type NexusDashboardCodexChatStarter,
   type NexusDashboardHostWorkspaceRecord,
+  type NexusDashboardServerRecord,
   type NexusProjectConfig,
   type NexusWorktreeLeaseRecord,
+  type StopProcessByPidResult,
 } from "../../src/index.js";
 
 const tempDirs: string[] = [];
@@ -46,7 +49,12 @@ function fixedClock(timestamp: string): () => string {
   return () => timestamp;
 }
 
+function extractDashboardActionToken(html: string): string | undefined {
+  return html.match(/actionToken:\s*"([^"]+)"/u)?.[1];
+}
+
 async function loadDashboardClientTestHooks(): Promise<{
+  cockpitTooltipText: (target: { getAttribute?: (name: string) => string | null }) => string;
   cockpitThreadPrompt: (thread: {
     branchName?: string | null;
     componentId?: string | null;
@@ -56,6 +64,13 @@ async function loadDashboardClientTestHooks(): Promise<{
     title: string;
     workItemId?: string | null;
   }) => string;
+  dashboardRenderSignature: (value: unknown) => string;
+  isCockpitTooltipTargetTruncated: (target: {
+    clientHeight?: number;
+    clientWidth?: number;
+    scrollHeight?: number;
+    scrollWidth?: number;
+  }) => boolean;
   historyRows: (snapshot: unknown) => {
     rows: Array<{ detail: string; lane: number; node: { id: string }; title: string }>;
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>;
@@ -69,8 +84,14 @@ async function loadDashboardClientTestHooks(): Promise<{
   gitHistoryRows: (snapshot: unknown, filter?: string | null) => {
     maxLane: number;
     repository: unknown;
-    rows: Array<{ commit: { hash: string }; lane: number; selectId: string }>;
-    paths: Array<{ fromLane?: number; points?: Array<{ lane: number }>; toLane?: number }>;
+    rows: Array<{ commit: { hash: string }; index: number; lane: number; selectId: string }>;
+    paths: Array<{
+      fromIndex?: number;
+      fromLane?: number;
+      points?: Array<{ index: number; lane: number }>;
+      toIndex?: number;
+      toLane?: number;
+    }>;
   } | null;
   renderActionStrip: (
     actions: Array<{
@@ -127,7 +148,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, gitHistoryRows, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, gitHistoryRows, historyRows, isCockpitTooltipTargetTruncated, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1311,7 +1332,7 @@ describe("nexus dashboard", () => {
             field: "workspaces[]",
           },
           selectedWorkspaceSnapshot: {
-            endpoint: "/api/dashboard?workspace=:workspaceId",
+            endpoint: "/api/cockpit?workspace=:workspaceId",
           },
           actionQueue: {
             field: "actionQueue",
@@ -1491,7 +1512,7 @@ describe("nexus dashboard", () => {
   it("renders a client module with explicit light and dark mode controls", () => {
     const module = renderNexusDashboardClientModule();
 
-    expect(module).toContain("dev-nexus-dashboard-theme");
+    expect(module).toContain("dev-nexus-cockpit-theme");
     expect(module).toContain("data-dev-nexus-theme");
     expect(module).toContain("data-theme-mode=\"system\"");
     expect(module).toContain("data-theme-mode=\"light\"");
@@ -1519,7 +1540,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("dn-loading-panel");
     expect(module).toContain("dn-loader");
     expect(module).toContain("dn-skeleton");
-    expect(module).toContain("if (!workspaceId) {\n        if (!latestHost) {");
+    expect(module).toMatch(/if \(!workspaceId\) \{\s+if \(!latestHost\) \{/u);
     expect(module).toContain("@keyframes dn-spin");
     expect(module).toContain("@keyframes dn-shimmer");
     expect(module).toContain("Loading host cockpit");
@@ -1558,7 +1579,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderDisabledAction");
     expect(module).toContain("dn-policy-action");
     expect(module).toContain("data-thread-action");
-    expect(module).toContain("/api/dashboard/thread-action");
+    expect(module).toContain("/api/cockpit/thread-action");
     expect(module).toContain("Needs plugin enable policy");
     expect(module).toContain("Curated plugin catalogue entries copy a refresh command");
     expect(module).toContain("data-copy-text");
@@ -1665,6 +1686,30 @@ describe("nexus dashboard", () => {
     );
   });
 
+  it("shows cockpit tooltip copy only for clipped title-backed text", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const truncatedTarget = {
+      clientHeight: 20,
+      clientWidth: 120,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => (name === "title" ? "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway" : null),
+    };
+    const fittingTarget = {
+      clientHeight: 20,
+      clientWidth: 180,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => (name === "title" ? "Short label" : null),
+    };
+
+    expect(hooks.cockpitTooltipText(truncatedTarget)).toBe(
+      "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway",
+    );
+    expect(hooks.isCockpitTooltipTargetTruncated(truncatedTarget)).toBe(true);
+    expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
+  });
+
   it("keeps visible dashboard content stable during background refresh", () => {
     const module = renderNexusDashboardClientModule();
 
@@ -1677,6 +1722,69 @@ describe("nexus dashboard", () => {
     expect(module).toContain("latestSnapshot = null;");
     expect(module).not.toContain("catch (error) {\n      latestSnapshot = null;");
     expect(module).not.toContain("catch {\n      latestHost = null;");
+  });
+
+  it("ignores refresh-clock activity timestamps in dashboard render signatures", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const firstSnapshot = {
+      generatedAt: "2026-05-21T10:00:00.000Z",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:00.000Z",
+          title: "Snapshot refreshed",
+        },
+        {
+          id: "automation-status",
+          time: "2026-05-21T10:00:00.000Z",
+          title: "Automation blocked",
+        },
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T09:45:00.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+    const secondSnapshot = {
+      ...firstSnapshot,
+      generatedAt: "2026-05-21T10:00:15.000Z",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:15.000Z",
+          title: "Snapshot refreshed",
+        },
+        {
+          id: "automation-status",
+          time: "2026-05-21T10:00:15.000Z",
+          title: "Automation blocked",
+        },
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T09:45:00.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+    const actualWorkChange = {
+      ...secondSnapshot,
+      events: [
+        ...secondSnapshot.events.slice(0, 2),
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T10:00:10.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+
+    expect(hooks.dashboardRenderSignature(firstSnapshot)).toBe(
+      hooks.dashboardRenderSignature(secondSnapshot),
+    );
+    expect(hooks.dashboardRenderSignature(secondSnapshot)).not.toBe(
+      hooks.dashboardRenderSignature(actualWorkChange),
+    );
   });
 
   it("audits static visual guardrails for light and dark cockpit modes", () => {
@@ -1998,7 +2106,41 @@ describe("nexus dashboard", () => {
 
     expect(rows?.rows).toHaveLength(3);
     expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
-    expect(rendered).toContain("Project History");
+    expect(rendered).toContain("Project Writes");
+    expect(rendered).toContain("Selected write event");
+    expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
+    const selectedRowIndex = rendered.indexOf(
+      "dn-git-history-row selected\" type=\"button\" data-select-id=\"history:primary:feature000000000000000000000000000000000000\"",
+    );
+    const inlineDetailIndex = rendered.indexOf(
+      "dn-git-detail-panel dn-git-inline-detail",
+    );
+    const nextRowIndex = rendered.indexOf(
+      "data-select-id=\"history:primary:main10000000000000000000000000000000000000\"",
+    );
+    expect(selectedRowIndex).toBeGreaterThan(-1);
+    expect(inlineDetailIndex).toBeGreaterThan(selectedRowIndex);
+    expect(inlineDetailIndex).toBeLessThan(nextRowIndex);
+    expect(rendered.slice(selectedRowIndex, inlineDetailIndex)).not.toContain(
+      'data-scroll-target="selected-item"',
+    );
+    expect(rendered).toContain('data-history-row-count="10"');
+    expect(rendered).toContain("data-git-board");
+    expect(rendered).toContain("data-git-column=\"graph\"");
+    expect(rendered).toContain("data-git-column=\"description\"");
+    expect(rendered).toContain("data-git-column=\"date\"");
+    expect(rendered).toContain("data-git-column=\"author\"");
+    expect(rendered).toContain("data-git-column=\"commit\"");
+    expect(rendered).toContain("data-git-resize-column=\"graph\"");
+    expect(rendered).toContain("data-git-resize-column=\"description\"");
+    expect(rendered).toContain("data-git-resize-column=\"date\"");
+    expect(rendered).toContain("data-git-resize-column=\"author\"");
+    expect(rendered).toContain("data-git-resize-column=\"commit\"");
+    expect(rendered).toContain("<span class=\"dn-git-date\"");
+    expect(rendered).toContain("<span class=\"dn-git-author\"");
+    expect(rendered).toContain("Codex</span>");
+    expect(rendered).toContain("<span class=\"dn-git-sha\"");
+    expect(rendered).toContain(">feature</span>");
     expect(rendered).toContain("<svg");
     expect(rendered).toContain("feat/cockpit-graph");
     expect(rendered).toContain("Add graph data");
@@ -2006,7 +2148,7 @@ describe("nexus dashboard", () => {
     expect(detail).toMatchObject({
       title: "Add graph data",
       facts: expect.arrayContaining([
-        ["Type", "commit"],
+        ["Type", "write event"],
         ["Component", "DevNexus"],
         ["Commit", "feature"],
         ["Parents", "1"],
@@ -2118,10 +2260,131 @@ describe("nexus dashboard", () => {
     };
 
     const rendered = hooks.renderGitHistory(snapshot);
+    const graph = hooks.gitHistoryRows(snapshot);
+    const delayedCrossLanePaths = graph?.paths.filter(
+      (path) => {
+        if (path.fromLane === path.toLane) return false;
+        const points = path.points ?? [];
+        const firstCrossLanePoint = points.find((point) => point.lane !== path.fromLane);
+        return firstCrossLanePoint
+          ? Math.abs(firstCrossLanePoint.index - (path.fromIndex ?? 0)) > 1.5
+          : false;
+      },
+    );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toMatch(/M 22 15 V 28\.5 C .*40 40\.5 V 105/);
-    expect(rendered).not.toMatch(/M 22 15 C 22 36, 40 84, 40 105/);
+    expect(rendered).toContain("V 28.5");
+    expect(rendered).toContain("V 105");
+    expect(rendered).not.toContain("H 50 V 105");
+    expect(rendered).not.toMatch(/M 28 15 C .*50 .*105/);
+    expect(delayedCrossLanePaths).toEqual([]);
+  });
+
+  it("anchors fractional git graph connector endpoints on routed lanes", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "merge000000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/corridor"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "merge000000000000000000000000000000000000000",
+                shortHash: "merge00",
+                parents: [
+                  "main20000000000000000000000000000000000000",
+                  "feature000000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge feature branch",
+                refs: [],
+              },
+              {
+                hash: "main20000000000000000000000000000000000000",
+                shortHash: "main200",
+                parents: ["main10000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:58:00.000Z",
+                subject: "Main corridor step",
+                refs: [],
+              },
+              {
+                hash: "main10000000000000000000000000000000000000",
+                shortHash: "main100",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:56:00.000Z",
+                subject: "Main base step",
+                refs: [],
+              },
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Feature branch step",
+                refs: [],
+              },
+              {
+                hash: "base0000000000000000000000000000000000000",
+                shortHash: "base000",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const graph = hooks.gitHistoryRows(snapshot);
+    const allPoints =
+      graph?.paths.flatMap((path) => path.points ?? []) ?? [];
+    const fractionalEndpoints =
+      graph?.paths.flatMap((path) => {
+        const points = path.points ?? [];
+        const last = points.at(-1);
+        return last && !Number.isInteger(last.index) ? [last] : [];
+      }) ?? [];
+
+    expect(graph?.paths.length).toBeGreaterThan(0);
+    expect(fractionalEndpoints.length).toBeGreaterThan(0);
+    for (const endpoint of fractionalEndpoints) {
+      const matches = allPoints.filter(
+        (point) => point.lane === endpoint.lane && point.index === endpoint.index,
+      );
+      expect(matches.length).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it("reuses git graph lanes for side branches with separate lifetimes", async () => {
@@ -2393,8 +2656,9 @@ describe("nexus dashboard", () => {
     const sideB = rows?.rows.find((row) => row.commit.hash.startsWith("sideB"));
 
     expect(sideB?.lane).toBe(1);
+    expect(Math.max(...(rows?.rows.map((row) => row.lane) ?? []))).toBe(1);
     expect(rows?.maxLane).toBe(2);
-    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane === 2))).toBe(true);
+    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane > 2))).toBe(false);
   });
 
   it("keeps every loaded git history row visible in the graph", async () => {
@@ -2547,9 +2811,15 @@ describe("nexus dashboard", () => {
 
     const rendered = hooks.renderGitHistory(snapshot);
 
-    expect(rendered).toContain('width="118"');
+    expect(rendered).toContain('width="148"');
     expect(rendered).toContain('height="120"');
-    expect(rendered).toContain('viewBox="0 0 118 120"');
+    expect(rendered).toContain('viewBox="0 0 148 120"');
+    expect(rendered).toContain('data-history-row-count="4"');
+    expect(rendered).toContain('data-history-lane-count="1"');
+    expect(rendered).toContain('data-history-event-class="write"');
+    expect(rendered).toContain(
+      'data-history-write-event-id="history:primary:head000000000000000000000000000000000000"',
+    );
   });
 
   it("filters project git history by branch head ancestors", async () => {
@@ -2782,6 +3052,8 @@ describe("nexus dashboard", () => {
 
     expect(rendered).toContain("Needs review");
     expect(rendered).toContain("1 thread");
+    expect(rendered).toContain("Attached details");
+    expect(rendered).toContain("Open issue #42");
     expect(detail.facts).toEqual(
       expect.arrayContaining([
         ["Feature", "Cockpit graph"],
@@ -3275,6 +3547,57 @@ describe("nexus dashboard", () => {
     });
   });
 
+  it("renders compact next-action labels for HITL thread decisions", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      events: [],
+      weave: {
+        nodes: [],
+      },
+      threads: {
+        records: [
+          {
+            id: "archive-thread",
+            title: "Archive completed notes",
+            decision: "archive",
+            decisionLabel: "Archive",
+            decisionDetail: "Notes were captured elsewhere.",
+            updatedAt: "2026-05-21T10:00:00.000Z",
+          },
+          {
+            id: "rescue-thread",
+            title: "Rescue local branch",
+            decision: "rescue",
+            decisionLabel: "Rescue",
+            decisionDetail: "Local changes need inspection.",
+            updatedAt: "2026-05-21T09:00:00.000Z",
+          },
+          {
+            id: "blocked-thread",
+            title: "Resolve provider permission",
+            decision: "blocked",
+            decisionLabel: "Blocked",
+            decisionDetail: "Provider approval is required.",
+            updatedAt: "2026-05-21T08:00:00.000Z",
+          },
+        ],
+        needsDecisionCount: 3,
+        incomplete: false,
+      },
+    };
+
+    const html = hooks.renderThreadInbox(snapshot, "thread:rescue-thread");
+
+    expect(html).toContain("dn-thread-next");
+    expect(html).toContain("Archive local record");
+    expect(html).toContain("Inspect before cleanup");
+    expect(html).toContain("Resolve blocker");
+  });
+
   it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
@@ -3492,9 +3815,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       expect(actionToken).toBeTruthy();
       const unauthenticatedResponse = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
@@ -3545,6 +3866,388 @@ describe("nexus dashboard", () => {
     expect(codexChatStarter.closed).toBe(true);
   });
 
+  it("records dashboard server metadata and exposes server ownership info", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-info-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      now: fixedClock("2026-05-21T10:30:00.000Z"),
+    });
+
+    try {
+      const publicInfo = await fetch(`${server.url}api/dashboard/server-info`)
+        .then((response) => response.json());
+      expect(publicInfo).toMatchObject({
+        ok: true,
+        dashboard: {
+          id: expect.any(String),
+          pid: process.pid,
+          projectRoot: path.resolve(projectRoot),
+          currentProjectRoot: null,
+          host: "127.0.0.1",
+          port: server.port,
+          url: server.url,
+          startedAt: "2026-05-21T10:30:00.000Z",
+        },
+        verified: false,
+      });
+      expect(publicInfo.dashboard.verificationToken).toBeUndefined();
+
+      const registryPath = path.join(
+        projectRoot,
+        ".dev-nexus",
+        "runtime",
+        "dashboard-servers.json",
+      );
+      const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+      expect(registry).toMatchObject({
+        version: 1,
+        servers: [
+          {
+            id: publicInfo.dashboard.id,
+            pid: process.pid,
+            host: "127.0.0.1",
+            port: server.port,
+            url: server.url,
+            verificationToken: expect.any(String),
+          },
+        ],
+      });
+
+      const verifiedInfo = await fetch(`${server.url}api/dashboard/server-info`, {
+        headers: {
+          "x-dev-nexus-dashboard-verification":
+            registry.servers[0].verificationToken,
+        },
+      }).then((response) => response.json());
+      expect(verifiedInfo).toMatchObject({
+        ok: true,
+        verified: true,
+        dashboard: {
+          id: publicInfo.dashboard.id,
+        },
+      });
+      expect(verifiedInfo.dashboard.verificationToken).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+
+    const afterClosePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "runtime",
+      "dashboard-servers.json",
+    );
+    const afterClose = fs.existsSync(afterClosePath)
+      ? JSON.parse(fs.readFileSync(afterClosePath, "utf8"))
+      : { servers: [] };
+    expect(afterClose.servers).toEqual([]);
+  });
+
+  it("explains how to recover when a known cockpit port is occupied", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-port-conflict-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({ projectRoot });
+
+    try {
+      let message = "";
+      try {
+        await startNexusDashboardServer({
+          projectRoot,
+          host: "127.0.0.1",
+          port: server.port,
+        });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(message).toContain(
+        `Cockpit port 127.0.0.1:${server.port} is already in use.`,
+      );
+      expect(message).toContain(server.url);
+      expect(message).toContain("dev-nexus cockpit status");
+      expect(message).toContain("--restart");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("stops only a verified dashboard-owned server record for restart", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-safe-restart-");
+    const record: NexusDashboardServerRecord = {
+      id: "server-1",
+      pid: process.pid,
+      projectRoot,
+      currentProjectRoot: null,
+      host: "127.0.0.1",
+      port: 4242,
+      url: "http://127.0.0.1:4242/",
+      startedAt: "2026-05-21T10:30:00.000Z",
+      updatedAt: "2026-05-21T10:30:00.000Z",
+      verificationToken: "secret-token",
+    };
+    const stopped: number[] = [];
+
+    const result = await stopVerifiedNexusDashboardServerRecord(record, {
+      currentPid: 999,
+      fetcher: async (_url, init) => {
+        const headers = init?.headers as Record<string, string>;
+        expect(headers["x-dev-nexus-dashboard-verification"]).toBe(
+          "secret-token",
+        );
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            verified: true,
+            dashboard: {
+              id: "server-1",
+              pid: process.pid,
+              projectRoot,
+              currentProjectRoot: null,
+              host: "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              startedAt: "2026-05-21T10:30:00.000Z",
+              updatedAt: "2026-05-21T10:30:00.000Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      },
+      stopper: async (pid): Promise<StopProcessByPidResult> => {
+        stopped.push(pid);
+        return {
+          pid,
+          stopped: true,
+          alreadyExited: false,
+          method: "process.kill",
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      stopped: true,
+      reason: "stopped",
+      verification: {
+        owned: true,
+      },
+    });
+    expect(stopped).toEqual([process.pid]);
+  });
+
+  it("shares provider freshness across cockpit server routes", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-provider-freshness-");
+    const homePath = makeTempDir("dev-nexus-dashboard-provider-freshness-home-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [],
+        authProfiles: [
+          {
+            id: "bot-github",
+            actorId: "example-bot-actor",
+            provider: "github",
+            kind: "app",
+            credentialKind: "github_app",
+            account: "example-bot",
+            host: "github.com",
+            sshHost: "github.com-bot",
+            githubCliConfigDir: "home:.config/gh-example-bot",
+            gitUserName: "Example Bot",
+            gitUserEmail: "bot@example.invalid",
+            environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        selector: {
+          ...defaultNexusAutomationConfig.selector,
+          statuses: ["ready"],
+          limit: 5,
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          remoteUrl: "git@github.com-bot:example/project.git",
+          sshHostAlias: "github.com-bot",
+          targetBranch: "main",
+          push: true,
+          actor: {
+            kind: "app",
+            provider: "github",
+            handle: "example-bot",
+            id: null,
+          },
+          commandEnvironment: {
+            GH_CONFIG_DIR: "home:.config/gh-example-bot",
+          },
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "service_account",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["maintainer"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+      components: [
+        {
+          id: "primary",
+          name: "Dashboard Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:example/project.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "github",
+          workTrackers: [
+            {
+              id: "github",
+              name: "GitHub Issues",
+              enabled: true,
+              roles: ["primary", "eligible_source"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "project",
+                },
+              },
+            },
+          ],
+          trackerDiscovery: {
+            scannedRoles: ["primary", "eligible_source"],
+            directExternalSelection: "allowed",
+            importRequiredFirst: false,
+            providerFilters: ["github"],
+            queryLimit: 5,
+            conflictWinner: "scanned_tracker",
+            missingCredentialBehavior: "skip",
+          },
+          relationships: [],
+        },
+      ],
+    }));
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "remote get-url bot") {
+        return ok([...args], "git@github.com-bot:example/project.git\n");
+      }
+      if (command === "remote get-url --push bot") {
+        return ok([...args], "git@github.com-bot:example/project.git\n");
+      }
+      if (
+        command === "config --local --get user.name" ||
+        command === "config --get user.name"
+      ) {
+        return ok([...args], "Example Bot\n");
+      }
+      if (
+        command === "config --local --get user.email" ||
+        command === "config --get user.email"
+      ) {
+        return ok([...args], "bot@example.invalid\n");
+      }
+      return baseGitRunner(args, cwd);
+    };
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fetcher: typeof fetch = async (input, init = {}) => {
+      const headers = init.headers as Record<string, string>;
+      calls.push({ url: String(input), headers });
+      if (headers["If-None-Match"] === "\"dashboard-issues\"") {
+        return new Response(null, { status: 304 });
+      }
+      return new Response(
+        JSON.stringify([
+          {
+            id: 42,
+            number: 42,
+            title: "Ready cockpit task",
+            body: "Provider-backed task",
+            state: "open",
+            labels: [{ name: "status:ready" }],
+            assignees: [],
+            created_at: "2026-05-21T09:40:00.000Z",
+            updated_at: "2026-05-21T09:45:00.000Z",
+            html_url: "https://github.com/example/project/issues/42",
+          },
+        ]),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            etag: "\"dashboard-issues\"",
+          },
+        },
+      );
+    };
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      homePath,
+      gitRunner,
+      env: {
+        GH_TOKEN: "github-token",
+        GITHUB_TOKEN: "github-token",
+      },
+      providerOptions: {
+        github: {
+          fetch: fetcher,
+          token: "github-token",
+          apiBaseUrl: "https://api.github.test",
+        },
+      },
+      now: fixedClock("2026-05-21T10:26:45.000Z"),
+    });
+
+    try {
+      const host = await fetch(
+        `${server.url}api/host?workspace=dashboard-demo`,
+      ).then((response) => response.json());
+      const cockpit = await fetch(
+        `${server.url}api/cockpit?workspace=dashboard-demo`,
+      ).then((response) => response.json());
+
+      expect(host.actionQueue).toEqual(expect.any(Array));
+      expect(cockpit.project.id).toBe("dashboard-demo");
+      expect(calls.length).toBeGreaterThan(1);
+      expect(calls.slice(1).some((call) =>
+        call.headers["If-None-Match"] === "\"dashboard-issues\""
+      )).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("archives dashboard threads locally without deleting worktrees", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-thread-action-");
     const worktreesRoot = makeTempDir("dev-nexus-dashboard-thread-action-worktrees-");
@@ -3576,11 +4279,9 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       expect(actionToken).toBeTruthy();
-      const before = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const before = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
       expect(before.threads.records).toEqual(
@@ -3592,7 +4293,7 @@ describe("nexus dashboard", () => {
         ]),
       );
 
-      const response = await fetch(`${server.url}api/dashboard/thread-action`, {
+      const response = await fetch(`${server.url}api/cockpit/thread-action`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -3616,7 +4317,7 @@ describe("nexus dashboard", () => {
       });
       expect(fs.existsSync(worktreePath)).toBe(true);
 
-      const after = await fetch(`${server.url}api/dashboard`).then((nextResponse) =>
+      const after = await fetch(`${server.url}api/cockpit`).then((nextResponse) =>
         nextResponse.json(),
       );
       expect(
@@ -3683,7 +4384,7 @@ describe("nexus dashboard", () => {
         `${server.url}api/host?workspace=server-registered`,
       ).then((response) => response.json());
       const selectedDashboard = await fetch(
-        `${server.url}api/dashboard?workspace=server-registered`,
+        `${server.url}api/cockpit?workspace=server-registered`,
       ).then((response) => response.json());
       const selectedDiagnostics = await fetch(
         `${server.url}api/diagnostics?workspace=server-registered`,
@@ -3695,7 +4396,7 @@ describe("nexus dashboard", () => {
         `${server.url}api/events?workspace=server-registered`,
       ).then((response) => response.json());
       const missingResponse = await fetch(
-        `${server.url}api/dashboard?workspace=missing-workspace`,
+        `${server.url}api/cockpit?workspace=missing-workspace`,
       );
 
       expect(host).toMatchObject({
@@ -3807,7 +4508,7 @@ describe("nexus dashboard", () => {
     });
 
     try {
-      const first = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const first = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
       expect(first.project.id).toBe("dashboard-demo");
@@ -3824,7 +4525,7 @@ describe("nexus dashboard", () => {
       const events = await fetch(`${server.url}api/events`).then((response) =>
         response.json(),
       );
-      const second = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const second = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
 
@@ -4017,7 +4718,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard?workspace=selected-current`,
+        `${server.url}api/cockpit?workspace=selected-current`,
       );
       const payload = await response.json();
 
@@ -4068,7 +4769,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/shell?workspace=workspace-shell`,
+        `${server.url}api/cockpit/shell?workspace=workspace-shell`,
       );
       const payload = await response.json();
 
@@ -4137,11 +4838,11 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=workspace-section&section=plugins`,
+        `${server.url}api/cockpit/section?workspace=workspace-section&section=plugins`,
       );
       const payload = await response.json();
       const invalidResponse = await fetch(
-        `${server.url}api/dashboard/section?workspace=workspace-section&section=unknown`,
+        `${server.url}api/cockpit/section?workspace=workspace-section&section=unknown`,
       );
 
       expect(response.status).toBe(200);
@@ -4220,7 +4921,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=tracked-local&section=tracked-work`,
+        `${server.url}api/cockpit/section?workspace=tracked-local&section=tracked-work`,
       );
       const payload = await response.json();
 
@@ -4306,7 +5007,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=thread-local&section=threads`,
+        `${server.url}api/cockpit/section?workspace=thread-local&section=threads`,
       );
       const payload = await response.json();
 
@@ -4371,7 +5072,7 @@ describe("nexus dashboard", () => {
       const host = await fetch(`${server.url}api/host`).then((response) =>
         response.json(),
       );
-      const workspaceResponse = await fetch(`${server.url}api/dashboard`);
+      const workspaceResponse = await fetch(`${server.url}api/cockpit`);
 
       expect(server.projectRoot).toBeNull();
       expect(host).toMatchObject({
@@ -4460,9 +5161,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(
         `${server.url}api/codex/thread?workspace=chat-registered`,
         {
@@ -4536,9 +5235,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const openProject = await fetch(
         `${server.url}api/local/open?workspace=open-registered`,
         {
@@ -4694,9 +5391,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {
@@ -4801,9 +5496,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {
@@ -4843,9 +5536,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {

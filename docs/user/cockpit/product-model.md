@@ -1,4 +1,4 @@
-# Dashboard Product Model
+# Cockpit Product Model
 
 This page is the review gate for the cockpit redesign. It defines the page
 model and user vocabulary before broader UI and data-shape changes.
@@ -90,7 +90,7 @@ collapsed or lower on the page.
 
 ## Implementation-Ready Decisions
 
-- `dashboard serve` without a workspace root opens the host cockpit.
+- `cockpit serve` without a workspace root opens the host cockpit.
 - The host cockpit should be a real status surface, not only a switcher.
 - The default UI should avoid raw timestamps, raw ids, JSON-shaped text, and long
   paragraphs.

@@ -1,6 +1,6 @@
-# Dashboard Cockpit
+# DevNexus Cockpit
 
-The DevNexus dashboard is an operator cockpit for human-in-the-loop agent work.
+The DevNexus cockpit is an operator cockpit for human-in-the-loop agent work.
 It should show what needs attention first, then let the user drill into the
 workspace, thread, branch, issue, pull request, or plugin behind it.
 
@@ -31,6 +31,8 @@ diagnostics mode.
 - [UX principles](ux-principles.md) records source-backed design constraints.
 - [Host cockpit](host-cockpit.md) describes the host-wide page.
 - [Workspace cockpit](workspace-cockpit.md) describes the workspace drill-down.
+- [History widget](history-widget.md) records the reusable write-event graph
+  model for project history.
 - [Cockpit actions](actions.md) describes approvals, provider links, and chat
   actions.
 - [Data contracts](data-contracts.md) describes routes and embeddable payloads.
@@ -42,11 +44,11 @@ diagnostics mode.
 ## Commands
 
 ```bash
-dev-nexus dashboard serve
-dev-nexus dashboard serve <workspace-root>
-dev-nexus dashboard snapshot <workspace-root> --json
-dev-nexus dashboard weave <workspace-root> --json
+dev-nexus cockpit serve
+dev-nexus cockpit serve <workspace-root>
+dev-nexus cockpit snapshot <workspace-root> --json
+dev-nexus cockpit weave <workspace-root> --json
 ```
 
-`dashboard serve` opens the host cockpit. Passing a workspace root starts the
+`cockpit serve` opens the host cockpit. Passing a workspace root starts the
 same cockpit with that workspace selected.

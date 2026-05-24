@@ -1,6 +1,6 @@
 # Host Cockpit
 
-The host cockpit is the default page for `dev-nexus dashboard serve`. It is
+The host cockpit is the default page for `dev-nexus cockpit serve`. It is
 host-scoped, not workspace-scoped.
 
 The page should answer:

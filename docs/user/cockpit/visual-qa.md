@@ -1,10 +1,10 @@
-# Dashboard Visual QA
+# Cockpit Visual QA
 
 The cockpit has two layers of visual QA.
 
 ## Static Audit
 
-`auditNexusDashboardClientVisuals()` checks the generated dashboard client for
+`auditNexusDashboardClientVisuals()` checks the generated cockpit client for
 layout guardrails that are easy to regress while iterating quickly:
 
 | Check | Guards |
@@ -19,7 +19,7 @@ layout guardrails that are easy to regress while iterating quickly:
 | Plugin cards | Installed plugin cards and compact capability pills. |
 | Responsive layout | Desktop and narrow viewport breakpoints. |
 
-The audit is deterministic and runs inside the normal dashboard test suite.
+The audit is deterministic and runs inside the normal cockpit test suite.
 
 ## Human Review
 

@@ -1,0 +1,316 @@
+export interface NexusCockpitHistoryGraphPoint {
+  readonly lane: number;
+  readonly index: number;
+}
+
+export interface NexusCockpitHistoryGraphRoute {
+  readonly colorLane?: number;
+  readonly fromLane?: number;
+  readonly toLane?: number;
+  readonly fromIndex?: number;
+  readonly toIndex?: number;
+  readonly points?: readonly NexusCockpitHistoryGraphPoint[];
+}
+
+export interface NexusCockpitHistoryGraphRow {
+  readonly colorLane?: number;
+  readonly lane: number;
+  readonly index: number;
+  readonly selectId?: string;
+  readonly commit?: {
+    readonly hash?: string;
+    readonly shortHash?: string;
+    readonly subject?: string;
+  };
+}
+
+export interface NexusCockpitHistoryGraph {
+  readonly maxLane?: number;
+  readonly rows: readonly NexusCockpitHistoryGraphRow[];
+  readonly paths?: readonly NexusCockpitHistoryGraphRoute[];
+}
+
+export interface NexusCockpitHistoryGraphSvgOptions {
+  readonly ariaLabel?: string;
+  readonly branchColorCount?: number;
+  readonly laneGap?: number;
+  readonly minWidth?: number;
+  readonly nodeRadius?: number;
+  readonly offsetX?: number;
+  readonly rowHeight?: number;
+}
+
+export interface NexusCockpitHistoryGraphSvgPoint {
+  readonly lane: number;
+  readonly index: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface NexusCockpitHistoryGraphSvgRoute {
+  readonly id: string;
+  readonly colorIndex: number;
+  readonly d: string;
+  readonly points: readonly NexusCockpitHistoryGraphSvgPoint[];
+}
+
+export interface NexusCockpitHistoryGraphSvgNode {
+  readonly id: string;
+  readonly colorIndex: number;
+  readonly eventClass: "write";
+  readonly lane: number;
+  readonly index: number;
+  readonly x: number;
+  readonly y: number;
+  readonly label: string;
+}
+
+export interface NexusCockpitHistoryGraphSvgModel {
+  readonly width: number;
+  readonly height: number;
+  readonly laneCount: number;
+  readonly rowCount: number;
+  readonly nodeRadius: number;
+  readonly routes: readonly NexusCockpitHistoryGraphSvgRoute[];
+  readonly nodes: readonly NexusCockpitHistoryGraphSvgNode[];
+}
+
+export function renderNexusCockpitHistoryGraphSvg(
+  graph: NexusCockpitHistoryGraph,
+  options: NexusCockpitHistoryGraphSvgOptions = {},
+): string {
+  const model = buildNexusCockpitHistoryGraphSvgModel(graph, options);
+  const ariaLabel = escapeNexusCockpitHistoryGraphAttribute(
+    options.ariaLabel ?? "Write history graph",
+  );
+  const paths = model.routes
+    .map((route) => {
+      const color = `var(--dn-branch-${route.colorIndex})`;
+      const id = escapeNexusCockpitHistoryGraphAttribute(route.id);
+      const d = escapeNexusCockpitHistoryGraphAttribute(route.d);
+      return `<g data-history-route-id="${id}" data-history-color-index="${route.colorIndex}"><path class="dn-git-line-shadow" d="${d}" /><path class="dn-git-line" d="${d}" stroke="${color}" /></g>`;
+    })
+    .join("");
+  const nodes = model.nodes
+    .map((node) => {
+      const id = escapeNexusCockpitHistoryGraphAttribute(node.id);
+      const label = escapeNexusCockpitHistoryGraphAttribute(node.label);
+      const color = `var(--dn-branch-${node.colorIndex})`;
+      return `<circle data-history-event-class="${node.eventClass}" data-history-write-event-id="${id}" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="var(--dn-surface)" stroke="${color}" stroke-width="3" />`;
+    })
+    .join("");
+  return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${paths}${nodes}</svg>`;
+}
+
+export function buildNexusCockpitHistoryGraphSvgModel(
+  graph: NexusCockpitHistoryGraph,
+  options: NexusCockpitHistoryGraphSvgOptions = {},
+): NexusCockpitHistoryGraphSvgModel {
+  const metrics = nexusCockpitHistoryGraphSvgMetrics(options);
+  const rows = graph.rows ?? [];
+  const routes = graph.paths ?? [];
+  const rowCount = Math.max(
+    1,
+    rows.length,
+    Math.ceil(
+      Math.max(
+        0,
+        ...routes.flatMap((route) =>
+          nexusCockpitHistoryGraphRoutePoints(route).map((point) => point.index),
+        ),
+      ) + 0.5,
+    ),
+  );
+  const maxLane = Math.max(
+    0,
+    finiteNexusCockpitHistoryGraphNumber(graph.maxLane, 0),
+    ...rows.map((row) => finiteNexusCockpitHistoryGraphNumber(row.lane, 0)),
+    ...routes.flatMap((route) =>
+      nexusCockpitHistoryGraphRoutePoints(route).map((point) =>
+        finiteNexusCockpitHistoryGraphNumber(point.lane, 0),
+      ),
+    ),
+  );
+  const laneCount = maxLane + 1;
+  const width = Math.max(
+    metrics.minWidth,
+    metrics.offsetX * 2 + maxLane * metrics.laneGap,
+  );
+  const height = Math.max(metrics.rowHeight, rowCount * metrics.rowHeight);
+  const x = (lane: number): number =>
+    metrics.offsetX + finiteNexusCockpitHistoryGraphNumber(lane, 0) * metrics.laneGap;
+  const y = (index: number): number =>
+    metrics.rowHeight / 2 +
+    finiteNexusCockpitHistoryGraphNumber(index, 0) * metrics.rowHeight;
+
+  return {
+    width,
+    height,
+    laneCount,
+    rowCount,
+    nodeRadius: metrics.nodeRadius,
+    routes: routes
+      .map((route, index) => {
+        const points = nexusCockpitHistoryGraphRoutePoints(route).map((point) => ({
+          lane: point.lane,
+          index: point.index,
+          x: x(point.lane),
+          y: y(point.index),
+        }));
+        return {
+          id: `route:${index}`,
+          colorIndex: nexusCockpitHistoryGraphColorIndex(
+            route.colorLane ?? route.fromLane ?? 0,
+            metrics.branchColorCount,
+          ),
+          d: nexusCockpitHistoryGraphRouteD(points, metrics.rowHeight),
+          points,
+        };
+      })
+      .filter((route) => route.points.length > 1 && route.d !== ""),
+    nodes: rows.map((row, index) => ({
+      id: nexusCockpitHistoryGraphNodeId(row, index),
+      colorIndex: nexusCockpitHistoryGraphColorIndex(
+        row.colorLane ?? row.lane,
+        metrics.branchColorCount,
+      ),
+      eventClass: "write" as const,
+      lane: row.lane,
+      index: row.index,
+      x: x(row.lane),
+      y: y(row.index),
+      label: nexusCockpitHistoryGraphNodeLabel(row, index),
+    })),
+  };
+}
+
+export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
+  return [
+    renderNexusCockpitHistoryGraphSvg,
+    buildNexusCockpitHistoryGraphSvgModel,
+    nexusCockpitHistoryGraphSvgMetrics,
+    nexusCockpitHistoryGraphRoutePoints,
+    nexusCockpitHistoryGraphRouteD,
+    nexusCockpitHistoryGraphColorIndex,
+    nexusCockpitHistoryGraphNodeId,
+    nexusCockpitHistoryGraphNodeLabel,
+    finiteNexusCockpitHistoryGraphNumber,
+    escapeNexusCockpitHistoryGraphAttribute,
+  ]
+    .map((fn) => fn.toString())
+    .join("\n\n");
+}
+
+function nexusCockpitHistoryGraphSvgMetrics(
+  options: NexusCockpitHistoryGraphSvgOptions,
+): Required<NexusCockpitHistoryGraphSvgOptions> {
+  return {
+    ariaLabel: options.ariaLabel ?? "Write history graph",
+    branchColorCount: Math.max(
+      1,
+      Math.floor(
+        finiteNexusCockpitHistoryGraphNumber(options.branchColorCount, 7),
+      ),
+    ),
+    laneGap: Math.max(
+      1,
+      finiteNexusCockpitHistoryGraphNumber(options.laneGap, 22),
+    ),
+    minWidth: Math.max(
+      1,
+      finiteNexusCockpitHistoryGraphNumber(options.minWidth, 148),
+    ),
+    nodeRadius: Math.max(
+      0.5,
+      finiteNexusCockpitHistoryGraphNumber(options.nodeRadius, 5.2),
+    ),
+    offsetX: Math.max(
+      0,
+      finiteNexusCockpitHistoryGraphNumber(options.offsetX, 28),
+    ),
+    rowHeight: Math.max(
+      1,
+      finiteNexusCockpitHistoryGraphNumber(options.rowHeight, 30),
+    ),
+  };
+}
+
+function nexusCockpitHistoryGraphRoutePoints(
+  route: NexusCockpitHistoryGraphRoute,
+): readonly NexusCockpitHistoryGraphPoint[] {
+  if (route.points?.length) return route.points;
+  return [
+    {
+      lane: finiteNexusCockpitHistoryGraphNumber(route.fromLane, 0),
+      index: finiteNexusCockpitHistoryGraphNumber(route.fromIndex, 0),
+    },
+    {
+      lane: finiteNexusCockpitHistoryGraphNumber(route.toLane, 0),
+      index: finiteNexusCockpitHistoryGraphNumber(route.toIndex, 0),
+    },
+  ];
+}
+
+function nexusCockpitHistoryGraphRouteD(
+  points: readonly NexusCockpitHistoryGraphSvgPoint[],
+  rowHeight: number,
+): string {
+  if (!points.length) return "";
+  let d = `M ${points[0]!.x} ${points[0]!.y}`;
+  for (let index = 1; index < points.length; index++) {
+    const from = points[index - 1]!;
+    const to = points[index]!;
+    if (from.x === to.x) {
+      d += ` V ${to.y}`;
+    } else if (from.y === to.y) {
+      d += ` H ${to.x}`;
+    } else {
+      const curve = Math.min(
+        rowHeight * 0.7,
+        Math.max(8, Math.abs(to.y - from.y) * 0.58),
+      );
+      d += ` C ${from.x} ${from.y + curve}, ${to.x} ${to.y - curve}, ${to.x} ${to.y}`;
+    }
+  }
+  return d;
+}
+
+function nexusCockpitHistoryGraphColorIndex(
+  value: number | undefined,
+  branchColorCount: number,
+): number {
+  const color = Math.floor(finiteNexusCockpitHistoryGraphNumber(value, 0));
+  return ((color % branchColorCount) + branchColorCount) % branchColorCount;
+}
+
+function nexusCockpitHistoryGraphNodeId(
+  row: NexusCockpitHistoryGraphRow,
+  index: number,
+): string {
+  return String(row.selectId ?? row.commit?.hash ?? `write:${index}`);
+}
+
+function nexusCockpitHistoryGraphNodeLabel(
+  row: NexusCockpitHistoryGraphRow,
+  index: number,
+): string {
+  const subject = String(row.commit?.subject ?? "").trim();
+  const shortHash = String(row.commit?.shortHash ?? "").trim();
+  if (subject && shortHash) return `${subject} (${shortHash})`;
+  return subject || shortHash || `Write event ${index + 1}`;
+}
+
+function finiteNexusCockpitHistoryGraphNumber(
+  value: number | null | undefined,
+  fallback: number,
+): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function escapeNexusCockpitHistoryGraphAttribute(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}

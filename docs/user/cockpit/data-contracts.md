@@ -1,6 +1,6 @@
-# Dashboard Data Contracts
+# Cockpit Data Contracts
 
-Dashboard data is meant for both the built-in local cockpit and embedders that
+Cockpit data is meant for both the built-in local cockpit and embedders that
 provide their own tenant, auth, and navigation shell.
 
 ## Local Server Routes
@@ -8,18 +8,18 @@ provide their own tenant, auth, and navigation shell.
 ```text
 GET /api/host
 GET /api/projects
-GET /api/dashboard
+GET /api/cockpit
 GET /api/snapshot
 GET /api/weave
 GET /api/events
 GET /api/diagnostics
-GET /assets/dev-nexus-dashboard.js
+GET /assets/dev-nexus-cockpit.js
 ```
 
 `/api/host` is the host cockpit payload. It works without a current workspace
 root and carries the workspace list, selected workspace id, and action queue.
 
-`/api/dashboard?workspace=<id>` and `/api/snapshot?workspace=<id>` return the
+`/api/cockpit?workspace=<id>` and `/api/snapshot?workspace=<id>` return the
 selected workspace payload. The default workspace payload is meant for UI: it
 keeps summaries, threads, plugins, provider actions, events, and the parallel
 work map, but leaves raw automation objects out.
@@ -35,7 +35,7 @@ surfaces:
 | --- | --- | --- |
 | Host summary | `workspaces` | not default |
 | Workspace summary | `workspaces[]` | `summary` |
-| Selected snapshot | link to `/api/dashboard?workspace=:workspaceId` | `project` |
+| Selected snapshot | link to `/api/cockpit?workspace=:workspaceId` | `project` |
 | Action queue | `actionQueue` | not default |
 | Provider actions | `actionQueue[].providerAction` | `actions` on events, threads, and weave nodes |
 | Plugins | `workspaces[].pluginCount` | `plugins` |
@@ -65,10 +65,10 @@ archive/forget actions have explicit local action contracts:
 
 ```text
 POST /api/codex/thread
-POST /api/dashboard/thread-action
+POST /api/cockpit/thread-action
 ```
 
-`/api/dashboard/thread-action` records a local cockpit decision only. It hides
+`/api/cockpit/thread-action` records a local cockpit decision only. It hides
 the selected thread from active attention, but does not delete worktrees,
 branches, notes, or provider records. Curated plugin catalogue entries may
 expose copyable install and refresh guidance, but the browser does not execute
@@ -89,7 +89,7 @@ workspace routes:
 
 ```text
 /api/host?workspace=<id>
-/api/dashboard?workspace=<id>
+/api/cockpit?workspace=<id>
 /api/weave?workspace=<id>
 /api/events?workspace=<id>
 /api/codex/thread?workspace=<id>
@@ -101,13 +101,16 @@ still listing the other registered workspaces.
 ## Browser Module
 
 ```js
-mountDevNexusDashboard(root, options)
-fetchDevNexusDashboard(baseUrl)
-fetchDevNexusDashboardHost(baseUrl)
+mountDevNexusCockpit(root, options)
+fetchDevNexusCockpit(baseUrl)
+fetchDevNexusCockpitHost(baseUrl)
 ```
 
 The built-in module owns local rendering. Higher-level apps can mount it as a
 workspace page or use the JSON routes to render their own UI.
+
+The older `dashboard` route and module names remain as compatibility aliases
+while the cockpit surface moves to the new names.
 
 ## Ownership Boundary
 
