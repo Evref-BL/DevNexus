@@ -301,6 +301,12 @@ describe("nexus skills", () => {
     expect(skillMarkdown["dev-nexus"]).toContain(
       "delete merged local and remote review branches",
     );
+    expect(skillMarkdown["dev-nexus"]).toContain(
+      "automation-run records only when this chat was launched by DevNexus automation",
+    );
+    expect(skillMarkdown["dev-nexus"]).toContain(
+      "Treat that as product feedback to propose to the user",
+    );
     expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
     expect(skillMarkdown["dev-nexus"]).toContain("workspace/meta worktree");
     expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");
@@ -447,6 +453,15 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "feature branchStrategy",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "publication review-handoff",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "hosted status checks",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "automation-run",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "Do not silently",
