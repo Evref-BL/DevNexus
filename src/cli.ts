@@ -1546,49 +1546,59 @@ async function handleProjectTrackerCommand(
 ): Promise<number> {
   const command = argv[2];
   if (command === "configure") {
-    const parsed = parseProjectTrackerConfigureCommand(argv);
-    const result = configureNexusProjectTracker({
-      homePath: resolvedCommandHomePath(parsed.homePath),
-      homeStore: fileProjectHomeStore(),
-      project: parsed.project,
-      provider: parsed.provider,
-      ...(parsed.host !== undefined ? { host: parsed.host } : {}),
-      ...(parsed.repositoryOwner !== undefined
-        ? { repositoryOwner: parsed.repositoryOwner }
-        : {}),
-      ...(parsed.repositoryName !== undefined
-        ? { repositoryName: parsed.repositoryName }
-        : {}),
-      ...(parsed.repositoryId !== undefined ? { repositoryId: parsed.repositoryId } : {}),
-      ...(parsed.projectKey !== undefined ? { projectKey: parsed.projectKey } : {}),
-      ...(parsed.issueType !== undefined ? { issueType: parsed.issueType } : {}),
-      ...(parsed.storePath !== undefined ? { storePath: parsed.storePath } : {}),
-    });
-    printProjectTrackerConfigureResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
+    return handleProjectTrackerConfigureCommand(argv, dependencies);
   }
 
   if (command === "link") {
-    const parsed = parseProjectTrackerLinkCommand(argv);
-    const result = linkNexusProjectTracker({
-      homePath: resolvedCommandHomePath(parsed.homePath),
-      homeStore: fileProjectHomeStore(),
-      project: parsed.project,
-      trackerProjectId: parsed.trackerProjectId,
-    });
-    printProjectTrackerLinkResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
+    return handleProjectTrackerLinkCommand(argv, dependencies);
   }
 
   throw new Error("workspace tracker requires configure or link");
+}
+
+async function handleProjectTrackerConfigureCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const parsed = parseProjectTrackerConfigureCommand(argv);
+  const result = configureNexusProjectTracker({
+    homePath: resolvedCommandHomePath(parsed.homePath),
+    homeStore: fileProjectHomeStore(),
+    project: parsed.project,
+    provider: parsed.provider,
+    ...(parsed.host !== undefined ? { host: parsed.host } : {}),
+    ...(parsed.repositoryOwner !== undefined ? { repositoryOwner: parsed.repositoryOwner } : {}),
+    ...(parsed.repositoryName !== undefined ? { repositoryName: parsed.repositoryName } : {}),
+    ...(parsed.repositoryId !== undefined ? { repositoryId: parsed.repositoryId } : {}),
+    ...(parsed.projectKey !== undefined ? { projectKey: parsed.projectKey } : {}),
+    ...(parsed.issueType !== undefined ? { issueType: parsed.issueType } : {}),
+    ...(parsed.storePath !== undefined ? { storePath: parsed.storePath } : {}),
+  });
+  printProjectTrackerConfigureResult(
+    result,
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
+  return 0;
+}
+
+async function handleProjectTrackerLinkCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const parsed = parseProjectTrackerLinkCommand(argv);
+  const result = linkNexusProjectTracker({
+    homePath: resolvedCommandHomePath(parsed.homePath),
+    homeStore: fileProjectHomeStore(),
+    project: parsed.project,
+    trackerProjectId: parsed.trackerProjectId,
+  });
+  printProjectTrackerLinkResult(
+    result,
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
+  return 0;
 }
 
 async function handleSetupCommand(
