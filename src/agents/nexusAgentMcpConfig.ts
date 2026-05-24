@@ -131,6 +131,8 @@ export function currentNexusCliScriptPath(): string {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     path.join(moduleDir, "cli.js"),
+    path.join(moduleDir, "..", "cli.js"),
+    path.join(moduleDir, "..", "..", "dist", "cli.js"),
     path.join(moduleDir, "..", "dist", "cli.js"),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ??
