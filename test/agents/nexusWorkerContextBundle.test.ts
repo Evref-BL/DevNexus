@@ -410,31 +410,43 @@ describe("nexus worker context bundle", () => {
     );
   });
 
-  it("fails before worker launch when a referenced planning doc is missing", () => {
+  it("skips missing referenced planning docs without blocking context materialization", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
     const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
     const worktreePath = path.join(worktreesRoot, "local-44");
+    const relativePath = "docs/component-multi-tracker-prd.md";
     const workItem: WorkItem = {
       id: "local-44",
       title: "Add component multi-tracker schema",
-      description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
+      description: `Source PRD: \`${relativePath}\`.`,
       status: "ready",
       provider: "local",
     };
 
-    expect(() =>
-      materializeNexusWorkerContextBundle({
-        projectRoot,
-        componentId: "dev-nexus",
-        sourceRoot,
-        worktreesRoot,
-        worktreePath,
-        branchName: "codex/local-44-component-trackers",
-        baseRef: "origin/main",
-        workItem,
-      }),
-    ).toThrow(/Referenced context file is missing/);
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-44-component-trackers",
+      baseRef: "origin/main",
+      workItem,
+    });
+
+    expect(result.context.projectContext.referencedFiles).toEqual([]);
+    expect(result.context.projectContext.missingReferencedFiles).toEqual([
+      {
+        relativePath,
+        projectPath: path.join(projectRoot, relativePath),
+        componentPath: path.join(sourceRoot, relativePath),
+      },
+    ]);
+    expect(result.briefingMarkdown).toContain("Skipped missing referenced docs:");
+    expect(result.briefingMarkdown).toContain(
+      `- ${relativePath}: not found under project root or component source root`,
+    );
   });
 
   it("records workspace-managed skills and worker-local agent workspaceions", () => {
