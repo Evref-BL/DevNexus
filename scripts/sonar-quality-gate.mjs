@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_OPTIONS = {
   minCoverage: 70,
@@ -251,7 +252,7 @@ Defaults:
   failures: any Sonar bug or vulnerability, low coverage, or high duplication`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main()
     .then((code) => {
       process.exitCode = code;

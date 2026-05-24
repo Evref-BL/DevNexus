@@ -1,13 +1,27 @@
-import { describe, expect, it } from "vitest";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
 
-const { evaluateQualityGate } = (await import("../../scripts/sonar-quality-gate.mjs")) as {
-  evaluateQualityGate: (input: unknown, options?: unknown) => {
-    status: "passed" | "failed";
-    failures: string[];
-    warnings: string[];
-    summary: Record<string, number | null>;
-  };
+type QualityGateResult = {
+  status: "passed" | "failed";
+  failures: string[];
+  warnings: string[];
+  summary: Record<string, number | null>;
 };
+
+type EvaluateQualityGate = (input: unknown, options?: unknown) => QualityGateResult;
+
+let evaluateQualityGate: EvaluateQualityGate;
+
+beforeAll(async () => {
+  const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+  const moduleUrl = pathToFileURL(
+    path.resolve(testDirectory, "../../scripts/sonar-quality-gate.mjs"),
+  ).href;
+  ({ evaluateQualityGate } = (await import(moduleUrl)) as {
+    evaluateQualityGate: EvaluateQualityGate;
+  });
+});
 
 function measures(values: Record<string, string | number>) {
   return {

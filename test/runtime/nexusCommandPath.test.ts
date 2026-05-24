@@ -26,19 +26,35 @@ describe("nexus command path", () => {
     );
   });
 
-  it("ignores relative and group-writable PATH entries", () => {
+  it("ignores relative PATH entries", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-command-path-"));
-    const unsafeBin = path.join(root, "unsafe-bin");
-    fs.mkdirSync(unsafeBin, { recursive: true, mode: 0o777 });
-    fs.chmodSync(unsafeBin, 0o777);
-    makeExecutable(unsafeBin, "demo-tool");
+    const trustedBin = path.join(root, "trusted-bin");
+    fs.mkdirSync(trustedBin, { recursive: true, mode: 0o755 });
+    const commandPath = makeExecutable(trustedBin, "demo-tool");
 
-    expect(() =>
+    expect(
       resolveNexusCommandPath("demo-tool", {
-        PATH: [".", unsafeBin].join(path.delimiter),
+        PATH: [".", trustedBin].join(path.delimiter),
       }),
-    ).toThrow(NexusCommandPathError);
+    ).toBe(commandPath);
   });
+
+  it.skipIf(process.platform === "win32")(
+    "ignores group-writable PATH entries when POSIX mode bits are available",
+    () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-command-path-"));
+      const unsafeBin = path.join(root, "unsafe-bin");
+      fs.mkdirSync(unsafeBin, { recursive: true, mode: 0o777 });
+      fs.chmodSync(unsafeBin, 0o777);
+      makeExecutable(unsafeBin, "demo-tool");
+
+      expect(() =>
+        resolveNexusCommandPath("demo-tool", {
+          PATH: [".", unsafeBin].join(path.delimiter),
+        }),
+      ).toThrow(NexusCommandPathError);
+    },
+  );
 
   it("rejects relative command paths", () => {
     expect(() =>
