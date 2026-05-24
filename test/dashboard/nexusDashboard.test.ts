@@ -2055,7 +2055,12 @@ describe("nexus dashboard", () => {
 
     expect(rows?.rows).toHaveLength(3);
     expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
-    expect(rendered).toContain("Project History");
+    expect(rendered).toContain("Project Writes");
+    expect(rendered).toContain("Selected write event");
+    expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
+    expect(rendered.indexOf("dn-git-detail-panel")).toBeLessThan(
+      rendered.indexOf("dn-git-board"),
+    );
     expect(rendered).toContain("<svg");
     expect(rendered).toContain("feat/cockpit-graph");
     expect(rendered).toContain("Add graph data");
@@ -2063,7 +2068,7 @@ describe("nexus dashboard", () => {
     expect(detail).toMatchObject({
       title: "Add graph data",
       facts: expect.arrayContaining([
-        ["Type", "commit"],
+        ["Type", "write event"],
         ["Component", "DevNexus"],
         ["Commit", "feature"],
         ["Parents", "1"],
@@ -2967,6 +2972,8 @@ describe("nexus dashboard", () => {
 
     expect(rendered).toContain("Needs review");
     expect(rendered).toContain("1 thread");
+    expect(rendered).toContain("Attached details");
+    expect(rendered).toContain("Open issue #42");
     expect(detail.facts).toEqual(
       expect.arrayContaining([
         ["Feature", "Cockpit graph"],

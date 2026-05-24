@@ -162,6 +162,18 @@ button, input, select { font: inherit; }
 .dn-git-meta, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }
 .dn-git-note { margin: 8px 0 0; color: var(--dn-muted); font-size: 0.8rem; }
+.dn-git-detail-panel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr); gap: 12px; margin: 0 0 10px; padding: 12px; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-raised) 82%, transparent); }
+.dn-git-detail-main { display: grid; gap: 7px; min-width: 0; }
+.dn-git-detail-main strong { min-width: 0; overflow: hidden; color: var(--dn-strong); text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-detail-main p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.82rem; }
+.dn-git-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.dn-git-detail-grid div { min-width: 0; padding: 8px; border: 1px solid var(--dn-border-muted); border-radius: 7px; background: var(--dn-surface-muted); }
+.dn-git-detail-grid dt { color: var(--dn-label); font-size: 0.66rem; font-weight: 850; text-transform: uppercase; }
+.dn-git-detail-grid dd { margin: 3px 0 0; overflow: hidden; color: var(--dn-strong); font-size: 0.78rem; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-detail-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.dn-history-marker-list { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.dn-history-marker { max-width: 160px; overflow: hidden; padding: 3px 7px; border: 1px solid var(--dn-border-muted); border-radius: 7px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.68rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+.dn-history-marker.tone-good { border-color: color-mix(in srgb, var(--dn-good) 52%, var(--dn-border)); color: var(--dn-good); } .dn-history-marker.tone-active { border-color: color-mix(in srgb, var(--dn-active) 52%, var(--dn-border)); color: var(--dn-active); } .dn-history-marker.tone-warn { border-color: color-mix(in srgb, var(--dn-warn) 52%, var(--dn-border)); color: var(--dn-warn-soft); } .dn-history-marker.tone-danger { border-color: color-mix(in srgb, var(--dn-danger) 52%, var(--dn-border)); color: var(--dn-danger); }
 .dn-weave { width: 100%; min-height: 430px; overflow: auto; border-radius: 8px; background: var(--dn-weave-bg); }
 .dn-weave svg { min-width: 900px; display: block; }
 .dn-lane-label { fill: var(--dn-label); font-size: 12px; font-weight: 800; text-transform: uppercase; }
@@ -261,7 +273,7 @@ button, input, select { font: inherit; }
 .dn-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dn-active) 24%, transparent), transparent); animation: dn-shimmer 1.35s ease-in-out infinite; }
 @media (max-width: 1120px) { .dn-signals { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dn-grid, .dn-main-grid, .dn-secondary-grid, .dn-selected-layout { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } }
-@media (max-width: 680px) { .dn-shell { padding: 12px; } .dn-header { padding: 20px; } .dn-meta { min-width: 0; } .dn-open-menu { justify-self: stretch; } .dn-open-trigger { width: 100%; } .dn-open-options { left: 0; right: auto; } .dn-theme-toggle button { min-width: 0; flex: 1; } .dn-signals { grid-template-columns: 1fr; } .dn-panel-heading { align-items: flex-start; flex-direction: column; } .dn-history-item { grid-template-columns: minmax(0, 1fr) auto; } .dn-history-detail { display: none; } .dn-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .dn-shell { padding: 12px; } .dn-header { padding: 20px; } .dn-meta { min-width: 0; } .dn-open-menu { justify-self: stretch; } .dn-open-trigger { width: 100%; } .dn-open-options { left: 0; right: auto; } .dn-theme-toggle button { min-width: 0; flex: 1; } .dn-signals { grid-template-columns: 1fr; } .dn-panel-heading { align-items: flex-start; flex-direction: column; } .dn-history-item { grid-template-columns: minmax(0, 1fr) auto; } .dn-history-detail { display: none; } .dn-detail-grid, .dn-git-detail-grid, .dn-git-detail-panel { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .dn-header-actions { justify-content: stretch; } .dn-header-strip { justify-content: stretch; } .dn-header-path-menu { width: 100%; max-width: 100%; } }
 `;
 
@@ -532,7 +544,7 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
   const threadsLoaded = sectionLoaded(snapshot, 'threads');
   const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');
   const pluginsLoaded = sectionLoaded(snapshot, 'plugins');
-  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Git history', 'Project History', 'Loading commits, refs, and branch heads.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
+  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Write history', 'Project Writes', 'Loading write events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
   const workHistory = loading && !threadsLoaded ? renderProgressivePanel('parallel-work-map', 'Workspace map', 'Activity Lanes', 'Loading source checkout, branches, automation, and decisions.') : renderWorkHistory(snapshot, activeSelection);
   const features = loading && !threadsLoaded ? renderProgressivePanel('active-features', 'Project workflow', 'Active Features', 'Loading feature branches and active threads.') : renderFeatureOverview(snapshot, activeSelection);
   const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('hitl-queue', 'HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot, activeSelection);
@@ -1007,11 +1019,11 @@ function renderEvent(event, selectedId) {
 function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const activeFilter = normalizeGitHistoryFilter(filter);
   const graph = gitHistoryRows(snapshot, activeFilter);
-  if (!graph) return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Git history</span><h2>Project History</h2></div><span class="dn-count">0 commits</span></div><p>No Git history loaded.</p></div>`;
+  if (!graph) return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2></div><span class="dn-count">0 write events</span></div><p>No write history loaded.</p></div>`;
   const repository = graph.repository;
-  const count = `${countLabel(graph.rows.length, 'commit')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
-  const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} commits. Branch filters use the loaded commit window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Git history</span><h2>Project History</h2><p class="dn-history-note">Git refs and commit parent relationships are the source of truth.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}<div class="dn-git-board">${renderGitHistorySvg(graph)}<div class="dn-git-rows">${graph.rows.map((row) => renderGitHistoryRow(snapshot, row, selectedId)).join('')}</div></div>${note}</div>`;
+  const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
+  const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} write events. Branch filters use the loaded history window.</p>` : '';
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryDetailPanel(snapshot, graph, selectedId)}<div class="dn-git-board">${renderGitHistorySvg(graph)}<div class="dn-git-rows">${graph.rows.map((row) => renderGitHistoryRow(snapshot, row, selectedId)).join('')}</div></div>${note}</div>`;
 }
 
 function normalizeGitHistoryFilter(value) {
@@ -1025,11 +1037,11 @@ function normalizeGitHistoryFilter(value) {
 function renderGitHistoryFilters(snapshot, repository, activeFilter) {
   const filters = gitHistoryFilters(snapshot, repository);
   if (filters.length <= 1) return '';
-  return `<div class="dn-git-filters" aria-label="Git history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
+  return `<div class="dn-git-filters" aria-label="Write history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
 }
 
 function gitHistoryFilters(snapshot, repository) {
-  const filters = [{ id: 'all', label: 'All commits', title: 'Show the loaded project history' }];
+  const filters = [{ id: 'all', label: 'All writes', title: 'Show the loaded project write history' }];
   const seen = new Set(filters.map((filter) => filter.id));
   const push = (id, label, title = label) => {
     const normalized = normalizeGitHistoryFilter(id);
@@ -1037,14 +1049,14 @@ function gitHistoryFilters(snapshot, repository) {
     seen.add(normalized);
     filters.push({ id: normalized, label, title });
   };
-  if (repository.defaultBranch) push(`branch:${repository.defaultBranch}`, repository.defaultBranch, `Show ${repository.defaultBranch} and its loaded ancestors`);
+  if (repository.defaultBranch) push(`branch:${repository.defaultBranch}`, repository.defaultBranch, `Show ${repository.defaultBranch} and its loaded write ancestors`);
   for (const feature of snapshot.features?.records ?? []) {
     const branches = featureGitBranches(feature);
     if (!branches.length) continue;
-    push(`feature:${feature.id}`, feature.title, `Show commits reachable from ${feature.title}`);
+    push(`feature:${feature.id}`, feature.title, `Show write events reachable from ${feature.title}`);
   }
   const branchNames = gitHistoryBranchNames(repository);
-  for (const branch of branchNames) push(`branch:${branch}`, compactBranchName(branch), `Show ${branch} and its loaded ancestors`);
+  for (const branch of branchNames) push(`branch:${branch}`, compactBranchName(branch), `Show ${branch} and its loaded write ancestors`);
   return filters.slice(0, 18);
 }
 
@@ -1168,6 +1180,40 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
   const meta = [row.commit.authorName, formatTime(row.commit.committedAt)].filter(Boolean).join(' · ');
   return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-scroll-target="selected-item"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-meta">${escapeHtml(meta)}</span><span class="dn-git-sha">${escapeHtml(row.commit.shortHash)}</span></button>`;
+}
+
+function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
+  if (!selectedId || !String(selectedId).startsWith('history:')) return '';
+  const row = graph.rows.find((candidate) => candidate.selectId === selectedId);
+  if (!row) return '';
+  const commit = row.commit;
+  const parents = gitHistoryParentCommits(row.repository, commit);
+  const children = gitHistoryChildCommits(row.repository, commit);
+  const annotations = gitHistoryAnnotations(snapshot, row.repository, commit);
+  const actions = uniqueActions(annotations.flatMap((annotation) => annotation.actions ?? []));
+  const markers = annotations.length
+    ? `<div class="dn-history-marker-list">${annotations.map((annotation) => `<span class="dn-history-marker tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('')}</div>`
+    : '<p>No attached decision, review, or tracked-work markers.</p>';
+  const actionStrip = actions.length ? renderActionStrip(actions, 'compact') : '<p>No direct action for this write event.</p>';
+  const facts = [
+    ['Parents', parents.length ? parents.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
+    ['Children', children.length ? children.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
+    ['Source', commit.shortHash ?? commit.hash],
+  ];
+  return `<section class="dn-git-detail-panel" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Selected write event</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ') || 'Git commit write event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl></article><aside class="dn-git-detail-side"><span class="dn-label">Attached details</span>${markers}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
+}
+
+function gitHistoryParentCommits(repository, commit) {
+  const byHash = new Map((repository.commits ?? []).map((candidate) => [candidate.hash, candidate]));
+  return (commit.parents ?? []).map((parent) => byHash.get(parent)).filter(Boolean);
+}
+
+function gitHistoryChildCommits(repository, commit) {
+  return (repository.commits ?? []).filter((candidate) => (candidate.parents ?? []).includes(commit.hash));
+}
+
+function gitHistoryWriteEventLabel(commit) {
+  return [commit.shortHash, commit.subject].filter(Boolean).join(' ');
 }
 
 function gitHistoryAnnotations(snapshot, repository, commit) {
@@ -1737,7 +1783,7 @@ function gitHistoryDetail(snapshot, id) {
   const refs = (commit?.refs ?? []).filter((ref) => ref.kind !== 'head').map((ref) => ref.name).join(', ') || 'none';
   const annotations = commit && repository ? gitHistoryAnnotations(snapshot, repository, commit) : [];
   const facts = [
-    ['Type', 'commit'],
+    ['Type', 'write event'],
     ['Component', repository?.componentName ?? repository?.componentId ?? 'workspace'],
     ['Commit', commit?.shortHash ?? 'unknown'],
     ['Parents', String(commit?.parents?.length ?? 0)],
@@ -1752,7 +1798,7 @@ function gitHistoryDetail(snapshot, id) {
   if (issueCount) facts.push(['Tracked work', String(issueCount)]);
   if (commit?.committedAt) facts.push(['Time', formatTime(commit.committedAt)]);
   const actions = uniqueActions(annotations.flatMap((annotation) => annotation.actions ?? []));
-  return { title: commit?.subject ?? 'Commit', body: commit?.subject ?? 'Git commit.', facts, events: [], actions, chat: null };
+  return { title: commit?.subject ?? 'Write event', body: commit?.subject ?? 'Git commit recorded as a write event.', facts, events: [], actions, chat: null };
 }
 
 function featureBySelectId(snapshot, id) {
