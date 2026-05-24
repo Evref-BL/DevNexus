@@ -255,184 +255,280 @@ export async function claimNexusEligibleWorkItem(
   });
   const now = currentDate(options.now);
   const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
-  const activeClaims: NexusWorkItemClaimObservation[] = [];
-  if (eligibleWork.eligibleWorkItems.length === 0) {
-    const inspectedClaims = await inspectExistingWorkItemClaims({
-      options,
-      projectRoot,
-      components,
-      env,
-      selectorQuery,
-      now,
-    });
-    const reclaimed = await maybeReclaimStaleClaim({
-      options,
-      projectRoot,
-      env,
-      inspection: inspectedClaims,
-      now,
-      skippedCandidates: [],
-    });
-    if (reclaimed) {
-      return reclaimed;
-    }
-
-    return noClaimResult("no_eligible_candidate", [], {
-      activeClaims: inspectedClaims.activeClaims.map((item) => item.observation),
-      staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
-    });
-  }
-
-  const skippedCandidates: NexusWorkItemClaimSkippedCandidate[] = [];
-  for (const candidate of eligibleWork.eligibleWorkItems) {
-    const resolved = await resolveCandidateTracker(
-      options,
-      projectRoot,
-      components,
-      candidate,
-      env,
-    );
-    if (!resolved) {
-      skippedCandidates.push(skippedCandidate(candidate, "missing_tracker", null));
-      continue;
-    }
-
-    const { provider, tracker } = resolved;
-    assertWorkTrackerCapability(provider, "get", "verify claim candidates");
-    const ref = workItemRefForCandidate(candidate);
-    const fresh = await provider.getWorkItem(ref);
-    const activeClaim = activeWorkItemClaim(fresh, now);
-    const selectorMatch = eligibleNexusAutomationWorkItems(
-      [fresh],
-      options.automationConfig,
-    ).length === 1;
-
-    if (fresh.status === "in_progress") {
-      skippedCandidates.push(
-        skippedCandidate(candidate, "already_in_progress", fresh.status),
-      );
-      continue;
-    }
-    if (activeClaim) {
-      activeClaims.push(
-        claimObservation(candidate, tracker, fresh, activeClaim),
-      );
-      skippedCandidates.push(
-        skippedCandidate(candidate, "claimed_by_another_owner", fresh.status),
-      );
-      continue;
-    }
-    if (!selectorMatch) {
-      skippedCandidates.push(
-        skippedCandidate(
-          candidate,
-          fresh.status === "ready" ? "selector_mismatch" : "no_longer_ready",
-          fresh.status,
-        ),
-      );
-      continue;
-    }
-
-    const owner = claimOwner({
-      input: options.owner,
-      leaseToken:
-        options.leaseTokenFactory?.() ?? randomUUID(),
-      now,
-      leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
-    });
-    const claimAttempt = await claimAuthority.claimCandidate({
-      projectId: options.projectConfig.id,
-      candidate,
-      tracker,
-      provider,
-      ref,
-      freshWorkItem: fresh,
-      owner,
-      now,
-    });
-    if (claimAttempt.status === "lost_race") {
-      return {
-        status: "lost_race",
-        reason: "verification_failed",
-        candidate: fresh,
-        observedWorkItem: claimAttempt.observedWorkItem,
-        componentId: candidate.componentId,
-        trackerId: tracker.id,
-        owner,
-        ...(claimAttempt.authorityClaim
-          ? { authorityClaim: claimAttempt.authorityClaim }
-          : {}),
-        skippedCandidates,
-        ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
-      };
-    }
-    const verification = await verifyAuthorityBackedClaim({
-      claimAuthority,
-      authorityClaim: claimAttempt.authorityClaim,
-      provider,
-      ref,
-      owner,
-      now,
-    });
-    if (verification.status === "lost_race") {
-      return {
-        status: "lost_race",
-        reason: "verification_failed",
-        candidate: fresh,
-        observedWorkItem: verification.observedWorkItem,
-        componentId: candidate.componentId,
-        trackerId: tracker.id,
-        owner,
-        ...(verification.authorityClaim
-          ? { authorityClaim: verification.authorityClaim }
-          : {}),
-        skippedCandidates,
-        ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
-      };
-    }
-
-    return {
-      status: "claimed",
-      workItem: claimAttempt.workItem,
-      componentId: candidate.componentId,
-      trackerId: tracker.id,
-      owner,
-      ...(verification.authorityClaim
-        ? { authorityClaim: verification.authorityClaim }
-        : {}),
-      skippedCandidates,
-      ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
-    };
-  }
-
-  const inspectedClaims = await inspectExistingWorkItemClaims({
+  const context: ClaimExecutionContext = {
     options,
     projectRoot,
     components,
     env,
     selectorQuery,
+    eligibleWork,
     now,
+    claimAuthority,
+    activeClaims: [],
+    skippedCandidates: [],
+  };
+
+  if (eligibleWork.eligibleWorkItems.length === 0) {
+    return claimNoEligibleCandidateResult(context);
+  }
+
+  return (
+    (await claimFirstEligibleCandidate(context)) ??
+    (await claimRemainingCandidatesResult(context))
+  );
+}
+
+interface ClaimExecutionContext {
+  options: ClaimNexusEligibleWorkItemOptions;
+  projectRoot: string;
+  components: ResolvedNexusProjectComponent[];
+  env: NodeJS.ProcessEnv;
+  selectorQuery: WorkItemQuery;
+  eligibleWork: Awaited<ReturnType<typeof listNexusEligibleWorkByComponent>>;
+  now: Date;
+  claimAuthority: NexusWorkItemClaimAuthority;
+  activeClaims: NexusWorkItemClaimObservation[];
+  skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+}
+
+interface ResolvedClaimCandidate {
+  candidate: NexusEligibleWorkItem;
+  provider: WorkTrackerProvider;
+  tracker: ResolvedNexusProjectWorkTracker;
+  ref: WorkItemRef;
+  fresh: WorkItem;
+}
+
+async function claimNoEligibleCandidateResult(
+  context: ClaimExecutionContext,
+): Promise<NexusWorkItemClaimResult> {
+  const inspectedClaims = await inspectClaimsForContext(context);
+  const reclaimed = await maybeReclaimStaleClaim({
+    options: context.options,
+    projectRoot: context.projectRoot,
+    env: context.env,
+    inspection: inspectedClaims,
+    now: context.now,
+    skippedCandidates: [],
   });
+  if (reclaimed) {
+    return reclaimed;
+  }
+
+  return noClaimResult("no_eligible_candidate", [], {
+    activeClaims: inspectedClaims.activeClaims.map((item) => item.observation),
+    staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+  });
+}
+
+async function claimFirstEligibleCandidate(
+  context: ClaimExecutionContext,
+): Promise<NexusWorkItemClaimResult | null> {
+  for (const candidate of context.eligibleWork.eligibleWorkItems) {
+    const resolved = await resolveFreshClaimCandidate(context, candidate);
+    if (!resolved) {
+      continue;
+    }
+    return claimResolvedEligibleCandidate(context, resolved);
+  }
+  return null;
+}
+
+async function resolveFreshClaimCandidate(
+  context: ClaimExecutionContext,
+  candidate: NexusEligibleWorkItem,
+): Promise<ResolvedClaimCandidate | null> {
+  const resolved = await resolveCandidateTracker(
+    context.options,
+    context.projectRoot,
+    context.components,
+    candidate,
+    context.env,
+  );
+  if (!resolved) {
+    context.skippedCandidates.push(
+      skippedCandidate(candidate, "missing_tracker", null),
+    );
+    return null;
+  }
+
+  const { provider, tracker } = resolved;
+  assertWorkTrackerCapability(provider, "get", "verify claim candidates");
+  const ref = workItemRefForCandidate(candidate);
+  const fresh = await provider.getWorkItem(ref);
+  const activeClaim = activeWorkItemClaim(fresh, context.now);
+  const selectorMatch =
+    eligibleNexusAutomationWorkItems(
+      [fresh],
+      context.options.automationConfig,
+    ).length === 1;
+  const skipReason = freshClaimSkipReason(fresh, activeClaim, selectorMatch);
+  if (skipReason) {
+    if (activeClaim) {
+      context.activeClaims.push(
+        claimObservation(candidate, tracker, fresh, activeClaim),
+      );
+    }
+    context.skippedCandidates.push(
+      skippedCandidate(candidate, skipReason, fresh.status),
+    );
+    return null;
+  }
+
+  return { candidate, provider, tracker, ref, fresh };
+}
+
+function freshClaimSkipReason(
+  fresh: WorkItem,
+  activeClaim: NexusWorkItemClaimOwner | null,
+  selectorMatch: boolean,
+): NexusWorkItemClaimSkipReason | null {
+  if (fresh.status === "in_progress") {
+    return "already_in_progress";
+  }
+  if (activeClaim) {
+    return "claimed_by_another_owner";
+  }
+  if (!selectorMatch) {
+    return fresh.status === "ready" ? "selector_mismatch" : "no_longer_ready";
+  }
+  return null;
+}
+
+async function claimResolvedEligibleCandidate(
+  context: ClaimExecutionContext,
+  resolved: ResolvedClaimCandidate,
+): Promise<NexusWorkItemClaimResult> {
+  const owner = claimOwner({
+    input: context.options.owner,
+    leaseToken: context.options.leaseTokenFactory?.() ?? randomUUID(),
+    now: context.now,
+    leaseDurationMs: context.options.leaseDurationMs ?? defaultLeaseDurationMs,
+  });
+  const claimAttempt = await context.claimAuthority.claimCandidate({
+    projectId: context.options.projectConfig.id,
+    candidate: resolved.candidate,
+    tracker: resolved.tracker,
+    provider: resolved.provider,
+    ref: resolved.ref,
+    freshWorkItem: resolved.fresh,
+    owner,
+    now: context.now,
+  });
+  if (claimAttempt.status === "lost_race") {
+    return claimCandidateLostRaceResult(
+      context,
+      resolved,
+      owner,
+      claimAttempt.observedWorkItem,
+      claimAttempt.authorityClaim,
+    );
+  }
+
+  const verification = await verifyAuthorityBackedClaim({
+    claimAuthority: context.claimAuthority,
+    authorityClaim: claimAttempt.authorityClaim,
+    provider: resolved.provider,
+    ref: resolved.ref,
+    owner,
+    now: context.now,
+  });
+  if (verification.status === "lost_race") {
+    return claimCandidateLostRaceResult(
+      context,
+      resolved,
+      owner,
+      verification.observedWorkItem,
+      verification.authorityClaim,
+    );
+  }
+
+  return claimCandidateSuccessResult(
+    context,
+    resolved,
+    owner,
+    claimAttempt.workItem,
+    verification.authorityClaim,
+  );
+}
+
+function claimCandidateLostRaceResult(
+  context: ClaimExecutionContext,
+  resolved: ResolvedClaimCandidate,
+  owner: NexusWorkItemClaimOwner,
+  observedWorkItem: WorkItem,
+  authorityClaim?: NexusWorkItemClaimAuthorityRecord,
+): NexusWorkItemClaimResult {
+  return {
+    status: "lost_race",
+    reason: "verification_failed",
+    candidate: resolved.fresh,
+    observedWorkItem,
+    componentId: resolved.candidate.componentId,
+    trackerId: resolved.tracker.id,
+    owner,
+    ...(authorityClaim ? { authorityClaim } : {}),
+    skippedCandidates: context.skippedCandidates,
+    ...claimDiagnosticsFields({ activeClaims: context.activeClaims, staleClaims: [] }),
+  };
+}
+
+function claimCandidateSuccessResult(
+  context: ClaimExecutionContext,
+  resolved: ResolvedClaimCandidate,
+  owner: NexusWorkItemClaimOwner,
+  workItem: WorkItem,
+  authorityClaim?: NexusWorkItemClaimAuthorityRecord,
+): NexusWorkItemClaimResult {
+  return {
+    status: "claimed",
+    workItem,
+    componentId: resolved.candidate.componentId,
+    trackerId: resolved.tracker.id,
+    owner,
+    ...(authorityClaim ? { authorityClaim } : {}),
+    skippedCandidates: context.skippedCandidates,
+    ...claimDiagnosticsFields({ activeClaims: context.activeClaims, staleClaims: [] }),
+  };
+}
+
+async function claimRemainingCandidatesResult(
+  context: ClaimExecutionContext,
+): Promise<NexusWorkItemClaimResult> {
+  const inspectedClaims = await inspectClaimsForContext(context);
   const combinedActiveClaims = [
-    ...activeClaims,
+    ...context.activeClaims,
     ...inspectedClaims.activeClaims.map((item) => item.observation),
   ];
   const reclaimed = await maybeReclaimStaleClaim({
-    options,
-    projectRoot,
-    env,
+    options: context.options,
+    projectRoot: context.projectRoot,
+    env: context.env,
     inspection: inspectedClaims,
-    now,
-    skippedCandidates,
+    now: context.now,
+    skippedCandidates: context.skippedCandidates,
     activeClaims: combinedActiveClaims,
   });
   if (reclaimed) {
     return reclaimed;
   }
 
-  return noClaimResult("candidates_not_claimable", skippedCandidates, {
+  return noClaimResult("candidates_not_claimable", context.skippedCandidates, {
     activeClaims: combinedActiveClaims,
     staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+  });
+}
+
+function inspectClaimsForContext(
+  context: ClaimExecutionContext,
+): Promise<ClaimInspectionResult> {
+  return inspectExistingWorkItemClaims({
+    options: context.options,
+    projectRoot: context.projectRoot,
+    components: context.components,
+    env: context.env,
+    selectorQuery: context.selectorQuery,
+    now: context.now,
   });
 }
 
