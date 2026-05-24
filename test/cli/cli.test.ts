@@ -18,6 +18,7 @@ import {
   readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
   shellQuoteArgument,
+  startNexusDashboardServer,
   writeNexusWorktreeLeaseStore,
   type NexusEligibleWorkClaimProviderFactory,
   type GitCommandResult,
@@ -443,6 +444,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus quick-fix finish");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus cockpit snapshot");
+    expect(output.output()).toContain("dev-nexus cockpit status");
     expect(output.output()).toContain("dev-nexus cockpit serve");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
@@ -966,6 +968,79 @@ describe("dev-nexus cli", () => {
         scope: "host",
       },
     });
+  });
+
+  it("prints known local cockpit servers from cockpit status", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-status-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({ projectRoot });
+
+    try {
+      const output = captureOutput();
+      await expect(
+        main(["cockpit", "status", projectRoot, "--json"], {
+          stdout: output.writer,
+        }),
+      ).resolves.toBe(0);
+
+      expect(JSON.parse(output.output())).toMatchObject({
+        ok: true,
+        cockpit: {
+          projectRoot: path.resolve(projectRoot),
+          servers: [
+            {
+              id: expect.any(String),
+              pid: process.pid,
+              host: "127.0.0.1",
+              port: server.port,
+              url: server.url,
+              running: true,
+              owned: true,
+            },
+          ],
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("refuses to restart a cockpit server owned by the current process", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-restart-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({ projectRoot });
+
+    try {
+      const output = captureOutput();
+      await expect(
+        main(
+          [
+            "cockpit",
+            "serve",
+            projectRoot,
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(server.port),
+            "--restart",
+            "--json",
+          ],
+          { stdout: output.writer },
+        ),
+      ).resolves.toBe(1);
+
+      expect(JSON.parse(output.output())).toMatchObject({
+        ok: false,
+        error: {
+          code: "cli_error",
+          message: expect.stringContaining("current process"),
+        },
+      });
+    } finally {
+      await server.close();
+    }
   });
 
   it("refreshes a local project plugin and materializes skills and MCP config", async () => {

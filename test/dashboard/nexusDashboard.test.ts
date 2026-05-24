@@ -19,6 +19,7 @@ import {
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
+  stopVerifiedNexusDashboardServerRecord,
   validateNexusHomeConfigBase,
   writeNexusWorktreeLeaseStore,
   type CodexAppServerJsonRpcRequest,
@@ -30,8 +31,10 @@ import {
   type NexusDashboardCodexChatStartResult,
   type NexusDashboardCodexChatStarter,
   type NexusDashboardHostWorkspaceRecord,
+  type NexusDashboardServerRecord,
   type NexusProjectConfig,
   type NexusWorktreeLeaseRecord,
+  type StopProcessByPidResult,
 } from "../../src/index.js";
 
 const tempDirs: string[] = [];
@@ -3861,6 +3864,180 @@ describe("nexus dashboard", () => {
     }
 
     expect(codexChatStarter.closed).toBe(true);
+  });
+
+  it("records dashboard server metadata and exposes server ownership info", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-info-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      now: fixedClock("2026-05-21T10:30:00.000Z"),
+    });
+
+    try {
+      const publicInfo = await fetch(`${server.url}api/dashboard/server-info`)
+        .then((response) => response.json());
+      expect(publicInfo).toMatchObject({
+        ok: true,
+        dashboard: {
+          id: expect.any(String),
+          pid: process.pid,
+          projectRoot: path.resolve(projectRoot),
+          currentProjectRoot: null,
+          host: "127.0.0.1",
+          port: server.port,
+          url: server.url,
+          startedAt: "2026-05-21T10:30:00.000Z",
+        },
+        verified: false,
+      });
+      expect(publicInfo.dashboard.verificationToken).toBeUndefined();
+
+      const registryPath = path.join(
+        projectRoot,
+        ".dev-nexus",
+        "runtime",
+        "dashboard-servers.json",
+      );
+      const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+      expect(registry).toMatchObject({
+        version: 1,
+        servers: [
+          {
+            id: publicInfo.dashboard.id,
+            pid: process.pid,
+            host: "127.0.0.1",
+            port: server.port,
+            url: server.url,
+            verificationToken: expect.any(String),
+          },
+        ],
+      });
+
+      const verifiedInfo = await fetch(`${server.url}api/dashboard/server-info`, {
+        headers: {
+          "x-dev-nexus-dashboard-verification":
+            registry.servers[0].verificationToken,
+        },
+      }).then((response) => response.json());
+      expect(verifiedInfo).toMatchObject({
+        ok: true,
+        verified: true,
+        dashboard: {
+          id: publicInfo.dashboard.id,
+        },
+      });
+      expect(verifiedInfo.dashboard.verificationToken).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+
+    const afterClosePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "runtime",
+      "dashboard-servers.json",
+    );
+    const afterClose = fs.existsSync(afterClosePath)
+      ? JSON.parse(fs.readFileSync(afterClosePath, "utf8"))
+      : { servers: [] };
+    expect(afterClose.servers).toEqual([]);
+  });
+
+  it("explains how to recover when a known cockpit port is occupied", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-port-conflict-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({ projectRoot });
+
+    try {
+      let message = "";
+      try {
+        await startNexusDashboardServer({
+          projectRoot,
+          host: "127.0.0.1",
+          port: server.port,
+        });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(message).toContain(
+        `Cockpit port 127.0.0.1:${server.port} is already in use.`,
+      );
+      expect(message).toContain(server.url);
+      expect(message).toContain("dev-nexus cockpit status");
+      expect(message).toContain("--restart");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("stops only a verified dashboard-owned server record for restart", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-safe-restart-");
+    const record: NexusDashboardServerRecord = {
+      id: "server-1",
+      pid: process.pid,
+      projectRoot,
+      currentProjectRoot: null,
+      host: "127.0.0.1",
+      port: 4242,
+      url: "http://127.0.0.1:4242/",
+      startedAt: "2026-05-21T10:30:00.000Z",
+      updatedAt: "2026-05-21T10:30:00.000Z",
+      verificationToken: "secret-token",
+    };
+    const stopped: number[] = [];
+
+    const result = await stopVerifiedNexusDashboardServerRecord(record, {
+      currentPid: 999,
+      fetcher: async (_url, init) => {
+        const headers = init?.headers as Record<string, string>;
+        expect(headers["x-dev-nexus-dashboard-verification"]).toBe(
+          "secret-token",
+        );
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            verified: true,
+            dashboard: {
+              id: "server-1",
+              pid: process.pid,
+              projectRoot,
+              currentProjectRoot: null,
+              host: "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              startedAt: "2026-05-21T10:30:00.000Z",
+              updatedAt: "2026-05-21T10:30:00.000Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      },
+      stopper: async (pid): Promise<StopProcessByPidResult> => {
+        stopped.push(pid);
+        return {
+          pid,
+          stopped: true,
+          alreadyExited: false,
+          method: "process.kill",
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      stopped: true,
+      reason: "stopped",
+      verification: {
+        owned: true,
+      },
+    });
+    expect(stopped).toEqual([process.pid]);
   });
 
   it("archives dashboard threads locally without deleting worktrees", async () => {

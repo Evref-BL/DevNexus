@@ -133,6 +133,12 @@ import {
   type NexusDashboardServerHandle,
 } from "./dashboard/nexusDashboardServer.js";
 import {
+  listNexusDashboardServerStatuses,
+  restartNexusDashboardServerForPort,
+  type NexusDashboardServerStatus,
+  type RestartNexusDashboardServerForPortResult,
+} from "./dashboard/nexusDashboardServerRegistry.js";
+import {
   defaultNexusAutomationConfig,
 } from "./automation/nexusAutomationConfig.js";
 import type {
@@ -751,6 +757,7 @@ interface ParsedDashboardCommand {
   port?: number;
   homePath?: string;
   mode?: NexusEligibleWorkMode;
+  restart?: boolean;
   json?: boolean;
 }
 
@@ -1100,6 +1107,30 @@ async function handleDashboardCommand(
     const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
     const currentProjectRoot =
       parsed.projectRoot ?? discoverDashboardCurrentProjectRoot(process.cwd());
+    let restartResult: RestartNexusDashboardServerForPortResult | null = null;
+    if (parsed.restart) {
+      if (!currentProjectRoot) {
+        throw new Error(
+          `${surfaceName} serve --restart requires a workspace root or current workspace`,
+        );
+      }
+      if (!parsed.port || parsed.port <= 0) {
+        throw new Error(`${surfaceName} serve --restart requires a non-zero --port`);
+      }
+      restartResult = await restartNexusDashboardServerForPort({
+        projectRoot: currentProjectRoot,
+        host: parsed.host ?? "127.0.0.1",
+        port: parsed.port,
+      });
+      const currentProcessSkip = restartResult.skipped.find((skip) =>
+        skip.reason === "current_process"
+      );
+      if (currentProcessSkip) {
+        throw new Error(
+          `Refusing to restart ${surfaceName} server ${currentProcessSkip.record.id} because it belongs to the current process (${currentProcessSkip.record.pid})`,
+        );
+      }
+    }
     const handle = await starter({
       ...(parsed.projectRoot ? { projectRoot: parsed.projectRoot } : {}),
       ...(currentProjectRoot ? { currentProjectRoot } : {}),
@@ -1114,12 +1145,37 @@ async function handleDashboardCommand(
       handle,
       parsed,
       dependencies.stdout ?? process.stdout,
+      restartResult,
     );
     await (dependencies.dashboardServerWaiter ?? waitForDashboardServer)(handle);
     return 0;
   }
 
-  throw new Error(`${surfaceName} requires snapshot, weave, or serve`);
+  if (command === "status") {
+    const parsed = parseDashboardCommand(argv, `${surfaceName} status`, {
+      requireProjectRoot: false,
+    });
+    parsed.surfaceName = surfaceName;
+    const projectRoot =
+      parsed.projectRoot ?? discoverDashboardCurrentProjectRoot(process.cwd());
+    const servers = projectRoot
+      ? await listNexusDashboardServerStatuses(projectRoot, {
+          host: parsed.host,
+          port: parsed.port,
+        })
+      : [];
+    printDashboardStatusResult(
+      {
+        projectRoot: projectRoot ? path.resolve(projectRoot) : null,
+        servers,
+      },
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error(`${surfaceName} requires snapshot, weave, serve, or status`);
 }
 
 async function waitForDashboardServer(
@@ -5821,6 +5877,9 @@ function parseDashboardCommand(
       case "--discovery":
         parsed.mode = "discovery";
         break;
+      case "--restart":
+        parsed.restart = true;
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -7489,6 +7548,7 @@ function printDashboardServeResult(
   handle: NexusDashboardServerHandle,
   parsed: ParsedDashboardCommand,
   stdout: TextWriter,
+  restartResult: RestartNexusDashboardServerForPortResult | null = null,
 ): void {
   const surfaceName = parsed.surfaceName ?? "dashboard";
   const surface = {
@@ -7497,6 +7557,7 @@ function printDashboardServeResult(
     host: handle.host,
     port: handle.port,
     url: handle.url,
+    ...(restartResult ? { restart: restartResult } : {}),
   };
   const payload = {
     ok: true,
@@ -7514,7 +7575,54 @@ function printDashboardServeResult(
     writeLine(stdout, "  Scope: host");
   }
   writeLine(stdout, `  URL: ${handle.url}`);
+  if (restartResult) {
+    writeLine(stdout, `  Restart matched: ${restartResult.matched}`);
+    writeLine(stdout, `  Restart stopped: ${restartResult.stopped.length}`);
+    if (restartResult.skipped.length > 0) {
+      writeLine(stdout, `  Restart skipped: ${restartResult.skipped.length}`);
+    }
+  }
   writeLine(stdout, "  Press Ctrl+C to stop.");
+}
+
+function printDashboardStatusResult(
+  result: {
+    projectRoot: string | null;
+    servers: NexusDashboardServerStatus[];
+  },
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const surfaceName = parsed.surfaceName ?? "dashboard";
+  const payload = {
+    ok: true,
+    [surfaceName]: result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus ${surfaceName} server status.`);
+  if (result.projectRoot) {
+    writeLine(stdout, `  Project root: ${result.projectRoot}`);
+  } else {
+    writeLine(stdout, "  Project root: none discovered");
+  }
+  writeLine(stdout, `  Known servers: ${result.servers.length}`);
+  for (const server of result.servers) {
+    const state = server.owned
+      ? "owned"
+      : server.reachable
+        ? "reachable"
+        : server.running
+          ? "running"
+          : "stale";
+    writeLine(stdout, `    ${server.url} (${state}, pid ${server.pid})`);
+    if (server.stale && server.error) {
+      writeLine(stdout, `      ${server.error}`);
+    }
+  }
 }
 
 function printWorkItemCreateResult(

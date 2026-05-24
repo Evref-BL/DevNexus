@@ -981,7 +981,7 @@ function renderPlugins(plugins) {
   if (plugins?.capabilityCount) countParts.push(countLabel(plugins.capabilityCount, 'capability', 'capabilities'));
   const count = countParts.join(' · ');
   const body = records.length ? records.map(renderPluginCard).join('') : '<p>No DevNexus plugins installed.</p>';
-  return `<div class="dn-panel dn-plugin-panel" id="plugins-panel"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Extensions</span><h2>Plugins</h2></div><span class="dn-count">${escapeHtml(count)}</span></div><div class="dn-plugin-list">${body}</div><p class="dn-plugin-note">Local plugin candidates copy a refresh command. Direct install stays policy-gated.</p></div>`;
+  return `<div class="dn-panel dn-plugin-panel" id="plugins-panel"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Extensions</span><h2>Plugins</h2></div><span class="dn-count">${escapeHtml(count)}</span></div><div class="dn-plugin-list">${body}</div><p class="dn-plugin-note">Curated plugin catalogue entries copy a refresh command. Direct install stays policy-gated.</p></div>`;
 }
 
 function renderPluginCard(plugin) {
