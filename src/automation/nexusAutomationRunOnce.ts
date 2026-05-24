@@ -461,6 +461,9 @@ export async function runNexusAutomationOnce(
           worktreePath: worktree.worktreePath,
           branchName: worktree.branchName,
           baseRef: worktree.baseRef,
+          requestedBaseRef: worktree.requestedBaseRef,
+          resolvedBaseCommit: worktree.resolvedBaseCommit,
+          baseRefKind: worktree.baseRefKind,
           workItem,
         },
         agentTargetPolicy: {

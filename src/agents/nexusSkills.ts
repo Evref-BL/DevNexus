@@ -677,29 +677,33 @@ handoff, publication, or cleanup.
 2. Inspect Git status, diff, commits ahead of the base branch, remotes, and
    upstream. Separate owned changes from unrelated dirty state.
 3. Confirm durable records are current: work item status or comment, feature
-   notes, coordination handoff, target-cycle facts, and verification summary.
+   notes, coordination handoff, verification summary, and automation-run
+   records when this work is part of a DevNexus-launched automation run.
 4. Read the component publication policy and current authority. Do not silently
    fall back to a human account when policy expects an automation actor.
 5. If publication is allowed, use the configured remote, credential profile,
-   selected branchStrategy, target branch, and review path. For green-main policy,
-   prefer branch or pull request validation and required checks before merge.
-   When a publication policy exists, use DevNexus publication commands such as
-   \`publication branch-push\`, \`publication pull-request upsert\`, or
-   \`publication review-handoff\` instead of raw \`git push\` or \`gh pr\`
-   provider writes.
+   selected branchStrategy, target branch, and review path. When a publication
+   policy exists, use DevNexus publication commands such as
+   \`publication review-handoff\` for pull request handoff and
+   \`publication branch-push\` for branch publication instead of raw \`git push\`
+   or \`gh pr\` provider writes. For green-main policy, prefer branch or pull
+   request validation and required checks before merge.
    A review branch in a feature branchStrategy targets the feature branch;
    final publication happens from the feature branch only
    after the accumulated work is coherent, reviewed, verified, and approved.
-6. If publication authority is blocked, leave a human handoff with branch name,
+6. After opening or updating a pull request, check the hosted status checks when
+   feasible. Watch them to pass or fail when the wait is reasonable; otherwise
+   report exactly which checks are still pending.
+7. If publication authority is blocked, leave a human handoff with branch name,
    commit ids, verification commands and outcomes, target branch, and the exact
    PR or review action needed.
-7. Ask for explicit human approval before merge, release, destructive cleanup,
+8. Ask for explicit human approval before merge, release, destructive cleanup,
    force deletion, live-runtime action, or provider mutation that policy marks
    approval-required.
-8. Clean up only after integration is factual: fetched target branch, branch is
+9. Clean up only after integration is factual: fetched target branch, branch is
    merged or intentionally preserved, worktree ownership is clear, and no
    unrelated changes would be lost.
-9. Close or move the tracker item only when the publication state matches the
+10. Close or move the tracker item only when the publication state matches the
    workspace definition of done, or when the user explicitly chooses a different
    terminal state.
 
@@ -807,16 +811,20 @@ parallel work is useful instead of waiting for the user to name subagents.
 5. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
    paths for mutating work. Avoid parallel edits to the same file unless one
    agent is explicitly the integrator.
-6. Dispatch only sidecar work that can progress while the coordinator continues
+6. For feature, integration, stacked, or other non-default review flows, prepare
+   each worker from the intended parent branch, tag, or pinned commit. Do not
+   let workers implicitly branch from the component default branch when the
+   review target is another branch.
+7. Dispatch only sidecar work that can progress while the coordinator continues
    useful non-overlapping work. Keep immediate blockers local when waiting would
    stall the critical path.
-7. Review returned work before integration: spec fit first, then implementation
+8. Review returned work before integration: spec fit first, then implementation
    quality, then conflict risk. Ask the worker to fix its own change when review
    finds issues.
-8. Integrate deliberately. Use DevNexus coordination status or integration
+9. Integrate deliberately. Use DevNexus coordination status or integration
    planning when multiple branches or handoffs exist, then run focused and
    broader verification from the base branch or artifact path.
-9. Record the result in the tracker, target-cycle facts, coordination handoff,
+10. Record the result in the tracker, target-cycle facts, coordination handoff,
    or pull request so the parallel work does not vanish into chat history.
 
 ## Guardrails
@@ -1108,7 +1116,7 @@ export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
 Use this skill when working inside a DevNexus-managed workspace.
 
 1. Read project instructions first: agent context file when set, \`AGENTS.md\` or equivalent, durable workspace context, plan, and target state.
-2. Use DevNexus MCP or CLI surfaces for workspace status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
+2. Use DevNexus MCP or CLI surfaces for workspace status, component metadata, work-item services, eligible work, agent profiles, worktrees, automation-run records, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
 3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue breakdown, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
 4. Work through configured component work-item services. Prefer component-qualified work-item ids when a workspace has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
 5. Run a Git freshness preflight before editing a checkout: inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, fast-forward clean branches with an upstream, and record blockers.
@@ -1117,11 +1125,12 @@ Use this skill when working inside a DevNexus-managed workspace.
 8. Let configured setup make prepared worktrees usable. For example, JavaScript/TypeScript projects should expose reusable dependencies through a plugin \`dependency_projection\` such as \`node_modules\` -> \`node_modules\`, instead of teaching every agent to repair missing dependencies manually.
 9. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
 10. Run source and Git commands from the assigned worktree. Stage only files owned by that worktree and avoid committing unrelated workspace-state or tracker files from another chat.
-11. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, record target-cycle facts, and use coordination handoffs for \`working\`, \`ready\`, \`blocked\`, or \`merged\` worktree branches.
+11. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, and use coordination handoffs for \`working\`, \`ready\`, \`blocked\`, or \`merged\` worktree branches. Write automation-run records only when this chat was launched by DevNexus automation, workspace instructions require them, or a target run is explicitly in scope.
 12. Before integrating parallel chat branches, use DevNexus coordination status or integration planning to check related branches, stale handoffs, unpushed commits, conflicts, and verification order.
 13. Verify with focused checks first, then broader relevant checks when feasible. Publish only according to component publication policy.
 14. After direct integration or merge, fetch/prune, confirm work branches are ancestors of the target branch, remove disposable worktrees, and delete merged local and remote review branches. Preserve dirty or ambiguous branches with an explicit handoff.
 15. When running under a DevNexus-launched cycle, write the configured result file with status, summary, commits, verification, publication decision, and error or blocker details before exiting.
+16. If DevNexus itself gets in the way while serving as project infrastructure, capture the exact command, context, and error. Treat that as product feedback to propose to the user; file, diagnose, or fix a DevNexus issue only after the user approves that follow-up or the current task explicitly authorizes DevNexus maintenance.
 `,
   ),
   curatedCoreSkill(

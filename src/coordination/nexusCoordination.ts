@@ -286,6 +286,7 @@ export interface NexusCoordinationIntegrationBranchPlan {
     status: NexusCoordinationHandoffStatus;
     createdAt: string;
     stale: boolean;
+    baseRef: string | null;
     changedAreas: string[];
     decisions: string[];
     verificationSummary: string | null;
@@ -729,10 +730,16 @@ export async function getNexusCoordinationIntegrationPlan(
     targetRef,
     decisionConflicts,
   });
+  const baseRefWarnings = handoffDefaultBaseRefWarnings({
+    records: handoffCollection.records,
+    targetBranch,
+    defaultBranch: context.component.defaultBranch,
+  });
   const warnings = [
     ...git.warnings,
     ...handoffCollection.warnings,
     ...(fetch.warning ? [fetch.warning] : []),
+    ...baseRefWarnings,
     ...branches.flatMap((branch) =>
       branch.merge.status === "unknown" ? [branch.merge.summary] : [],
     ),
@@ -1481,6 +1488,41 @@ function handoffTargetsBranch(
   );
 }
 
+function handoffDefaultBaseRefWarnings(options: {
+  records: NexusCoordinationHandoffSummary[];
+  targetBranch: string | null;
+  defaultBranch: string | null;
+}): string[] {
+  if (!options.targetBranch || !options.defaultBranch) {
+    return [];
+  }
+  if (sameBranchTarget(options.targetBranch, options.defaultBranch)) {
+    return [];
+  }
+
+  return options.records
+    .filter(
+      (record) =>
+        record.status !== "merged" &&
+        Boolean(record.branch) &&
+        Boolean(record.baseRef) &&
+        sameBranchTarget(record.baseRef!, options.defaultBranch!),
+    )
+    .map(
+      (record) =>
+        `Handoff branch ${record.branch} was based on default branch ${options.defaultBranch} ` +
+        `while integration target is ${options.targetBranch}; prepare worker branches with ` +
+        `--base-ref ${options.targetBranch} or a pinned commit.`,
+    );
+}
+
+function sameBranchTarget(left: string, right: string): boolean {
+  const leftTail = normalizedBranchTail(left);
+  const rightTail = normalizedBranchTail(right);
+
+  return leftTail === rightTail || leftTail.endsWith(`/${rightTail}`);
+}
+
 function normalizedBranchTail(value: string): string {
   return value
     .trim()
@@ -1535,6 +1577,7 @@ function integrationBranchPlan(options: {
       status: options.record.status,
       createdAt: options.record.createdAt,
       stale: options.record.stale,
+      baseRef: options.record.baseRef,
       changedAreas: options.record.changedAreas,
       decisions: options.record.decisions,
       verificationSummary: options.record.verificationSummary,
