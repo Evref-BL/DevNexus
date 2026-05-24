@@ -2089,9 +2089,22 @@ describe("nexus dashboard", () => {
     expect(rendered).toContain("Project Writes");
     expect(rendered).toContain("Selected write event");
     expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
-    expect(rendered.indexOf("dn-git-detail-panel")).toBeLessThan(
-      rendered.indexOf("dn-git-board"),
+    const selectedRowIndex = rendered.indexOf(
+      "dn-git-history-row selected\" type=\"button\" data-select-id=\"history:primary:feature000000000000000000000000000000000000\"",
     );
+    const inlineDetailIndex = rendered.indexOf(
+      "dn-git-detail-panel dn-git-inline-detail",
+    );
+    const nextRowIndex = rendered.indexOf(
+      "data-select-id=\"history:primary:main10000000000000000000000000000000000000\"",
+    );
+    expect(selectedRowIndex).toBeGreaterThan(-1);
+    expect(inlineDetailIndex).toBeGreaterThan(selectedRowIndex);
+    expect(inlineDetailIndex).toBeLessThan(nextRowIndex);
+    expect(rendered.slice(selectedRowIndex, inlineDetailIndex)).not.toContain(
+      'data-scroll-target="selected-item"',
+    );
+    expect(rendered).toContain('data-history-row-count="10"');
     expect(rendered).toContain("data-git-board");
     expect(rendered).toContain("data-git-column=\"graph\"");
     expect(rendered).toContain("data-git-column=\"description\"");

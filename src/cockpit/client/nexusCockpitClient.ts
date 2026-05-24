@@ -18,6 +18,7 @@ export interface DevNexusDashboardMountHandle {
 const defaultRefreshMs = 15000;
 const themeStorageKey = 'dev-nexus-cockpit-theme';
 const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
+const gitHistoryInlineDetailRows = 7;
 const gitHistoryColumnStorageKey = 'dev-nexus-cockpit-git-history-columns';
 const gitHistoryColumnSpecs = {
   graph: { property: '--dn-git-graph-width', defaultWidth: 230, minWidth: 96, maxWidth: 520 },
@@ -184,6 +185,7 @@ button, input, select { font: inherit; }
 .dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }
 .dn-git-note { margin: 8px 0 0; color: var(--dn-muted); font-size: 0.8rem; }
 .dn-git-detail-panel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr); gap: 12px; margin: 0 0 10px; padding: 12px; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-raised) 82%, transparent); }
+.dn-git-inline-detail { height: 210px; min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 50px); margin: 0; overflow: auto; border-width: 0 0 1px; border-radius: 0; background: color-mix(in srgb, var(--dn-surface-raised) 58%, var(--dn-control-active)); }
 .dn-git-detail-main { display: grid; gap: 7px; min-width: 0; }
 .dn-git-detail-main strong { min-width: 0; overflow: hidden; color: var(--dn-strong); text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-detail-main p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.82rem; }
@@ -583,7 +585,7 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
     </header>
     ${renderHostOverview(host, snapshot, selectedWorkspaceId)}
     ${renderSignals(snapshot.signals, activeSelection)}
-    ${renderSelectedItem(snapshot, activeSelection)}
+    ${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}
     <section class="dn-main-grid">
       <div class="dn-work-stack">${gitHistory}${features}${workHistory}${threadInbox}${trackedWork}</div>
     </section>
@@ -1227,6 +1229,10 @@ function renderEvent(event, selectedId) {
   return `<article class="dn-event-card"><button class="dn-event ${relatedId === selectedId ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(relatedId)}"><span class="dn-label">${escapeHtml(formatTime(event.time))} · ${escapeHtml(event.source)}</span><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatDisplayText(event.body))}</p></button>${renderActionStrip(event.actions, 'compact')}</article>`;
 }
 
+function isGitHistorySelection(selectedId) {
+  return String(selectedId ?? '').startsWith('history:');
+}
+
 function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const activeFilter = normalizeGitHistoryFilter(filter);
   const graph = gitHistoryRows(snapshot, activeFilter);
@@ -1234,12 +1240,13 @@ function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const repository = graph.repository;
   const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
   const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} write events. Branch filters use the loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryDetailPanel(snapshot, graph, selectedId)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
 }
 
 function renderGitHistoryBoard(snapshot, graph, selectedId) {
   const widths = readStoredGitHistoryColumnWidths();
-  return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(graph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${graph.rows.map((row) => renderGitHistoryRow(snapshot, row, selectedId)).join('')}</div></div></div>`;
+  const visualGraph = gitHistoryVisualGraph(graph, selectedId);
+  return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
 }
 
 function renderGitHistoryColumnHeader(column, label, widths) {
@@ -1435,6 +1442,35 @@ function renderGitHistorySvg(graph) {
   });
 }
 
+function renderGitHistoryRows(snapshot, graph, selectedId) {
+  return graph.rows.map((row) => {
+    const detail = row.selectId === selectedId ? renderGitHistoryDetailPanel(snapshot, graph, selectedId) : '';
+    return `${renderGitHistoryRow(snapshot, row, selectedId)}${detail}`;
+  }).join('');
+}
+
+function gitHistoryVisualGraph(graph, selectedId) {
+  if (!isGitHistorySelection(selectedId)) return graph;
+  const selectedRow = graph.rows.find((row) => row.selectId === selectedId);
+  if (!selectedRow) return graph;
+  const pivot = selectedRow.index;
+  const shiftIndex = (index) => {
+    const value = Number(index);
+    if (!Number.isFinite(value)) return index;
+    return value > pivot ? value + gitHistoryInlineDetailRows : value;
+  };
+  return {
+    ...graph,
+    rows: graph.rows.map((row) => ({ ...row, index: shiftIndex(row.index) })),
+    paths: (graph.paths ?? []).map((path) => ({
+      ...path,
+      fromIndex: path.fromIndex === undefined ? path.fromIndex : shiftIndex(path.fromIndex),
+      toIndex: path.toIndex === undefined ? path.toIndex : shiftIndex(path.toIndex),
+      points: (path.points ?? []).map((point) => ({ ...point, index: shiftIndex(point.index) })),
+    })),
+  };
+}
+
 function renderGitHistoryRow(snapshot, row, selectedId) {
   const selected = row.selectId === selectedId ? ' selected' : '';
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
@@ -1443,7 +1479,7 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const date = formatTime(row.commit.committedAt);
   const author = row.commit.authorName ?? '';
   const authorTitle = [row.commit.authorName, row.commit.authorEmail].filter(Boolean).join(' · ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-scroll-target="selected-item"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
+  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -1464,7 +1500,7 @@ function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
     ['Children', children.length ? children.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
     ['Source', commit.shortHash ?? commit.hash],
   ];
-  return `<section class="dn-git-detail-panel" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Selected write event</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ') || 'Git commit write event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl></article><aside class="dn-git-detail-side"><span class="dn-label">Attached details</span>${markers}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
+  return `<section class="dn-git-detail-panel dn-git-inline-detail" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Selected write event</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ') || 'Git commit write event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl></article><aside class="dn-git-detail-side"><span class="dn-label">Attached details</span>${markers}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
 }
 
 function gitHistoryParentCommits(repository, commit) {
