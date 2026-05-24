@@ -2196,7 +2196,7 @@ describe("DevNexus MCP server", () => {
     );
     expect(prepared.setup.context.context).toBeUndefined();
     expect(prepared.setup.context.briefingMarkdown).toBeUndefined();
-    expect(gitCalls[0]).toMatchObject({
+    expect(gitCalls).toContainEqual({
       args: [
         "worktree",
         "add",
@@ -2342,7 +2342,7 @@ describe("DevNexus MCP server", () => {
       activeProviders: ["codex"],
       assignedProvider: "codex",
     });
-    expect(gitCalls[0]).toMatchObject({
+    expect(gitCalls).toContainEqual({
       args: [
         "worktree",
         "add",

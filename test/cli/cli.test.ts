@@ -7967,7 +7967,7 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(commandRuns).toEqual(["node task.js", "npm test"]);
-    expect(gitCalls[0]).toMatchObject({
+    expect(gitCalls).toContainEqual({
       args: [
         "worktree",
         "add",
