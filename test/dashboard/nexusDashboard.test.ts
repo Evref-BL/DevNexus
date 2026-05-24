@@ -1540,7 +1540,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("dn-loading-panel");
     expect(module).toContain("dn-loader");
     expect(module).toContain("dn-skeleton");
-    expect(module).toContain("if (!workspaceId) {\n        if (!latestHost) {");
+    expect(module).toMatch(/if \(!workspaceId\) \{\s+if \(!latestHost\) \{/u);
     expect(module).toContain("@keyframes dn-spin");
     expect(module).toContain("@keyframes dn-shimmer");
     expect(module).toContain("Loading host cockpit");
