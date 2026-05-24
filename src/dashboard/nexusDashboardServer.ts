@@ -377,12 +377,28 @@ export function renderNexusDashboardHtml(options: {
 }
 
 export function renderNexusDashboardClientModule(): string {
-  return readNexusCockpitClientModuleSource();
+  return readNexusCockpitLegacyClientModuleSource();
 }
 
-function readNexusCockpitClientModuleSource(): string {
+export function renderNexusCockpitBrowserModule(): string {
+  return readNexusCockpitBuiltClientModuleSource() ?? renderNexusDashboardClientModule();
+}
+
+function readNexusCockpitBuiltClientModuleSource(): string | null {
   const candidates = [
     new URL("../cockpit-client/dev-nexus-cockpit.js", import.meta.url),
+  ];
+  for (const candidate of candidates) {
+    const candidatePath = candidate.pathname;
+    if (fs.existsSync(candidatePath)) {
+      return fs.readFileSync(candidatePath, "utf8");
+    }
+  }
+  return null;
+}
+
+function readNexusCockpitLegacyClientModuleSource(): string {
+  const candidates = [
     new URL("../cockpit/client/nexusCockpitClient.js", import.meta.url),
     new URL("../cockpit/client/nexusCockpitClient.ts", import.meta.url),
   ];
@@ -394,16 +410,20 @@ function readNexusCockpitClientModuleSource(): string {
       ? standaloneNexusCockpitClientSource(source)
       : source;
   }
-  throw new Error("DevNexus cockpit client asset is missing; run npm run build:cockpit");
+  throw new Error("DevNexus cockpit legacy client source is missing");
 }
 
 function standaloneNexusCockpitClientSource(source: string): string {
   return source
     .replace(/^\/\/ @ts-nocheck\s*/u, "")
+    .replace(/^export interface \w+ \{[^}]*\}\s*/gmu, "")
     .replace(
       /^import \{ buildWriteHistoryLayout \} from ["'][^"']+["'];\s*/mu,
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n`,
-    );
+    )
+    .replace(/^export async function /gmu, "async function ")
+    .replace(/^export function /gmu, "function ")
+    .replace(/^export const /gmu, "const ");
 }
 
 export type NexusDashboardVisualAuditStatus = "passed" | "failed";
@@ -701,7 +721,7 @@ async function routeDashboardRequest(
       sendText(
         response,
         "text/javascript; charset=utf-8",
-        renderNexusDashboardClientModule(),
+        renderNexusCockpitBrowserModule(),
       );
       return;
     }

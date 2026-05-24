@@ -1,6 +1,19 @@
 // @ts-nocheck
 import { buildWriteHistoryLayout } from "../../dashboard/nexusDashboardHistoryLayout.js";
 
+export interface DevNexusDashboardMountOptions {
+  actionToken?: string;
+  baseUrl?: string;
+  hostRefreshMs?: number;
+  refreshMs?: number;
+  theme?: string;
+  workspaceId?: string;
+}
+
+export interface DevNexusDashboardMountHandle {
+  dispose(): void;
+}
+
 const defaultRefreshMs = 15000;
 const themeStorageKey = 'dev-nexus-cockpit-theme';
 const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
