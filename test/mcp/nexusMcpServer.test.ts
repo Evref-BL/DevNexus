@@ -129,10 +129,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     ],
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },
@@ -195,6 +191,86 @@ function featureProjectConfig(): NexusProjectConfig {
       },
     },
   });
+}
+
+function createMcpPublicationProject(): {
+  projectRoot: string;
+  homePath: string;
+  sourceRoot: string;
+} {
+  const projectRoot = makeTempDir("dev-nexus-mcp-publication-");
+  const homePath = path.join(projectRoot, "home");
+  const sourceRoot = path.join(projectRoot, "source");
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  saveHomeConfig(homePath, [
+    {
+      id: "dev-nexus-app",
+      actorId: "dev-nexus-automation-app",
+      provider: "github",
+      kind: "app",
+      credentialKind: "github_app",
+      account: "devnexus-automation",
+      host: "github.com",
+      purposes: ["api", "git"],
+      command: "home:secrets/github-app-token.mjs --format token",
+      environmentKeys: ["GH_TOKEN"],
+    },
+  ]);
+  saveProjectConfig(
+    projectRoot,
+    projectConfig({
+      home: homePath,
+      repo: {
+        kind: "git",
+        remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+      },
+      workTracking: {
+        provider: "github",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      },
+      automation: {
+        ...defaultNexusAutomationConfig,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          remote: "app",
+          targetBranch: "main",
+          push: false,
+          actor: {
+            id: "dev-nexus-automation-app",
+            kind: "app",
+            provider: "github",
+            handle: "devnexus-automation",
+          },
+        },
+      },
+      components: [
+        {
+          id: "primary",
+          name: "MCP Publication Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          workTracking: {
+            provider: "github",
+            repository: {
+              owner: "Evref-BL",
+              name: "DevNexus",
+            },
+          },
+          relationships: [],
+        },
+      ],
+    }),
+  );
+  return { projectRoot, homePath, sourceRoot };
 }
 
 function toolJson(result: { content: Array<{ text: string }> }): any {
@@ -261,6 +337,38 @@ function ok(args: string[], stdout: string): GitCommandResult {
   };
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function githubIssueResponse(options: {
+  number: number;
+  title: string;
+  state: string;
+  stateReason?: string | null;
+  labels?: string[];
+}): Record<string, unknown> {
+  return {
+    id: options.number,
+    number: options.number,
+    title: options.title,
+    body: null,
+    state: options.state,
+    state_reason:
+      options.stateReason ?? (options.state === "closed" ? "completed" : null),
+    labels: options.labels ?? [],
+    assignees: [],
+    created_at: "2026-05-20T09:00:00.000Z",
+    updated_at: "2026-05-20T10:00:00.000Z",
+    closed_at:
+      options.state === "closed" ? "2026-05-20T10:00:00.000Z" : null,
+    html_url: `https://github.com/example/demo/issues/${options.number}`,
+  };
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -289,6 +397,12 @@ describe("DevNexus MCP server", () => {
       "publication_feature_plan",
       "publication_feature_report",
       "publication_feature_finalization",
+      "publication_actor_verify",
+      "publication_branch_push",
+      "publication_pull_request_upsert",
+      "publication_review_handoff",
+      "publication_pull_request_evidence",
+      "publication_pull_request_merge",
       "review_plan",
       "current_agent_adopt",
       "current_agent_heartbeat",
@@ -581,6 +695,227 @@ describe("DevNexus MCP server", () => {
         ],
       },
     });
+  });
+
+  it("dry-runs publication review handoffs through configured App credentials", async () => {
+    const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_review_handoff",
+        {
+          projectRoot,
+          componentId: "primary",
+          repositoryPath: sourceRoot,
+          branch: "codex/dev-nexus/mcp-publication-facade",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          dryRun: true,
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      dryRun: true,
+      componentId: "primary",
+      repository: {
+        owner: "Evref-BL",
+        name: "DevNexus",
+      },
+      branchPush: {
+        ok: true,
+        dryRun: true,
+        credential: {
+          profileId: "dev-nexus-app",
+          kind: "github_app",
+        },
+        push: {
+          git: {
+            exitCode: null,
+            stderr: "dry-run: git push was not executed",
+          },
+          plan: {
+            transport: "https_token",
+            remote: "https://github.com/Evref-BL/DevNexus.git",
+            refspec: "codex/dev-nexus/mcp-publication-facade",
+          },
+        },
+      },
+      pullRequest: {
+        ok: true,
+        dryRun: true,
+        pullRequest: null,
+        plan: {
+          head: "codex/dev-nexus/mcp-publication-facade",
+          base: "main",
+          title: "Expose publication facade through MCP",
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+  });
+
+  it("verifies publication actors through MCP before provider mutations", async () => {
+    const { projectRoot, homePath } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_actor_verify",
+        {
+          projectRoot,
+          componentId: "primary",
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      componentId: "primary",
+      credential: {
+        profileId: "dev-nexus-app",
+        kind: "github_app",
+      },
+      actor: {
+        expected: {
+          handle: "devnexus-automation",
+          kind: "app",
+        },
+        observed: {
+          handle: "devnexus-automation",
+          source: "credential:dev-nexus-app",
+        },
+        matched: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+  });
+
+  it("upserts publication pull requests through MCP with configured App API credentials", async () => {
+    const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+    const requests: Array<{ url: string; authorization: string | null; body: unknown }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_pull_request_upsert",
+        {
+          projectRoot,
+          componentId: "primary",
+          repositoryPath: sourceRoot,
+          head: "codex/dev-nexus/mcp-publication-facade",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          draft: true,
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+          publicationFetch: (async (input, init = {}) => {
+            requests.push({
+              url: String(input),
+              authorization:
+                ((init.headers as Record<string, string> | undefined)
+                  ?.Authorization ?? null),
+              body: init.body ? JSON.parse(String(init.body)) : null,
+            });
+            return new Response(
+              JSON.stringify({
+                number: 311,
+                html_url: "https://github.com/Evref-BL/DevNexus/pull/311",
+                state: "open",
+                title: "Expose publication facade through MCP",
+              }),
+              { status: 201 },
+            );
+          }) as typeof fetch,
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      dryRun: false,
+      credential: {
+        profileId: "dev-nexus-app",
+        kind: "github_app",
+      },
+      plan: {
+        operation: "create",
+        head: "codex/dev-nexus/mcp-publication-facade",
+        base: "main",
+        title: "Expose publication facade through MCP",
+        draft: true,
+      },
+      pullRequest: {
+        number: 311,
+        url: "https://github.com/Evref-BL/DevNexus/pull/311",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        authorization: "Bearer installation-token",
+        body: {
+          head: "codex/dev-nexus/mcp-publication-facade",
+          base: "main",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          draft: true,
+        },
+      },
+    ]);
   });
 
   it("exposes read-only review plans through MCP", async () => {
@@ -1344,7 +1679,11 @@ describe("DevNexus MCP server", () => {
   it("allows guarded provider-backed work item creation from the shared checkout", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    const requests: Array<{ method: string | undefined; url: string; body: unknown }> = [];
+    const requests: Array<{
+      method: string;
+      url: string;
+      body: Record<string, unknown> | null;
+    }> = [];
     saveProjectConfig(
       projectRoot,
       projectConfig({
@@ -1397,12 +1736,14 @@ describe("DevNexus MCP server", () => {
             credentialRunner: false,
             fetch: (async (input, init = {}) => {
               requests.push({
-                method: init.method,
+                method: init.method ?? "GET",
                 url: String(input),
-                body: init.body ? JSON.parse(String(init.body)) : null,
+                body: init.body
+                  ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+                  : null,
               });
-              return new Response(
-                JSON.stringify({
+              return jsonResponse(
+                {
                   id: 42,
                   number: 42,
                   title: "Provider backed task",
@@ -1410,11 +1751,8 @@ describe("DevNexus MCP server", () => {
                   state: "open",
                   labels: [],
                   html_url: "https://github.com/example/mcp-demo/issues/42",
-                }),
-                {
-                  status: 201,
-                  headers: { "content-type": "application/json" },
                 },
+                201,
               );
             }) as typeof fetch,
           },
@@ -1442,6 +1780,180 @@ describe("DevNexus MCP server", () => {
       },
     });
     expect(requests[0]?.url).toContain("/repos/example/mcp-demo/issues");
+  });
+
+  it("allows guarded provider-backed MCP work-item mutations from shared checkouts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, githubClaimProjectConfig());
+    const requests: Array<{
+      method: string;
+      url: string;
+      body: Record<string, unknown> | null;
+    }> = [];
+    const githubFetch = (async (input, init = {}) => {
+      const request = {
+        method: init.method ?? "GET",
+        url: String(input),
+        body: init.body
+          ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+          : null,
+      };
+      requests.push(request);
+
+      if (
+        request.method === "POST" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7/comments"
+      ) {
+        return jsonResponse({
+          id: 101,
+          body: "Provider-backed comment.",
+          html_url: "https://github.com/example/demo/issues/7#issuecomment-101",
+        });
+      }
+
+      if (
+        request.method === "GET" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7"
+      ) {
+        return jsonResponse(githubIssueResponse({
+          number: 7,
+          title: "Provider-backed issue",
+          state: "open",
+          labels: ["ready"],
+        }));
+      }
+
+      if (
+        request.method === "PATCH" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7"
+      ) {
+        return jsonResponse(githubIssueResponse({
+          number: 7,
+          title: String(request.body?.title ?? "Provider-backed issue"),
+          state: String(request.body?.state ?? "open"),
+          labels: request.body?.labels as string[] | undefined,
+        }));
+      }
+
+      return jsonResponse(
+        { message: `unexpected ${request.method} ${request.url}` },
+        500,
+      );
+    }) as typeof fetch;
+
+    const context = {
+      gitRunner: fakeGitRunner(projectRoot),
+      sharedCheckoutGuard: "enforce" as const,
+      workItemProviderOptions: {
+        github: {
+          credentialRunner: false,
+          fetch: githubFetch,
+        },
+      },
+    };
+
+    const comment = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_comment",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          body: "Provider-backed comment.",
+        },
+        context,
+      ),
+    );
+    const updated = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_update",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          title: "Provider-backed issue renamed",
+        },
+        context,
+      ),
+    );
+    const closed = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_set_status",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          status: "done",
+        },
+        context,
+      ),
+    );
+
+    expect(comment.comment).toMatchObject({
+      id: "github-comment-101",
+      body: "Provider-backed comment.",
+    });
+    expect(updated.workItem).toMatchObject({
+      id: "github-7",
+      title: "Provider-backed issue renamed",
+    });
+    expect(closed.workItem).toMatchObject({
+      id: "github-7",
+      status: "done",
+    });
+    expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
+      "POST https://api.github.com/repos/example/demo/issues/7/comments",
+      "PATCH https://api.github.com/repos/example/demo/issues/7",
+      "GET https://api.github.com/repos/example/demo/issues/7",
+      "PATCH https://api.github.com/repos/example/demo/issues/7",
+    ]);
+  });
+
+  it("allows guarded work-item comments from generated workspace-meta worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "mcp-demo",
+      "comment-meta",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Comment from meta worktree",
+      status: "in_progress",
+    });
+
+    const result = await callDevNexusMcpTool(
+      "work_item_comment",
+      {
+        projectRoot,
+        id: "local-1",
+        body: "Ready for review.",
+        currentPath: generatedMetaWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(generatedMetaWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(payload.comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for review.",
+    });
   });
 
   it("returns guard details for guarded inbound import execution", async () => {

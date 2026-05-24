@@ -361,6 +361,95 @@ describe("nexus publication policy", () => {
     expect(actorCommands).toEqual([]);
   });
 
+  it("uses repository-scoped GitHub App profiles without requiring legacy SSH aliases", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...appPublicationPolicy(),
+          remoteUrl: null,
+          pushUrl: null,
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "dev-nexus-automation-app",
+            kind: "service_account",
+            provider: "github",
+            providerIdentity: "devnexus-automation",
+            displayName: "DevNexus Automation",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "dev-nexus-automation-app",
+            roles: ["maintainer"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "status",
+      authProfiles: [
+        {
+          ...appAuthProfiles()[0]!,
+          githubApp: {
+            ...appAuthProfiles()[0]!.githubApp!,
+            installationAccount: "example",
+            repositories: ["project"],
+          },
+        },
+        {
+          ...appAuthProfiles()[0]!,
+          id: "dev-nexus-app-other-repo",
+          githubApp: {
+            ...appAuthProfiles()[0]!.githubApp!,
+            installationAccount: "other-owner",
+            repositories: ["other-project"],
+          },
+        },
+      ],
+      gitRunner: publicationGitRunner(sourceRoot, {
+        remoteUrl: "git@github.com:example/project.git",
+        pushUrl: "git@github.com:example/project.git",
+        localUserName: "devnexus-automation[bot]",
+        localUserEmail:
+          "286661136+devnexus-automation[bot]@users.noreply.github.com",
+      }),
+      actorRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr: "unexpected GitHub CLI actor check",
+      }),
+    });
+
+    expect(status.blocking).toBe(false);
+    expect(status.actor).toMatchObject({
+      status: "matched",
+      observed: {
+        source: "authProfile:dev-nexus-app",
+      },
+    });
+    expect(status.checks).not.toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:sshHostAlias",
+      }),
+    );
+  });
+
   it("uses project publication Git identity as the default commit identity", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-project-");
     const sourceRoot = path.join(projectRoot, "source");
@@ -1175,7 +1264,8 @@ function appAuthProfiles(): NexusHostingAuthProfileConfig[] {
       githubApp: {
         slug: "devnexus-automation",
         privateKeyPath: "/keys/devnexus-automation.private-key.pem",
-        installationAccount: "Evref-BL",
+        installationAccount: "example",
+        repositories: ["project"],
       },
     },
   ];

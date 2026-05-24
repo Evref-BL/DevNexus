@@ -5,7 +5,6 @@ import type {
   GitLabWorkTrackingConfig,
   JiraWorkTrackingConfig,
   LocalWorkTrackingConfig,
-  VibeKanbanWorkTrackingConfig,
   WorkTrackingBoardConfig,
   WorkTrackingConfig,
   WorkTrackingProviderName,
@@ -293,11 +292,6 @@ export interface NexusAgentConfig {
   reasoning?: string;
 }
 
-export interface NexusProjectKanbanConfig {
-  provider: "vibe-kanban";
-  projectId: string | null;
-}
-
 export type NexusProjectExtensionsConfig = Record<string, Record<string, unknown>>;
 
 export interface NexusProjectConfig {
@@ -308,7 +302,6 @@ export interface NexusProjectConfig {
   repo: NexusProjectRepoConfig;
   components: NexusProjectComponentConfig[];
   worktreesRoot: string;
-  kanban?: NexusProjectKanbanConfig;
   workTracking?: WorkTrackingConfig;
   workTrackerCommunication?: NexusProjectTrackerCommunicationPolicyConfig;
   extensions?: NexusProjectExtensionsConfig;
@@ -878,24 +871,6 @@ function validateNexusAuthorityConfig(
     ...(roles !== undefined ? { roles } : {}),
     ...(roleBindings !== undefined ? { roleBindings } : {}),
     ...(unknownActorFallbackRole !== undefined ? { unknownActorFallbackRole } : {}),
-  };
-}
-
-function validateKanbanConfig(
-  value: unknown,
-): NexusProjectKanbanConfig | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const record = assertRecord(value, "kanban");
-  if (record.provider !== "vibe-kanban") {
-    throw new NexusConfigError("kanban.provider must be vibe-kanban");
-  }
-
-  return {
-    provider: "vibe-kanban",
-    projectId: nullableString(record, "projectId", "kanban"),
   };
 }
 
@@ -2455,7 +2430,6 @@ function validateWorkTrackingProviderName(
 ): WorkTrackingProviderName {
   if (
     value === "local" ||
-    value === "vibe-kanban" ||
     value === "github" ||
     value === "gitlab" ||
     value === "jira"
@@ -2464,7 +2438,7 @@ function validateWorkTrackingProviderName(
   }
 
   throw new NexusConfigError(
-    `${pathName} must be local, vibe-kanban, github, gitlab, or jira`,
+    `${pathName} must be local, github, gitlab, or jira`,
   );
 }
 
@@ -2638,18 +2612,6 @@ function validateWorkTrackingConfig(
       ...common,
       ...(storePath !== undefined ? { storePath } : {}),
     } satisfies LocalWorkTrackingConfig;
-  }
-
-  if (provider === "vibe-kanban") {
-    const projectId = optionalNullableString(record, "projectId", pathName);
-    const repoId = optionalNullableString(record, "repoId", pathName);
-
-    return {
-      provider,
-      ...common,
-      ...(projectId !== undefined ? { projectId } : {}),
-      ...(repoId !== undefined ? { repoId } : {}),
-    } satisfies VibeKanbanWorkTrackingConfig;
   }
 
   if (provider === "github") {
@@ -3768,7 +3730,6 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const runnerProfiles = validateRunnerProfilesConfig(record.runnerProfiles);
   const authority = validateNexusAuthorityConfig(record.authority);
   const repo = validateRepoConfig(record.repo);
-  const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
     optionalString(record, "worktreesRoot", "workspace config") ??
     nexusProjectWorktreesDirectoryName;
@@ -3779,7 +3740,6 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     home: nullableString(record, "home", "workspace config"),
     repo,
     worktreesRoot,
-    ...(kanban ? { kanban } : {}),
     ...(workTracking ? { workTracking } : {}),
     ...(workTrackerCommunication ? { workTrackerCommunication } : {}),
   };

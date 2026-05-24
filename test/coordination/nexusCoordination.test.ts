@@ -66,10 +66,6 @@ function projectConfig(
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",
@@ -107,10 +103,6 @@ function coordinationTrackerProjectConfig(options: {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",
@@ -170,10 +162,6 @@ function providerCoordinationProjectConfig(options: {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     ...(options.projectCommunication
       ? { workTrackerCommunication: options.projectCommunication }
       : {}),
@@ -262,10 +250,6 @@ function multiComponentProjectConfig(options: {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "primary",

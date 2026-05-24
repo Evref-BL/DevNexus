@@ -53,10 +53,6 @@ function projectConfig(
       },
     ],
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },

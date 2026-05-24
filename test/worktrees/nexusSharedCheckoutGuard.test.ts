@@ -145,7 +145,7 @@ describe("shared checkout mutation guard", () => {
 
     const decision = evaluateNexusSharedCheckoutMutation({
       projectRoot,
-      mutationClass: "provider_work_item",
+      mutationClass: "provider_tracker",
       command: "work-item create",
       gitRunner,
     });
@@ -153,7 +153,7 @@ describe("shared checkout mutation guard", () => {
     expect(decision).toMatchObject({
       ok: true,
       classification: "shared_project_checkout",
-      mutationClass: "provider_work_item",
+      mutationClass: "provider_tracker",
     });
   });
 

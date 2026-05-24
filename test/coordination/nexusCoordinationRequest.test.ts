@@ -41,10 +41,6 @@ function projectConfig(
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",
@@ -141,10 +137,6 @@ function externalFeedbackTrackerProjectConfig(options: {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",

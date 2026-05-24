@@ -299,9 +299,7 @@ function updateNexusProjectSetupHome(options: {
   const homeConfig = loadOrCreateProjectSetupHome(options.homePath);
   upsertSetupAuthProfiles(homeConfig, options.proposal.answers.authProfiles ?? []);
   if (options.proposal.answers.home.registerProject !== false) {
-    upsertNexusProjectReference(homeConfig, options.projectRoot, options.projectConfig, {
-      vibeKanbanProjectId: null,
-    });
+    upsertNexusProjectReference(homeConfig, options.projectRoot, options.projectConfig);
   }
   saveNexusHomeConfigFile(options.homePath, homeConfig, validateNexusHomeConfigBase);
   return nexusHomeConfigPath(options.homePath);

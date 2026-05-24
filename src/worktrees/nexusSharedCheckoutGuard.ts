@@ -27,7 +27,6 @@ export type NexusCheckoutClassification =
 export type NexusCheckoutMutationClass =
   | "read_only"
   | "local_tracker"
-  | "provider_work_item"
   | "target_state"
   | "project_state"
   | "skill_mcp_projection"
@@ -37,7 +36,8 @@ export type NexusCheckoutMutationClass =
   | "publication_integration"
   | "cleanup_execution"
   | "local_remote_repair"
-  | "provider_sync";
+  | "provider_sync"
+  | "provider_tracker";
 
 export type NexusSharedCheckoutGuardOverride =
   | "allow"
@@ -314,7 +314,7 @@ function mutationAllowed(
   if (mutationClass === "read_only") {
     return true;
   }
-  if (mutationClass === "provider_work_item") {
+  if (mutationClass === "provider_tracker") {
     return true;
   }
   if (mutationClass === "local_remote_repair") {

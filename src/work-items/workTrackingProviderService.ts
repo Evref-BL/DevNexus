@@ -24,16 +24,10 @@ import {
   createLocalWorkTrackerProvider,
   localWorkTrackerCapabilities,
 } from "./workTrackingLocalProvider.js";
-import {
-  createVibeWorkTrackerProvider,
-  vibeWorkTrackerCapabilities,
-  type VibeWorkTrackerProviderOptions,
-} from "./workTrackingVibeProvider.js";
 import type {
   GitHubWorkTrackingConfig,
   GitLabWorkTrackingConfig,
   JiraWorkTrackingConfig,
-  VibeKanbanWorkTrackingConfig,
   WorkTrackerActionCapabilities,
   WorkTrackerCapabilityName,
   WorkTrackerCapabilityReport,
@@ -50,7 +44,6 @@ export interface CreateWorkTrackerProviderOptions {
   github?: Omit<GitHubWorkTrackerProviderOptions, "config">;
   gitlab?: Omit<GitLabWorkTrackerProviderOptions, "config">;
   jira?: Omit<JiraWorkTrackerProviderOptions, "config">;
-  vibeKanban?: Omit<VibeWorkTrackerProviderOptions, "config">;
 }
 
 export interface CreateWorkTrackerProviderCredentialOptions {
@@ -118,19 +111,6 @@ function createWorkTrackerProviderFromCredential(
       projectRoot: options.projectRoot,
       config,
       now: options.now,
-    });
-  }
-
-  if (config.provider === "vibe-kanban") {
-    if (!options.vibeKanban) {
-      throw new WorkTrackingProviderServiceError(
-        "Vibe Kanban provider requires Vibe Kanban API options",
-      );
-    }
-
-    return createVibeWorkTrackerProvider({
-      ...options.vibeKanban,
-      config: config as VibeKanbanWorkTrackingConfig,
     });
   }
 
@@ -283,9 +263,6 @@ export function workTrackerCapabilitiesForConfig(
   const providerName = config.provider;
   if (config.provider === "local") {
     return localWorkTrackerCapabilities;
-  }
-  if (config.provider === "vibe-kanban") {
-    return vibeWorkTrackerCapabilities;
   }
   if (config.provider === "github") {
     return githubWorkTrackerCapabilitiesForConfig(config);

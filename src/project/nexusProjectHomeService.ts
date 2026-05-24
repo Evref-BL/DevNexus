@@ -10,7 +10,6 @@ import {
   configureNexusProjectTrackerInRegistry,
   createNexusProjectInRegistry,
   importNexusProjectInRegistry,
-  linkNexusProjectTrackerInRegistry,
   type ConfigureNexusProjectTrackerProvider,
   type NexusProjectRegistryWithRoot,
 } from "./nexusProjectOperations.js";
@@ -41,7 +40,6 @@ export interface CreateNexusProjectOptions {
   root?: string;
   from?: string;
   gitInit?: boolean;
-  vibeKanbanProjectId?: string;
   gitRunner?: ProjectGitRunner;
 }
 
@@ -51,7 +49,6 @@ export interface ImportNexusProjectOptions {
   root: string;
   projectRoot?: string;
   name?: string;
-  vibeKanbanProjectId?: string;
   gitRunner?: ProjectGitRunner;
 }
 
@@ -106,23 +103,6 @@ export interface GetNexusProjectStatusOptions {
 export interface GetNexusProjectStatusResult {
   homePath: string;
   project: NexusProjectStatusBase;
-}
-
-export interface LinkNexusProjectTrackerOptions {
-  homePath: string;
-  homeStore: NexusProjectHomeStore;
-  project: string;
-  trackerProjectId: string;
-}
-
-export interface LinkNexusProjectTrackerResult {
-  homePath: string;
-  vibeKanbanProjectId: string;
-  vibeKanbanRepoId: string | null;
-  project: NexusProjectStatusBase;
-  projectRoot: string;
-  projectConfigPath: string;
-  projectConfig: NexusProjectConfig;
 }
 
 export interface ConfigureNexusProjectTrackerOptions {
@@ -189,12 +169,6 @@ function statusForNexusProjectPath(
     id: baseStatus.id,
     name: baseStatus.name,
     projectRoot: baseStatus.projectRoot,
-    ...(baseStatus.vibeKanbanProjectId
-      ? { vibeKanbanProjectId: baseStatus.vibeKanbanProjectId }
-      : {}),
-    ...(baseStatus.vibeKanbanRepoId
-      ? { vibeKanbanRepoId: baseStatus.vibeKanbanRepoId }
-      : {}),
   }, homeConfig);
 }
 
@@ -209,9 +183,6 @@ export function createNexusProject(
     ...(options.root !== undefined ? { root: options.root } : {}),
     ...(options.from !== undefined ? { from: options.from } : {}),
     ...(options.gitInit !== undefined ? { gitInit: options.gitInit } : {}),
-    ...(options.vibeKanbanProjectId !== undefined
-      ? { vibeKanbanProjectId: options.vibeKanbanProjectId }
-      : {}),
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
   saveProjectHome(options.homeStore, homePath, registry);
@@ -240,9 +211,6 @@ export function importNexusProject(
       ? { projectRoot: options.projectRoot }
       : {}),
     ...(options.name !== undefined ? { name: options.name } : {}),
-    ...(options.vibeKanbanProjectId !== undefined
-      ? { vibeKanbanProjectId: options.vibeKanbanProjectId }
-      : {}),
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
   saveProjectHome(options.homeStore, homePath, registry);
@@ -304,29 +272,6 @@ export function getNexusProjectStatus(
   return {
     homePath,
     project,
-  };
-}
-
-export function linkNexusProjectTracker(
-  options: LinkNexusProjectTrackerOptions,
-): LinkNexusProjectTrackerResult {
-  assertNonEmptyString(options.project, "project");
-  const { homePath, registry } = loadProjectHome(options);
-  const result = linkNexusProjectTrackerInRegistry({
-    registry,
-    project: options.project,
-    trackerProjectId: options.trackerProjectId,
-  });
-  saveProjectHome(options.homeStore, homePath, registry);
-
-  return {
-    homePath,
-    vibeKanbanProjectId: result.vibeKanbanProjectId,
-    vibeKanbanRepoId: result.vibeKanbanRepoId,
-    project: statusForNexusProjectReference(result.reference),
-    projectRoot: result.projectRoot,
-    projectConfigPath: result.projectConfigPath,
-    projectConfig: result.projectConfig,
   };
 }
 
