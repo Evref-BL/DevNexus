@@ -3279,62 +3279,10 @@ function inferredFeatureRecords(options: {
         )
       ),
   );
-  const groups = new Map<string, {
-    family: InferredFeatureFamily;
-    branches: DashboardFeatureBranchReference[];
-    worktrees: NexusDashboardWorktreeSummary["records"];
-    threads: NexusDashboardThreadSummary["records"];
-  }>();
-
-  for (const branch of gitBranches) {
-    if (matchedBranches.has(branch.branchName)) {
-      continue;
-    }
-    const family = inferFeatureFamilyFromBranch(branch.branchName);
-    if (!family) {
-      continue;
-    }
-    const group = inferredFeatureGroup(groups, family);
-    addInferredFeatureBranch(group, branch);
-  }
-
-  for (const worktree of options.worktrees.records) {
-    if (!worktree.branchName || matchedBranches.has(worktree.branchName)) {
-      continue;
-    }
-    const family = inferFeatureFamilyFromBranch(worktree.branchName);
-    if (!family) {
-      continue;
-    }
-    const group = inferredFeatureGroup(groups, family);
-    addInferredFeatureBranch(group, {
-      branchName: worktree.branchName,
-      componentId: worktree.componentId,
-      componentName: worktree.componentId,
-      updatedAt: worktree.updatedAt,
-    });
-    group.worktrees.push(worktree);
-  }
-
-  for (const thread of options.threads.records) {
-    if (!thread.branchName || matchedBranches.has(thread.branchName)) {
-      continue;
-    }
-    const family = inferFeatureFamilyFromBranch(thread.branchName);
-    if (!family) {
-      continue;
-    }
-    const group = inferredFeatureGroup(groups, family);
-    addInferredFeatureBranch(group, {
-      branchName: thread.branchName,
-      componentId: thread.componentId,
-      componentName: thread.componentId,
-      updatedAt: thread.updatedAt,
-    });
-    if (!group.threads.some((candidate) => candidate.id === thread.id)) {
-      group.threads.push(thread);
-    }
-  }
+  const groups = new Map<string, InferredFeatureGroup>();
+  addInferredGitBranches(groups, gitBranches, matchedBranches);
+  addInferredWorktreeBranches(groups, options.worktrees.records, matchedBranches);
+  addInferredThreadBranches(groups, options.threads.records, matchedBranches);
 
   return [...groups.values()]
     .map((group) =>
@@ -3356,20 +3304,107 @@ interface DashboardFeatureBranchReference {
   updatedAt: string | null;
 }
 
-function inferredFeatureGroup(
-  groups: Map<string, {
-    family: InferredFeatureFamily;
-    branches: DashboardFeatureBranchReference[];
-    worktrees: NexusDashboardWorktreeSummary["records"];
-    threads: NexusDashboardThreadSummary["records"];
-  }>,
-  family: InferredFeatureFamily,
-): {
+interface InferredFeatureGroup {
   family: InferredFeatureFamily;
   branches: DashboardFeatureBranchReference[];
   worktrees: NexusDashboardWorktreeSummary["records"];
   threads: NexusDashboardThreadSummary["records"];
-} {
+}
+
+function addInferredGitBranches(
+  groups: Map<string, InferredFeatureGroup>,
+  branches: DashboardFeatureBranchReference[],
+  matchedBranches: Set<string>,
+): void {
+  for (const branch of branches) {
+    const group = inferredFeatureGroupForBranch(groups, branch.branchName, matchedBranches);
+    if (group) {
+      addInferredFeatureBranch(group, branch);
+    }
+  }
+}
+
+function addInferredWorktreeBranches(
+  groups: Map<string, InferredFeatureGroup>,
+  worktrees: NexusDashboardWorktreeSummary["records"],
+  matchedBranches: Set<string>,
+): void {
+  for (const worktree of worktrees) {
+    if (!worktree.branchName) {
+      continue;
+    }
+    const group = inferredFeatureGroupForBranch(groups, worktree.branchName, matchedBranches);
+    if (group) {
+      addInferredFeatureBranch(group, dashboardFeatureBranchFromWorktree(worktree));
+      group.worktrees.push(worktree);
+    }
+  }
+}
+
+function addInferredThreadBranches(
+  groups: Map<string, InferredFeatureGroup>,
+  threads: NexusDashboardThreadSummary["records"],
+  matchedBranches: Set<string>,
+): void {
+  for (const thread of threads) {
+    if (!thread.branchName) {
+      continue;
+    }
+    const group = inferredFeatureGroupForBranch(groups, thread.branchName, matchedBranches);
+    if (group) {
+      addInferredFeatureBranch(group, dashboardFeatureBranchFromThread(thread));
+      addUniqueInferredFeatureThread(group, thread);
+    }
+  }
+}
+
+function inferredFeatureGroupForBranch(
+  groups: Map<string, InferredFeatureGroup>,
+  branchName: string,
+  matchedBranches: Set<string>,
+): InferredFeatureGroup | null {
+  if (matchedBranches.has(branchName)) {
+    return null;
+  }
+  const family = inferFeatureFamilyFromBranch(branchName);
+  return family ? inferredFeatureGroup(groups, family) : null;
+}
+
+function dashboardFeatureBranchFromWorktree(
+  worktree: NexusDashboardWorktreeSummary["records"][number],
+): DashboardFeatureBranchReference {
+  return {
+    branchName: worktree.branchName ?? "",
+    componentId: worktree.componentId,
+    componentName: worktree.componentId,
+    updatedAt: worktree.updatedAt,
+  };
+}
+
+function dashboardFeatureBranchFromThread(
+  thread: NexusDashboardThreadSummary["records"][number],
+): DashboardFeatureBranchReference {
+  return {
+    branchName: thread.branchName ?? "",
+    componentId: thread.componentId,
+    componentName: thread.componentId,
+    updatedAt: thread.updatedAt,
+  };
+}
+
+function addUniqueInferredFeatureThread(
+  group: InferredFeatureGroup,
+  thread: NexusDashboardThreadSummary["records"][number],
+): void {
+  if (!group.threads.some((candidate) => candidate.id === thread.id)) {
+    group.threads.push(thread);
+  }
+}
+
+function inferredFeatureGroup(
+  groups: Map<string, InferredFeatureGroup>,
+  family: InferredFeatureFamily,
+): InferredFeatureGroup {
   const group = groups.get(family.key) ?? {
     family,
     branches: [],
@@ -3403,12 +3438,7 @@ interface InferredFeatureFamily {
 }
 
 function inferredFeatureRecord(
-  group: {
-    family: InferredFeatureFamily;
-    branches: DashboardFeatureBranchReference[];
-    worktrees: NexusDashboardWorktreeSummary["records"];
-    threads: NexusDashboardThreadSummary["records"];
-  },
+  group: InferredFeatureGroup,
   targetBranch: string,
 ): NexusDashboardFeatureRecord {
   const branches = uniqueNonEmptyStrings(
