@@ -183,7 +183,7 @@ export interface NexusPublicationPullRequestUpsertResult {
 }
 
 export interface NexusPublicationPullRequestUpsertPlan {
-  operation: "create" | "update";
+  operation: "create" | "update" | "upsert";
   number: number | null;
   head: string;
   base: string;
@@ -710,7 +710,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
     publicationTargetDefaultBranch(context) ??
     "main";
   const plan: NexusPublicationPullRequestUpsertPlan = {
-    operation: options.number ? "update" : "create",
+    operation: options.number ? "update" : options.dryRun === true ? "upsert" : "create",
     number: options.number ?? null,
     head: options.head,
     base,
@@ -755,8 +755,20 @@ export async function upsertNexusPublicationPullRequestForComponent(
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
     dryRun: false,
-    plan,
+    plan: pullRequestUpsertResultPlan(plan, pullRequest),
     pullRequest,
+  };
+}
+
+function pullRequestUpsertResultPlan(
+  plan: NexusPublicationPullRequestUpsertPlan,
+  pullRequest: NexusForgePullRequestResult,
+): NexusPublicationPullRequestUpsertPlan {
+  const operation = pullRequest.operation ?? plan.operation;
+  return {
+    ...plan,
+    operation,
+    number: operation === "update" ? pullRequest.number : plan.number,
   };
 }
 

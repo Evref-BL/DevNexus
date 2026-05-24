@@ -1024,7 +1024,7 @@ describe("DevNexus MCP server", () => {
   it("upserts publication pull requests through MCP with configured App API credentials", async () => {
     const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
     const commandRuns: Array<{ command: string; args: string[] }> = [];
-    const requests: Array<{ url: string; authorization: string | null; body: unknown }> = [];
+    const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
 
     const result = toolJson(
       await callDevNexusMcpTool(
@@ -1050,11 +1050,15 @@ describe("DevNexus MCP server", () => {
           publicationFetch: (async (input, init = {}) => {
             requests.push({
               url: String(input),
+              method: init.method ?? "GET",
               authorization:
                 ((init.headers as Record<string, string> | undefined)
                   ?.Authorization ?? null),
               body: init.body ? JSON.parse(String(init.body)) : null,
             });
+            if ((init.method ?? "GET") === "GET") {
+              return new Response(JSON.stringify([]), { status: 200 });
+            }
             return new Response(
               JSON.stringify({
                 number: 311,
@@ -1097,7 +1101,15 @@ describe("DevNexus MCP server", () => {
     ]);
     expect(requests).toEqual([
       {
+        url:
+          "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fmcp-publication-facade&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
         url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        method: "POST",
         authorization: "Bearer installation-token",
         body: {
           head: "codex/dev-nexus/mcp-publication-facade",

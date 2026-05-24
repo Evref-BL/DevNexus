@@ -172,6 +172,9 @@ describe("nexus forge publication facade", () => {
       credential: restCredential(),
       fetch: queuedFetch(calls, [
         {
+          body: [],
+        },
+        {
           status: 201,
           body: {
             number: 12,
@@ -253,24 +256,83 @@ describe("nexus forge publication facade", () => {
 
     expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`))
       .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls",
         "POST /repos/Evref-BL/DevNexus/pulls",
         "PATCH /repos/Evref-BL/DevNexus/pulls/12",
         "PUT /repos/Evref-BL/DevNexus/pulls/12/merge",
         "PATCH /repos/Evref-BL/DevNexus/issues/148",
       ]);
-    expect(calls[0]!.body).toEqual({
+    expect(new URL(calls[0]!.url).searchParams.get("head"))
+      .toBe("Evref-BL:codex/dev-nexus/github-148");
+    expect(calls[1]!.body).toEqual({
       head: "codex/dev-nexus/github-148",
       base: "main",
       title: "Feature",
       body: "Body",
       draft: true,
     });
-    expect(calls[2]!.body).toEqual({
+    expect(calls[3]!.body).toEqual({
       merge_method: "squash",
     });
-    expect(calls[3]!.body).toEqual({
+    expect(calls[4]!.body).toEqual({
       state: "closed",
       state_reason: "completed",
+    });
+  });
+
+  it("updates an existing same-head GitHub pull request through REST", async () => {
+    const calls: CapturedFetchCall[] = [];
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential(),
+      fetch: queuedFetch(calls, [
+        {
+          body: [
+            {
+              number: 30,
+              html_url: "https://github.com/Evref-BL/DevNexus/pull/30",
+              state: "open",
+              title: "Old title",
+            },
+          ],
+        },
+        {
+          body: {
+            number: 30,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/30",
+            state: "open",
+            title: "New title",
+          },
+        },
+      ]),
+    });
+
+    await expect(
+      adapter.upsertPullRequest({
+        head: "codex/dev-nexus/github-148",
+        base: "main",
+        title: "New title",
+        body: "Updated body",
+      }),
+    ).resolves.toMatchObject({
+      number: 30,
+      title: "New title",
+      operation: "update",
+    });
+
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls",
+        "PATCH /repos/Evref-BL/DevNexus/pulls/30",
+      ]);
+    const lookupUrl = new URL(calls[0]!.url);
+    expect(lookupUrl.searchParams.get("head"))
+      .toBe("Evref-BL:codex/dev-nexus/github-148");
+    expect(lookupUrl.searchParams.get("base")).toBe("main");
+    expect(lookupUrl.searchParams.get("state")).toBe("open");
+    expect(calls[1]!.body).toMatchObject({
+      title: "New title",
+      body: "Updated body",
     });
   });
 
@@ -439,6 +501,9 @@ describe("nexus forge publication facade", () => {
       if (key.startsWith("api app ")) {
         return commandResult("devnexus-automation\n");
       }
+      if (key.startsWith("pr list ")) {
+        return commandResult("[]");
+      }
       if (key.startsWith("pr create ")) {
         return commandResult(
           "https://github.com/Evref-BL/DevNexus/pull/12\n",
@@ -553,13 +618,66 @@ describe("nexus forge publication facade", () => {
     });
     expect(calls.map((call) => call.args.slice(0, 2))).toEqual([
       ["api", "app"],
+      ["pr", "list"],
       ["pr", "create"],
       ["pr", "checks"],
       ["pr", "view"],
       ["pr", "merge"],
       ["issue", "close"],
     ]);
-    expect(calls[1]!.args).toContain("--draft");
+    expect(calls[2]!.args).toContain("--draft");
+  });
+
+  it("updates an existing same-head GitHub pull request through the CLI backend", async () => {
+    const calls: Array<{ args: readonly string[] }> = [];
+    const runner: NexusForgePublicationCommandRunner = (_command, args) => {
+      calls.push({ args });
+      const key = args.join(" ");
+      if (key.startsWith("pr list ")) {
+        return commandResult(JSON.stringify([
+          {
+            number: 30,
+            url: "https://github.com/Evref-BL/DevNexus/pull/30",
+            state: "OPEN",
+            title: "Old title",
+          },
+        ]));
+      }
+      if (key.startsWith("pr edit 30 ")) {
+        return commandResult(
+          "https://github.com/Evref-BL/DevNexus/pull/30\n",
+        );
+      }
+      return {
+        status: 1,
+        stdout: "",
+        stderr: `unexpected gh command: ${key}`,
+      };
+    };
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: cliCredential(),
+      commandRunner: runner,
+    });
+
+    await expect(
+      adapter.upsertPullRequest({
+        head: "codex/dev-nexus/github-148",
+        base: "main",
+        title: "New title",
+        body: "Updated body",
+      }),
+    ).resolves.toMatchObject({
+      number: 30,
+      url: "https://github.com/Evref-BL/DevNexus/pull/30",
+      operation: "update",
+    });
+
+    expect(calls.map((call) => call.args.slice(0, 3))).toEqual([
+      ["pr", "list", "--repo"],
+      ["pr", "edit", "30"],
+    ]);
+    expect(calls[1]!.args).not.toContain("--head");
   });
 
   it("reports provider request failures with capability context", async () => {
