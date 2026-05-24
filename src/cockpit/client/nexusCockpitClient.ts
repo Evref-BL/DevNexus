@@ -1,5 +1,11 @@
 // @ts-nocheck
 import { buildWriteHistoryLayout } from "../../dashboard/nexusDashboardHistoryLayout.js";
+import {
+  bindGitHistoryColumnResizers,
+  gitHistoryColumnStyle,
+  readStoredGitHistoryColumnWidths,
+  renderGitHistoryColumnHeader,
+} from "./history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvg } from "./history/nexusCockpitHistoryGraphSvg.js";
 import {
   cockpitTooltipText,
@@ -24,14 +30,6 @@ const defaultRefreshMs = 15000;
 const themeStorageKey = 'dev-nexus-cockpit-theme';
 const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
 const gitHistoryInlineDetailRows = 7;
-const gitHistoryColumnStorageKey = 'dev-nexus-cockpit-git-history-columns';
-const gitHistoryColumnSpecs = {
-  graph: { property: '--dn-git-graph-width', defaultWidth: 230, minWidth: 96, maxWidth: 520 },
-  description: { property: '--dn-git-description-width', defaultWidth: 360, minWidth: 150, maxWidth: 760 },
-  date: { property: '--dn-git-date-width', defaultWidth: 124, minWidth: 92, maxWidth: 230 },
-  author: { property: '--dn-git-author-width', defaultWidth: 170, minWidth: 96, maxWidth: 320 },
-  commit: { property: '--dn-git-commit-width', defaultWidth: 78, minWidth: 58, maxWidth: 150 },
-};
 const styles = `
 :root { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; color: var(--dn-text); background: var(--dn-bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-synthesis: none; }
 :root[data-dev-nexus-theme='dark'] { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; }
@@ -902,65 +900,6 @@ function bindGitHistoryFilterControls(container, onSelect) {
   });
 }
 
-function bindGitHistoryColumnResizers(container) {
-  container.querySelectorAll('[data-git-resize-column]').forEach((handle) => {
-    handle.addEventListener('pointerdown', (event) => startGitHistoryColumnResize(event, handle));
-    handle.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      event.preventDefault();
-      const board = handle.closest('[data-git-board]');
-      const column = handle.getAttribute('data-git-resize-column');
-      if (!board || !column) return;
-      const direction = event.key === 'ArrowRight' ? 1 : -1;
-      const step = event.shiftKey ? 32 : 12;
-      updateGitHistoryColumnWidth(board, column, gitHistoryColumnWidth(board, column) + direction * step, handle);
-    });
-  });
-}
-
-function startGitHistoryColumnResize(event, handle) {
-  if (event.button !== undefined && event.button !== 0) return;
-  const board = handle.closest('[data-git-board]');
-  const column = handle.getAttribute('data-git-resize-column');
-  if (!board || !column) return;
-  event.preventDefault();
-  const startX = event.clientX ?? 0;
-  const startWidth = gitHistoryColumnWidth(board, column);
-  board.classList.add('resizing');
-  const move = (moveEvent) => {
-    updateGitHistoryColumnWidth(board, column, startWidth + ((moveEvent.clientX ?? startX) - startX), handle);
-  };
-  const stop = () => {
-    board.classList.remove('resizing');
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', stop);
-    document.removeEventListener('pointercancel', stop);
-  };
-  document.addEventListener('pointermove', move);
-  document.addEventListener('pointerup', stop);
-  document.addEventListener('pointercancel', stop);
-}
-
-function updateGitHistoryColumnWidth(board, column, nextWidth, handle = null) {
-  const width = normalizeGitHistoryColumnWidth(column, nextWidth);
-  const spec = gitHistoryColumnSpecs[column];
-  if (!spec) return;
-  board.style.setProperty(spec.property, `${width}px`);
-  if (handle) handle.setAttribute('aria-valuenow', String(width));
-  writeStoredGitHistoryColumnWidths({ ...gitHistoryBoardColumnWidths(board), [column]: width });
-}
-
-function gitHistoryBoardColumnWidths(board) {
-  return Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => {
-    const value = Number.parseInt(board.style.getPropertyValue(spec.property), 10);
-    return [column, normalizeGitHistoryColumnWidth(column, Number.isFinite(value) ? value : spec.defaultWidth)];
-  }));
-}
-
-function gitHistoryColumnWidth(board, column) {
-  return gitHistoryBoardColumnWidths(board)[column] ?? gitHistoryColumnSpecs[column]?.defaultWidth ?? 120;
-}
-
 function scrollToDashboardSection(targetId) {
   requestAnimationFrame(() => {
     const target = document.getElementById(targetId);
@@ -1124,52 +1063,6 @@ function renderGitHistoryBoard(snapshot, graph, selectedId) {
   const widths = readStoredGitHistoryColumnWidths();
   const visualGraph = gitHistoryVisualGraph(graph, selectedId);
   return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
-}
-
-function renderGitHistoryColumnHeader(column, label, widths) {
-  const spec = gitHistoryColumnSpecs[column];
-  const width = widths[column] ?? spec?.defaultWidth ?? 120;
-  const min = spec?.minWidth ?? 48;
-  const max = spec?.maxWidth ?? 999;
-  return `<span class="dn-git-column-header" data-git-column="${escapeAttribute(column)}"><span class="dn-git-column-label">${escapeHtml(label)}</span><span class="dn-git-resize-handle" role="separator" tabindex="0" aria-label="Resize ${escapeHtml(label)} column" aria-orientation="vertical" aria-valuemin="${escapeHtml(min)}" aria-valuemax="${escapeHtml(max)}" aria-valuenow="${escapeHtml(width)}" data-git-resize-column="${escapeAttribute(column)}"></span></span>`;
-}
-
-function gitHistoryColumnStyle(widths = readStoredGitHistoryColumnWidths()) {
-  return Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => `${spec.property}:${normalizeGitHistoryColumnWidth(column, widths[column])}px`).join(';');
-}
-
-function readStoredGitHistoryColumnWidths() {
-  const defaults = Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => [column, spec.defaultWidth]));
-  if (typeof window === 'undefined') return defaults;
-  try {
-    const storage = window.localStorage;
-    if (!storage) return defaults;
-    const raw = storage.getItem(gitHistoryColumnStorageKey);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    return Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => [column, normalizeGitHistoryColumnWidth(column, parsed?.[column] ?? spec.defaultWidth)]));
-  } catch {
-    return defaults;
-  }
-}
-
-function writeStoredGitHistoryColumnWidths(widths) {
-  if (typeof window === 'undefined') return;
-  try {
-    const storage = window.localStorage;
-    if (!storage) return;
-    storage.setItem(gitHistoryColumnStorageKey, JSON.stringify(Object.fromEntries(Object.keys(gitHistoryColumnSpecs).map((column) => [column, normalizeGitHistoryColumnWidth(column, widths?.[column])]))));
-  } catch {
-    // Column resizing is still useful without persistent storage.
-  }
-}
-
-function normalizeGitHistoryColumnWidth(column, value) {
-  const spec = gitHistoryColumnSpecs[column];
-  if (!spec) return Number(value) || 0;
-  const width = Number(value);
-  if (!Number.isFinite(width)) return spec.defaultWidth;
-  return Math.min(Math.max(Math.round(width), spec.minWidth), spec.maxWidth);
 }
 
 function normalizeGitHistoryFilter(value) {

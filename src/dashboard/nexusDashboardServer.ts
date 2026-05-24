@@ -33,6 +33,7 @@ import {
   type NexusDashboardCodexChatStarter,
 } from "./nexusDashboardCodexChat.js";
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
+import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
 import { renderNexusCockpitTooltipsClientSource } from "../cockpit/client/nexusCockpitTooltips.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
@@ -421,6 +422,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(
       /^import \{ buildWriteHistoryLayout \} from ["'][^"']+["'];\s*/mu,
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n`,
+    )
+    .replace(
+      /^import \{\s*bindGitHistoryColumnResizers,\s*gitHistoryColumnStyle,\s*readStoredGitHistoryColumnWidths,\s*renderGitHistoryColumnHeader,\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
+      `${renderNexusCockpitHistoryColumnsClientSource()}\n\n`,
     )
     .replace(
       /^import \{ renderNexusCockpitHistoryGraphSvg \} from ["'][^"']+["'];\s*/mu,
