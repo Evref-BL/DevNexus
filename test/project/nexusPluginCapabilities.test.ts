@@ -1,9 +1,60 @@
 import { describe, expect, it } from "vitest";
 import {
+  devNexusPluginCatalogueSecurityRationale,
+  findDevNexusPluginCatalogueEntry,
+  listDevNexusPluginCatalogue,
+  nexusPluginCatalogueRefreshCommand,
   projectPluginCapabilityProjections,
   projectPluginDependencyProjections,
   projectPluginWorkerFragments,
 } from "../../src/project/nexusPluginCapabilities.js";
+
+describe("nexus plugin catalogue", () => {
+  it("exposes curated DevNexus plugin package metadata and refresh guidance", () => {
+    const catalogue = listDevNexusPluginCatalogue();
+
+    expect(catalogue.map((entry) => entry.id)).toEqual([
+      "dev-nexus-typescript",
+      "dev-nexus-pharo",
+      "dev-nexus-research",
+    ]);
+    expect(catalogue).toEqual([
+      expect.objectContaining({
+        id: "dev-nexus-typescript",
+        packageName: "@evref-bl/dev-nexus-typescript",
+        configExportName: "devNexusTypeScriptDevNexusPluginConfig",
+        sourcePath: null,
+      }),
+      expect.objectContaining({
+        id: "dev-nexus-pharo",
+        packageName: "@evref-bl/dev-nexus-pharo",
+        configExportName: "devNexusPharoDevNexusPluginConfig",
+        sourcePath: null,
+      }),
+      expect.objectContaining({
+        id: "dev-nexus-research",
+        packageName: "@evref-bl/dev-nexus-research",
+        configExportName: "devNexusResearchDevNexusPluginConfig",
+        sourcePath: null,
+      }),
+    ]);
+    expect(catalogue.every((entry) => entry.sourcePath === null)).toBe(true);
+    expect(devNexusPluginCatalogueSecurityRationale).toContain("curated");
+    expect(devNexusPluginCatalogueSecurityRationale).toContain("allowlist");
+  });
+
+  it("builds package-backed refresh commands from catalogue entries", () => {
+    const entry = findDevNexusPluginCatalogueEntry("@evref-bl/dev-nexus-pharo");
+
+    expect(entry).toMatchObject({
+      id: "dev-nexus-pharo",
+      packageName: "@evref-bl/dev-nexus-pharo",
+    });
+    expect(nexusPluginCatalogueRefreshCommand("/tmp/demo project", entry!)).toBe(
+      "dev-nexus workspace plugin refresh '/tmp/demo project' --from '@evref-bl/dev-nexus-pharo' --export devNexusPharoDevNexusPluginConfig",
+    );
+  });
+});
 
 describe("nexus plugin capability projections", () => {
   it("includes dependency projection records in plugin capability summaries", () => {

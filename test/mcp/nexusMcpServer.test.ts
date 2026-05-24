@@ -2860,6 +2860,26 @@ describe("DevNexus MCP server", () => {
 
     expect(result).toMatchObject({
       ok: true,
+      pluginCatalogue: [
+        {
+          id: "dev-nexus-typescript",
+          packageName: "@evref-bl/dev-nexus-typescript",
+          configExportName: "devNexusTypeScriptDevNexusPluginConfig",
+          sourcePath: null,
+        },
+        {
+          id: "dev-nexus-pharo",
+          packageName: "@evref-bl/dev-nexus-pharo",
+          configExportName: "devNexusPharoDevNexusPluginConfig",
+          sourcePath: null,
+        },
+        {
+          id: "dev-nexus-research",
+          packageName: "@evref-bl/dev-nexus-research",
+          configExportName: "devNexusResearchDevNexusPluginConfig",
+          sourcePath: null,
+        },
+      ],
       pluginCapabilities: [
         {
           pluginId: "analysis-tools",

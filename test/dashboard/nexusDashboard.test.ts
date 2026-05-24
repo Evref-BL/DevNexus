@@ -550,7 +550,7 @@ describe("nexus dashboard", () => {
       },
       plugins: {
         enabledCount: 1,
-        totalCount: 1,
+        totalCount: 3,
         capabilityCount: 2,
       },
     });
@@ -585,7 +585,7 @@ describe("nexus dashboard", () => {
       value: "1",
       detail: "2 capabilities",
     });
-    expect(snapshot.plugins.records).toEqual([
+    expect(snapshot.plugins.records).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "dev-nexus-typescript",
         name: "DevNexus TypeScript",
@@ -595,7 +595,12 @@ describe("nexus dashboard", () => {
         projectedSkills: ["typescript-diagnose"],
         mcpServers: ["dev-nexus-typescript"],
       }),
-    ]);
+      expect.objectContaining({
+        id: "dev-nexus-pharo",
+        source: "catalogue",
+        state: "available",
+      }),
+    ]));
     expect(snapshot.weave.nodes.map((node) => node.id)).toEqual(
       expect.arrayContaining([
         "project",
@@ -1165,8 +1170,10 @@ describe("nexus dashboard", () => {
     });
 
     expect(snapshot.plugins).toMatchObject({
-      totalCount: 2,
+      totalCount: 3,
       enabledCount: 1,
+      configuredCount: 2,
+      availableCount: 1,
       capabilityCount: 4,
     });
     expect(snapshot.plugins.records).toEqual(
@@ -1183,19 +1190,9 @@ describe("nexus dashboard", () => {
     );
   });
 
-  it("surfaces local plugin packages as available cockpit plugins", async () => {
-    const projectRoot = makeTempDir("dev-nexus-dashboard-local-plugins-");
-    const pluginRoot = path.join(projectRoot, "source", "plugins", "dev-nexus-research");
-    fs.mkdirSync(pluginRoot, { recursive: true });
-    fs.writeFileSync(
-      path.join(pluginRoot, "package.json"),
-      JSON.stringify({
-        name: "@evref-bl/dev-nexus-research",
-        version: "0.1.0-alpha.0",
-        description: "Research workflow support for DevNexus.",
-      }),
-      "utf8",
-    );
+  it("surfaces curated catalogue plugins as available cockpit plugins", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-catalogue-plugins-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig({ plugins: [] }));
 
     const snapshot = await buildNexusDashboardSnapshot({
@@ -1205,25 +1202,49 @@ describe("nexus dashboard", () => {
     });
 
     expect(snapshot.plugins).toMatchObject({
-      totalCount: 1,
+      totalCount: 3,
       enabledCount: 0,
       configuredCount: 0,
-      availableCount: 1,
+      availableCount: 3,
       capabilityCount: 0,
     });
-    expect(snapshot.plugins.records[0]).toMatchObject({
-      id: "dev-nexus-research",
-      name: "DevNexus Research",
-      source: "local",
-      state: "available",
-      enabled: false,
-      packageName: "@evref-bl/dev-nexus-research",
-      sourcePath: pluginRoot,
-      detail: "Research workflow support for DevNexus.",
-    });
-    expect(snapshot.plugins.records[0]?.refreshCommand).toContain("dev-nexus workspace plugin refresh");
-    expect(snapshot.plugins.records[0]?.refreshCommand).toContain("--from");
-    expect(snapshot.plugins.records[0]?.refreshCommand).toContain(pluginRoot);
+    expect(snapshot.plugins.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "dev-nexus-typescript",
+          name: "DevNexus TypeScript",
+          source: "catalogue",
+          state: "available",
+          enabled: false,
+          packageName: "@evref-bl/dev-nexus-typescript",
+          sourcePath: null,
+        }),
+        expect.objectContaining({
+          id: "dev-nexus-pharo",
+          name: "DevNexus-Pharo",
+          source: "catalogue",
+          state: "available",
+          enabled: false,
+          packageName: "@evref-bl/dev-nexus-pharo",
+          sourcePath: null,
+        }),
+        expect.objectContaining({
+          id: "dev-nexus-research",
+          name: "DevNexus Research",
+          source: "catalogue",
+          state: "available",
+          enabled: false,
+          packageName: "@evref-bl/dev-nexus-research",
+          sourcePath: null,
+          detail: "Research and LaTeX paper-writing workflow plugin for DevNexus.",
+        }),
+      ]),
+    );
+    const research = snapshot.plugins.records.find((record) => record.id === "dev-nexus-research");
+    expect(research?.refreshCommand).toContain("dev-nexus workspace plugin refresh");
+    expect(research?.refreshCommand).toContain("--from '@evref-bl/dev-nexus-research'");
+    expect(research?.refreshCommand).toContain("--export devNexusResearchDevNexusPluginConfig");
+    expect(research?.refreshCommand).not.toContain(path.join(projectRoot, "source"));
   });
 
   it("builds a host snapshot from registered workspaces plus the current project", async () => {
@@ -1539,7 +1560,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-thread-action");
     expect(module).toContain("/api/dashboard/thread-action");
     expect(module).toContain("Needs plugin enable policy");
-    expect(module).toContain("Local plugin candidates copy a refresh command");
+    expect(module).toContain("Curated plugin catalogue entries copy a refresh command");
     expect(module).toContain("data-copy-text");
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
@@ -3342,7 +3363,7 @@ describe("nexus dashboard", () => {
     expect(html).toContain("MCP: dev-nexus-typescript");
     expect(html).toContain("Setup: Prepare research corpus");
     expect(html).toContain("Deps: node_modules -&gt; node_modules");
-    expect(html).toContain("Local plugin candidates copy a refresh command");
+    expect(html).toContain("Curated plugin catalogue entries copy a refresh command");
     expect(html).toContain("Enable unavailable");
     expect(html).toContain("Needs plugin enable policy");
     expect(html).toContain("dn-policy-action");
@@ -3351,7 +3372,7 @@ describe("nexus dashboard", () => {
     expect(html).not.toContain("data-enable-plugin");
   });
 
-  it("renders local plugin candidates with a copyable refresh command", async () => {
+  it("renders catalogue plugin entries with a copyable refresh command", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
     const html = hooks.renderPlugins({
@@ -3367,11 +3388,11 @@ describe("nexus dashboard", () => {
           version: "0.1.0-alpha.0",
           enabled: false,
           state: "available",
-          source: "local",
+          source: "catalogue",
           packageName: "@evref-bl/dev-nexus-research",
-          sourcePath: "/tmp/project/source/plugins/dev-nexus-research",
+          sourcePath: null,
           refreshCommand:
-            "dev-nexus workspace plugin refresh '/tmp/project' --from '/tmp/project/source/plugins/dev-nexus-research'",
+            "dev-nexus workspace plugin refresh '/tmp/project' --from '@evref-bl/dev-nexus-research' --export devNexusResearchDevNexusPluginConfig",
           capabilityCount: 0,
           projectedSkillCount: 0,
           mcpServerCount: 0,
@@ -4131,12 +4152,18 @@ describe("nexus dashboard", () => {
           loadedSections: ["plugins"],
           plugins: {
             enabledCount: 1,
-            records: [
+            availableCount: 3,
+            records: expect.arrayContaining([
               expect.objectContaining({
                 id: "configured-plugin",
                 state: "enabled",
               }),
-            ],
+              expect.objectContaining({
+                id: "dev-nexus-research",
+                source: "catalogue",
+                state: "available",
+              }),
+            ]),
           },
         },
       });

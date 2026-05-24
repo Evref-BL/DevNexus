@@ -1,5 +1,93 @@
 import type { NexusMcpExposureMode } from "../mcp/nexusMcpExposureTypes.js";
 
+export const devNexusPluginCatalogueSecurityRationale =
+  "DevNexus keeps plugin discovery on a curated allowlist so agents and dashboards do not turn arbitrary packages, component source roots, or a public marketplace into executable setup or MCP guidance before trust, signing, permission diffs, and revocation policy exist.";
+
+export interface NexusPluginCatalogueEntry {
+  id: string;
+  name: string;
+  packageName: string;
+  version: string | null;
+  description: string;
+  repositoryUrl: string;
+  configExportName: string;
+  installCommand: string;
+  sourcePath: null;
+}
+
+const devNexusPluginCatalogueEntries: NexusPluginCatalogueEntry[] = [
+  {
+    id: "dev-nexus-typescript",
+    name: "DevNexus TypeScript",
+    packageName: "@evref-bl/dev-nexus-typescript",
+    version: "0.1.0-alpha.1",
+    description: "TypeScript and JavaScript tooling plugin for DevNexus worktrees.",
+    repositoryUrl: "https://github.com/Evref-BL/DevNexus-TypeScript",
+    configExportName: "devNexusTypeScriptDevNexusPluginConfig",
+    installCommand: "npm install --save-dev @evref-bl/dev-nexus-typescript",
+    sourcePath: null,
+  },
+  {
+    id: "dev-nexus-pharo",
+    name: "DevNexus-Pharo",
+    packageName: "@evref-bl/dev-nexus-pharo",
+    version: "0.1.0-alpha.10",
+    description: "Pharo specialization layer for DevNexus, PLexus, and Pharo project workspaces.",
+    repositoryUrl: "https://github.com/Evref-BL/DevNexus-Pharo",
+    configExportName: "devNexusPharoDevNexusPluginConfig",
+    installCommand: "npm install --save-dev @evref-bl/dev-nexus-pharo",
+    sourcePath: null,
+  },
+  {
+    id: "dev-nexus-research",
+    name: "DevNexus Research",
+    packageName: "@evref-bl/dev-nexus-research",
+    version: "0.1.0-alpha.0",
+    description: "Research and LaTeX paper-writing workflow plugin for DevNexus.",
+    repositoryUrl: "https://github.com/Evref-BL/DevNexus-Research",
+    configExportName: "devNexusResearchDevNexusPluginConfig",
+    installCommand: "npm install --save-dev @evref-bl/dev-nexus-research",
+    sourcePath: null,
+  },
+];
+
+export function listDevNexusPluginCatalogue(): NexusPluginCatalogueEntry[] {
+  return devNexusPluginCatalogueEntries.map((entry) => ({ ...entry }));
+}
+
+export function findDevNexusPluginCatalogueEntry(
+  idOrPackageName: string,
+): NexusPluginCatalogueEntry | null {
+  const normalized = normalizePluginCatalogueKey(idOrPackageName);
+  const entry = devNexusPluginCatalogueEntries.find((candidate) =>
+    normalizePluginCatalogueKey(candidate.id) === normalized ||
+    normalizePluginCatalogueKey(candidate.packageName) === normalized
+  );
+  return entry ? { ...entry } : null;
+}
+
+export function nexusPluginCatalogueRefreshCommand(
+  projectRoot: string,
+  entry: NexusPluginCatalogueEntry,
+): string {
+  return [
+    "dev-nexus workspace plugin refresh",
+    shellQuote(projectRoot),
+    "--from",
+    shellQuote(entry.packageName),
+    "--export",
+    entry.configExportName,
+  ].join(" ");
+}
+
+function normalizePluginCatalogueKey(value: string): string {
+  return value.trim().toLowerCase().replace(/^@[^/]+\//u, "");
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/gu, "'\\''")}'`;
+}
+
 export type NexusPluginCapabilityKind =
   | "projected_skill"
   | "mcp_server"

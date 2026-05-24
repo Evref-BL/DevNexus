@@ -70,17 +70,17 @@ POST /api/dashboard/thread-action
 
 `/api/dashboard/thread-action` records a local cockpit decision only. It hides
 the selected thread from active attention, but does not delete worktrees,
-branches, notes, or provider records. Local plugin candidates may expose a
-copyable refresh command, but the browser does not execute it. Provider writes,
-destructive cleanup, direct plugin install, and plugin setup still need their
-own explicit action contract. When the UI can name one of those desired actions
-but no contract exists yet, it should render a disabled control instead of
-hiding the action or guessing the mutation.
+branches, notes, or provider records. Curated plugin catalogue entries may
+expose copyable install and refresh guidance, but the browser does not execute
+it. Provider writes, destructive cleanup, direct plugin install, and plugin
+setup still need their own explicit action contract. When the UI can name one
+of those desired actions but no contract exists yet, it should render a disabled
+control instead of hiding the action or guessing the mutation.
 
-Workspace `plugins.records[]` includes configured plugins and local plugin
-packages found under component `plugins/` directories. A local candidate has
-`state: "available"`, `source: "local"`, `sourcePath`, `packageName`, and a
-`refreshCommand` suitable for copying into a shell.
+Workspace `plugins.records[]` includes configured plugins and curated catalogue
+entries. A catalogue entry has `state: "available"`, `source: "catalogue"`,
+`sourcePath: null`, `packageName`, `repositoryUrl`, `configExportName`,
+`installCommand`, and a `refreshCommand` suitable for copying into a shell.
 
 ## Workspace Drill-Down
 

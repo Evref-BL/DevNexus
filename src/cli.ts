@@ -8678,6 +8678,7 @@ function printAutomationAgentProfilesResult(
   }
   writeLine(stdout, `  Profiles: ${result.profiles.length}`);
   printAutomationAgentProfileRows(result.profiles, stdout);
+  printAutomationAgentPluginCatalogue(result.pluginCatalogue, stdout);
   printAutomationAgentPluginCapabilities(result.pluginCapabilities, stdout);
 }
 
@@ -8725,6 +8726,19 @@ function formatAutomationAgentAppServerSummary(
     `ephemeralThread=${profile.appServer.ephemeralThreadDefault ? "yes" : "no"}`,
     `hostLocalHints=${profile.appServer.hostLocalSafetyHints.length}`,
   ].join(" ");
+}
+
+function printAutomationAgentPluginCatalogue(
+  pluginCatalogue: NexusAutomationAgentProfileSummary["pluginCatalogue"],
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  Plugin catalogue: ${pluginCatalogue.length}`);
+  for (const plugin of pluginCatalogue) {
+    writeLine(
+      stdout,
+      `    ${plugin.id} package=${plugin.packageName} export=${plugin.configExportName}`,
+    );
+  }
 }
 
 function printAutomationAgentPluginCapabilities(

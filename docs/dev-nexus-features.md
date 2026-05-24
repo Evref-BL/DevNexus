@@ -58,6 +58,13 @@ plugin can contribute projected skills, MCP servers, setup obligations,
 environment hints, cleanup hooks, agent affordances, dependency projections, and
 worker context or briefing fragments.
 
+DevNexus exposes a curated plugin catalogue for known DevNexus-maintained
+plugins: DevNexus TypeScript, DevNexus-Pharo, and DevNexus Research. Catalogue
+entries provide package install guidance and `workspace plugin refresh` command
+guidance, but they are not installed automatically. DevNexus does not expose a
+public plugin marketplace; new catalogue entries require an explicit core
+allowlist change.
+
 Generic workspace, setup, coordination, automation, worktree, and work-item
 operations still belong to the core `dev_nexus` MCP server.
 
