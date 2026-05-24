@@ -150,19 +150,7 @@ export async function applyNexusProjectSetup(
   options: ApplyNexusProjectSetupOptions,
 ): Promise<NexusProjectSetupApplyResult> {
   const proposal = previewNexusProjectSetup(options.answers);
-  if (proposal.status !== "ready") {
-    throw new Error(
-      `workspace init proposal is blocked: ${proposal.diagnostics
-        .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`)
-        .join("; ")}`,
-    );
-  }
-  const providerMutation = proposal.operations.find(
-    (operation) => operation.mutationClass === "provider_mutation",
-  );
-  if (providerMutation?.allowedDuringLocalSetup) {
-    throw new Error("workspace init refuses provider mutations during local setup");
-  }
+  assertNexusProjectSetupProposalCanApply(proposal);
 
   const projectRoot = path.resolve(proposal.answers.project.root);
   const homePath = path.resolve(proposal.answers.home.path);
@@ -170,28 +158,12 @@ export async function applyNexusProjectSetup(
   const gitCommands: ProjectGitCommandResult[] = [];
   const writtenFiles: string[] = [];
 
-  fs.mkdirSync(projectRoot, { recursive: true });
-  if (proposal.answers.project.initializeGit) {
-    runGitIfMissing(projectRoot, gitRunner, gitCommands);
-  }
-
-  for (const component of proposal.answers.components) {
-    const sourceRoot = componentSourceRoot(projectRoot, component);
-    if (component.source.kind === "clone_project_local" && !fs.existsSync(sourceRoot)) {
-      fs.mkdirSync(path.dirname(sourceRoot), { recursive: true });
-      runProjectGitCommand(gitRunner, gitCommands, [
-        "clone",
-        component.source.remoteUrl as string,
-        sourceRoot,
-      ]);
-    }
-    if (component.source.kind === "create_local") {
-      fs.mkdirSync(sourceRoot, { recursive: true });
-      if (component.source.initializeGit) {
-        runGitIfMissing(sourceRoot, gitRunner, gitCommands);
-      }
-    }
-  }
+  initializeNexusProjectSetupSources({
+    proposal,
+    projectRoot,
+    gitRunner,
+    gitCommands,
+  });
 
   const projectConfig = buildNexusProjectConfigFromSetupAnswers(proposal.answers);
   const savedProjectConfigPath = saveProjectConfig(projectRoot, projectConfig);
@@ -225,19 +197,14 @@ export async function applyNexusProjectSetup(
     projectConfig,
   });
 
-  if (
-    proposal.answers.home.registerProject !== false ||
-    (proposal.answers.authProfiles?.length ?? 0) > 0
-  ) {
-    const homeConfig = loadOrCreateProjectSetupHome(homePath);
-    upsertSetupAuthProfiles(homeConfig, proposal.answers.authProfiles ?? []);
-    if (proposal.answers.home.registerProject !== false) {
-      upsertNexusProjectReference(homeConfig, projectRoot, projectConfig, {
-        vibeKanbanProjectId: null,
-      });
-    }
-    saveNexusHomeConfigFile(homePath, homeConfig, validateNexusHomeConfigBase);
-    writtenFiles.push(nexusHomeConfigPath(homePath));
+  const homeConfigPath = updateNexusProjectSetupHome({
+    proposal,
+    homePath,
+    projectRoot,
+    projectConfig,
+  });
+  if (homeConfigPath) {
+    writtenFiles.push(homeConfigPath);
   }
 
   return {
@@ -252,6 +219,92 @@ export async function applyNexusProjectSetup(
     writtenFiles: uniqueStrings(writtenFiles),
     ensuredLocalTrackerStores,
   };
+}
+
+function assertNexusProjectSetupProposalCanApply(
+  proposal: NexusProjectSetupProposal,
+): void {
+  if (proposal.status !== "ready") {
+    throw new Error(
+      `workspace init proposal is blocked: ${proposal.diagnostics
+        .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`)
+        .join("; ")}`,
+    );
+  }
+  const providerMutation = proposal.operations.find(
+    (operation) => operation.mutationClass === "provider_mutation",
+  );
+  if (providerMutation?.allowedDuringLocalSetup) {
+    throw new Error("workspace init refuses provider mutations during local setup");
+  }
+}
+
+function initializeNexusProjectSetupSources(options: {
+  proposal: NexusProjectSetupProposal;
+  projectRoot: string;
+  gitRunner: ProjectGitRunner;
+  gitCommands: ProjectGitCommandResult[];
+}): void {
+  fs.mkdirSync(options.projectRoot, { recursive: true });
+  if (options.proposal.answers.project.initializeGit) {
+    runGitIfMissing(options.projectRoot, options.gitRunner, options.gitCommands);
+  }
+
+  for (const component of options.proposal.answers.components) {
+    initializeNexusProjectSetupComponentSource({
+      component,
+      projectRoot: options.projectRoot,
+      gitRunner: options.gitRunner,
+      gitCommands: options.gitCommands,
+    });
+  }
+}
+
+function initializeNexusProjectSetupComponentSource(options: {
+  component: NexusProjectSetupAnswers["components"][number];
+  projectRoot: string;
+  gitRunner: ProjectGitRunner;
+  gitCommands: ProjectGitCommandResult[];
+}): void {
+  const sourceRoot = componentSourceRoot(options.projectRoot, options.component);
+  if (options.component.source.kind === "clone_project_local" && !fs.existsSync(sourceRoot)) {
+    fs.mkdirSync(path.dirname(sourceRoot), { recursive: true });
+    runProjectGitCommand(options.gitRunner, options.gitCommands, [
+      "clone",
+      options.component.source.remoteUrl as string,
+      sourceRoot,
+    ]);
+  }
+  if (options.component.source.kind === "create_local") {
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    if (options.component.source.initializeGit) {
+      runGitIfMissing(sourceRoot, options.gitRunner, options.gitCommands);
+    }
+  }
+}
+
+function updateNexusProjectSetupHome(options: {
+  proposal: NexusProjectSetupProposal;
+  homePath: string;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+}): string | null {
+  if (
+    options.proposal.answers.home.registerProject === false &&
+    (options.proposal.answers.authProfiles?.length ?? 0) === 0
+  ) {
+    return null;
+  }
+
+  const homeConfig = loadOrCreateProjectSetupHome(options.homePath);
+  upsertSetupAuthProfiles(homeConfig, options.proposal.answers.authProfiles ?? []);
+  if (options.proposal.answers.home.registerProject !== false) {
+    upsertNexusProjectReference(homeConfig, options.projectRoot, options.projectConfig, {
+      vibeKanbanProjectId: null,
+    });
+  }
+  saveNexusHomeConfigFile(options.homePath, homeConfig, validateNexusHomeConfigBase);
+  return nexusHomeConfigPath(options.homePath);
 }
 
 export function buildNexusProjectConfigFromSetupAnswers(
