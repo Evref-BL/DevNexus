@@ -231,7 +231,11 @@ interface NexusPublicationTarget {
   remoteUrl: string | null;
   defaultBranch: string | null;
   trackerId: string | null;
-  workTracking: { provider?: string; host?: string | null } | null;
+  workTracking: {
+    provider?: string;
+    host?: string | null;
+    repository?: { owner?: string; name?: string } | null;
+  } | null;
 }
 
 export class NexusPublicationPolicyError extends Error {
