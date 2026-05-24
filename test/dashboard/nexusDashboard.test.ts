@@ -51,6 +51,7 @@ function extractDashboardActionToken(html: string): string | undefined {
 }
 
 async function loadDashboardClientTestHooks(): Promise<{
+  cockpitTooltipText: (target: { getAttribute?: (name: string) => string | null }) => string;
   cockpitThreadPrompt: (thread: {
     branchName?: string | null;
     componentId?: string | null;
@@ -61,6 +62,12 @@ async function loadDashboardClientTestHooks(): Promise<{
     workItemId?: string | null;
   }) => string;
   dashboardRenderSignature: (value: unknown) => string;
+  isCockpitTooltipTargetTruncated: (target: {
+    clientHeight?: number;
+    clientWidth?: number;
+    scrollHeight?: number;
+    scrollWidth?: number;
+  }) => boolean;
   historyRows: (snapshot: unknown) => {
     rows: Array<{ detail: string; lane: number; node: { id: string }; title: string }>;
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>;
@@ -138,7 +145,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, dashboardRenderSignature, gitHistoryRows, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, gitHistoryRows, historyRows, isCockpitTooltipTargetTruncated, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1657,6 +1664,30 @@ describe("nexus dashboard", () => {
     expect(module.indexOf("const snapshot = await fetchDevNexusDashboard")).toBeGreaterThan(
       module.indexOf("await sectionRefresh;"),
     );
+  });
+
+  it("shows cockpit tooltip copy only for clipped title-backed text", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const truncatedTarget = {
+      clientHeight: 20,
+      clientWidth: 120,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => (name === "title" ? "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway" : null),
+    };
+    const fittingTarget = {
+      clientHeight: 20,
+      clientWidth: 180,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => (name === "title" ? "Short label" : null),
+    };
+
+    expect(hooks.cockpitTooltipText(truncatedTarget)).toBe(
+      "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway",
+    );
+    expect(hooks.isCockpitTooltipTargetTruncated(truncatedTarget)).toBe(true);
+    expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
   });
 
   it("keeps visible dashboard content stable during background refresh", () => {

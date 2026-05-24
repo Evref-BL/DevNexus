@@ -82,6 +82,8 @@ button, input, select { font: inherit; }
 .dn-open-option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 0; border-radius: 6px; color: var(--dn-strong); background: transparent; text-align: left; cursor: pointer; }
 .dn-open-option:hover { background: var(--dn-control-hover); }
 .dn-open-option:disabled { opacity: 0.7; cursor: wait; }
+.dn-tooltip { position: fixed; z-index: 1000; max-width: min(420px, calc(100vw - 24px)); padding: 7px 9px; border: 1px solid var(--dn-border-strong); border-radius: 7px; color: var(--dn-strong); background: color-mix(in srgb, var(--dn-surface) 96%, var(--dn-bg) 4%); box-shadow: var(--dn-shadow); font-size: 0.78rem; font-weight: 760; line-height: 1.25; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translate(-50%, -4px); transition: opacity 90ms ease, transform 90ms ease; }
+.dn-tooltip.visible { opacity: 1; transform: translate(-50%, -8px); }
 .dn-open-option svg, .dn-open-trigger svg, .dn-header-path-control svg { flex: 0 0 auto; width: 16px; height: 16px; }
 .dn-open-option svg:not(.dn-app-icon), .dn-open-trigger svg, .dn-header-path-control svg:not(.dn-app-icon) { stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .dn-app-icon { overflow: visible; } .dn-app-icon path, .dn-app-icon rect { stroke: none; } .dn-app-icon-vscode path { fill: #2f80ed; } .dn-app-icon-finder .finder-left { fill: #5bb6ff; } .dn-app-icon-finder .finder-right { fill: #dbeeff; } .dn-app-icon-finder path { stroke: #123354; stroke-width: 0.75; fill: none; } .dn-app-icon-terminal rect { fill: #24272e; } .dn-app-icon-terminal path { stroke: #d7f7df; stroke-width: 1.35; fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -336,6 +338,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   let workspaceSectionToken = 0;
   applyThemePreference(themeMode);
   injectStyles();
+  const tooltipController = installCockpitTooltips(root);
   const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const onSystemThemeChange = () => {
     if (themeMode !== 'system') return;
@@ -391,6 +394,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   function renderRoot(markup, signature = '') {
     if (signature && signature === lastRenderSignature) return;
     lastRenderSignature = signature || markup;
+    tooltipController.hide();
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
     bindSelectionControls(root, setSelectedId);
@@ -526,7 +530,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   renderCurrent();
   void refresh();
   const timer = setInterval(refresh, refreshMs);
-  return { dispose() { disposed = true; clearInterval(timer); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
+  return { dispose() { disposed = true; clearInterval(timer); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
 }
 
 function injectStyles() {
@@ -837,6 +841,134 @@ function emptyHostWorkspaceText(hostFocus = 'components') {
 
 function renderThemeToggle(themeMode) {
   return `<div class="dn-theme-toggle" role="group" aria-label="Color theme"><button type="button" data-theme-mode="system" aria-pressed="${themeMode === 'system' ? 'true' : 'false'}">System</button><button type="button" data-theme-mode="light" aria-pressed="${themeMode === 'light' ? 'true' : 'false'}">Light</button><button type="button" data-theme-mode="dark" aria-pressed="${themeMode === 'dark' ? 'true' : 'false'}">Dark</button></div>`;
+}
+
+function installCockpitTooltips(root) {
+  if (typeof document === 'undefined') return { hide() {}, dispose() {} };
+  const tooltip = document.createElement('div');
+  tooltip.className = 'dn-tooltip';
+  tooltip.id = `dn-tooltip-${Math.random().toString(36).slice(2)}`;
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(tooltip);
+  let activeTarget = null;
+
+  function show(target, clientX = null, clientY = null, mode = 'pointer') {
+    const text = cockpitTooltipText(target).trim();
+    if (!text || !isCockpitTooltipTargetTruncated(target)) {
+      hide();
+      return;
+    }
+    if (activeTarget && activeTarget !== target) restoreActiveTarget();
+    activeTarget = target;
+    if (target.hasAttribute('title')) {
+      target.setAttribute('data-dn-native-title', target.getAttribute('title') ?? '');
+      target.removeAttribute('title');
+    }
+    if (!target.hasAttribute('data-dn-previous-describedby')) target.setAttribute('data-dn-previous-describedby', target.getAttribute('aria-describedby') ?? '');
+    target.setAttribute('aria-describedby', [target.getAttribute('data-dn-previous-describedby'), tooltip.id].filter(Boolean).join(' '));
+    tooltip.textContent = text;
+    tooltip.classList.add('visible');
+    tooltip.setAttribute('aria-hidden', 'false');
+    positionCockpitTooltip(tooltip, target, clientX, clientY, mode);
+  }
+
+  function hide() {
+    restoreActiveTarget();
+    tooltip.classList.remove('visible');
+    tooltip.setAttribute('aria-hidden', 'true');
+  }
+
+  function restoreActiveTarget() {
+    if (!activeTarget) return;
+    const nativeTitle = activeTarget.getAttribute('data-dn-native-title');
+    if (nativeTitle !== null) {
+      activeTarget.setAttribute('title', nativeTitle);
+      activeTarget.removeAttribute('data-dn-native-title');
+    }
+    const previousDescribedBy = activeTarget.getAttribute('data-dn-previous-describedby');
+    if (previousDescribedBy !== null) {
+      if (previousDescribedBy) activeTarget.setAttribute('aria-describedby', previousDescribedBy);
+      else activeTarget.removeAttribute('aria-describedby');
+      activeTarget.removeAttribute('data-dn-previous-describedby');
+    }
+    activeTarget = null;
+  }
+
+  function onPointerOver(event) {
+    const target = findCockpitTooltipTarget(event.target, root);
+    if (target) show(target, event.clientX, event.clientY, 'pointer');
+  }
+  function onPointerMove(event) {
+    if (activeTarget) positionCockpitTooltip(tooltip, activeTarget, event.clientX, event.clientY, 'pointer');
+  }
+  function onPointerOut(event) {
+    if (activeTarget && event.relatedTarget && activeTarget.contains(event.relatedTarget)) return;
+    hide();
+  }
+  function onFocusIn(event) {
+    const target = findCockpitTooltipTarget(event.target, root);
+    if (target) show(target, null, null, 'focus');
+  }
+  function onFocusOut(event) {
+    if (!activeTarget || activeTarget.contains(event.relatedTarget)) return;
+    hide();
+  }
+  function onKeyDown(event) {
+    if (event.key === 'Escape') hide();
+  }
+
+  root.addEventListener('pointerover', onPointerOver);
+  root.addEventListener('pointermove', onPointerMove);
+  root.addEventListener('pointerout', onPointerOut);
+  root.addEventListener('focusin', onFocusIn);
+  root.addEventListener('focusout', onFocusOut);
+  document.addEventListener('keydown', onKeyDown);
+  return {
+    hide,
+    dispose() {
+      hide();
+      root.removeEventListener('pointerover', onPointerOver);
+      root.removeEventListener('pointermove', onPointerMove);
+      root.removeEventListener('pointerout', onPointerOut);
+      root.removeEventListener('focusin', onFocusIn);
+      root.removeEventListener('focusout', onFocusOut);
+      document.removeEventListener('keydown', onKeyDown);
+      tooltip.remove();
+    },
+  };
+}
+
+function findCockpitTooltipTarget(source, root) {
+  const target = source?.closest?.('[data-dn-tooltip], [data-dn-native-title], [title]');
+  if (!target || !root.contains(target)) return null;
+  if (!cockpitTooltipText(target).trim()) return null;
+  return isCockpitTooltipTargetTruncated(target) ? target : null;
+}
+
+function cockpitTooltipText(target) {
+  return target?.getAttribute?.('data-dn-tooltip') ?? target?.getAttribute?.('data-dn-native-title') ?? target?.getAttribute?.('title') ?? '';
+}
+
+function isCockpitTooltipTargetTruncated(target) {
+  return Number(target?.scrollWidth ?? 0) > Number(target?.clientWidth ?? 0) + 1 || Number(target?.scrollHeight ?? 0) > Number(target?.clientHeight ?? 0) + 1;
+}
+
+function positionCockpitTooltip(tooltip, target, clientX = null, clientY = null, mode = 'pointer') {
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 320;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 320;
+  const anchor = target.getBoundingClientRect();
+  const x = mode === 'pointer' && Number.isFinite(clientX) ? clientX : anchor.left + anchor.width / 2;
+  const y = mode === 'pointer' && Number.isFinite(clientY) ? clientY : anchor.top;
+  const bounds = tooltip.getBoundingClientRect();
+  const margin = 8;
+  const halfWidth = bounds.width / 2;
+  const left = Math.min(Math.max(x, halfWidth + margin), viewportWidth - halfWidth - margin);
+  let top = y - bounds.height - 12;
+  if (top < margin) top = y + 18;
+  top = Math.min(Math.max(top, margin), viewportHeight - bounds.height - margin);
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 
 function bindThemeControls(container, onSelect) {
