@@ -178,6 +178,7 @@ export interface NexusDashboardEmbeddingContract {
   };
   routes: {
     host: string;
+    cockpit: string;
     dashboard: string;
     diagnostics: string;
     projects: string;
@@ -1366,6 +1367,9 @@ export function nexusDashboardEmbeddingContract(options: {
   const hostMode = options.hostMode ?? options.scope === "host";
   const diagnosticsDefaultPayload =
     options.diagnosticsDefaultPayload ?? options.scope === "diagnostics";
+  const cockpitEndpoint = hostMode
+    ? "/api/cockpit?workspace=:workspaceId"
+    : "/api/cockpit";
   const dashboardEndpoint = hostMode
     ? "/api/dashboard?workspace=:workspaceId"
     : "/api/dashboard";
@@ -1402,14 +1406,14 @@ export function nexusDashboardEmbeddingContract(options: {
       },
       workspaceSummary: {
         field: options.scope === "host" ? "workspaces[]" : "summary",
-        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        endpoint: options.scope === "host" ? "/api/host" : cockpitEndpoint,
         owner: "dev-nexus",
         defaultPayload: true,
         action: "read",
       },
       selectedWorkspaceSnapshot: {
         field: "project",
-        endpoint: dashboardEndpoint,
+        endpoint: cockpitEndpoint,
         owner: "dev-nexus",
         defaultPayload: options.scope !== "host",
         action: "read",
@@ -1425,14 +1429,14 @@ export function nexusDashboardEmbeddingContract(options: {
         field: options.scope === "host"
           ? "actionQueue[].providerAction"
           : "actions",
-        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        endpoint: options.scope === "host" ? "/api/host" : cockpitEndpoint,
         owner: "provider",
         defaultPayload: true,
         action: "open-provider",
       },
       plugins: {
         field: options.scope === "host" ? "workspaces[].pluginCount" : "plugins",
-        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        endpoint: options.scope === "host" ? "/api/host" : cockpitEndpoint,
         owner: "dev-nexus",
         defaultPayload: true,
         action: "read",
@@ -1441,7 +1445,7 @@ export function nexusDashboardEmbeddingContract(options: {
         field: options.scope === "host"
           ? "workspaces[].needsDecisionCount"
           : "threads.records",
-        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        endpoint: options.scope === "host" ? "/api/host" : cockpitEndpoint,
         owner: "assistant-provider",
         defaultPayload: true,
         action: "start-chat",
@@ -1450,7 +1454,7 @@ export function nexusDashboardEmbeddingContract(options: {
         field: options.scope === "host"
           ? "workspaces[].eligibleWorkCount"
           : "trackedWork",
-        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        endpoint: options.scope === "host" ? "/api/host" : cockpitEndpoint,
         owner: "dev-nexus",
         defaultPayload: true,
         action: "read",
@@ -1462,6 +1466,7 @@ export function nexusDashboardEmbeddingContract(options: {
     },
     routes: {
       host: "/api/host",
+      cockpit: cockpitEndpoint,
       dashboard: dashboardEndpoint,
       diagnostics: "/api/diagnostics",
       projects: "/api/projects",
@@ -1475,8 +1480,8 @@ export function nexusDashboardEmbeddingContract(options: {
         ? "/api/codex/thread?workspace=:workspaceId"
         : "/api/codex/thread",
       threadResolution: hostMode
-        ? "/api/dashboard/thread-action?workspace=:workspaceId"
-        : "/api/dashboard/thread-action",
+        ? "/api/cockpit/thread-action?workspace=:workspaceId"
+        : "/api/cockpit/thread-action",
     },
   };
 }

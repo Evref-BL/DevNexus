@@ -2,7 +2,8 @@
 import { buildWriteHistoryLayout } from "../../dashboard/nexusDashboardHistoryLayout.js";
 
 const defaultRefreshMs = 15000;
-const themeStorageKey = 'dev-nexus-dashboard-theme';
+const themeStorageKey = 'dev-nexus-cockpit-theme';
+const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
 const styles = `
 :root { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; color: var(--dn-text); background: var(--dn-bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-synthesis: none; }
 :root[data-dev-nexus-theme='dark'] { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; }
@@ -251,21 +252,21 @@ button, input, select { font: inherit; }
 `;
 
 export async function fetchDevNexusDashboard(baseUrl = '', workspaceId = '') {
-  const response = await fetch(`${baseUrl}/api/dashboard${workspaceQuery(workspaceId)}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Dashboard API returned ${response.status}`);
+  const response = await fetch(`${baseUrl}/api/cockpit${workspaceQuery(workspaceId)}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Cockpit API returned ${response.status}`);
   return response.json();
 }
 
 export async function fetchDevNexusDashboardShell(baseUrl = '', workspaceId = '') {
-  const response = await fetch(`${baseUrl}/api/dashboard/shell${workspaceQuery(workspaceId)}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Dashboard shell API returned ${response.status}`);
+  const response = await fetch(`${baseUrl}/api/cockpit/shell${workspaceQuery(workspaceId)}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Cockpit shell API returned ${response.status}`);
   return response.json();
 }
 
 export async function fetchDevNexusDashboardSection(baseUrl = '', workspaceId = '', section = '') {
   const query = `${workspaceQuery(workspaceId)}${workspaceQuery(workspaceId) ? '&' : '?'}section=${encodeURIComponent(section)}`;
-  const response = await fetch(`${baseUrl}/api/dashboard/section${query}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Dashboard section API returned ${response.status}`);
+  const response = await fetch(`${baseUrl}/api/cockpit/section${query}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Cockpit section API returned ${response.status}`);
   return response.json();
 }
 
@@ -503,9 +504,9 @@ export function mountDevNexusDashboard(root, options = {}) {
 }
 
 function injectStyles() {
-  if (document.getElementById('dev-nexus-dashboard-styles')) return;
+  if (document.getElementById('dev-nexus-cockpit-styles')) return;
   const style = document.createElement('style');
-  style.id = 'dev-nexus-dashboard-styles';
+  style.id = 'dev-nexus-cockpit-styles';
   style.textContent = styles;
   document.head.appendChild(style);
 }
@@ -899,7 +900,7 @@ function bindLocalActions(container, baseUrl = '', actionToken = '', workspaceId
       try {
         const headers = { 'content-type': 'application/json' };
         if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;
-        const response = await fetch(`${baseUrl}/api/dashboard/thread-action${workspaceQuery(workspaceId)}`, {
+        const response = await fetch(`${baseUrl}/api/cockpit/thread-action${workspaceQuery(workspaceId)}`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ action, threadId }),
@@ -2014,7 +2015,10 @@ function applyThemePreference(mode) {
 function readStoredThemeMode() {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return 'system';
-    return normalizeThemeMode(window.localStorage.getItem(themeStorageKey));
+    return normalizeThemeMode(
+      window.localStorage.getItem(themeStorageKey) ??
+      window.localStorage.getItem(legacyThemeStorageKey),
+    );
   } catch {
     return 'system';
   }
@@ -2024,7 +2028,7 @@ function writeStoredThemeMode(mode) {
   try {
     if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem(themeStorageKey, normalizeThemeMode(mode));
   } catch {
-    // Storage may be disabled for embedded dashboards.
+    // Storage may be disabled for embedded cockpits.
   }
 }
 
@@ -2050,7 +2054,7 @@ function writeWorkspaceIdToLocation(workspaceId) {
     else url.searchParams.delete('workspace');
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   } catch {
-    // Embedded dashboards may not expose a mutable location.
+    // Embedded cockpits may not expose a mutable location.
   }
 }
 

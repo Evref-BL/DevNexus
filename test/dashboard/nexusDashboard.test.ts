@@ -1301,7 +1301,7 @@ describe("nexus dashboard", () => {
             field: "workspaces[]",
           },
           selectedWorkspaceSnapshot: {
-            endpoint: "/api/dashboard?workspace=:workspaceId",
+            endpoint: "/api/cockpit?workspace=:workspaceId",
           },
           actionQueue: {
             field: "actionQueue",
@@ -1481,7 +1481,7 @@ describe("nexus dashboard", () => {
   it("renders a client module with explicit light and dark mode controls", () => {
     const module = renderNexusDashboardClientModule();
 
-    expect(module).toContain("dev-nexus-dashboard-theme");
+    expect(module).toContain("dev-nexus-cockpit-theme");
     expect(module).toContain("data-dev-nexus-theme");
     expect(module).toContain("data-theme-mode=\"system\"");
     expect(module).toContain("data-theme-mode=\"light\"");
@@ -1548,7 +1548,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderDisabledAction");
     expect(module).toContain("dn-policy-action");
     expect(module).toContain("data-thread-action");
-    expect(module).toContain("/api/dashboard/thread-action");
+    expect(module).toContain("/api/cockpit/thread-action");
     expect(module).toContain("Needs plugin enable policy");
     expect(module).toContain("Local plugin candidates copy a refresh command");
     expect(module).toContain("data-copy-text");
@@ -3806,7 +3806,7 @@ describe("nexus dashboard", () => {
         /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
       )?.[1];
       expect(actionToken).toBeTruthy();
-      const before = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const before = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
       expect(before.threads.records).toEqual(
@@ -3818,7 +3818,7 @@ describe("nexus dashboard", () => {
         ]),
       );
 
-      const response = await fetch(`${server.url}api/dashboard/thread-action`, {
+      const response = await fetch(`${server.url}api/cockpit/thread-action`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -3842,7 +3842,7 @@ describe("nexus dashboard", () => {
       });
       expect(fs.existsSync(worktreePath)).toBe(true);
 
-      const after = await fetch(`${server.url}api/dashboard`).then((nextResponse) =>
+      const after = await fetch(`${server.url}api/cockpit`).then((nextResponse) =>
         nextResponse.json(),
       );
       expect(
@@ -3909,7 +3909,7 @@ describe("nexus dashboard", () => {
         `${server.url}api/host?workspace=server-registered`,
       ).then((response) => response.json());
       const selectedDashboard = await fetch(
-        `${server.url}api/dashboard?workspace=server-registered`,
+        `${server.url}api/cockpit?workspace=server-registered`,
       ).then((response) => response.json());
       const selectedDiagnostics = await fetch(
         `${server.url}api/diagnostics?workspace=server-registered`,
@@ -3921,7 +3921,7 @@ describe("nexus dashboard", () => {
         `${server.url}api/events?workspace=server-registered`,
       ).then((response) => response.json());
       const missingResponse = await fetch(
-        `${server.url}api/dashboard?workspace=missing-workspace`,
+        `${server.url}api/cockpit?workspace=missing-workspace`,
       );
 
       expect(host).toMatchObject({
@@ -4033,7 +4033,7 @@ describe("nexus dashboard", () => {
     });
 
     try {
-      const first = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const first = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
       expect(first.project.id).toBe("dashboard-demo");
@@ -4050,7 +4050,7 @@ describe("nexus dashboard", () => {
       const events = await fetch(`${server.url}api/events`).then((response) =>
         response.json(),
       );
-      const second = await fetch(`${server.url}api/dashboard`).then((response) =>
+      const second = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
       );
 
@@ -4243,7 +4243,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard?workspace=selected-current`,
+        `${server.url}api/cockpit?workspace=selected-current`,
       );
       const payload = await response.json();
 
@@ -4294,7 +4294,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/shell?workspace=workspace-shell`,
+        `${server.url}api/cockpit/shell?workspace=workspace-shell`,
       );
       const payload = await response.json();
 
@@ -4363,11 +4363,11 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=workspace-section&section=plugins`,
+        `${server.url}api/cockpit/section?workspace=workspace-section&section=plugins`,
       );
       const payload = await response.json();
       const invalidResponse = await fetch(
-        `${server.url}api/dashboard/section?workspace=workspace-section&section=unknown`,
+        `${server.url}api/cockpit/section?workspace=workspace-section&section=unknown`,
       );
 
       expect(response.status).toBe(200);
@@ -4440,7 +4440,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=tracked-local&section=tracked-work`,
+        `${server.url}api/cockpit/section?workspace=tracked-local&section=tracked-work`,
       );
       const payload = await response.json();
 
@@ -4526,7 +4526,7 @@ describe("nexus dashboard", () => {
 
     try {
       const response = await fetch(
-        `${server.url}api/dashboard/section?workspace=thread-local&section=threads`,
+        `${server.url}api/cockpit/section?workspace=thread-local&section=threads`,
       );
       const payload = await response.json();
 
@@ -4591,7 +4591,7 @@ describe("nexus dashboard", () => {
       const host = await fetch(`${server.url}api/host`).then((response) =>
         response.json(),
       );
-      const workspaceResponse = await fetch(`${server.url}api/dashboard`);
+      const workspaceResponse = await fetch(`${server.url}api/cockpit`);
 
       expect(server.projectRoot).toBeNull();
       expect(host).toMatchObject({

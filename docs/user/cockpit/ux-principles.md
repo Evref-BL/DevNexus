@@ -1,4 +1,4 @@
-# Dashboard UX Principles
+# Cockpit UX Principles
 
 Here, "richer" means stronger grouping, clearer actions, better links, and more
 useful details on request. It does not mean longer default text.
@@ -46,7 +46,7 @@ useful details on request. It does not mean longer default text.
 6. Work history should show shape and movement, not every field.
 7. Threads are first-class work artifacts.
 8. Plugins are part of the cockpit.
-9. Diagnostics are a mode, not the default dashboard.
+9. Diagnostics are a mode, not the default cockpit.
 
 ## Anti-Patterns
 

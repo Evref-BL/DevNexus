@@ -92,23 +92,23 @@ These JSON commands are compact by default. Use `--full --json` only when you
 need raw workspace config, full ledgers, target-state markdown, or complete
 handoff details for diagnostics.
 
-## Dashboard Cockpit
+## DevNexus Cockpit
 
-The dashboard commands expose a local cockpit for humans and for GUI hosts that
+The cockpit commands expose a local cockpit for humans and for GUI hosts that
 want to embed DevNexus project pages:
 
 ```bash
-dev-nexus dashboard serve
-dev-nexus dashboard serve <workspace-root>
-dev-nexus dashboard snapshot <workspace-root> --json
-dev-nexus dashboard weave <workspace-root> --json
+dev-nexus cockpit serve
+dev-nexus cockpit serve <workspace-root>
+dev-nexus cockpit snapshot <workspace-root> --json
+dev-nexus cockpit weave <workspace-root> --json
 ```
 
-`dashboard serve` opens the host cockpit. Passing a workspace root starts the
-same cockpit with that workspace selected. `dashboard snapshot` and `dashboard
+`cockpit serve` opens the host cockpit. Passing a workspace root starts the
+same cockpit with that workspace selected. `cockpit snapshot` and `cockpit
 weave` expose JSON for embedders and automation.
 
-See [Dashboard cockpit](dashboard/index.md) for the UI model, host cockpit,
+See [DevNexus cockpit](cockpit/index.md) for the UI model, host cockpit,
 workspace drill-down, actions, plugins, and data contracts.
 
 Then record the work it selected:

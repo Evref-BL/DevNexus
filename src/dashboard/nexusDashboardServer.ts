@@ -661,7 +661,11 @@ async function routeDashboardRequest(
     );
     return;
   }
-  if (method === "POST" && url.pathname === "/api/dashboard/thread-action") {
+  if (
+    method === "POST" &&
+    (url.pathname === "/api/cockpit/thread-action" ||
+      url.pathname === "/api/dashboard/thread-action")
+  ) {
     await routeDashboardThreadAction(
       request,
       response,
@@ -706,7 +710,10 @@ async function routeDashboardRequest(
       sendBinary(response, icon.contentType, icon.body);
       return;
     }
-    if (url.pathname === "/api/dashboard/shell") {
+    if (
+      url.pathname === "/api/cockpit/shell" ||
+      url.pathname === "/api/dashboard/shell"
+    ) {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
         workspaceIdFromUrl(url),
@@ -720,7 +727,10 @@ async function routeDashboardRequest(
       sendJson(response, dashboardWorkspacePayload(snapshot, selection));
       return;
     }
-    if (url.pathname === "/api/dashboard/section") {
+    if (
+      url.pathname === "/api/cockpit/section" ||
+      url.pathname === "/api/dashboard/section"
+    ) {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
         workspaceIdFromUrl(url),
@@ -741,7 +751,11 @@ async function routeDashboardRequest(
       );
       return;
     }
-    if (url.pathname === "/api/dashboard" || url.pathname === "/api/snapshot") {
+    if (
+      url.pathname === "/api/cockpit" ||
+      url.pathname === "/api/dashboard" ||
+      url.pathname === "/api/snapshot"
+    ) {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
         workspaceIdFromUrl(url),

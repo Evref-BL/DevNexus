@@ -1,6 +1,6 @@
-# Dashboard History Widget
+# Cockpit History Widget
 
-The dashboard history widget is a reusable history graph. Its first source is
+The cockpit history widget is a reusable history graph. Its first source is
 Git, but the model should not be named or shaped around Git alone.
 
 ## Purpose

@@ -747,6 +747,7 @@ interface ParsedAutomationEligibleWorkCommand {
 
 interface ParsedDashboardCommand {
   projectRoot?: string;
+  surfaceName?: "cockpit" | "dashboard";
   host?: string;
   port?: number;
   homePath?: string;
@@ -988,7 +989,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1015,6 +1016,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
   "quick-fix": handleQuickFixCommand,
   "work-item": handleWorkItemCommand,
   "ci-failure-intake": handleCiFailureIntakeCommand,
+  cockpit: handleDashboardCommand,
   dashboard: handleDashboardCommand,
   automation: handleAutomationCommand,
   "mcp-stdio": async () => {
@@ -1032,10 +1034,12 @@ async function handleDashboardCommand(
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
   const command = argv[1];
+  const surfaceName = argv[0] === "cockpit" ? "cockpit" : "dashboard";
   if (command === "snapshot") {
-    const parsed = parseDashboardCommand(argv, "dashboard snapshot", {
+    const parsed = parseDashboardCommand(argv, `${surfaceName} snapshot`, {
       requireProjectRoot: true,
     });
+    parsed.surfaceName = surfaceName;
     const snapshot = await buildNexusDashboardSnapshot({
       projectRoot: parsed.projectRoot!,
       homePath: parsed.homePath,
@@ -1052,9 +1056,10 @@ async function handleDashboardCommand(
   }
 
   if (command === "weave") {
-    const parsed = parseDashboardCommand(argv, "dashboard weave", {
+    const parsed = parseDashboardCommand(argv, `${surfaceName} weave`, {
       requireProjectRoot: true,
     });
+    parsed.surfaceName = surfaceName;
     const snapshot = await buildNexusDashboardSnapshot({
       projectRoot: parsed.projectRoot!,
       homePath: parsed.homePath,
@@ -1071,9 +1076,10 @@ async function handleDashboardCommand(
   }
 
   if (command === "serve") {
-    const parsed = parseDashboardCommand(argv, "dashboard serve", {
+    const parsed = parseDashboardCommand(argv, `${surfaceName} serve`, {
       requireProjectRoot: false,
     });
+    parsed.surfaceName = surfaceName;
     const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
     const currentProjectRoot =
       parsed.projectRoot ?? discoverDashboardCurrentProjectRoot(process.cwd());
@@ -1096,7 +1102,7 @@ async function handleDashboardCommand(
     return 0;
   }
 
-  throw new Error("dashboard requires snapshot, weave, or serve");
+  throw new Error(`${surfaceName} requires snapshot, weave, or serve`);
 }
 
 async function waitForDashboardServer(
@@ -7363,13 +7369,14 @@ function printDashboardSnapshotResult(
   parsed: ParsedDashboardCommand,
   stdout: TextWriter,
 ): void {
+  const surfaceName = parsed.surfaceName ?? "dashboard";
   const payload = { ok: true, snapshot };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
   }
 
-  writeLine(stdout, `DevNexus dashboard snapshot: ${snapshot.project.name}`);
+  writeLine(stdout, `DevNexus ${surfaceName} snapshot: ${snapshot.project.name}`);
   writeLine(stdout, `  Root: ${snapshot.project.root}`);
   writeLine(stdout, `  Summary: ${snapshot.summary}`);
   writeLine(stdout, `  Components: ${snapshot.components.length}`);
@@ -7389,13 +7396,14 @@ function printDashboardWeaveResult(
   parsed: ParsedDashboardCommand,
   stdout: TextWriter,
 ): void {
+  const surfaceName = parsed.surfaceName ?? "dashboard";
   const payload = { ok: true, weave: snapshot.weave };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
   }
 
-  writeLine(stdout, `DevNexus dashboard weave: ${snapshot.project.name}`);
+  writeLine(stdout, `DevNexus ${surfaceName} weave: ${snapshot.project.name}`);
   writeLine(stdout, `  Lanes: ${snapshot.weave.lanes.length}`);
   writeLine(stdout, `  Nodes: ${snapshot.weave.nodes.length}`);
   writeLine(stdout, `  Edges: ${snapshot.weave.edges.length}`);
@@ -7406,22 +7414,24 @@ function printDashboardServeResult(
   parsed: ParsedDashboardCommand,
   stdout: TextWriter,
 ): void {
+  const surfaceName = parsed.surfaceName ?? "dashboard";
+  const surface = {
+    projectRoot: handle.projectRoot,
+    scope: handle.projectRoot ? "workspace" : "host",
+    host: handle.host,
+    port: handle.port,
+    url: handle.url,
+  };
   const payload = {
     ok: true,
-    dashboard: {
-      projectRoot: handle.projectRoot,
-      scope: handle.projectRoot ? "workspace" : "host",
-      host: handle.host,
-      port: handle.port,
-      url: handle.url,
-    },
+    [surfaceName]: surface,
   };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
   }
 
-  writeLine(stdout, "DevNexus dashboard server started.");
+  writeLine(stdout, `DevNexus ${surfaceName} server started.`);
   if (handle.projectRoot) {
     writeLine(stdout, `  Project root: ${handle.projectRoot}`);
   } else {

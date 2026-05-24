@@ -32,14 +32,14 @@ Provider buttons should show:
 Example labels:
 
 - `GitHub #42: Fix setup fallback`
-- `GitHub PR #66: Dashboard cockpit`
+- `GitHub PR #66: DevNexus cockpit`
 - `Repository: DevNexus`
 
 Provider actions are read-only navigation unless a separate provider mutation
 policy explicitly allows posting, approving, merging, or cleanup.
 
 Archive and forget are local cockpit decisions. They hide a thread from active
-attention by writing local dashboard state; they must not delete worktrees,
+attention by writing local cockpit state; they must not delete worktrees,
 branches, notes, or provider records.
 
 Plugin enable and plugin setup controls should be visible but disabled until a

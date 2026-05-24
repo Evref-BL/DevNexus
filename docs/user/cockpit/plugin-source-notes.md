@@ -1,7 +1,7 @@
 # Plugin source notes
 
 Status: parked. These notes record marketplace research for later; they are
-not active dashboard scope.
+not active cockpit scope.
 
 ## What mature plugin ecosystems do
 
