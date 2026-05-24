@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main, usage } from "../../src/cli.js";
 import {
+  createOrRefreshNexusWorktreeLease,
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
@@ -5404,6 +5405,147 @@ describe("dev-nexus cli", () => {
         ],
       },
     });
+  });
+
+  it("executes safe coordination cleanup through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-cleanup-execute-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "merged");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      components: [
+        {
+          id: "primary",
+          name: "Primary",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/primary.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          worktreesRoot: "worktrees/primary",
+          relationships: [],
+        },
+      ],
+    }));
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "primary",
+      branchName: "codex/primary/merged",
+      worktreePath,
+      status: "merged",
+      gitFacts: { headCommit: "branch123", dirty: false, pushed: true },
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      const joined = argsArray.join(" ");
+      if (joined === "worktree list --porcelain") {
+        return {
+          args: argsArray,
+          stdout: [
+            `worktree ${sourceRoot}`,
+            "HEAD target123",
+            "branch refs/heads/main",
+            "",
+            `worktree ${worktreePath}`,
+            "HEAD branch123",
+            "branch refs/heads/codex/primary/merged",
+            "",
+          ].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
+        return {
+          args: argsArray,
+          stdout: "codex/primary/merged\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-parse --verify main") {
+        return { args: argsArray, stdout: "target123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse codex/primary/merged") {
+        return { args: argsArray, stdout: "branch123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "merge-base --is-ancestor codex/primary/merged main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (
+        joined ===
+        "rev-parse --abbrev-ref --symbolic-full-name codex/primary/merged@{u}"
+      ) {
+        return {
+          args: argsArray,
+          stdout: "origin/codex/primary/merged\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        joined ===
+        "rev-list --left-right --count codex/primary/merged...origin/codex/primary/merged"
+      ) {
+        return { args: argsArray, stdout: "0\t0\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --is-inside-work-tree") {
+        return { args: argsArray, stdout: "true\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "symbolic-ref --short HEAD") {
+        return {
+          args: argsArray,
+          stdout: cwd === worktreePath ? "codex/primary/merged\n" : "",
+          stderr: "",
+          exitCode: cwd === worktreePath ? 0 : 1,
+        };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+    const output = captureOutput();
+
+    await main(
+      [
+        "coordination",
+        "cleanup-execute",
+        projectRoot,
+        "--component",
+        "primary",
+        "--candidate",
+        "component:primary:worktree:merged",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-18T10:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      result: {
+        mutatesSource: true,
+        actions: {
+          removedWorktree: worktreePath,
+          deletedBranch: "codex/primary/merged",
+          updatedLeaseIds: [lease.id],
+        },
+      },
+    });
+    expect(calls.filter(({ args }) =>
+      args[0] === "branch" ||
+      (args[0] === "worktree" && args[1] === "remove"),
+    )).toEqual([
+      { cwd: sourceRoot, args: ["worktree", "remove", worktreePath] },
+      { cwd: sourceRoot, args: ["branch", "-d", "codex/primary/merged"] },
+    ]);
   });
 
   it("returns actionable JSON when coordination integration cannot parse a local tracker store", async () => {

@@ -61,12 +61,29 @@ export interface PrepareGitWorktreeResult {
 export interface RemoveGitWorktreeOptions {
   sourceRoot: string;
   worktreePath: string;
+  force?: boolean;
   gitRunner?: GitRunner;
 }
 
 export interface RemoveGitWorktreeResult {
   sourceRoot: string;
   worktreePath: string;
+  git: {
+    commands: GitCommandResult[];
+  };
+}
+
+export interface DeleteGitBranchOptions {
+  sourceRoot: string;
+  branchName: string;
+  force?: boolean;
+  gitRunner?: GitRunner;
+}
+
+export interface DeleteGitBranchResult {
+  sourceRoot: string;
+  branchName: string;
+  force: boolean;
   git: {
     commands: GitCommandResult[];
   };
@@ -168,13 +185,38 @@ export function removeGitWorktree(
   runGitCommand(
     gitRunner,
     commands,
-    ["worktree", "remove", worktreePath],
+    ["worktree", "remove", ...(options.force ? ["--force"] : []), worktreePath],
     sourceRoot,
   );
 
   return {
     sourceRoot,
     worktreePath,
+    git: {
+      commands,
+    },
+  };
+}
+
+export function deleteGitBranch(
+  options: DeleteGitBranchOptions,
+): DeleteGitBranchResult {
+  const sourceRoot = path.resolve(options.sourceRoot);
+  const branchName = normalizeBranchName(options.branchName);
+  const force = options.force === true;
+  const gitRunner = options.gitRunner ?? defaultGitRunner;
+  const commands: GitCommandResult[] = [];
+  runGitCommand(
+    gitRunner,
+    commands,
+    ["branch", force ? "-D" : "-d", branchName],
+    sourceRoot,
+  );
+
+  return {
+    sourceRoot,
+    branchName,
+    force,
     git: {
       commands,
     },

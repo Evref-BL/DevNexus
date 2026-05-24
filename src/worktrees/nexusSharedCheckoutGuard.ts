@@ -342,6 +342,14 @@ function mutationAllowed(
       classification === "generated_project_meta_worktree"
     );
   }
+  if (mutationClass === "cleanup_execution") {
+    return [
+      "shared_project_checkout",
+      "shared_component_checkout",
+      "generated_component_worktree",
+      "generated_project_meta_worktree",
+    ].includes(classification);
+  }
   if (classification === "generated_component_worktree") {
     return mutationClass === "component_source";
   }
@@ -352,7 +360,6 @@ function mutationAllowed(
       "project_state",
       "skill_mcp_projection",
       "coordination_record",
-      "cleanup_execution",
       "provider_sync",
     ].includes(mutationClass);
   }
