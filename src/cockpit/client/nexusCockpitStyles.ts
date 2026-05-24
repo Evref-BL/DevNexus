@@ -148,9 +148,10 @@ button, input, select { font: inherit; }
 .dn-git-history-row.selected { background: var(--dn-control-active); }
 .dn-git-subject { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dn-git-subject strong { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.86rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
-.dn-git-refs { display: inline-flex; flex: 0 1 auto; gap: 4px; max-width: 42%; overflow: hidden; }
+.dn-git-component { flex: 0 1 auto; max-width: 150px; overflow: hidden; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--dn-active) 42%, var(--dn-border)); border-radius: 6px; color: var(--dn-active); background: var(--dn-surface-raised); font-size: 0.68rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-refs { display: inline-flex; flex: 0 1 auto; gap: 4px; max-width: 32%; overflow: hidden; }
 .dn-git-ref { max-width: 150px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-strong); border-left: 5px solid var(--dn-branch-color, var(--dn-active)); border-radius: 6px; color: var(--dn-pill-text); background: var(--dn-surface-raised); font-size: 0.68rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
-.dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 38%; overflow: hidden; }
+.dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 30%; overflow: hidden; }
 .dn-git-badge { max-width: 130px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.66rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-badge.tone-good { border-color: color-mix(in srgb, var(--dn-good) 48%, var(--dn-border)); color: var(--dn-good); } .dn-git-badge.tone-active { border-color: color-mix(in srgb, var(--dn-active) 48%, var(--dn-border)); color: var(--dn-active); } .dn-git-badge.tone-warn { border-color: color-mix(in srgb, var(--dn-warn) 48%, var(--dn-border)); color: var(--dn-warn-soft); } .dn-git-badge.tone-danger { border-color: color-mix(in srgb, var(--dn-danger) 54%, var(--dn-border)); color: var(--dn-danger-soft); }
 .dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }

@@ -88,6 +88,7 @@ import type {
   NexusDashboardGitHistoryRefKind,
   NexusDashboardGitHistoryRepository,
   NexusDashboardGitHistorySummary,
+  NexusDashboardGitHistoryComponent,
 } from "./nexusDashboardGitHistory.js";
 import type {
   NexusDashboardSignalTone,
@@ -260,12 +261,19 @@ export async function buildNexusDashboardSnapshot(
   const componentSummaries = components.map((component) =>
     summarizeComponent(component, gitRunner),
   );
+  const workspaceHistory = summarizeWorkspaceGitHistoryComponent(
+    projectRoot,
+    projectConfig,
+    componentSummaries,
+    gitRunner,
+  );
   const history = summarizeGitHistory({
     components: componentSummaries,
     defaultBranch: projectConfig.repo.defaultBranch,
     gitRunner,
     branches: options.historyBranches,
     maxCommits: options.historyMaxCommits,
+    workspace: workspaceHistory,
   });
   const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
   const cycles = readTargetCycles(projectRoot, projectConfig);
@@ -445,12 +453,19 @@ export async function buildNexusDashboardWorkspaceSection(
     const componentSummaries = components.map((component) =>
       summarizeComponent(component, gitRunner),
     );
+    const workspaceHistory = summarizeWorkspaceGitHistoryComponent(
+      projectRoot,
+      projectConfig,
+      componentSummaries,
+      gitRunner,
+    );
     const history = summarizeGitHistory({
       components: componentSummaries,
       defaultBranch: projectConfig.repo.defaultBranch,
       gitRunner,
       branches: options.historyBranches,
       maxCommits: options.historyMaxCommits,
+      workspace: workspaceHistory,
     });
     return {
       version: 1,
@@ -1835,6 +1850,64 @@ function summarizeComponent(
       ? collectDashboardGitState(component.sourceRoot, gitRunner)
       : null,
   };
+}
+
+function summarizeWorkspaceGitHistoryComponent(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  components: NexusDashboardComponentSummary[],
+  gitRunner: GitRunner,
+): NexusDashboardGitHistoryComponent | null {
+  const git = collectDashboardGitState(projectRoot, gitRunner);
+  if (!git) return null;
+  const primaryComponent = components.find((component) => component.role === "primary");
+  if (
+    primaryComponent?.remoteUrl &&
+    projectConfig.repo.remoteUrl &&
+    sameGitRemoteIdentity(primaryComponent.remoteUrl, projectConfig.repo.remoteUrl)
+  ) {
+    return null;
+  }
+  if (components.some((component) =>
+    component.git?.repositoryPath &&
+    samePath(component.git.repositoryPath, git.repositoryPath)
+  )) {
+    return null;
+  }
+  return {
+    id: workspaceGitHistoryComponentId(components),
+    name: "Workspace",
+    sourceRoot: projectRoot,
+    sourceRootExists: true,
+    git: {
+      repositoryPath: git.repositoryPath,
+      headCommit: git.headCommit,
+    },
+  };
+}
+
+function workspaceGitHistoryComponentId(
+  components: NexusDashboardComponentSummary[],
+): string {
+  const componentIds = new Set(components.map((component) => component.id));
+  if (!componentIds.has("workspace")) return "workspace";
+  let index = 2;
+  while (componentIds.has(`workspace-${index}`)) index += 1;
+  return `workspace-${index}`;
+}
+
+function sameGitRemoteIdentity(left: string, right: string): boolean {
+  return normalizeGitRemoteIdentity(left) === normalizeGitRemoteIdentity(right);
+}
+
+function normalizeGitRemoteIdentity(remoteUrl: string): string {
+  return remoteUrl
+    .trim()
+    .toLowerCase()
+    .replace(/^git@([^:]+):/u, "$1/")
+    .replace(/^ssh:\/\/git@/u, "")
+    .replace(/^https?:\/\//u, "")
+    .replace(/\.git$/u, "");
 }
 
 function summarizeComponentShell(

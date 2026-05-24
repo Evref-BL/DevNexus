@@ -56,7 +56,10 @@ import {
 } from "../providers/nexusProviderFreshness.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "../work-items/nexusEligibleWorkSummary.js";
-import { renderNexusCockpitBrowserModule } from "./nexusDashboardServerAssets.js";
+import {
+  nexusCockpitBrowserModuleAssetRevision,
+  renderNexusCockpitBrowserModule,
+} from "./nexusDashboardServerAssets.js";
 
 export {
   auditNexusDashboardClientVisuals,
@@ -288,7 +291,7 @@ export function renderNexusDashboardHtml(options: {
   actionToken?: string;
 } = {}): string {
   const title = escapeHtml(options.title ?? "DevNexus Cockpit");
-  const modulePath = escapeHtml(options.modulePath ?? "/assets/dev-nexus-cockpit.js");
+  const modulePath = escapeHtml(options.modulePath ?? defaultNexusCockpitModulePath());
   const mountOptions = options.actionToken
     ? `{ actionToken: ${safeJsonString(options.actionToken)} }`
     : "{}";
@@ -306,6 +309,10 @@ export function renderNexusDashboardHtml(options: {
     "</body>",
     "</html>",
   ].join("\n");
+}
+
+function defaultNexusCockpitModulePath(): string {
+  return `/assets/dev-nexus-cockpit.js?v=${encodeURIComponent(nexusCockpitBrowserModuleAssetRevision())}`;
 }
 
 async function routeDashboardRequest(

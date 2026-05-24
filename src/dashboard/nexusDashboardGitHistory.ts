@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 
 export type NexusDashboardGitHistoryRefKind =
@@ -76,8 +77,13 @@ export function summarizeGitHistory(options: {
   gitRunner: GitRunner;
   branches?: string[];
   maxCommits?: number;
+  workspace?: NexusDashboardGitHistoryComponent | null;
 }): NexusDashboardGitHistorySummary {
-  const repositories = options.components
+  const historyComponents = [
+    ...options.components,
+    ...(options.workspace ? [options.workspace] : []),
+  ];
+  const repositories = uniqueDashboardGitHistoryRepositories(historyComponents
     .filter((component) => component.sourceRootExists && component.git?.repositoryPath)
     .map((component) =>
       collectDashboardGitHistory(component, options.gitRunner, {
@@ -88,7 +94,7 @@ export function summarizeGitHistory(options: {
     )
     .filter((repository): repository is NexusDashboardGitHistoryRepository =>
       repository !== null,
-    );
+    ));
   const totalCommitCount = repositories.reduce(
     (total, repository) => total + repository.commits.length,
     0,
@@ -99,6 +105,29 @@ export function summarizeGitHistory(options: {
     incomplete: repositories.some((repository) => repository.warnings.length > 0),
     detail: repositories.flatMap((repository) => repository.warnings)[0] ?? null,
   };
+}
+
+function uniqueDashboardGitHistoryRepositories(
+  repositories: NexusDashboardGitHistoryRepository[],
+): NexusDashboardGitHistoryRepository[] {
+  const unique: NexusDashboardGitHistoryRepository[] = [];
+  for (const repository of repositories) {
+    if (unique.some((candidate) =>
+      sameDashboardGitHistoryPath(candidate.repositoryPath, repository.repositoryPath)
+    )) {
+      continue;
+    }
+    unique.push(repository);
+  }
+  return unique;
+}
+
+function sameDashboardGitHistoryPath(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === "win32"
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
 }
 
 function collectDashboardGitHistory(

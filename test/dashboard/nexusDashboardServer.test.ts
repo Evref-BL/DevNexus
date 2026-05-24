@@ -14,6 +14,7 @@ import {
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
   renderNexusDashboardClientModule,
+  renderNexusDashboardHtml,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
@@ -44,6 +45,14 @@ import {
 afterEach(cleanupDashboardTestTempDirs);
 
 describe("nexus dashboard server", () => {
+  it("imports the cockpit module through a revisioned asset URL", () => {
+    const html = renderNexusDashboardHtml();
+
+    expect(html).toMatch(
+      /import \{ mountDevNexusCockpit \} from "\/assets\/dev-nexus-cockpit\.js\?v=[^"]+"/u,
+    );
+  });
+
   it("serves a Codex thread action endpoint for dashboard prompts", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-server-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

@@ -43,6 +43,7 @@ import {
   gitHistoryRows,
   gitHistorySelectId,
   isGitHistorySelection,
+  normalizeGitHistoryFilter,
   renderGitHistory,
   threadsForGitBranches,
   trackedWorkForGitBranches,
@@ -188,9 +189,8 @@ export function mountDevNexusDashboard(root, options = {}) {
     tooltipController.hide();
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
-    bindSelectionControls(root, setSelectedId);
+    bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
     bindHostSignalControls(root, setHostFocus);
-    bindGitHistoryFilterControls(root, setGitHistoryFilter);
     bindGitHistoryColumnResizers(root);
     bindWorkspaceControls(root, setWorkspaceId);
     bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));
@@ -636,14 +636,27 @@ function bindThemeControls(container, onSelect) {
   });
 }
 
-function bindSelectionControls(container, onSelect) {
-  container.querySelectorAll('[data-select-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      onSelect(button.getAttribute('data-select-id'));
-      const targetId = button.getAttribute('data-scroll-target');
-      if (targetId) scrollToDashboardSection(targetId);
-    });
+function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
+  container.addEventListener('click', (event) => {
+    const target = eventElementTarget(event.target);
+    const filterButton = target?.closest?.('[data-git-history-filter]');
+    if (filterButton && container.contains(filterButton)) {
+      event.preventDefault();
+      onGitHistoryFilter?.(filterButton.getAttribute('data-git-history-filter'));
+      return;
+    }
+    const button = target?.closest?.('[data-select-id]');
+    if (!button || !container.contains(button)) return;
+    onSelect(button.getAttribute('data-select-id'));
+    const targetId = button.getAttribute('data-scroll-target');
+    if (targetId) scrollToDashboardSection(targetId);
   });
+}
+
+function eventElementTarget(target) {
+  if (target instanceof Element) return target;
+  if (target instanceof Node) return target.parentElement;
+  return null;
 }
 
 function bindHostSignalControls(container, onSelect) {
@@ -653,12 +666,6 @@ function bindHostSignalControls(container, onSelect) {
       onSelect(focus);
       scrollToDashboardSection(hostSignalTarget(focus));
     });
-  });
-}
-
-function bindGitHistoryFilterControls(container, onSelect) {
-  container.querySelectorAll('[data-git-history-filter]').forEach((button) => {
-    button.addEventListener('click', () => onSelect(button.getAttribute('data-git-history-filter')));
   });
 }
 

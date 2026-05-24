@@ -18,14 +18,30 @@ export function renderNexusCockpitBrowserModule(): string {
   return readNexusCockpitBuiltClientModuleSource() ?? renderNexusDashboardClientModule();
 }
 
+export function nexusCockpitBrowserModuleAssetRevision(): string {
+  const candidatePath = readNexusCockpitBuiltClientModulePath();
+  if (!candidatePath) return "legacy";
+  try {
+    const stats = fs.statSync(candidatePath);
+    return `${Math.round(stats.mtimeMs)}-${stats.size}`;
+  } catch {
+    return "legacy";
+  }
+}
+
 function readNexusCockpitBuiltClientModuleSource(): string | null {
+  const candidatePath = readNexusCockpitBuiltClientModulePath();
+  return candidatePath ? fs.readFileSync(candidatePath, "utf8") : null;
+}
+
+function readNexusCockpitBuiltClientModulePath(): string | null {
   const candidates = [
     new URL("../cockpit-client/dev-nexus-cockpit.js", import.meta.url),
   ];
   for (const candidate of candidates) {
     const candidatePath = fileURLToPath(candidate);
     if (fs.existsSync(candidatePath)) {
-      return fs.readFileSync(candidatePath, "utf8");
+      return candidatePath;
     }
   }
   return null;
@@ -68,7 +84,7 @@ function standaloneNexusCockpitClientSource(source: string): string {
       `${renderNexusCockpitWorkMapClientSource()}\n\n`,
     )
     .replace(
-      /^import \{\s*featureGitBranches,\s*firstGitHistoryCommit,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*gitHistorySelectId,\s*isGitHistorySelection,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
+      /^import \{\s*featureGitBranches,\s*firstGitHistoryCommit,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*gitHistorySelectId,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitWriteHistoryClientSource()}\n\n`,
     )
     .replace(

@@ -24,12 +24,14 @@ function isGitHistorySelection(selectedId) {
 
 function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const activeFilter = normalizeGitHistoryFilter(filter);
+  const repositories = gitHistoryRepositories(snapshot);
   const graph = gitHistoryRows(snapshot, activeFilter);
   if (!graph) return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2></div><span class="dn-count">0 write events</span></div><p>No write history loaded.</p></div>`;
-  const repository = graph.repository;
-  const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
-  const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} write events. Branch filters use the loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
+  const branchCount = gitHistoryBranchNames(graph.repositories).length;
+  const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(graph.repositories.length, 'repo')} · ${countLabel(branchCount, 'branch', 'branches')}`;
+  const cappedRepositories = graph.repositories.filter((repository) => repository.moreAvailable);
+  const note = cappedRepositories.length ? `<p class="dn-git-note">Showing the newest loaded write events for ${countLabel(cappedRepositories.length, 'repo')}. Branch filters use each loaded history window.</p>` : '';
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repositories, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
 }
 
 function renderGitHistoryBoard(snapshot, graph, selectedId) {
@@ -41,18 +43,19 @@ function renderGitHistoryBoard(snapshot, graph, selectedId) {
 function normalizeGitHistoryFilter(value) {
   const text = String(value ?? '').trim();
   if (!text || text === 'all') return 'all';
+  if (text.startsWith('component:') && text.slice('component:'.length).trim()) return `component:${text.slice('component:'.length).trim()}`;
   if (text.startsWith('branch:') && text.slice('branch:'.length).trim()) return `branch:${text.slice('branch:'.length).trim()}`;
   if (text.startsWith('feature:') && text.slice('feature:'.length).trim()) return `feature:${text.slice('feature:'.length).trim()}`;
   return 'all';
 }
 
-function renderGitHistoryFilters(snapshot, repository, activeFilter) {
-  const filters = gitHistoryFilters(snapshot, repository);
+function renderGitHistoryFilters(snapshot, repositories, activeFilter) {
+  const filters = gitHistoryFilters(snapshot, repositories);
   if (filters.length <= 1) return '';
   return `<div class="dn-git-filters" aria-label="Write history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
 }
 
-function gitHistoryFilters(snapshot, repository) {
+function gitHistoryFilters(snapshot, repositories) {
   const filters = [{ id: 'all', label: 'All writes', title: 'Show the loaded project write history' }];
   const seen = new Set(filters.map((filter) => filter.id));
   const push = (id, label, title = label) => {
@@ -61,18 +64,28 @@ function gitHistoryFilters(snapshot, repository) {
     seen.add(normalized);
     filters.push({ id: normalized, label, title });
   };
-  if (repository.defaultBranch) push(`branch:${repository.defaultBranch}`, repository.defaultBranch, `Show ${repository.defaultBranch} and its loaded write ancestors`);
+  const loadedRepositories = repositories ?? [];
+  if (loadedRepositories.length > 1) {
+    for (const repository of loadedRepositories) {
+      push(`component:${repository.componentId}`, repository.componentName ?? repository.componentId, `Show ${repository.componentName ?? repository.componentId} writes`);
+    }
+  }
+  const defaultBranches = [...new Set(loadedRepositories.map((repository) => repository.defaultBranch).filter(Boolean))];
+  for (const branch of defaultBranches) push(`branch:${branch}`, branch, `Show ${branch} and its loaded write ancestors`);
   for (const feature of snapshot.features?.records ?? []) {
     const branches = featureGitBranches(feature);
     if (!branches.length) continue;
     push(`feature:${feature.id}`, feature.title, `Show write events reachable from ${feature.title}`);
   }
-  const branchNames = gitHistoryBranchNames(repository);
+  const branchNames = gitHistoryBranchNames(loadedRepositories);
   for (const branch of branchNames) push(`branch:${branch}`, compactBranchName(branch), `Show ${branch} and its loaded write ancestors`);
   return filters.slice(0, 18);
 }
 
-function gitHistoryBranchNames(repository) {
+function gitHistoryBranchNames(repositoryOrRepositories) {
+  const repositories = Array.isArray(repositoryOrRepositories)
+    ? repositoryOrRepositories
+    : [repositoryOrRepositories].filter(Boolean);
   const names = [];
   const seen = new Set();
   const remember = (name) => {
@@ -81,12 +94,14 @@ function gitHistoryBranchNames(repository) {
     seen.add(normalized);
     names.push(normalized);
   };
-  for (const commit of repository.commits ?? []) {
-    for (const ref of commit.refs ?? []) {
-      if (ref.kind === 'branch' || ref.kind === 'remote') remember(ref.name);
+  for (const repository of repositories) {
+    for (const commit of repository.commits ?? []) {
+      for (const ref of commit.refs ?? []) {
+        if (ref.kind === 'branch' || ref.kind === 'remote') remember(ref.name);
+      }
     }
+    for (const branch of repository.branchNames ?? []) remember(branch);
   }
-  for (const branch of repository.branchNames ?? []) remember(branch);
   return names;
 }
 
@@ -100,6 +115,7 @@ function normalizeGitBranchName(value) {
 
 function filteredGitHistoryCommits(snapshot, repository, filter) {
   const commits = repository.commits ?? [];
+  if (filter.startsWith('component:')) return repository.componentId === filter.slice('component:'.length) ? commits : [];
   if (filter === 'all') return commits;
   const headHashes = gitHistoryFilterHeadHashes(snapshot, repository, filter);
   if (!headHashes.size) return [];
@@ -152,21 +168,37 @@ function collectGitAncestorHashes(commits, headHashes) {
 }
 
 function gitHistoryRows(snapshot, filter = 'all') {
-  const repository = (snapshot.history?.repositories ?? []).find((candidate) => (candidate.commits ?? []).length > 0) ?? null;
-  if (!repository) return null;
-  const commits = filteredGitHistoryCommits(snapshot, repository, normalizeGitHistoryFilter(filter));
-  const commitsByHash = new Map(commits.map((commit) => [commit.hash, commit]));
+  const repositories = gitHistoryRepositories(snapshot);
+  if (!repositories.length) return null;
+  const normalizedFilter = normalizeGitHistoryFilter(filter);
+  const commitRows = repositories.flatMap((repository, repositoryIndex) =>
+    filteredGitHistoryCommits(snapshot, repository, normalizedFilter).map((commit, commitIndex) => ({
+      repository,
+      repositoryIndex,
+      commit,
+      commitIndex,
+      writeEventId: gitHistorySelectId(repository, commit),
+    })),
+  ).sort(gitHistoryCommitRowCompare);
+  const commitsByEventId = new Map(commitRows.map((row) => [row.writeEventId, row]));
   const layout = buildWriteHistoryLayout({
-    writeEvents: commits.map((commit) => ({
-      id: commit.hash,
-      parentIds: commit.parents ?? [],
-      subject: commit.subject ?? commit.shortHash ?? commit.hash,
+    writeEvents: commitRows.map((row) => ({
+      id: row.writeEventId,
+      parentIds: (row.commit.parents ?? []).map((parent) => gitHistoryWriteEventId(row.repository, parent)),
+      subject: row.commit.subject ?? row.commit.shortHash ?? row.commit.hash,
     })),
   });
   const rows = layout.nodes.map((node) => {
-    const commit = commitsByHash.get(node.writeEventId);
-    if (!commit) return null;
-    return { repository, commit, lane: node.lane, colorLane: node.colorIndex, index: node.row, selectId: gitHistorySelectId(repository, commit) };
+    const row = commitsByEventId.get(node.writeEventId);
+    if (!row) return null;
+    return {
+      repository: row.repository,
+      commit: row.commit,
+      lane: node.lane,
+      colorLane: node.colorIndex,
+      index: node.row,
+      selectId: row.writeEventId,
+    };
   }).filter(Boolean);
   const paths = layout.segments.map((segment) => ({
     colorLane: segment.colorIndex,
@@ -176,7 +208,31 @@ function gitHistoryRows(snapshot, filter = 'all') {
     toIndex: segment.toRow,
     points: segment.points.map((point) => ({ lane: point.lane, index: point.row })),
   }));
-  return { repository, rows, paths, maxLane: layout.maxRouteLane, layout };
+  const visibleRepositoryIds = new Set(commitRows.map((row) => row.repository.componentId));
+  const visibleRepositories = repositories.filter((repository) => visibleRepositoryIds.has(repository.componentId));
+  const graphRepositories = visibleRepositories.length ? visibleRepositories : repositories;
+  return { repository: graphRepositories[0], repositories: graphRepositories, rows, paths, maxLane: layout.maxRouteLane, layout };
+}
+
+function gitHistoryRepositories(snapshot) {
+  return (snapshot.history?.repositories ?? []).filter((candidate) => (candidate.commits ?? []).length > 0);
+}
+
+function gitHistoryCommitRowCompare(left, right) {
+  const leftTime = gitHistoryCommitTime(left.commit);
+  const rightTime = gitHistoryCommitTime(right.commit);
+  if (leftTime !== rightTime) return rightTime - leftTime;
+  if (left.repositoryIndex !== right.repositoryIndex) return left.repositoryIndex - right.repositoryIndex;
+  return left.commitIndex - right.commitIndex;
+}
+
+function gitHistoryCommitTime(commit) {
+  const value = Date.parse(commit.committedAt ?? '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function gitHistoryWriteEventId(repository, hash) {
+  return `history:${repository.componentId}:${hash}`;
 }
 
 function renderGitHistorySvg(graph) {
@@ -217,12 +273,14 @@ function gitHistoryVisualGraph(graph, selectedId) {
 function renderGitHistoryRow(snapshot, row, selectedId) {
   const selected = row.selectId === selectedId ? ' selected' : '';
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
+  const componentLabel = row.repository.componentName ?? row.repository.componentId ?? 'Workspace';
+  const componentChip = `<span class="dn-git-component" title="${escapeHtml([componentLabel, row.repository.repositoryPath].filter(Boolean).join(' · '))}">${escapeHtml(componentLabel)}</span>`;
   const refChips = refs.map((ref) => `<span class="dn-git-ref" style="--dn-branch-color:var(--dn-branch-${(row.colorLane ?? row.lane) % 7});" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join('');
   const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
   const date = formatTime(row.commit.committedAt);
   const author = row.commit.authorName ?? '';
   const authorTitle = [row.commit.authorName, row.commit.authorEmail].filter(Boolean).join(' · ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
+  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}"><span class="dn-git-subject">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -239,6 +297,7 @@ function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
     : '<p>No attached decision, review, or tracked-work markers.</p>';
   const actionStrip = actions.length ? renderActionStrip(actions, 'compact') : '<p>No direct action for this write event.</p>';
   const facts = [
+    ['Component', row.repository.componentName ?? row.repository.componentId ?? 'Workspace'],
     ['Parents', parents.length ? parents.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
     ['Children', children.length ? children.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
     ['Source', commit.shortHash ?? commit.hash],
@@ -372,6 +431,10 @@ export function renderNexusCockpitWriteHistoryClientSource() {
     branchHeadHashes,
     collectGitAncestorHashes,
     gitHistoryRows,
+    gitHistoryRepositories,
+    gitHistoryCommitRowCompare,
+    gitHistoryCommitTime,
+    gitHistoryWriteEventId,
     renderGitHistorySvg,
     renderGitHistoryRows,
     gitHistoryVisualGraph,
@@ -409,6 +472,7 @@ export {
   gitHistoryRows,
   gitHistorySelectId,
   isGitHistorySelection,
+  normalizeGitHistoryFilter,
   renderGitHistory,
   threadsForGitBranches,
   trackedWorkForGitBranches,

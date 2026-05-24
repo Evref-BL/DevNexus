@@ -339,6 +339,124 @@ describe("nexus dashboard model", () => {
     });
   });
 
+  it("includes workspace git history when the workspace repo is separate from component repos", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-workspace-git-history-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      repo: {
+        kind: "git",
+        remoteUrl: "git@github.com:Gabot-Darbot/dev-nexus-dogfood.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+      },
+      components: [
+        {
+          id: "primary",
+          name: "Dashboard Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "local",
+          workTrackers: [
+            {
+              id: "local",
+              name: "Local",
+              enabled: true,
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        },
+      ],
+    }));
+    const field = "\x1f";
+    const record = "\x1e";
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "rev-parse --show-toplevel") {
+        return ok(args as string[], `${cwd === sourceRoot ? sourceRoot : projectRoot}\n`);
+      }
+      if (command === "rev-parse HEAD") {
+        return ok(
+          args as string[],
+          cwd === sourceRoot
+            ? "component00000000000000000000000000000000000\n"
+            : "workspace000000000000000000000000000000000\n",
+        );
+      }
+      if (command === "show-ref -d --head" && cwd === sourceRoot) {
+        return ok(args as string[], [
+          "component00000000000000000000000000000000000 HEAD",
+          "component00000000000000000000000000000000000 refs/heads/main",
+          "",
+        ].join("\n"));
+      }
+      if (command === "show-ref -d --head" && cwd === projectRoot) {
+        return ok(args as string[], [
+          "workspace000000000000000000000000000000000 HEAD",
+          "workspace000000000000000000000000000000000 refs/heads/main",
+          "",
+        ].join("\n"));
+      }
+      if (command.startsWith("-c log.showSignature=false log") && cwd === sourceRoot) {
+        return ok(args as string[], [
+          [
+            "component00000000000000000000000000000000000",
+            "",
+            "Codex",
+            "codex@example.com",
+            "1779537600",
+            "Component write",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      if (command.startsWith("-c log.showSignature=false log") && cwd === projectRoot) {
+        return ok(args as string[], [
+          [
+            "workspace000000000000000000000000000000000",
+            "",
+            "Gabriel",
+            "gabriel@example.com",
+            "1779537300",
+            "Workspace metadata write",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      return baseGitRunner(args, cwd);
+    };
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner,
+      now: fixedClock("2026-05-23T10:00:00.000Z"),
+    });
+
+    expect(snapshot.history.totalCommitCount).toBe(2);
+    expect(snapshot.history.repositories.map((repository) => repository.componentId)).toEqual([
+      "primary",
+      "workspace",
+    ]);
+    expect(snapshot.history.repositories[1]).toMatchObject({
+      componentId: "workspace",
+      componentName: "Workspace",
+      repositoryPath: projectRoot,
+      commits: [
+        expect.objectContaining({
+          hash: "workspace000000000000000000000000000000000",
+          subject: "Workspace metadata write",
+        }),
+      ],
+    });
+  });
+
   it("can scope git history to selected branches", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-filtered-git-history-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

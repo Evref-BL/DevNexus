@@ -196,6 +196,116 @@ describe("nexus dashboard history graph", () => {
     });
   });
 
+  it("renders write history from every loaded component repository", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "core100000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "core100000000000000000000000000000000000000",
+                shortHash: "core100",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Update core cockpit",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "core100000000000000000000000000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            componentId: "plugin",
+            componentName: "DevNexus-TypeScript",
+            repositoryPath: "/workspace/typescript",
+            head: "plug100000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "plug100000000000000000000000000000000000000",
+                shortHash: "plug100",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Update TypeScript setup",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "plug100000000000000000000000000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rows = hooks.gitHistoryRows(snapshot);
+    const rendered = hooks.renderGitHistory(snapshot);
+    const pluginRows = hooks.gitHistoryRows(snapshot, "component:plugin");
+    const pluginRendered = hooks.renderGitHistory(snapshot, null, "component:plugin");
+
+    expect(rows?.rows.map((row) => row.selectId)).toEqual([
+      "history:primary:core100000000000000000000000000000000000000",
+      "history:plugin:plug100000000000000000000000000000000000000",
+    ]);
+    expect(pluginRows?.rows.map((row) => row.selectId)).toEqual([
+      "history:plugin:plug100000000000000000000000000000000000000",
+    ]);
+    expect(rendered).toContain("2 write events");
+    expect(rendered).toContain("2 repos");
+    expect(rendered).toContain("Update core cockpit");
+    expect(rendered).toContain("Update TypeScript setup");
+    expect(rendered).toContain("DevNexus-TypeScript");
+    expect(pluginRendered).toContain("1 write event");
+    expect(pluginRendered).toContain("1 repo");
+    expect(pluginRendered).toContain("Update TypeScript setup");
+    expect(pluginRendered).not.toContain("Update core cockpit");
+  });
+
   it("routes cross-lane git graph links through row corridors", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
