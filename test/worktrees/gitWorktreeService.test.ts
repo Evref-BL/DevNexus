@@ -24,8 +24,12 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
   return (args: readonly string[], cwd?: string): GitCommandResult => {
     const argsArray = [...args];
     calls.push({ args: argsArray, cwd });
+    if (argsArray[0] === "for-each-ref") {
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    }
     if (argsArray[0] === "worktree" && argsArray[1] === "add") {
-      fs.mkdirSync(argsArray[4], { recursive: true });
+      const pathArgument = argsArray[2] === "-b" ? argsArray[4] : argsArray[2];
+      fs.mkdirSync(pathArgument!, { recursive: true });
     }
     if (argsArray[0] === "worktree" && argsArray[1] === "remove") {
       fs.rmSync(argsArray[2], { recursive: true, force: true });
@@ -79,6 +83,14 @@ describe("git worktree service", () => {
       {
         cwd: sourceRoot,
         args: [
+          "for-each-ref",
+          "--format=%(refname)",
+          "refs/heads/codex/demo/FCD-1",
+        ],
+      },
+      {
+        cwd: sourceRoot,
+        args: [
           "worktree",
           "add",
           "-b",
@@ -88,6 +100,131 @@ describe("git worktree service", () => {
         ],
       },
     ]);
+  });
+
+  it("adopts an existing local branch when it is not checked out", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const branchName = "codex/demo/existing-branch";
+
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      if (argsArray.join(" ") === `for-each-ref --format=%(refname) refs/heads/${branchName}`) {
+        return {
+          args: argsArray,
+          stdout: `refs/heads/${branchName}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (argsArray.join(" ") === "worktree list --porcelain") {
+        return {
+          args: argsArray,
+          stdout: [
+            `worktree ${sourceRoot}`,
+            "HEAD 1111111111111111111111111111111111111111",
+            "branch refs/heads/main",
+            "",
+          ].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        argsArray[0] === "worktree" &&
+        argsArray[1] === "add" &&
+        argsArray[2] !== "-b"
+      ) {
+        fs.mkdirSync(argsArray[2]!, { recursive: true });
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: `fatal: a branch named '${branchName}' already exists`,
+        exitCode: 128,
+      };
+    };
+
+    const result = prepareGitWorktree({
+      componentId: "core",
+      sourceRoot,
+      worktreesRoot,
+      branchName,
+      baseRef: "main",
+      gitRunner,
+    });
+
+    expect(result.worktreePath).toBe(
+      path.join(worktreesRoot, "codex-demo-existing-branch"),
+    );
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: ["worktree", "add", result.worktreePath, branchName],
+    });
+  });
+
+  it("reports the reusable worktree when an existing branch is already checked out", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    const existingWorktree = path.join(worktreesRoot, "already-open");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const branchName = "codex/demo/already-open";
+
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      if (argsArray.join(" ") === `for-each-ref --format=%(refname) refs/heads/${branchName}`) {
+        return {
+          args: argsArray,
+          stdout: `refs/heads/${branchName}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (argsArray.join(" ") === "worktree list --porcelain") {
+        return {
+          args: argsArray,
+          stdout: [
+            `worktree ${sourceRoot}`,
+            "HEAD 1111111111111111111111111111111111111111",
+            "branch refs/heads/main",
+            "",
+            `worktree ${existingWorktree}`,
+            "HEAD 2222222222222222222222222222222222222222",
+            `branch refs/heads/${branchName}`,
+            "",
+          ].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+
+    expect(() =>
+      prepareGitWorktree({
+        componentId: "core",
+        sourceRoot,
+        worktreesRoot,
+        branchName,
+        baseRef: "main",
+        gitRunner,
+      }),
+    ).toThrow(new RegExp(`already checked out.*${existingWorktree.replaceAll("\\", "\\\\")}`, "u"));
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: ["worktree", "list", "--porcelain"],
+    });
+    expect(calls.some((call) =>
+      call.args[0] === "worktree" && call.args[1] === "add"
+    )).toBe(false);
   });
 
   it("sets repo-local Git identity when a prepared identity is provided", () => {
@@ -113,6 +250,14 @@ describe("git worktree service", () => {
       email: "bot@example.invalid",
     });
     expect(calls).toEqual([
+      {
+        cwd: sourceRoot,
+        args: [
+          "for-each-ref",
+          "--format=%(refname)",
+          "refs/heads/codex/demo/local-154",
+        ],
+      },
       {
         cwd: sourceRoot,
         args: [
