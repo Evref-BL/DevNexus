@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -57,6 +58,7 @@ import {
   type NexusReleaseTrainReadinessReport,
 } from "../publication/nexusReleaseTrainReadiness.js";
 import type { NexusProviderCredentialCommandRunner } from "../providers/nexusProviderCredentialBroker.js";
+import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
 import {
   parsePositiveInteger,
   readCliJsonFile,
@@ -217,13 +219,20 @@ export async function handlePublicationCommand(
 ): Promise<number> {
   if (argv[1] === "branch-push") {
     const parsed = parsePublicationBranchPushCommand(argv);
+    const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
+    const projectRepository = inferProjectRepositoryPublicationTarget({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
+      repositoryPath,
+    });
     let result: NexusPublicationBranchPushResult;
     try {
       result = await pushNexusPublicationBranchForComponent({
         projectRoot: parsed.projectRoot,
         componentId: parsed.componentId,
-        projectRepository: parsed.projectRepository,
-        repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+        projectRepository,
+        repositoryPath,
         branch: parsed.branch,
         targetBranch: parsed.targetBranch,
         featureId: parsed.featureId,
@@ -292,11 +301,18 @@ export async function handlePublicationCommand(
 
   if (argv[1] === "review-handoff") {
     const parsed = parsePublicationReviewHandoffCommand(argv);
-    const branchPush = await pushNexusPublicationBranchForComponent({
+    const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
+    const projectRepository = inferProjectRepositoryPublicationTarget({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
       projectRepository: parsed.projectRepository,
-      repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+      repositoryPath,
+    });
+    const branchPush = await pushNexusPublicationBranchForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository,
+      repositoryPath,
       branch: parsed.branch,
       featureId: parsed.featureId,
       forceWithLease: parsed.forceWithLease,
@@ -314,7 +330,7 @@ export async function handlePublicationCommand(
       ? await upsertNexusPublicationPullRequestForComponent({
           projectRoot: parsed.projectRoot,
           componentId: parsed.componentId,
-          projectRepository: parsed.projectRepository,
+          projectRepository,
           head: parsed.branch,
           base: parsed.base,
           title: parsed.title,
@@ -982,6 +998,56 @@ function assertSinglePublicationTarget(
 ): void {
   if (componentId && projectRepository) {
     throw new Error("publication accepts --component or --project-repository, not both");
+  }
+}
+
+function inferProjectRepositoryPublicationTarget(options: {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  repositoryPath: string;
+}): boolean | undefined {
+  if (options.projectRepository || options.componentId) {
+    return options.projectRepository;
+  }
+
+  return sameGitRepository(options.projectRoot, options.repositoryPath)
+    ? true
+    : undefined;
+}
+
+function sameGitRepository(leftPath: string, rightPath: string): boolean {
+  const left = gitCommonDirectory(leftPath);
+  const right = gitCommonDirectory(rightPath);
+  return Boolean(left && right && left === right);
+}
+
+function gitCommonDirectory(repositoryPath: string): string | null {
+  const result = spawnSync(
+    resolveNexusCommandPath("git"),
+    ["rev-parse", "--git-common-dir"],
+    {
+      cwd: repositoryPath,
+      encoding: "utf8",
+    },
+  );
+  if (result.status !== 0) {
+    return null;
+  }
+
+  const value = result.stdout.trim();
+  if (!value) {
+    return null;
+  }
+
+  return realPath(path.resolve(repositoryPath, value));
+}
+
+function realPath(filePath: string): string {
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return path.resolve(filePath);
   }
 }
 

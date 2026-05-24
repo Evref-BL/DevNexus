@@ -1303,6 +1303,73 @@ describe("publication CLI operations", () => {
     expect(stdout.output()).not.toContain("installation-token");
   });
 
+  it("infers project repository review handoff from a workspace metadata worktree", async () => {
+    const { projectRoot } = createMultiComponentPublicationProject();
+    const repositoryPath = initProjectRepositoryWorktree(projectRoot, "codex/dogfood/meta");
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("dry-run should not call the provider");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--repository-path",
+        repositoryPath,
+        "--branch",
+        "codex/dev-nexus-dogfood/typescript-plugin-refresh",
+        "--title",
+        "Refresh TypeScript plugin projection",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdout.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      branchPush: {
+        componentId: null,
+        target: {
+          kind: "project",
+          id: "publication-project",
+        },
+        repository: {
+          owner: "Gabot-Darbot",
+          name: "dev-nexus-dogfood",
+        },
+        push: {
+          plan: {
+            remote: "https://github.com/Gabot-Darbot/dev-nexus-dogfood.git",
+          },
+        },
+      },
+      pullRequest: {
+        componentId: null,
+        target: {
+          kind: "project",
+          id: "publication-project",
+        },
+        repository: {
+          owner: "Gabot-Darbot",
+          name: "dev-nexus-dogfood",
+        },
+      },
+    });
+    expect(stdout.output()).not.toContain("Evref-BL/DevNexus");
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
   it("rejects publication commands that select a component and the project repository", async () => {
     const { projectRoot } = createMultiComponentPublicationProject();
     const stdout = textWriter();
@@ -2173,6 +2240,25 @@ function initGitRepositoryWithUpstream(options: {
     `branch.${options.branch}.merge`,
     `refs/heads/${options.branch}`,
   ]);
+}
+
+function initProjectRepositoryWorktree(projectRoot: string, branch: string): string {
+  runGit(projectRoot, ["init"]);
+  runGit(projectRoot, ["checkout", "-b", "main"]);
+  fs.writeFileSync(path.join(projectRoot, "README.md"), "test\n", "utf8");
+  runGit(projectRoot, ["add", "README.md"]);
+  runGit(projectRoot, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "Initial commit",
+  ]);
+  const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus-dogfood", "meta");
+  runGit(projectRoot, ["worktree", "add", "-b", branch, worktreePath, "HEAD"]);
+  return worktreePath;
 }
 
 function runGit(repositoryPath: string, args: string[]): void {
