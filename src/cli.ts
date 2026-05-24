@@ -952,6 +952,11 @@ interface ParsedAutomationCurrentAgentRecordCommand {
   json?: boolean;
 }
 
+type RootCommandHandler = (
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+) => Promise<number>;
+
 export async function main(
   argv: string[],
   dependencies: DevNexusCliDependencies = {},
@@ -977,73 +982,50 @@ async function mainUnchecked(
     return 0;
   }
 
-  if (argv[0] === "home") {
-    return handleHomeCommand(argv, dependencies);
-  }
-  if (argv[0] === "auth") {
-    return handleAuthCommand(argv, dependencies);
-  }
-  if (argv[0] === "workspace") {
-    return handleProjectCommand(argv, dependencies);
-  }
-  if (argv[0] === "setup") {
-    return handleSetupCommand(argv, dependencies);
-  }
-  if (argv[0] === "diagnostics") {
-    return handleDiagnosticsCommand(argv, { ...dependencies, usage });
-  }
-  if (argv[0] === "host") {
-    return handleHostCommand(argv, dependencies);
-  }
-  if (argv[0] === "coordination") {
-    return handleCoordinationCommand(argv, dependencies);
-  }
-  if (argv[0] === "remote-execution") {
-    return handleRemoteExecutionCommand(argv, {
-      stdout: dependencies.stdout,
-      now: dependencies.now,
-      assertMutationAllowed: (options) =>
-        assertCliMutationAllowed(dependencies, options),
-      coordinationAttachmentRefs: remoteExecutionCoordinationAttachmentRefs,
-    });
-  }
-  if (argv[0] === "worktree") {
-    return handleWorktreeCommand(argv, dependencies);
-  }
-  if (argv[0] === "publication") {
-    return handlePublicationCommand(argv, dependencies);
-  }
-  if (argv[0] === "review") {
-    return handleReviewCommand(argv, dependencies);
-  }
-  if (argv[0] === "quick-fix") {
-    return handleQuickFixCommand(argv, dependencies);
-  }
-  if (argv[0] === "work-item") {
-    return handleWorkItemCommand(argv, dependencies);
-  }
-  if (argv[0] === "ci-failure-intake") {
-    return handleCiFailureIntakeCommand(argv, dependencies);
-  }
-  if (argv[0] === "dashboard") {
-    return handleDashboardCommand(argv, dependencies);
-  }
-  if (argv[0] === "automation") {
-    return handleAutomationCommand(argv, dependencies);
-  }
-  if (argv[0] === "mcp-stdio") {
-    await runDevNexusMcpStdioServer();
-    return 0;
-  }
-  if (argv[0] === "mcp-gateway-stdio") {
-    await runDevNexusMcpGatewayStdioServer();
-    return 0;
+  const handler = rootCommandHandlers[argv[0]];
+  if (handler) {
+    return handler(argv, dependencies);
   }
 
   throw new Error(
     "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
+
+const rootCommandHandlers: Record<string, RootCommandHandler> = {
+  home: handleHomeCommand,
+  auth: handleAuthCommand,
+  workspace: handleProjectCommand,
+  setup: handleSetupCommand,
+  diagnostics: (argv, dependencies) =>
+    handleDiagnosticsCommand(argv, { ...dependencies, usage }),
+  host: handleHostCommand,
+  coordination: handleCoordinationCommand,
+  "remote-execution": (argv, dependencies) =>
+    handleRemoteExecutionCommand(argv, {
+      stdout: dependencies.stdout,
+      now: dependencies.now,
+      assertMutationAllowed: (options) =>
+        assertCliMutationAllowed(dependencies, options),
+      coordinationAttachmentRefs: remoteExecutionCoordinationAttachmentRefs,
+    }),
+  worktree: handleWorktreeCommand,
+  publication: handlePublicationCommand,
+  review: handleReviewCommand,
+  "quick-fix": handleQuickFixCommand,
+  "work-item": handleWorkItemCommand,
+  "ci-failure-intake": handleCiFailureIntakeCommand,
+  dashboard: handleDashboardCommand,
+  automation: handleAutomationCommand,
+  "mcp-stdio": async () => {
+    await runDevNexusMcpStdioServer();
+    return 0;
+  },
+  "mcp-gateway-stdio": async () => {
+    await runDevNexusMcpGatewayStdioServer();
+    return 0;
+  },
+};
 
 async function handleDashboardCommand(
   argv: string[],
