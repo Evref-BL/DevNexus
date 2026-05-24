@@ -170,7 +170,12 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain("data-git-resize-column=\"description\"");
     expect(rendered).toContain("data-git-resize-column=\"date\"");
     expect(rendered).toContain("data-git-resize-column=\"author\"");
-    expect(rendered).toContain("data-git-resize-column=\"commit\"");
+    expect(rendered).toContain("data-git-resize-next-column=\"description\"");
+    expect(rendered).toContain("data-git-resize-next-column=\"date\"");
+    expect(rendered).toContain("data-git-resize-next-column=\"author\"");
+    expect(rendered).toContain("data-git-resize-next-column=\"commit\"");
+    expect(rendered).not.toContain("data-git-resize-column=\"commit\"");
+    expect(rendered).toContain("Resize Graph and Description columns");
     expect(rendered).toContain("<span class=\"dn-git-date\"");
     expect(rendered).toContain("<span class=\"dn-git-author\"");
     expect(rendered).toContain("Codex</span>");

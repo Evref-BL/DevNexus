@@ -198,6 +198,9 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("signal-components");
     expect(module).toContain("Not Git history");
     expect(module).toContain("Each rail is a workspace category");
+    expect(module).toContain(".dn-git-graph-column { display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr);");
+    expect(module).toContain(".dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%;");
+    expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: var(--dn-git-description-width) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");
     expect(module).toContain("Source checkout");
     expect(module).toContain("Active branch");
     expect(module).toContain("More branches");

@@ -11,6 +11,14 @@ const gitHistoryColumnSpecs = {
   author: { property: "--dn-git-author-width", defaultWidth: 170, minWidth: 96, maxWidth: 320 },
   commit: { property: "--dn-git-commit-width", defaultWidth: 78, minWidth: 58, maxWidth: 150 },
 } as const;
+const gitHistoryColumnOrder = ["graph", "description", "date", "author", "commit"] as const;
+const gitHistoryColumnLabels = {
+  graph: "Graph",
+  description: "Description",
+  date: "Date",
+  author: "Author",
+  commit: "Commit",
+} as const;
 
 type GitHistoryColumn = keyof typeof gitHistoryColumnSpecs;
 type GitHistoryColumnWidths = Partial<Record<GitHistoryColumn, number>>;
@@ -26,7 +34,7 @@ export function bindGitHistoryColumnResizers(container: ParentNode): void {
       if (!board || !column) return;
       const direction = event.key === "ArrowRight" ? 1 : -1;
       const step = event.shiftKey ? 32 : 12;
-      updateGitHistoryColumnWidth(
+      updateGitHistoryColumnPairWidth(
         board,
         column,
         gitHistoryColumnWidth(board, column) + direction * step,
@@ -43,7 +51,17 @@ export function renderGitHistoryColumnHeader(
 ): string {
   const spec = gitHistoryColumnSpecs[column];
   const width = widths[column] ?? spec.defaultWidth;
-  return `<span class="dn-git-column-header" data-git-column="${escapeNexusCockpitHistoryColumnAttribute(column)}"><span class="dn-git-column-label">${escapeNexusCockpitHistoryColumnAttribute(label)}</span><span class="dn-git-resize-handle" role="separator" tabindex="0" aria-label="Resize ${escapeNexusCockpitHistoryColumnAttribute(label)} column" aria-orientation="vertical" aria-valuemin="${spec.minWidth}" aria-valuemax="${spec.maxWidth}" aria-valuenow="${escapeNexusCockpitHistoryColumnAttribute(width)}" data-git-resize-column="${escapeNexusCockpitHistoryColumnAttribute(column)}"></span></span>`;
+  const nextColumn = nextGitHistoryColumn(column);
+  const nextSpec = nextColumn ? gitHistoryColumnSpecs[nextColumn] : null;
+  const nextWidth = nextColumn ? widths[nextColumn] ?? nextSpec!.defaultWidth : null;
+  const totalWidth = nextWidth === null ? width : width + nextWidth;
+  const minWidth = nextSpec ? Math.max(spec.minWidth, totalWidth - nextSpec.maxWidth) : spec.minWidth;
+  const maxWidth = nextSpec ? Math.min(spec.maxWidth, totalWidth - nextSpec.minWidth) : spec.maxWidth;
+  const nextLabel = nextColumn ? gitHistoryColumnLabels[nextColumn] : "";
+  const handle = nextColumn
+    ? `<span class="dn-git-resize-handle" role="separator" tabindex="0" aria-label="Resize ${escapeNexusCockpitHistoryColumnAttribute(label)} and ${escapeNexusCockpitHistoryColumnAttribute(nextLabel)} columns" aria-orientation="vertical" aria-valuemin="${escapeNexusCockpitHistoryColumnAttribute(minWidth)}" aria-valuemax="${escapeNexusCockpitHistoryColumnAttribute(maxWidth)}" aria-valuenow="${escapeNexusCockpitHistoryColumnAttribute(width)}" data-git-resize-column="${escapeNexusCockpitHistoryColumnAttribute(column)}" data-git-resize-next-column="${escapeNexusCockpitHistoryColumnAttribute(nextColumn)}"></span>`
+    : "";
+  return `<span class="dn-git-column-header" data-git-column="${escapeNexusCockpitHistoryColumnAttribute(column)}"><span class="dn-git-column-label">${escapeNexusCockpitHistoryColumnAttribute(label)}</span>${handle}</span>`;
 }
 
 export function gitHistoryColumnStyle(
@@ -88,6 +106,8 @@ export function renderNexusCockpitHistoryColumnsClientSource(): string {
   return [
     `const gitHistoryColumnStorageKey = ${JSON.stringify(gitHistoryColumnStorageKey)};`,
     `const gitHistoryColumnSpecs = ${JSON.stringify(gitHistoryColumnSpecs)};`,
+    `const gitHistoryColumnOrder = ${JSON.stringify(gitHistoryColumnOrder)};`,
+    `const gitHistoryColumnLabels = ${JSON.stringify(gitHistoryColumnLabels)};`,
     bindGitHistoryColumnResizers,
     renderGitHistoryColumnHeader,
     gitHistoryColumnStyle,
@@ -95,8 +115,10 @@ export function renderNexusCockpitHistoryColumnsClientSource(): string {
     writeStoredGitHistoryColumnWidths,
     normalizeGitHistoryColumnWidth,
     historyColumnFromAttribute,
+    nextGitHistoryColumn,
     startGitHistoryColumnResize,
-    updateGitHistoryColumnWidth,
+    updateGitHistoryColumnPairWidth,
+    gitHistoryColumnPairLeftWidth,
     gitHistoryBoardColumnWidths,
     gitHistoryColumnWidth,
     escapeNexusCockpitHistoryColumnAttribute,
@@ -140,6 +162,11 @@ function historyColumnFromAttribute(value: string | null): GitHistoryColumn | nu
   return value && Object.hasOwn(gitHistoryColumnSpecs, value) ? (value as GitHistoryColumn) : null;
 }
 
+function nextGitHistoryColumn(column: GitHistoryColumn): GitHistoryColumn | null {
+  const index = gitHistoryColumnOrder.indexOf(column);
+  return index >= 0 ? gitHistoryColumnOrder[index + 1] ?? null : null;
+}
+
 function startGitHistoryColumnResize(event: PointerEvent, handle: HTMLElement): void {
   if (event.button !== undefined && event.button !== 0) return;
   const board = handle.closest<HTMLElement>("[data-git-board]");
@@ -148,13 +175,17 @@ function startGitHistoryColumnResize(event: PointerEvent, handle: HTMLElement): 
   event.preventDefault();
   const startX = event.clientX ?? 0;
   const startWidth = gitHistoryColumnWidth(board, column);
+  const nextColumn = nextGitHistoryColumn(column);
+  if (!nextColumn) return;
+  const pairWidth = startWidth + gitHistoryColumnWidth(board, nextColumn);
   board.classList.add("resizing");
   const move = (moveEvent: PointerEvent) => {
-    updateGitHistoryColumnWidth(
+    updateGitHistoryColumnPairWidth(
       board,
       column,
       startWidth + ((moveEvent.clientX ?? startX) - startX),
       handle,
+      pairWidth,
     );
   };
   const stop = () => {
@@ -168,17 +199,46 @@ function startGitHistoryColumnResize(event: PointerEvent, handle: HTMLElement): 
   document.addEventListener("pointercancel", stop);
 }
 
-function updateGitHistoryColumnWidth(
+function updateGitHistoryColumnPairWidth(
   board: HTMLElement,
   column: GitHistoryColumn,
-  nextWidth: number,
+  nextLeftWidth: number,
   handle: HTMLElement | null = null,
+  pairWidth: number | null = null,
 ): void {
-  const width = normalizeGitHistoryColumnWidth(column, nextWidth);
+  const nextColumn = nextGitHistoryColumn(column);
+  if (!nextColumn) return;
+  const widths = gitHistoryBoardColumnWidths(board);
+  const leftSpec = gitHistoryColumnSpecs[column];
+  const rightSpec = gitHistoryColumnSpecs[nextColumn];
+  const totalWidth = pairWidth ?? widths[column] + widths[nextColumn];
+  const width = gitHistoryColumnPairLeftWidth(column, nextColumn, nextLeftWidth, totalWidth);
+  const nextWidth = totalWidth - width;
+  board.style.setProperty(leftSpec.property, `${width}px`);
+  board.style.setProperty(rightSpec.property, `${nextWidth}px`);
+  if (handle) {
+    handle.setAttribute("aria-valuenow", String(width));
+    handle.setAttribute("aria-valuemin", String(Math.max(leftSpec.minWidth, totalWidth - rightSpec.maxWidth)));
+    handle.setAttribute("aria-valuemax", String(Math.min(leftSpec.maxWidth, totalWidth - rightSpec.minWidth)));
+  }
+  writeStoredGitHistoryColumnWidths({
+    ...widths,
+    [column]: width,
+    [nextColumn]: nextWidth,
+  });
+}
+
+function gitHistoryColumnPairLeftWidth(
+  column: GitHistoryColumn,
+  nextColumn: GitHistoryColumn,
+  nextLeftWidth: number,
+  pairWidth: number,
+): number {
   const spec = gitHistoryColumnSpecs[column];
-  board.style.setProperty(spec.property, `${width}px`);
-  if (handle) handle.setAttribute("aria-valuenow", String(width));
-  writeStoredGitHistoryColumnWidths({ ...gitHistoryBoardColumnWidths(board), [column]: width });
+  const nextSpec = gitHistoryColumnSpecs[nextColumn];
+  const minWidth = Math.max(spec.minWidth, pairWidth - nextSpec.maxWidth);
+  const maxWidth = Math.min(spec.maxWidth, pairWidth - nextSpec.minWidth);
+  return Math.min(Math.max(Math.round(nextLeftWidth), minWidth), maxWidth);
 }
 
 function gitHistoryBoardColumnWidths(board: HTMLElement): Record<GitHistoryColumn, number> {

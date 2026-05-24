@@ -126,9 +126,10 @@ button, input, select { font: inherit; }
 .dn-git-filter { flex: 0 0 auto; max-width: 210px; overflow: hidden; padding: 5px 8px; border: 1px solid var(--dn-border-muted); border-radius: 7px; color: var(--dn-muted); background: var(--dn-surface); cursor: pointer; font-size: 0.72rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-filter:hover { color: var(--dn-strong); border-color: var(--dn-border-strong); background: var(--dn-control-hover); }
 .dn-git-filter[aria-pressed='true'] { color: var(--dn-strong); border-color: var(--dn-active); background: var(--dn-control-active); }
-.dn-git-graph-column { display: grid; grid-template-rows: 30px auto; min-width: 0; overflow: hidden; border-right: 1px solid var(--dn-border-muted); }
+.dn-git-graph-column { display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 1px solid var(--dn-border-muted); }
+.dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%; border-bottom: 1px solid var(--dn-border-muted); background: color-mix(in srgb, var(--dn-surface-raised) 72%, transparent); }
 .dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: 0; overflow-x: auto; }
-.dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(150px, var(--dn-git-description-width)) minmax(92px, var(--dn-git-date-width)) minmax(96px, var(--dn-git-author-width)) minmax(58px, var(--dn-git-commit-width)); align-items: center; gap: 10px; }
+.dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: var(--dn-git-description-width) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width); align-items: center; gap: 10px; width: max-content; min-width: 100%; }
 .dn-git-column-row { min-height: 30px; height: 30px; border-bottom: 1px solid var(--dn-border-muted); background: color-mix(in srgb, var(--dn-surface-raised) 72%, transparent); }
 .dn-git-column-header { position: relative; display: flex; align-items: center; min-width: 0; min-height: 30px; height: 30px; padding: 0 10px; color: var(--dn-label); font-size: 0.66rem; font-weight: 900; letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
 .dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }
