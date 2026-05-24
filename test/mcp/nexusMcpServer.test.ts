@@ -1648,6 +1648,49 @@ describe("DevNexus MCP server", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("allows guarded work-item comments from generated workspace-meta worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "mcp-demo",
+      "comment-meta",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Comment from meta worktree",
+      status: "in_progress",
+    });
+
+    const result = await callDevNexusMcpTool(
+      "work_item_comment",
+      {
+        projectRoot,
+        id: "local-1",
+        body: "Ready for review.",
+        currentPath: generatedMetaWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(generatedMetaWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(payload.comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for review.",
+    });
+  });
+
   it("returns guard details for guarded inbound import execution", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

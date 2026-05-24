@@ -771,6 +771,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         projectMeta: { type: "boolean" },
         workItemId: { type: ["string", "null"] },
@@ -821,6 +822,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -836,7 +838,6 @@ const tools: McpTool[] = [
         verificationSummary: { type: ["string", "null"] },
         integrationPreference: { type: ["string", "null"] },
         note: { type: ["string", "null"] },
-        currentPath: { type: "string" },
       },
       required: ["workItemId", "status"],
       additionalProperties: false,
@@ -851,13 +852,13 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
         trackerRole: { type: "string" },
         targetBranch: { type: "string" },
         fetch: { type: "boolean" },
-        currentPath: { type: "string" },
       },
       additionalProperties: false,
     },
@@ -871,6 +872,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -898,7 +900,6 @@ const tools: McpTool[] = [
         responseSummary: { type: ["string", "null"] },
         responder: { type: ["string", "null"] },
         requestedChanges: { type: "array", items: { type: "string" } },
-        currentPath: { type: "string" },
       },
       required: ["intent"],
       additionalProperties: false,
@@ -1165,6 +1166,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1190,6 +1192,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1211,6 +1214,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -2239,6 +2243,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_update",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
@@ -2261,6 +2266,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_comment",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
@@ -2280,6 +2286,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_set_status",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [

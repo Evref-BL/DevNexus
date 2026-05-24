@@ -619,6 +619,7 @@ interface ParsedWorkItemUpdateCommand {
 
 interface ParsedWorkItemCommentCommand {
   projectRoot: string;
+  currentPath?: string;
   componentId?: string;
   trackerId?: string;
   itemId: string;
@@ -628,6 +629,7 @@ interface ParsedWorkItemCommentCommand {
 
 interface ParsedWorkItemSetStatusCommand {
   projectRoot: string;
+  currentPath?: string;
   componentId?: string;
   trackerId?: string;
   itemId: string;
@@ -2132,6 +2134,7 @@ async function handleWorkItemCommand(
       projectRoot: path.resolve(parsed.projectRoot),
       command: "work-item comment",
       mutationClass: "local_tracker",
+      targetPath: parsed.currentPath,
       componentId: parsed.componentId,
     });
     const reference = resolveCliWorkItemReference(
@@ -2179,6 +2182,7 @@ async function handleWorkItemCommand(
       projectRoot: path.resolve(parsed.projectRoot),
       command: "work-item set-status",
       mutationClass: "local_tracker",
+      targetPath: parsed.currentPath,
       componentId: parsed.componentId,
     });
     const reference = resolveCliWorkItemReference(
@@ -4846,6 +4850,9 @@ function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentComma
       case "--tracker":
         parsed.trackerId = next();
         break;
+      case "--current-path":
+        parsed.currentPath = next();
+        break;
       case "--body":
         parsed.body = next();
         break;
@@ -4896,6 +4903,9 @@ function parseWorkItemSetStatusCommand(
         break;
       case "--tracker":
         parsed.trackerId = next();
+        break;
+      case "--current-path":
+        parsed.currentPath = next();
         break;
       case "--status":
         parsed.status = parseWorkStatus(next(), arg);

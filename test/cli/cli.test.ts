@@ -2632,6 +2632,66 @@ describe("dev-nexus cli", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("allows guarded work-item comments from workspace-meta current paths", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "demo-project",
+      "comment-meta",
+    );
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Comment guarded work",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${path.resolve(cwd ?? projectRoot)}\n`);
+      }
+      if (joined === "worktree list --porcelain") {
+        return ok(argsArray, `worktree ${projectRoot}\nHEAD abc123\nbranch refs/heads/main\n`);
+      }
+
+      return ok(argsArray, "");
+    };
+
+    await expect(
+      main(
+        [
+          "work-item",
+          "comment",
+          projectRoot,
+          "local-1",
+          "--body",
+          "Ready for review.",
+          "--current-path",
+          generatedMetaWorktree,
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          gitRunner,
+          sharedCheckoutGuard: "enforce",
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output()).comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for review.",
+    });
+  });
+
   it("fails guarded inbound import execution from a shared checkout before writing local state", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     saveProjectConfig(projectRoot, projectConfig());
