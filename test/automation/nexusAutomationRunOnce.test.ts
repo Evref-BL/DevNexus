@@ -68,10 +68,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       sourceRoot: "source",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },
@@ -187,7 +183,7 @@ describe("nexus automation run once", () => {
         title: "Implement run once",
       },
     });
-    expect(gitCalls[0]).toEqual({
+    expect(gitCalls).toContainEqual({
       cwd: path.join(projectRoot, "source"),
       args: [
         "worktree",

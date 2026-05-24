@@ -876,6 +876,7 @@ export async function getNexusAutomationStatus(
     component: primaryComponent,
     automationConfig,
     provider,
+    authProfiles,
     gitRunner: options.gitRunner,
     publicationActorRunner: options.publicationActorRunner,
   });

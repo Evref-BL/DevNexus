@@ -22,6 +22,7 @@ import {
   type NexusWorkerContextDependencyProjectionStatus,
   type NexusWorkerContextAgentSkillProjection,
   type NexusWorkerContextSkillReference,
+  type NexusWorkerContextCommandGuardrail,
   type NexusWorkerContextBundleWorktree,
   type NexusWorkerContextAgentTargetPolicy,
   type NexusWorkerContextFeatureBranchDelivery,
@@ -40,6 +41,10 @@ import {
 import type { NexusPluginWorkerFragmentsProjection } from "../project/nexusPluginCapabilities.js";
 import type { NexusRunnerProfilePolicySummary } from "../remote-execution/nexusRunnerProfile.js";
 import type { NexusExpectedGitIdentity } from "../git/nexusGitIdentity.js";
+import {
+  materializeNexusWorktreePublicationGuardrails,
+  type NexusWorktreePublicationGuardrailResult,
+} from "./nexusWorktreePublicationGuardrails.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -109,6 +114,7 @@ export interface NexusAutomationWorktreeSetupResult {
   links: NexusAutomationWorktreeSetupLinkResult[];
   dependencyProjections: NexusAutomationWorktreeDependencyProjectionResult[];
   skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
+  guardrails?: NexusWorktreePublicationGuardrailResult[];
   context?: MaterializeNexusWorkerContextBundleResult;
 }
 
@@ -140,6 +146,7 @@ export interface NexusAutomationWorktreeSetupOptions {
   context?: NexusAutomationWorktreeSetupContextInput;
   gitRunner?: GitRunner;
   platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
 }
 
 export class NexusAutomationWorktreeSetupError extends Error {
@@ -243,6 +250,25 @@ export function materializeNexusAutomationWorktreeSetup(
       platform,
     }),
   );
+  const guardrails = options.context
+    ? [
+        materializeNexusWorktreePublicationGuardrails({
+          worktreePath,
+          platform,
+          env: options.env,
+        }),
+      ]
+    : [];
+  for (const guardrail of guardrails) {
+    if (guardrail.status === "materialized") {
+      addGitInfoExclude({
+        worktreePath,
+        targetPath: guardrail.rootDirectoryPath,
+        isDirectory: true,
+        gitRunner,
+      });
+    }
+  }
   const skillProjections = options.context
     ? materializeWorkerSkillProjections({
         projectRoot: options.context.project.root,
@@ -263,6 +289,7 @@ export function materializeNexusAutomationWorktreeSetup(
         gitRunner,
         skillProjections,
         dependencyProjections,
+        guardrails,
       })
     : undefined;
 
@@ -270,6 +297,7 @@ export function materializeNexusAutomationWorktreeSetup(
     links,
     dependencyProjections,
     skillProjections,
+    ...(guardrails.length > 0 ? { guardrails } : {}),
     ...(context ? { context } : {}),
   };
 }
@@ -283,6 +311,7 @@ function materializeWorkerContext(options: {
   gitRunner: GitRunner;
   skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
   dependencyProjections: NexusAutomationWorktreeDependencyProjectionResult[];
+  guardrails: NexusWorktreePublicationGuardrailResult[];
 }): MaterializeNexusWorkerContextBundleResult {
   const projectRoot = path.resolve(
     requiredNonEmptyString(options.context.project.root, "context.project.root"),
@@ -342,6 +371,7 @@ function materializeWorkerContext(options: {
       options.skillProjections,
     ),
     dependencyProjections: options.dependencyProjections,
+    commandGuardrails: workerContextCommandGuardrails(options.guardrails),
     pluginFragments: options.context.pluginFragments,
     publication:
       options.context.publication ?? options.automationConfig.publication,
@@ -358,6 +388,20 @@ function materializeWorkerContext(options: {
   });
 
   return result;
+}
+
+function workerContextCommandGuardrails(
+  guardrails: NexusWorktreePublicationGuardrailResult[],
+): NexusWorkerContextCommandGuardrail[] {
+  return guardrails.map((guardrail) => ({
+    id: guardrail.id,
+    status: guardrail.status,
+    binDirectoryPath: guardrail.binDirectoryPath,
+    guardedCommands: guardrail.commands.map((command) => command.command),
+    environmentKeys: Object.keys(guardrail.environment)
+      .sort((left, right) => left.localeCompare(right)),
+    message: guardrail.message,
+  }));
 }
 
 interface ProjectManagedSkillEntry {

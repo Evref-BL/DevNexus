@@ -10,6 +10,9 @@ import {
   type NexusAutomationCommandRunner,
 } from "../../src/automation/nexusAutomationCommandExecutor.js";
 import {
+  nexusPublicationCommandGuardrailId,
+} from "../../src/automation/nexusWorktreePublicationGuardrails.js";
+import {
   defaultNexusAutomationConfig,
   type NexusAutomationConfig,
 } from "../../src/automation/nexusAutomationConfig.js";
@@ -56,10 +59,6 @@ function executorInput(config: NexusAutomationConfig): NexusAutomationExecutorIn
         defaultBranch: "main",
       },
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       automation: config,
     },
     automationConfig: config,
@@ -132,6 +131,51 @@ describe("nexus automation command executor", () => {
       },
     });
     expect(result.verification).toHaveLength(3);
+  });
+
+  it("prepends worktree publication guardrails to executor commands", async () => {
+    const guardBinDirectory = path.resolve("project", "worktrees", "task", ".dev-nexus", "guardrails", "bin");
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      expect(command).toBe("npm test");
+      expect(options.env.DEV_NEXUS_PUBLICATION_GUARD_BIN)
+        .toBe(guardBinDirectory);
+      expect(options.env.PATH?.split(path.delimiter)[0]).toBe(guardBinDirectory);
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const config = automationConfig();
+    const input = executorInput(config);
+    input.setup.guardrails = [
+      {
+        id: nexusPublicationCommandGuardrailId,
+        status: "materialized",
+        rootDirectoryPath: path.dirname(guardBinDirectory),
+        binDirectoryPath: guardBinDirectory,
+        guardScriptPath: path.join(
+          path.dirname(guardBinDirectory),
+          "publication-command-guard.mjs",
+        ),
+        commands: [],
+        environment: {},
+        message: "guarded",
+      },
+    ];
+    const executor = createNexusAutomationCommandExecutor({
+      command: "npm test",
+      commandRunner,
+      env: {
+        PATH: "/usr/bin",
+      },
+    });
+
+    await expect(executor(input)).resolves.toMatchObject({
+      status: "completed",
+    });
   });
 
   it("fails without running verification when the executor command fails", async () => {

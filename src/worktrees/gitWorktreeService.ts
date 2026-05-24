@@ -105,20 +105,29 @@ export function prepareGitWorktree(
 
   const gitRunner = options.gitRunner ?? defaultGitRunner;
   const commands: GitCommandResult[] = [];
-  fs.mkdirSync(worktreesRoot, { recursive: true });
-  runGitCommand(
+  const localBranch = readLocalBranchCheckout({
     gitRunner,
     commands,
-    [
-      "worktree",
-      "add",
-      "-b",
-      branchName,
-      worktreePath,
-      ...(baseRef ? [baseRef] : []),
-    ],
     sourceRoot,
-  );
+    branchName,
+  });
+  if (localBranch.checkedOutAt) {
+    throw new GitWorktreeServiceError(
+      `Branch ${branchName} is already checked out at ${localBranch.checkedOutAt}. Reuse that worktree or choose a different branch name.`,
+    );
+  }
+  fs.mkdirSync(worktreesRoot, { recursive: true });
+  const addArgs = localBranch.exists
+    ? ["worktree", "add", worktreePath, branchName]
+    : [
+        "worktree",
+        "add",
+        "-b",
+        branchName,
+        worktreePath,
+        ...(baseRef ? [baseRef] : []),
+      ];
+  runGitCommand(gitRunner, commands, addArgs, sourceRoot);
   if (gitIdentity) {
     runGitCommand(
       gitRunner,
@@ -270,6 +279,65 @@ export function defaultGitRunner(
     stderr: result.stderr ?? "",
     exitCode: result.status,
   };
+}
+
+function readLocalBranchCheckout(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  branchName: string;
+}): { exists: boolean; checkedOutAt: string | null } {
+  const branchRef = `refs/heads/${options.branchName}`;
+  const refResult = runGitCommand(
+    options.gitRunner,
+    options.commands,
+    ["for-each-ref", "--format=%(refname)", branchRef],
+    options.sourceRoot,
+  );
+  const exists = refResult.stdout
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .includes(branchRef);
+  if (!exists) {
+    return { exists: false, checkedOutAt: null };
+  }
+
+  const worktreeList = runGitCommand(
+    options.gitRunner,
+    options.commands,
+    ["worktree", "list", "--porcelain"],
+    options.sourceRoot,
+  );
+  return {
+    exists: true,
+    checkedOutAt: worktreePathForBranch(
+      worktreeList.stdout,
+      options.branchName,
+    ),
+  };
+}
+
+function worktreePathForBranch(
+  porcelain: string,
+  branchName: string,
+): string | null {
+  const expectedBranch = `refs/heads/${branchName}`;
+  let currentWorktree: string | null = null;
+  for (const line of porcelain.split(/\r?\n/u)) {
+    if (line.startsWith("worktree ")) {
+      currentWorktree = line.slice("worktree ".length).trim();
+      continue;
+    }
+    if (line.trim() === "") {
+      currentWorktree = null;
+      continue;
+    }
+    if (line === `branch ${expectedBranch}`) {
+      return currentWorktree;
+    }
+  }
+
+  return null;
 }
 
 export function runGitCommand(

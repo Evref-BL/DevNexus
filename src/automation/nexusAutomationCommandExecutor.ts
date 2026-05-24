@@ -21,6 +21,10 @@ import type {
 } from "../worktrees/worktreeExecutionMetadata.js";
 import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
 import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
+import {
+  nexusPublicationCommandGuardrailId,
+  publicationGuardrailEnvironment,
+} from "./nexusWorktreePublicationGuardrails.js";
 
 export interface NexusAutomationCommandRunOptions {
   cwd: string;
@@ -505,6 +509,7 @@ function executorEnvironment(
   return {
     ...baseEnv,
     ...nonInteractiveGitEnvironment(baseEnv),
+    ...executorPublicationGuardrailEnvironment(baseEnv, input),
     DEV_NEXUS_RUN_ID: input.runId,
     DEV_NEXUS_STARTED_AT: input.startedAt,
     DEV_NEXUS_PROJECT_ROOT: input.projectRoot,
@@ -520,6 +525,22 @@ function executorEnvironment(
         }
       : {}),
   };
+}
+
+function executorPublicationGuardrailEnvironment(
+  baseEnv: NodeJS.ProcessEnv,
+  input: NexusAutomationExecutorInput,
+): Record<string, string> {
+  const guardrail = input.setup.guardrails?.find(
+    (candidate) =>
+      candidate.id === nexusPublicationCommandGuardrailId &&
+      candidate.status === "materialized",
+  );
+  if (!guardrail) {
+    return {};
+  }
+
+  return publicationGuardrailEnvironment(guardrail.binDirectoryPath, baseEnv);
 }
 
 function verificationFromCommandResult(

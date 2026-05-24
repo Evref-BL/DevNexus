@@ -39,10 +39,6 @@ function projectConfig(options: {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",

@@ -14,6 +14,11 @@ import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "../project/nexusProjectLifecycle.js";
+import {
+  readNexusWorktreeLeaseStore,
+  type NexusWorktreeLeaseLocation,
+  type NexusWorktreeLeaseRecord,
+} from "./nexusWorktreeLease.js";
 
 export type NexusCheckoutClassification =
   | "shared_project_checkout"
@@ -36,7 +41,8 @@ export type NexusCheckoutMutationClass =
   | "publication_integration"
   | "cleanup_execution"
   | "local_remote_repair"
-  | "provider_sync";
+  | "provider_sync"
+  | "provider_tracker";
 
 export type NexusSharedCheckoutGuardOverride =
   | "allow"
@@ -147,6 +153,20 @@ export function classifyNexusCheckout(
   });
 
   for (const context of contexts) {
+    const recordedWorktree = recordedWorktreeClassification(
+      context,
+      targetRepositoryPath,
+    );
+    if (recordedWorktree) {
+      return {
+        ...recordedWorktree,
+        projectRoot,
+        sharedProjectRoot: context.projectRoot,
+        targetPath,
+        repositoryPath: targetRepositoryPath,
+      };
+    }
+
     const componentWorktree = context.components.find((component) =>
       pathInside(component.worktreesRoot, targetRepositoryPath),
     );
@@ -311,6 +331,9 @@ function mutationAllowed(
   classification: NexusCheckoutClassification,
 ): boolean {
   if (mutationClass === "read_only") {
+    return true;
+  }
+  if (mutationClass === "provider_tracker") {
     return true;
   }
   if (mutationClass === "local_remote_repair") {
@@ -551,6 +574,92 @@ function runOptionalGit(
   } catch {
     return null;
   }
+}
+
+function recordedWorktreeClassification(
+  context: ProjectContext,
+  targetRepositoryPath: string,
+): Pick<
+  NexusCheckoutClassificationResult,
+  "classification" | "componentId" | "reason"
+> | null {
+  const match = latestMatchingLease(context, targetRepositoryPath);
+  if (!match) {
+    return null;
+  }
+
+  if (match.scope.kind === "project_meta") {
+    return {
+      classification: "generated_project_meta_worktree",
+      componentId: null,
+      reason: `Target repository matches recorded workspace/meta worktree lease ${match.id}.`,
+    };
+  }
+
+  return {
+    classification: "generated_component_worktree",
+    componentId: match.scope.componentId,
+    reason: `Target repository matches recorded component worktree lease ${match.id}.`,
+  };
+}
+
+function latestMatchingLease(
+  context: ProjectContext,
+  targetRepositoryPath: string,
+): NexusWorktreeLeaseRecord | null {
+  let leases: NexusWorktreeLeaseRecord[];
+  try {
+    leases = readNexusWorktreeLeaseStore(context.projectRoot).leases;
+  } catch {
+    return null;
+  }
+  const matches = leases.filter((lease) => {
+    if (lease.projectId !== context.projectConfig.id) {
+      return false;
+    }
+    const leasePath = leaseLocationPath(context, lease.worktree);
+    return leasePath ? samePath(leasePath, targetRepositoryPath) : false;
+  });
+
+  return matches.sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  )[0] ?? null;
+}
+
+function leaseLocationPath(
+  context: ProjectContext,
+  location: NexusWorktreeLeaseLocation,
+): string | null {
+  if (!location.relativePath) {
+    return null;
+  }
+  if (location.base === "projectRoot") {
+    return path.join(context.projectRoot, location.relativePath);
+  }
+  if (location.base === "projectWorktreesRoot") {
+    return path.join(
+      projectWorktreesRootPath(context.projectRoot, context.projectConfig),
+      location.relativePath,
+    );
+  }
+  if (location.base === "componentWorktreesRoot") {
+    const component = context.components.find(
+      (candidate) => candidate.id === location.componentId,
+    );
+    return component
+      ? path.join(component.worktreesRoot, location.relativePath)
+      : null;
+  }
+  if (location.base === "componentSourceRoot") {
+    const component = context.components.find(
+      (candidate) => candidate.id === location.componentId,
+    );
+    return component
+      ? path.join(component.sourceRoot, location.relativePath)
+      : null;
+  }
+
+  return null;
 }
 
 function samePath(left: string, right: string): boolean {

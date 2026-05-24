@@ -36,6 +36,12 @@ export interface NexusWorkerContextFileReference {
   access: "read_only";
 }
 
+export interface NexusWorkerContextMissingFileReference {
+  relativePath: string;
+  projectPath: string;
+  componentPath: string;
+}
+
 export interface NexusWorkerContextProject {
   id: string | null;
   name: string | null;
@@ -61,6 +67,7 @@ export interface NexusWorkerProjectContextReferences {
   planPath: string;
   targetStatePath: string;
   referencedFiles: NexusWorkerContextFileReference[];
+  missingReferencedFiles: NexusWorkerContextMissingFileReference[];
   files: NexusWorkerContextFileReference[];
 }
 
@@ -198,6 +205,7 @@ export interface NexusWorkerContextBundle {
   publicationScope: NexusWorkerContextPublicationScope;
   publication: NexusAutomationPublicationConfig | null;
   gitIdentity: NexusExpectedGitIdentity | null;
+  commandGuardrails: NexusWorkerContextCommandGuardrail[];
   authority: NexusAuthorityComponentSummary | null;
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy: NexusWorkerContextAgentTargetPolicy;
@@ -225,9 +233,19 @@ export interface NexusWorkerContextBundleOptions {
   publicationScope?: NexusWorkerContextPublicationScope;
   publication?: NexusAutomationPublicationConfig | null;
   gitIdentity?: NexusExpectedGitIdentity | null;
+  commandGuardrails?: NexusWorkerContextCommandGuardrail[];
   authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
+}
+
+export interface NexusWorkerContextCommandGuardrail {
+  id: string;
+  status: string;
+  binDirectoryPath: string | null;
+  guardedCommands: string[];
+  environmentKeys: string[];
+  message: string | null;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -317,6 +335,9 @@ export function buildNexusWorkerContextBundle(
   const publicationScope = options.publicationScope ?? "component";
   const publication = options.publication ?? null;
   const gitIdentity = options.gitIdentity ?? null;
+  const commandGuardrails = normalizeWorkerCommandGuardrails(
+    options.commandGuardrails,
+  );
   const authority = options.authority ?? null;
   const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
   const agentTargetPolicy = normalizeWorkerAgentTargetPolicy(
@@ -353,6 +374,7 @@ export function buildNexusWorkerContextBundle(
     publicationScope,
     publication,
     gitIdentity,
+    commandGuardrails,
     authority,
     runnerProfiles,
     agentTargetPolicy,
@@ -410,6 +432,9 @@ export function renderNexusWorkerBriefing(
     `- PLAN.md: ${context.projectContext.planPath}`,
     `- target-state: ${context.projectContext.targetStatePath}`,
     ...renderReferencedProjectFileLines(context.projectContext.referencedFiles),
+    ...renderMissingReferencedProjectFileLines(
+      context.projectContext.missingReferencedFiles,
+    ),
     "",
     "Skills:",
     `Workspace-managed skills: ${context.skills.projectManagedRoot}`,
@@ -421,6 +446,8 @@ export function renderNexusWorkerBriefing(
     "",
     ...renderPublicationPolicyLines(context.publication, context.publicationScope),
     ...renderGitIdentityLines(context.gitIdentity),
+    "",
+    ...renderCommandGuardrailLines(context.commandGuardrails),
     "",
     ...renderAuthorityPolicyLines(context.authority),
     "",
@@ -522,7 +549,7 @@ function projectContextReferences(options: {
     { id: "plan", path: planPath, access: "read_only" },
     { id: "target-state", path: targetStatePath, access: "read_only" },
   ];
-  const referencedFiles = referencedProjectFiles({
+  const referencedContext = referencedProjectFiles({
     projectRoot: options.projectRoot,
     sourceRoot: options.sourceRoot,
     textSources: [
@@ -536,8 +563,9 @@ function projectContextReferences(options: {
     contextPath,
     planPath,
     targetStatePath,
-    referencedFiles,
-    files: [...defaultFiles, ...referencedFiles],
+    referencedFiles: referencedContext.files,
+    missingReferencedFiles: referencedContext.missingFiles,
+    files: [...defaultFiles, ...referencedContext.files],
   };
 }
 
@@ -545,11 +573,15 @@ function referencedProjectFiles(options: {
   projectRoot: string;
   sourceRoot: string;
   textSources: string[];
-}): NexusWorkerContextFileReference[] {
+}): {
+  files: NexusWorkerContextFileReference[];
+  missingFiles: NexusWorkerContextMissingFileReference[];
+} {
   const references = new Map<string, NexusWorkerContextFileReference>();
+  const missingReferences = new Map<string, NexusWorkerContextMissingFileReference>();
   for (const text of options.textSources) {
     for (const relativePath of extractRootRelativeProjectDocReferences(text)) {
-      if (references.has(relativePath)) {
+      if (references.has(relativePath) || missingReferences.has(relativePath)) {
         continue;
       }
       const projectPath = resolveInsideRoot(
@@ -582,14 +614,18 @@ function referencedProjectFiles(options: {
         continue;
       }
 
-      throw new NexusWorkerContextBundleError(
-        `Referenced context file is missing: ${relativePath} ` +
-          `(projectRoot: ${projectPath}; sourceRoot: ${componentPath})`,
-      );
+      missingReferences.set(relativePath, {
+        relativePath,
+        projectPath,
+        componentPath,
+      });
     }
   }
 
-  return [...references.values()];
+  return {
+    files: [...references.values()],
+    missingFiles: [...missingReferences.values()],
+  };
 }
 
 function extractRootRelativeProjectDocReferences(text: string): string[] {
@@ -645,6 +681,24 @@ function renderReferencedFileGroup(
     "",
     title,
     ...files.map((file) => `- ${referencedFileRelativePath(file)}: ${file.path}`),
+  ];
+}
+
+function renderMissingReferencedProjectFileLines(
+  files: NexusWorkerContextMissingFileReference[],
+): string[] {
+  if (files.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Skipped missing referenced docs:",
+    ...files.map(
+      (file) =>
+        `- ${file.relativePath}: not found under project root or component source root ` +
+        `(project: ${file.projectPath}; component: ${file.componentPath})`,
+    ),
   ];
 }
 
@@ -928,7 +982,12 @@ function renderPublicationPolicyLines(
   scope: NexusWorkerContextPublicationScope,
 ): string[] {
   if (!publication) {
-    return ["Publication policy:", `- scope: ${scope}`, "- automation remote: none"];
+    return [
+      "Publication policy:",
+      `- scope: ${scope}`,
+      "- automation remote: none",
+      ...renderPublicationFacadeGuidanceLines(false),
+    ];
   }
 
   const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
@@ -952,6 +1011,27 @@ function renderPublicationPolicyLines(
     `- manual remote: ${publication.manualRemote ?? "none"}`,
     `- manual actor: ${publicationActorLabel(publication.manualActor)}`,
     `- command environment keys: ${commandEnvironmentKeys || "none"}`,
+    ...renderPublicationFacadeGuidanceLines(true),
+  ];
+}
+
+function renderPublicationFacadeGuidanceLines(
+  policyConfigured: boolean,
+): string[] {
+  if (!policyConfigured) {
+    return [
+      "Publication facade:",
+      "- status: unavailable; no publication policy is configured for this worker.",
+    ];
+  }
+
+  return [
+    "Publication facade:",
+    "- verify the configured actor before provider writes with `publication_actor_verify`.",
+    "- use `publication_review_handoff` for branch push plus PR handoff.",
+    "- use `publication_branch_push` and `publication_pull_request_upsert` when push and PR steps must be separate.",
+    "- use `publication_pull_request_evidence` for PR checks; use `publication_pull_request_merge` only with explicit merge authority.",
+    "- do not use raw `git push`, `gh`, or `glab` for provider mutations; read-only diagnostics are allowed.",
   ];
 }
 
@@ -986,6 +1066,57 @@ function publicationActorLabel(
     actor.provider ?? "unknown-provider",
     actor.handle ?? actor.id ?? "unknown-actor",
   ].join(":");
+}
+
+function normalizeWorkerCommandGuardrails(
+  commandGuardrails: NexusWorkerContextCommandGuardrail[] | undefined,
+): NexusWorkerContextCommandGuardrail[] {
+  return (commandGuardrails ?? [])
+    .map((guardrail) => ({
+      id: requiredNonEmptyString(guardrail.id, "commandGuardrails.id"),
+      status: requiredNonEmptyString(
+        guardrail.status,
+        "commandGuardrails.status",
+      ),
+      binDirectoryPath:
+        optionalNullableString(
+          guardrail.binDirectoryPath,
+          "commandGuardrails.binDirectoryPath",
+        ) ?? null,
+      guardedCommands: normalizeStringArray(
+        guardrail.guardedCommands,
+        "commandGuardrails.guardedCommands",
+      ),
+      environmentKeys: normalizeStringArray(
+        guardrail.environmentKeys,
+        "commandGuardrails.environmentKeys",
+      ),
+      message:
+        optionalNullableString(
+          guardrail.message,
+          "commandGuardrails.message",
+        ) ?? null,
+    }))
+    .sort((left, right) => compareStrings(left.id, right.id));
+}
+
+function renderCommandGuardrailLines(
+  commandGuardrails: NexusWorkerContextCommandGuardrail[],
+): string[] {
+  if (commandGuardrails.length === 0) {
+    return ["Command guardrails:", "- publication command wrappers: none"];
+  }
+
+  return [
+    "Command guardrails:",
+    ...commandGuardrails.flatMap((guardrail) => [
+      `- ${guardrail.id}: ${guardrail.status}`,
+      `  PATH directory: ${guardrail.binDirectoryPath ?? "none"}`,
+      `  Guarded commands: ${guardrail.guardedCommands.join(", ") || "none"}`,
+      `  Environment keys: ${guardrail.environmentKeys.join(", ") || "none"}`,
+      ...(guardrail.message ? [`  Note: ${guardrail.message}`] : []),
+    ]),
+  ];
 }
 
 function renderAuthorityPolicyLines(

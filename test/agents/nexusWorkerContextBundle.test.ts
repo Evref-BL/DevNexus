@@ -70,6 +70,22 @@ describe("nexus worker context bundle", () => {
       baseRef: "origin/main",
       workItem,
       publication,
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          binDirectoryPath: path.join(
+            worktreePath,
+            ".dev-nexus",
+            "guardrails",
+            "bin",
+          ),
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+          message:
+            "Prepared worktree-local wrappers that block raw publication mutations.",
+        },
+      ],
       authority: summarizeNexusAuthorityForComponent({
         projectId: "worker-demo",
         componentId: "dev-nexus",
@@ -186,6 +202,14 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+        },
+      ],
       authority: {
         actor: {
           actorId: "example-bot-actor",
@@ -282,6 +306,31 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain("- manual remote: origin");
     expect(briefing).toContain("- manual actor: human:github:example-human");
     expect(briefing).toContain("- command environment keys: GH_CONFIG_DIR");
+    expect(briefing).toContain("Command guardrails:");
+    expect(briefing).toContain("- publication-command-guard: materialized");
+    expect(briefing).toContain(
+      `  PATH directory: ${path.join(worktreePath, ".dev-nexus", "guardrails", "bin")}`,
+    );
+    expect(briefing).toContain("  Guarded commands: git, gh, glab");
+    expect(briefing).toContain(
+      "  Environment keys: DEV_NEXUS_PUBLICATION_GUARD_BIN, PATH",
+    );
+    expect(briefing).toContain("Publication facade:");
+    expect(briefing).toContain(
+      "- verify the configured actor before provider writes with `publication_actor_verify`.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_review_handoff` for branch push plus PR handoff.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_branch_push` and `publication_pull_request_upsert` when push and PR steps must be separate.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_pull_request_evidence` for PR checks; use `publication_pull_request_merge` only with explicit merge authority.",
+    );
+    expect(briefing).toContain(
+      "- do not use raw `git push`, `gh`, or `glab` for provider mutations; read-only diagnostics are allowed.",
+    );
     expect(briefing).not.toContain("home:.config/gh-example-bot");
   });
 
@@ -310,6 +359,9 @@ describe("nexus worker context bundle", () => {
       path: targetStatePath,
       access: "read_only",
     });
+    expect(result.briefingMarkdown).toContain(
+      "- status: unavailable; no publication policy is configured for this worker.",
+    );
   });
 
   it("records planning docs referenced by work item descriptions as read-only root context", () => {
@@ -365,15 +417,15 @@ describe("nexus worker context bundle", () => {
     const componentDocPath = path.join(
       sourceRoot,
       "docs",
-      "kanban-agent-pharo-access.md",
+      "agent-pharo-access.md",
     );
     fs.mkdirSync(path.dirname(componentDocPath), { recursive: true });
-    fs.writeFileSync(componentDocPath, "# Kanban Agent Pharo Access\n", "utf8");
+    fs.writeFileSync(componentDocPath, "# Agent Pharo Access\n", "utf8");
     const workItem: WorkItem = {
       id: "local-31",
       title: "Fix component doc context",
       description:
-        "Component reference: `docs/kanban-agent-pharo-access.md`.",
+        "Component reference: `docs/agent-pharo-access.md`.",
       status: "ready",
       provider: "local",
       labels: ["dogfood"],
@@ -391,7 +443,7 @@ describe("nexus worker context bundle", () => {
     });
 
     const expectedReference = {
-      id: "component-doc:docs/kanban-agent-pharo-access.md",
+      id: "component-doc:docs/agent-pharo-access.md",
       path: componentDocPath,
       access: "read_only",
     };
@@ -406,35 +458,47 @@ describe("nexus worker context bundle", () => {
     );
     expect(result.briefingMarkdown).toContain("Referenced component docs:");
     expect(result.briefingMarkdown).toContain(
-      `- docs/kanban-agent-pharo-access.md: ${componentDocPath}`,
+      `- docs/agent-pharo-access.md: ${componentDocPath}`,
     );
   });
 
-  it("fails before worker launch when a referenced planning doc is missing", () => {
+  it("skips missing referenced planning docs without blocking context materialization", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
     const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
     const worktreePath = path.join(worktreesRoot, "local-44");
+    const relativePath = "docs/component-multi-tracker-prd.md";
     const workItem: WorkItem = {
       id: "local-44",
       title: "Add component multi-tracker schema",
-      description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
+      description: `Source PRD: \`${relativePath}\`.`,
       status: "ready",
       provider: "local",
     };
 
-    expect(() =>
-      materializeNexusWorkerContextBundle({
-        projectRoot,
-        componentId: "dev-nexus",
-        sourceRoot,
-        worktreesRoot,
-        worktreePath,
-        branchName: "codex/local-44-component-trackers",
-        baseRef: "origin/main",
-        workItem,
-      }),
-    ).toThrow(/Referenced context file is missing/);
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-44-component-trackers",
+      baseRef: "origin/main",
+      workItem,
+    });
+
+    expect(result.context.projectContext.referencedFiles).toEqual([]);
+    expect(result.context.projectContext.missingReferencedFiles).toEqual([
+      {
+        relativePath,
+        projectPath: path.join(projectRoot, relativePath),
+        componentPath: path.join(sourceRoot, relativePath),
+      },
+    ]);
+    expect(result.briefingMarkdown).toContain("Skipped missing referenced docs:");
+    expect(result.briefingMarkdown).toContain(
+      `- ${relativePath}: not found under project root or component source root`,
+    );
   });
 
   it("records workspace-managed skills and worker-local agent workspaceions", () => {

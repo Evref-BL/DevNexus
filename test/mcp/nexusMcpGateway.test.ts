@@ -47,10 +47,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     ],
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     automation: defaultNexusAutomationConfig,
     ...overrides,
   };
@@ -58,6 +54,10 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
 
 function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
+}
+
+function safeGatewayFilePart(value: string): string {
+  return value.trim().replace(/[^A-Za-z0-9_.-]/gu, "_");
 }
 
 function writeEchoMcpServer(projectRoot: string): string {
@@ -72,16 +72,26 @@ process.stdin.on("data", (chunk) => {
 });
 function processBuffer() {
   while (true) {
-    const headerEnd = buffer.indexOf("\\r\\n\\r\\n");
-    if (headerEnd < 0) return;
-    const header = buffer.slice(0, headerEnd).toString("utf8");
-    const match = /Content-Length:\\s*(\\d+)/i.exec(header);
-    if (!match) throw new Error("missing content length");
-    const bodyStart = headerEnd + 4;
-    const bodyEnd = bodyStart + Number(match[1]);
-    if (buffer.length < bodyEnd) return;
-    const message = JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8"));
-    buffer = buffer.slice(bodyEnd);
+    let message;
+    if (buffer.subarray(0, Math.min(buffer.length, "Content-Length:".length)).toString("utf8").toLowerCase() === "content-length:") {
+      const headerEnd = buffer.indexOf("\\r\\n\\r\\n");
+      if (headerEnd < 0) return;
+      const header = buffer.slice(0, headerEnd).toString("utf8");
+      const match = /Content-Length:\\s*(\\d+)/i.exec(header);
+      if (!match) throw new Error("missing content length");
+      const bodyStart = headerEnd + 4;
+      const bodyEnd = bodyStart + Number(match[1]);
+      if (buffer.length < bodyEnd) return;
+      message = JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8"));
+      buffer = buffer.slice(bodyEnd);
+    } else {
+      const newlineIndex = buffer.indexOf("\\n");
+      if (newlineIndex < 0) return;
+      const line = buffer.slice(0, newlineIndex).toString("utf8").trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line) continue;
+      message = JSON.parse(line);
+    }
     handle(message);
   }
 }
@@ -400,6 +410,29 @@ describe("DevNexus MCP gateway", () => {
         decision: "allowed",
       },
     });
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "runtime",
+          "mcp-gateway",
+          "results",
+          `${called.resultId}.json`,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "mcp-gateway",
+          "results",
+          `${called.resultId}.json`,
+        ),
+      ),
+    ).toBe(false);
     const fetched = toolJson(await callDevNexusMcpGatewayTool(
       "mcp_gateway_result_fetch",
       { projectRoot, resultId: called.resultId },
@@ -451,6 +484,29 @@ describe("DevNexus MCP gateway", () => {
       toolName: "echo",
       schemaStatus: "discovered",
     });
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "runtime",
+          "mcp-gateway",
+          "discovery",
+          `${safeGatewayFilePart(search.matches[0].serverId)}.json`,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "mcp-gateway",
+          "discovery",
+          `${safeGatewayFilePart(search.matches[0].serverId)}.json`,
+        ),
+      ),
+    ).toBe(false);
 
     const described = toolJson(await callDevNexusMcpGatewayTool(
       "mcp_gateway_describe",
@@ -473,6 +529,66 @@ describe("DevNexus MCP gateway", () => {
     ));
     expect(called.response).toMatchObject({
       content: [{ type: "text", text: "dynamic" }],
+    });
+  });
+
+  it("discovers schemas for declared gateway tool names", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-declared-schema-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+              tools: [
+                {
+                  name: "echo",
+                  description: "Declared echo entry.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "declared echo" },
+    ));
+
+    expect(search.matches[0]).toMatchObject({
+      serverName: "echo_runtime",
+      toolName: "echo",
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+    });
+
+    const described = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_describe",
+      { projectRoot, toolId: search.matches[0].toolId },
+    ));
+    expect(described.tool).toMatchObject({
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+      },
     });
   });
 

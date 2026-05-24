@@ -220,6 +220,139 @@ describe("nexus manual worktree worker target preparation", () => {
     expect(result.setup.context!.briefingMarkdown).not.toContain("Claude Note");
   });
 
+  it("prepares a worktree when work item text references a missing doc", () => {
+    const { projectRoot, calls } = prepareProject();
+    const relativePath = "docs/dev/source-quality.md";
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "missing doc reference",
+      branchName: "codex/primary/missing-doc-reference",
+      worktreeName: "missing-doc-reference",
+      workItemId: "30",
+      workItemTitle: "Audit source quality",
+      workItemDescription: `See \`${relativePath}\` for the local audit notes.`,
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(fs.existsSync(result.worktree.worktreePath)).toBe(true);
+    expect(context.projectContext.referencedFiles).toEqual([]);
+    expect(context.projectContext.missingReferencedFiles).toEqual([
+      {
+        relativePath,
+        projectPath: path.join(projectRoot, relativePath),
+        componentPath: path.join(projectRoot, "source", relativePath),
+      },
+    ]);
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Skipped missing referenced docs:",
+    );
+  });
+
+  it("applies setup projections when preparing an existing local branch", () => {
+    const { projectRoot, sourceRoot, calls } = prepareProject({
+      plugins: [
+        {
+          id: "typescript",
+          enabled: true,
+          name: "TypeScript Tooling",
+          capabilities: [
+            {
+              kind: "dependency_projection",
+              id: "node-modules",
+              source: "node_modules",
+              target: "node_modules",
+              required: true,
+              reason: "Resolve local npm binaries from prepared JS/TS worktrees.",
+              targetComponents: ["primary"],
+            },
+          ],
+        },
+      ],
+    });
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    fs.mkdirSync(sourceDependency, { recursive: true });
+    fs.writeFileSync(path.join(sourceDependency, "tool.txt"), "ready\n", "utf8");
+    const branchName = "codex/primary/existing-branch";
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      if (argsArray.join(" ") === `for-each-ref --format=%(refname) refs/heads/${branchName}`) {
+        return {
+          args: argsArray,
+          stdout: `refs/heads/${branchName}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (argsArray.join(" ") === "worktree list --porcelain") {
+        return {
+          args: argsArray,
+          stdout: [
+            `worktree ${sourceRoot}`,
+            "HEAD 1111111111111111111111111111111111111111",
+            "branch refs/heads/main",
+            "",
+          ].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        argsArray[0] === "worktree" &&
+        argsArray[1] === "add" &&
+        argsArray[2] !== "-b"
+      ) {
+        fs.mkdirSync(argsArray[2]!, { recursive: true });
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+        return {
+          args: argsArray,
+          stdout: path.join(cwd ?? "", ".git", "info", "exclude"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: `fatal: a branch named '${branchName}' already exists`,
+        exitCode: 128,
+      };
+    };
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "existing branch",
+      branchName,
+      worktreeName: "existing-branch",
+      gitRunner,
+    });
+
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: ["worktree", "add", result.worktree.worktreePath, branchName],
+    });
+    expect(result.setup.dependencyProjections).toMatchObject([
+      {
+        id: "node-modules",
+        status: "linked",
+        sourcePath: sourceDependency,
+        targetPath: path.join(result.worktree.worktreePath, "node_modules"),
+      },
+    ]);
+    expect(
+      fs.existsSync(path.join(result.worktree.worktreePath, "node_modules", "tool.txt")),
+    ).toBe(true);
+  });
+
   it("prepares distinct worker contexts for different active providers", () => {
     const { projectRoot, calls } = prepareProject({
       agentTargets: {

@@ -554,7 +554,6 @@ function validateProvider(
   }
   if (
     value === "local" ||
-    value === "vibe-kanban" ||
     value === "github" ||
     value === "gitlab" ||
     value === "jira"
@@ -563,7 +562,7 @@ function validateProvider(
   }
 
   throw new NexusVersionPlanningConfigError(
-    `${pathName} must be local, vibe-kanban, github, gitlab, or jira`,
+    `${pathName} must be local, github, gitlab, or jira`,
   );
 }
 

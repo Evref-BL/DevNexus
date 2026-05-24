@@ -84,7 +84,7 @@ function unsupportedProvider(): WorkTrackerProvider {
   };
 
   return {
-    provider: "vibe-kanban",
+    provider: "minimal",
     capabilities: noWorkItemCapabilities,
     createWorkItem: shouldNotRun,
     listWorkItems: shouldNotRun,
@@ -611,9 +611,8 @@ describe("work item service", () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     const project = createProjectContext(projectRoot, {
       workTracking: {
-        provider: "vibe-kanban",
-        projectId: "legacy-vibe-project",
-      },
+        provider: "unknown",
+      } as unknown as ResolvedWorkItemProjectContext["workTracking"],
     });
     const service = createWorkItemService({
       resolveProject: createProjectResolver(project),
@@ -624,15 +623,14 @@ describe("work item service", () => {
     ).rejects.toThrow(WorkItemServiceError);
     await expect(
       service.resolveProviderContext({ project: "tracked-project" }),
-    ).rejects.toThrow(/tracked-project.*vibe-kanban.*not available/);
+    ).rejects.toThrow(/tracked-project.*unknown.*not available/);
   });
 
   it("fails before provider calls when neutral capabilities are disabled", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     const project = createProjectContext(projectRoot, {
       workTracking: {
-        provider: "vibe-kanban",
-        projectId: "legacy-vibe-project",
+        provider: "local",
       },
     });
     const service = createWorkItemService({
@@ -646,21 +644,21 @@ describe("work item service", () => {
         title: "Unsupported create",
       }),
     ).rejects.toThrow(
-      /provider "vibe-kanban" cannot create work items; required capability "create" is disabled/,
+      /provider "minimal" cannot create work items; required capability "create" is disabled/,
     );
     await expect(
       service.listWorkItems({ project: "tracked-project" }),
     ).rejects.toThrow(
-      /provider "vibe-kanban" cannot list work items; required capability "list" is disabled/,
+      /provider "minimal" cannot list work items; required capability "list" is disabled/,
     );
     await expect(
       service.addComment({
         project: "tracked-project",
-        ref: { id: "vibe-1" },
+        ref: { id: "blocked-1" },
         body: "Unsupported comment",
       }),
     ).rejects.toThrow(
-      /provider "vibe-kanban" cannot add comments; required capability "comment" is disabled/,
+      /provider "minimal" cannot add comments; required capability "comment" is disabled/,
     );
   });
 

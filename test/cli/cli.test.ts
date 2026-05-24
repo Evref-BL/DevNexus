@@ -133,10 +133,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       sourceRoot: "source",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },
@@ -2632,6 +2628,66 @@ describe("dev-nexus cli", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("allows guarded work-item comments from workspace-meta current paths", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "demo-project",
+      "comment-meta",
+    );
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Comment guarded work",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${path.resolve(cwd ?? projectRoot)}\n`);
+      }
+      if (joined === "worktree list --porcelain") {
+        return ok(argsArray, `worktree ${projectRoot}\nHEAD abc123\nbranch refs/heads/main\n`);
+      }
+
+      return ok(argsArray, "");
+    };
+
+    await expect(
+      main(
+        [
+          "work-item",
+          "comment",
+          projectRoot,
+          "local-1",
+          "--body",
+          "Ready for review.",
+          "--current-path",
+          generatedMetaWorktree,
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          gitRunner,
+          sharedCheckoutGuard: "enforce",
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output()).comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for review.",
+    });
+  });
+
   it("fails guarded inbound import execution from a shared checkout before writing local state", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     saveProjectConfig(projectRoot, projectConfig());
@@ -3698,7 +3754,6 @@ describe("dev-nexus cli", () => {
     fs.mkdirSync(sourceRoot, { recursive: true });
     const importOutput = captureOutput();
     const configureOutput = captureOutput();
-    const linkOutput = captureOutput();
     const gitCalls: string[][] = [];
 
     await main(["home", "init", homePath], {
@@ -3741,23 +3796,6 @@ describe("dev-nexus cli", () => {
         stdout: configureOutput.writer,
       },
     );
-    await main(
-      [
-        "workspace",
-        "tracker",
-        "link",
-        "imported",
-        "--home",
-        homePath,
-        "--tracker-project-id",
-        "tracker-1",
-        "--json",
-      ],
-      {
-        stdout: linkOutput.writer,
-      },
-    );
-
     expect(JSON.parse(importOutput.output())).toMatchObject({
       ok: true,
       projectConfig: {
@@ -3775,13 +3813,6 @@ describe("dev-nexus cli", () => {
       workTracking: {
         provider: "local",
         storePath: ".dev-nexus/work-items.json",
-      },
-    });
-    expect(JSON.parse(linkOutput.output())).toMatchObject({
-      ok: true,
-      vibeKanbanProjectId: "tracker-1",
-      project: {
-        id: "imported",
       },
     });
     expect(gitCalls).toContainEqual([
@@ -7936,7 +7967,7 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(commandRuns).toEqual(["node task.js", "npm test"]);
-    expect(gitCalls[0]).toMatchObject({
+    expect(gitCalls).toContainEqual({
       args: [
         "worktree",
         "add",

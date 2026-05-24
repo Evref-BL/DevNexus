@@ -83,6 +83,7 @@ import {
 import {
   loadNexusPublicationAuthProfiles,
   resolveNexusPublicationPolicy,
+  type NexusPublicationGitPushRunner,
 } from "../publication/nexusPublicationPolicy.js";
 import {
   getNexusEligibleWorkSummary,
@@ -212,6 +213,11 @@ import {
 } from "../work-items/workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "../worktrees/gitWorktreeService.js";
+import {
+  callNexusPublicationMcpTool,
+  isNexusPublicationMcpToolName,
+  nexusPublicationMcpTools,
+} from "./nexusMcpPublicationTools.js";
 import type {
   WorkItem,
   WorkItemPatch,
@@ -241,6 +247,10 @@ export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
   commandRunner?: NexusAutomationCommandRunner;
+  publicationFetch?: typeof fetch;
+  publicationCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
+  publicationGitPushRunner?: NexusPublicationGitPushRunner;
+  publicationRemoteProbeRunner?: NexusPublicationGitPushRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
   mcpRuntimeStartedAt?: Date | string;
@@ -613,6 +623,7 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  ...nexusPublicationMcpTools,
   {
     name: "review_plan",
     description: "Build a read-only component review plan from review policy, local authorization, and optional provider evidence.",
@@ -760,6 +771,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         projectMeta: { type: "boolean" },
         workItemId: { type: ["string", "null"] },
@@ -810,6 +822,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -825,7 +838,6 @@ const tools: McpTool[] = [
         verificationSummary: { type: ["string", "null"] },
         integrationPreference: { type: ["string", "null"] },
         note: { type: ["string", "null"] },
-        currentPath: { type: "string" },
       },
       required: ["workItemId", "status"],
       additionalProperties: false,
@@ -840,13 +852,13 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
         trackerRole: { type: "string" },
         targetBranch: { type: "string" },
         fetch: { type: "boolean" },
-        currentPath: { type: "string" },
       },
       additionalProperties: false,
     },
@@ -860,6 +872,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -887,7 +900,6 @@ const tools: McpTool[] = [
         responseSummary: { type: ["string", "null"] },
         responder: { type: ["string", "null"] },
         requestedChanges: { type: "array", items: { type: "string" } },
-        currentPath: { type: "string" },
       },
       required: ["intent"],
       additionalProperties: false,
@@ -1154,6 +1166,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1179,6 +1192,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1200,6 +1214,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1468,6 +1483,9 @@ export async function callDevNexusMcpTool(
 ): Promise<DevNexusMcpToolResult> {
   try {
     const args = argsValue === undefined ? {} : asRecord(argsValue, "arguments");
+    if (isNexusPublicationMcpToolName(name)) {
+      return toolResult(await callNexusPublicationMcpTool(name, args, context));
+    }
     switch (name) {
       case "project_status": {
         const detail = mcpDetailFromArgs(args);
@@ -2097,17 +2115,15 @@ export async function callDevNexusMcpTool(
             homePath: optionalString(args, "homePath", "arguments"),
           }),
         });
-      case "work_item_create":
+      case "work_item_create": {
+        const provider = workItemTrackerProviderFromArgs(args);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_create",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
           componentId: optionalString(args, "componentId", "arguments"),
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemCreateAuthorityActions(
-            args,
-            workItemTrackerProviderFromArgs(args),
-          ),
+          ...workItemCreateAuthorityActions(args, provider),
         ]);
         return toolResult({
           ok: true,
@@ -2121,6 +2137,7 @@ export async function callDevNexusMcpTool(
             milestone: optionalNullableString(args, "milestone", "arguments"),
           }),
         });
+      }
       case "work_item_discovery_status":
         return toolResult({
           ok: true,
@@ -2222,16 +2239,15 @@ export async function callDevNexusMcpTool(
       case "work_item_update": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
         const patch = workItemPatchFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_update",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemPatchAuthorityActions(
-            patch,
-            workItemTrackerProviderFromArgs(args, selector),
-          ),
+          ...workItemPatchAuthorityActions(patch, provider),
         ]);
         return toolResult({
           ok: true,
@@ -2244,13 +2260,15 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_comment": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_comment",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          workItemCommentAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+          workItemCommentAuthorityAction(provider),
         ]);
         return toolResult({
           ok: true,
@@ -2263,13 +2281,15 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_set_status": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_set_status",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          workItemStatusAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+          workItemStatusAuthorityAction(provider),
         ]);
         return toolResult({
           ok: true,
@@ -2696,6 +2716,14 @@ function workItemTrackerProviderFromResolved(
     ? resolved.workTrackers?.find((candidate) => candidate.id === trackerId)
     : null;
   return tracker?.workTracking.provider ?? resolved.workTracking?.provider ?? "local";
+}
+
+function workItemMutationClassForTrackerProvider(
+  provider: string,
+): NexusCheckoutMutationClass {
+  return provider.trim().toLowerCase() === "local"
+    ? "local_tracker"
+    : "provider_tracker";
 }
 
 function workItemCreateAuthorityActions(
@@ -4026,8 +4054,6 @@ export function summarizeProjectStatus(project: NexusProjectStatusBase) {
     workTracking: summarizeWorkTracking(project.workTracking ?? null),
     unsupportedWorkTrackingCapabilities:
       project.workTrackingCapabilityReport?.unsupported ?? null,
-    vibeKanbanProjectId: project.vibeKanbanProjectId,
-    vibeKanbanRepoId: project.vibeKanbanRepoId,
     hostCount: project.hosts.length,
     runnerProfileCount: project.runnerProfiles.length,
     agentTargets: project.agentTargets

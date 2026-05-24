@@ -42,10 +42,6 @@ function minimalProjectConfig(
       },
     ],
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     ...overrides,
   };
 }
@@ -303,10 +299,6 @@ describe("nexus project scaffold", () => {
         },
       ],
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       automation: {
         ...defaultNexusAutomationConfig,
         mode: "agent_launch",
@@ -478,10 +470,6 @@ describe("nexus project scaffold", () => {
         },
       ],
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       automation: {
         ...defaultNexusAutomationConfig,
         target: {

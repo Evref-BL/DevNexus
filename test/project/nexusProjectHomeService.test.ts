@@ -6,7 +6,6 @@ import {
   configureNexusProjectTracker,
   createNexusProject,
   getNexusProjectStatus,
-  linkNexusProjectTracker,
   listNexusProjects,
   loadProjectConfig,
   type NexusProjectHomeStore,
@@ -140,7 +139,7 @@ describe("project home service", () => {
     }).project.projectRoot).toBe(result.projectRoot);
   });
 
-  it("links the legacy tracker id and configures provider-neutral tracking", () => {
+  it("configures provider-neutral tracking", () => {
     const home = createHome();
     const project = createNexusProject({
       homePath: home.homePath,
@@ -148,22 +147,6 @@ describe("project home service", () => {
       name: "TrackedTool",
       gitRunner: fakeGitRunner([]),
     });
-
-    const linked = linkNexusProjectTracker({
-      homePath: home.homePath,
-      homeStore: home.homeStore,
-      project: "tracked-tool",
-      trackerProjectId: "tracker-1",
-    });
-
-    expect(linked).toMatchObject({
-      vibeKanbanProjectId: "tracker-1",
-      vibeKanbanRepoId: null,
-      projectRoot: project.projectRoot,
-    });
-    expect(loadProjectConfig(project.projectRoot).kanban.projectId).toBe(
-      "tracker-1",
-    );
 
     const configured = configureNexusProjectTracker({
       homePath: home.homePath,

@@ -42,10 +42,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     ],
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     automation: defaultNexusAutomationConfig,
     ...overrides,
   };

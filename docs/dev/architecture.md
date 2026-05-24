@@ -91,7 +91,7 @@ tools. Configured upstream MCP servers remain explicit workspace/plugin
 capabilities; the gateway does not auto-run arbitrary local commands. For
 command-based plugin MCP servers without declared tool metadata, the gateway can
 initialize the upstream server, call `tools/list`, and cache discovered metadata
-under `.dev-nexus/mcp-gateway/`. Workspace and agent-level gateway groups filter
+under `.dev-nexus/runtime/mcp-gateway/`. Workspace and agent-level gateway groups filter
 which configured servers and tools are searchable or callable.
 
 ## Plugin Capabilities

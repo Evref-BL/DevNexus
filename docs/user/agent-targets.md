@@ -95,7 +95,7 @@ Plugin MCP servers connect to the gateway through their `mcp_server`
 capability. Declare `serverName`, `command`, and `args`; declare `tools` when the
 tool names are known at plugin install time. If no tools are declared, the
 gateway starts the command-based MCP server, runs MCP initialization and
-`tools/list`, caches the discovered metadata under `.dev-nexus/mcp-gateway/`,
+`tools/list`, caches the discovered metadata under `.dev-nexus/runtime/mcp-gateway/`,
 and uses that cache in future budget reports.
 
 Check the context effect before changing exposure:

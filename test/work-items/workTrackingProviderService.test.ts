@@ -13,7 +13,6 @@ import {
   createWorkTrackerProviderAsync,
   workTrackerCapabilityReportForConfig,
   workTrackerCapabilitiesForConfig,
-  WorkTrackingProviderServiceError,
 } from "../../src/work-items/workTrackingProviderService.js";
 
 const tempDirs: string[] = [];
@@ -424,31 +423,6 @@ describe("work tracking provider service", () => {
     expect(jiraCalls[0]?.headers.Authorization).toBe("Bearer jira-broker-token");
   });
 
-  it("creates the Vibe provider when API options are available", () => {
-    expect(
-      createWorkTrackerProvider(
-        {
-          provider: "vibe-kanban",
-          projectId: "project-1",
-        },
-        {
-          vibeKanban: {
-            port: 3000,
-          },
-        },
-      ).capabilities.board,
-    ).toBe(true);
-  });
-
-  it("requires Vibe API options for Vibe providers", () => {
-    expect(() =>
-      createWorkTrackerProvider({
-        provider: "vibe-kanban",
-        projectId: "project-1",
-      }),
-    ).toThrow(WorkTrackingProviderServiceError);
-  });
-
   it("reports configured capabilities without requiring provider credentials", () => {
     expect(
       workTrackerCapabilityReportForConfig({
@@ -469,15 +443,6 @@ describe("work tracking provider service", () => {
         boardStatus: false,
       },
       unsupported: ["board", "boardStatus"],
-    });
-    expect(
-      workTrackerCapabilitiesForConfig({
-        provider: "vibe-kanban",
-        projectId: "project-1",
-      }),
-    ).toMatchObject({
-      board: true,
-      listItems: false,
     });
     expect(
       workTrackerCapabilitiesForConfig({
@@ -521,22 +486,18 @@ describe("work tracking provider service", () => {
   });
 
   it("uses explicit capability names in unsupported-operation diagnostics", () => {
-    const provider = createWorkTrackerProvider(
-      {
-        provider: "vibe-kanban",
-        projectId: "project-1",
+    const provider = {
+      provider: "minimal",
+      capabilities: {
+        ...workTrackerCapabilitiesForConfig({ provider: "local" }),
+        listItems: false,
       },
-      {
-        vibeKanban: {
-          port: 3000,
-        },
-      },
-    );
+    };
 
     expect(() =>
       assertWorkTrackerCapability(provider, "list", "discover eligible work"),
     ).toThrow(
-      /provider "vibe-kanban" cannot discover eligible work; required capability "list" is disabled/,
+      /provider "minimal" cannot discover eligible work; required capability "list" is disabled/,
     );
   });
 });

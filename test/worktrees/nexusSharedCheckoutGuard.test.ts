@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   assertNexusSharedCheckoutMutationAllowed,
   classifyNexusCheckout,
+  createOrRefreshNexusWorktreeLease,
   evaluateNexusSharedCheckoutMutation,
   NexusSharedCheckoutGuardError,
   saveProjectConfig,
@@ -55,6 +56,28 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
     },
     ...overrides,
   };
+}
+
+function overlappingResearchProjectConfig(): NexusProjectConfig {
+  return projectConfig({
+    id: "dev-nexus-research",
+    components: [
+      {
+        id: "dev-nexus-research",
+        name: "DevNexus-Research",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:guard/research.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+        worktreesRoot: "worktrees/dev-nexus-research",
+        workTracking: {
+          provider: "local",
+        },
+        relationships: [],
+      },
+    ],
+  });
 }
 
 function fakeGitRunner(repositoryByCwd: Map<string, string>): GitRunner {
@@ -136,6 +159,25 @@ describe("shared checkout mutation guard", () => {
       },
     });
     expect(decision.saferNextAction).toContain("workspace/meta worktree");
+  });
+
+  it("allows provider work item mutation from the shared project checkout", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner = fakeGitRunner(new Map([[canonical(projectRoot), projectRoot]]));
+
+    const decision = evaluateNexusSharedCheckoutMutation({
+      projectRoot,
+      mutationClass: "provider_tracker",
+      command: "work-item create",
+      gitRunner,
+    });
+
+    expect(decision).toMatchObject({
+      ok: true,
+      classification: "shared_project_checkout",
+      mutationClass: "provider_tracker",
+    });
   });
 
   it("refuses target-state mutation from the shared project checkout", () => {
@@ -256,6 +298,75 @@ describe("shared checkout mutation guard", () => {
     ).toMatchObject({
       ok: true,
       classification: "generated_project_meta_worktree",
+    });
+  });
+
+  it("prefers recorded workspace-meta leases over overlapping component worktree roots", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    const metaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus-research",
+      "quality-audit-tracker",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(metaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, overlappingResearchProjectConfig());
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      projectMeta: true,
+      worktreePath: metaWorktree,
+      branchName: "codex/dev-nexus-research/quality-audit-tracker",
+      gitFacts: {
+        repositoryPath: metaWorktree,
+        headCommit: "abc123",
+        dirty: false,
+      },
+      now: "2026-05-24T10:00:00.000Z",
+    });
+    const gitRunner = fakeGitRunner(new Map([[canonical(metaWorktree), metaWorktree]]));
+
+    expect(
+      evaluateNexusSharedCheckoutMutation({
+        projectRoot,
+        targetPath: metaWorktree,
+        mutationClass: "project_state",
+        command: "work-item create",
+        gitRunner,
+      }),
+    ).toMatchObject({
+      ok: true,
+      classification: "generated_project_meta_worktree",
+      componentId: null,
+      reason: expect.stringContaining("recorded workspace/meta worktree lease"),
+    });
+  });
+
+  it("keeps unrecorded overlapping paths classified as component worktrees", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    const worktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus-research",
+      "component-task",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, overlappingResearchProjectConfig());
+    const gitRunner = fakeGitRunner(new Map([[canonical(worktreePath), worktreePath]]));
+
+    expect(
+      evaluateNexusSharedCheckoutMutation({
+        projectRoot,
+        targetPath: worktreePath,
+        mutationClass: "project_state",
+        command: "work-item create",
+        gitRunner,
+      }),
+    ).toMatchObject({
+      ok: false,
+      classification: "generated_component_worktree",
+      componentId: "dev-nexus-research",
     });
   });
 
