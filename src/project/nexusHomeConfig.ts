@@ -630,19 +630,11 @@ function validateNexusProjectReference(
 ): NexusProjectReference {
   const pathName = `projects[${index}]`;
   const record = assertRecord(value, pathName);
-  const trackerProjectId = optionalString(
-    record,
-    "vibeKanbanProjectId",
-    pathName,
-  );
-  const trackerRepoId = optionalString(record, "vibeKanbanRepoId", pathName);
 
   return {
     id: requiredString(record, "id", pathName),
     name: requiredString(record, "name", pathName),
     projectRoot: requiredString(record, "projectRoot", pathName),
-    ...(trackerProjectId ? { vibeKanbanProjectId: trackerProjectId } : {}),
-    ...(trackerRepoId ? { vibeKanbanRepoId: trackerRepoId } : {}),
   };
 }
 

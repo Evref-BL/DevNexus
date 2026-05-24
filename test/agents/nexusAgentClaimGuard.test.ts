@@ -240,10 +240,6 @@ function projectConfig(): NexusProjectConfig {
       sourceRoot: "source",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },

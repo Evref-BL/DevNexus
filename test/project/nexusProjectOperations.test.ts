@@ -378,10 +378,6 @@ describe("project operations", () => {
             defaultBranch: "main",
           },
           worktreesRoot: "worktrees",
-          kanban: {
-            provider: "vibe-kanban",
-            projectId: null,
-          },
           extensions: {
             existing: {
               retained: true,

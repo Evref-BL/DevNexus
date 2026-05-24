@@ -1240,7 +1240,7 @@ describe("eligible work discovery", () => {
     ]);
   });
 
-  it("reports disabled trackers, capability gaps, missing credentials, and provider read errors without crashing", async () => {
+  it("reports disabled trackers, missing credentials, and provider read errors without crashing", async () => {
     const projectRoot = makeTempDir("dev-nexus-eligible-work-");
     const config = projectConfig({
       trackerDiscovery: {
@@ -1256,10 +1256,6 @@ describe("eligible work discovery", () => {
         tracker("disabled", "Disabled", false, ["eligible_source"], {
           provider: "local",
           storePath: "disabled.json",
-        }),
-        tracker("no-list", "No List", true, ["eligible_source"], {
-          provider: "vibe-kanban",
-          projectId: "vk-1",
         }),
         tracker("missing-creds", "Missing Credentials", true, ["eligible_source"], {
           provider: "github",
@@ -1312,7 +1308,6 @@ describe("eligible work discovery", () => {
       expect.stringContaining("disabled skipped"),
     ]);
     expect(result.blockers).toEqual([
-      expect.stringContaining("no-list blocked"),
       expect.stringContaining("missing-creds blocked"),
       expect.stringContaining("throws blocked"),
     ]);

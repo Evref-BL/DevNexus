@@ -158,10 +158,6 @@ describe("project lifecycle helpers", () => {
           sourceRoot: "source",
         },
         worktreesRoot: "worktrees",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
       }),
     ).toBe(sourceRoot);
   });
@@ -211,10 +207,6 @@ describe("project lifecycle helpers", () => {
           },
         ],
         worktreesRoot: "worktrees",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
       }),
     ).toMatchObject([
       {
@@ -257,10 +249,6 @@ describe("project lifecycle helpers", () => {
           storePath: ".dev-nexus/work-items.json",
         },
         worktreesRoot: "worktrees",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
       })[0],
     ).toMatchObject({
       id: "primary",
@@ -334,10 +322,6 @@ describe("project lifecycle helpers", () => {
           },
         ],
         worktreesRoot: "worktrees",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
       })[0],
     ).toMatchObject({
       defaultTrackerId: "github",
@@ -383,10 +367,6 @@ describe("project lifecycle helpers", () => {
         defaultBranch: null,
       },
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
     });
 
     expect(loadProjectConfigIfExists(projectRoot)).toMatchObject({

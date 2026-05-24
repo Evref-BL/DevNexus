@@ -46,10 +46,6 @@ describe("nexus project template", () => {
         },
       ],
       worktreesRoot: ".nexus/worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
     };
 
     const layout = buildNexusProjectTemplateLayout({

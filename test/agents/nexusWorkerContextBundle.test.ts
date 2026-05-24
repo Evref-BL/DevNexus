@@ -365,15 +365,15 @@ describe("nexus worker context bundle", () => {
     const componentDocPath = path.join(
       sourceRoot,
       "docs",
-      "kanban-agent-pharo-access.md",
+      "agent-pharo-access.md",
     );
     fs.mkdirSync(path.dirname(componentDocPath), { recursive: true });
-    fs.writeFileSync(componentDocPath, "# Kanban Agent Pharo Access\n", "utf8");
+    fs.writeFileSync(componentDocPath, "# Agent Pharo Access\n", "utf8");
     const workItem: WorkItem = {
       id: "local-31",
       title: "Fix component doc context",
       description:
-        "Component reference: `docs/kanban-agent-pharo-access.md`.",
+        "Component reference: `docs/agent-pharo-access.md`.",
       status: "ready",
       provider: "local",
       labels: ["dogfood"],
@@ -391,7 +391,7 @@ describe("nexus worker context bundle", () => {
     });
 
     const expectedReference = {
-      id: "component-doc:docs/kanban-agent-pharo-access.md",
+      id: "component-doc:docs/agent-pharo-access.md",
       path: componentDocPath,
       access: "read_only",
     };
@@ -406,7 +406,7 @@ describe("nexus worker context bundle", () => {
     );
     expect(result.briefingMarkdown).toContain("Referenced component docs:");
     expect(result.briefingMarkdown).toContain(
-      `- docs/kanban-agent-pharo-access.md: ${componentDocPath}`,
+      `- docs/agent-pharo-access.md: ${componentDocPath}`,
     );
   });
 

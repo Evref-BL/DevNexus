@@ -4026,8 +4026,6 @@ export function summarizeProjectStatus(project: NexusProjectStatusBase) {
     workTracking: summarizeWorkTracking(project.workTracking ?? null),
     unsupportedWorkTrackingCapabilities:
       project.workTrackingCapabilityReport?.unsupported ?? null,
-    vibeKanbanProjectId: project.vibeKanbanProjectId,
-    vibeKanbanRepoId: project.vibeKanbanRepoId,
     hostCount: project.hosts.length,
     runnerProfileCount: project.runnerProfiles.length,
     agentTargets: project.agentTargets
