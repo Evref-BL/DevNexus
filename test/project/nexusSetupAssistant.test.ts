@@ -8,6 +8,8 @@ import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   currentNexusCliScriptPath,
+  defaultNexusMcpGatewayServerName,
+  defaultNexusMcpGatewayStdioArg,
   listNexusSetupFlows,
   recordNexusSetupStep,
   type NexusAgentClientRuntimeCommandRunner,
@@ -17,8 +19,19 @@ import {
 const tempDirs: string[] = [];
 
 function projectedDevNexusMcpToml(): string {
-  return `[mcp_servers.dev_nexus]\ncommand = ${tomlString("node")}\nargs = [${
-    [currentNexusCliScriptPath(), "mcp-stdio"].map(tomlString).join(", ")
+  return projectedMcpServerToml("dev_nexus", "mcp-stdio");
+}
+
+function projectedDevNexusGatewayMcpToml(): string {
+  return projectedMcpServerToml(
+    defaultNexusMcpGatewayServerName,
+    defaultNexusMcpGatewayStdioArg,
+  );
+}
+
+function projectedMcpServerToml(serverName: string, stdioArg: string): string {
+  return `[mcp_servers.${serverName}]\ncommand = ${tomlString("node")}\nargs = [${
+    [currentNexusCliScriptPath(), stdioArg].map(tomlString).join(", ")
   }]\n`;
 }
 
@@ -1950,6 +1963,57 @@ describe("nexus setup assistant", () => {
             source: "server",
           }),
         },
+      }),
+    );
+  });
+
+  it("accepts the materialized gateway target for gateway-exposed core MCP setup checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-mcp-core-gateway-");
+    writeProject(projectRoot, {
+      mcp: {
+        exposure: "gateway",
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      projectedDevNexusGatewayMcpToml(),
+      "utf8",
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const setupCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "passed",
+        summary: expect.stringContaining("routed through dev_nexus_gateway"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "gateway",
+            source: "workspace",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus_gateway",
+        status: "passed",
+        summary: expect.stringContaining("configured for codex"),
+      }),
+    );
+    expect(setupCheck.checks).not.toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "warning",
       }),
     );
   });

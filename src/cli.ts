@@ -222,6 +222,7 @@ import {
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./worktrees/nexusManualWorktree.js";
+import type { NexusCheckoutMutationClass } from "./worktrees/nexusSharedCheckoutGuard.js";
 import {
   heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,

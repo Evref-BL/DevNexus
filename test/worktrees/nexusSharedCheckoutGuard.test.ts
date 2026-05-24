@@ -138,6 +138,25 @@ describe("shared checkout mutation guard", () => {
     expect(decision.saferNextAction).toContain("workspace/meta worktree");
   });
 
+  it("allows provider work item mutation from the shared project checkout", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner = fakeGitRunner(new Map([[canonical(projectRoot), projectRoot]]));
+
+    const decision = evaluateNexusSharedCheckoutMutation({
+      projectRoot,
+      mutationClass: "provider_tracker",
+      command: "work-item create",
+      gitRunner,
+    });
+
+    expect(decision).toMatchObject({
+      ok: true,
+      classification: "shared_project_checkout",
+      mutationClass: "provider_tracker",
+    });
+  });
+
   it("refuses target-state mutation from the shared project checkout", () => {
     const projectRoot = makeTempDir("dev-nexus-guard-project-");
     saveProjectConfig(projectRoot, projectConfig());

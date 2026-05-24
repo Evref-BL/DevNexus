@@ -733,7 +733,7 @@ function pluginGatewayRecords(
           serverName: capability.serverName,
         });
         const declaredTools = capability.tools ?? [];
-        const discovered = declaredTools.length === 0
+        const discovered = capability.command
           ? readNexusMcpGatewayDiscoveryRecord(projectRoot, serverId)
           : null;
         const discoveredCacheIsCurrent = discovered
@@ -743,6 +743,9 @@ function pluginGatewayRecords(
         const discoveredTools = discovered && discoveredCacheIsCurrent
           ? discovered.tools
           : [];
+        const discoveredToolsByName = new Map(
+          discoveredTools.map((tool) => [tool.name, tool]),
+        );
         servers.push({
           serverId,
           source: "plugin",
@@ -753,7 +756,9 @@ function pluginGatewayRecords(
           capabilityId: capability.id,
           command: capability.command ?? null,
           args: [...(capability.args ?? [])],
-          toolCount: declaredTools.length + discoveredTools.length,
+          toolCount: declaredTools.length > 0
+            ? declaredTools.length
+            : discoveredTools.length,
           effectiveExposure: exposure.mode,
           exposureSource: exposure.source,
           exposureReason: exposure.reason,
@@ -778,8 +783,11 @@ function pluginGatewayRecords(
           );
         }
         for (const tool of declaredTools) {
+          const discoveredTool = discoveredToolsByName.get(tool.name);
           tools.push(pluginToolRecord({
-            tool,
+            tool: discoveredTool
+              ? mergeDeclaredGatewayToolMetadata(tool, discoveredTool)
+              : tool,
             serverId,
             plugin,
             capability,
@@ -787,21 +795,25 @@ function pluginGatewayRecords(
             provider,
             exposureSource: exposure.source,
             exposureReason: exposure.reason,
-            schemaStatus: "declared_name_only",
+            schemaStatus: discoveredTool
+              ? "discovered"
+              : "declared_name_only",
           }));
         }
-        for (const tool of discoveredTools) {
-          tools.push(pluginToolRecord({
-            tool,
-            serverId,
-            plugin,
-            capability,
-            agentTarget,
-            provider,
-            exposureSource: exposure.source,
-            exposureReason: exposure.reason,
-            schemaStatus: "discovered",
-          }));
+        if (declaredTools.length === 0) {
+          for (const tool of discoveredTools) {
+            tools.push(pluginToolRecord({
+              tool,
+              serverId,
+              plugin,
+              capability,
+              agentTarget,
+              provider,
+              exposureSource: exposure.source,
+              exposureReason: exposure.reason,
+              schemaStatus: "discovered",
+            }));
+          }
         }
       }
     }
@@ -843,19 +855,33 @@ function pluginToolRecord(options: {
   };
 }
 
+function mergeDeclaredGatewayToolMetadata(
+  declared: NonNullable<NexusPluginMcpServerCapability["tools"]>[number],
+  discovered: NexusMcpGatewayDiscoveryTool,
+): NexusMcpGatewayDiscoveryTool {
+  return {
+    name: declared.name,
+    description: declared.description ?? discovered.description,
+    ...(discovered.inputSchema ? { inputSchema: discovered.inputSchema } : {}),
+  };
+}
+
 async function discoverMissingGatewayMetadata(
   index: NexusMcpGatewayIndex,
 ): Promise<void> {
-  const toolsByServer = new Map<string, number>();
+  const toolsByServer = new Map<string, NexusMcpGatewayToolRecord[]>();
   for (const tool of index.tools) {
-    toolsByServer.set(tool.serverId, (toolsByServer.get(tool.serverId) ?? 0) + 1);
+    const tools = toolsByServer.get(tool.serverId) ?? [];
+    tools.push(tool);
+    toolsByServer.set(tool.serverId, tools);
   }
 
   for (const server of index.servers) {
+    const existingTools = toolsByServer.get(server.serverId) ?? [];
     if (
       server.source !== "plugin" ||
       !server.command ||
-      (toolsByServer.get(server.serverId) ?? 0) > 0
+      !gatewayServerNeedsDiscovery(existingTools)
     ) {
       continue;
     }
@@ -881,6 +907,11 @@ async function discoverMissingGatewayMetadata(
           `Gateway-routed plugin MCP server ${server.serverName} discovery returned no tools.`,
         );
       }
+      if (existingTools.length > 0) {
+        mergeDiscoveredGatewayToolMetadata(existingTools, discoveredTools);
+        server.toolCount = existingTools.length;
+        continue;
+      }
       for (const tool of discoveredTools) {
         index.tools.push({
           toolId: gatewayToolId(server.serverId, tool.name),
@@ -905,6 +936,36 @@ async function discoverMissingGatewayMetadata(
         `Gateway-routed plugin MCP server ${server.serverName} discovery failed: ${error instanceof Error ? error.message : String(error)}.`,
       );
     }
+  }
+}
+
+function gatewayServerNeedsDiscovery(
+  tools: readonly NexusMcpGatewayToolRecord[],
+): boolean {
+  return tools.length === 0 ||
+    tools.some((tool) =>
+      tool.schemaStatus === "declared_name_only" &&
+      tool.inputSchema === null
+    );
+}
+
+function mergeDiscoveredGatewayToolMetadata(
+  existingTools: readonly NexusMcpGatewayToolRecord[],
+  discoveredTools: readonly NexusMcpGatewayDiscoveryTool[],
+): void {
+  const discoveredToolsByName = new Map(
+    discoveredTools.map((tool) => [tool.name, tool]),
+  );
+  for (const existingTool of existingTools) {
+    const discoveredTool = discoveredToolsByName.get(existingTool.toolName);
+    if (!discoveredTool) {
+      continue;
+    }
+    existingTool.description =
+      existingTool.description ?? discoveredTool.description ?? null;
+    existingTool.inputSchema =
+      discoveredTool.inputSchema ?? existingTool.inputSchema;
+    existingTool.schemaStatus = "discovered";
   }
 }
 
@@ -1219,7 +1280,9 @@ function readGatewayResultRecord(
   if (!/^mcp-result-[A-Za-z0-9TZ-]+$/u.test(resultId)) {
     throw new Error("arguments.resultId must be a gateway result id");
   }
-  const recordPath = gatewayResultRecordPath(projectRoot, resultId);
+  const recordPath =
+    existingGatewayResultRecordPath(projectRoot, resultId) ??
+      gatewayResultRecordPath(projectRoot, resultId);
   if (!fs.existsSync(recordPath)) {
     throw new Error(`Gateway result record not found: ${resultId}`);
   }
@@ -1230,7 +1293,9 @@ export function readNexusMcpGatewayDiscoveryRecord(
   projectRoot: string,
   serverId: string,
 ): NexusMcpGatewayDiscoveryRecord | null {
-  const recordPath = gatewayDiscoveryRecordPath(projectRoot, serverId);
+  const recordPath =
+    existingGatewayDiscoveryRecordPath(projectRoot, serverId) ??
+      gatewayDiscoveryRecordPath(projectRoot, serverId);
   if (!fs.existsSync(recordPath)) {
     return null;
   }
@@ -1257,6 +1322,7 @@ function gatewayResultRecordPath(projectRoot: string, resultId: string): string 
   return path.join(
     path.resolve(projectRoot),
     ".dev-nexus",
+    "runtime",
     "mcp-gateway",
     "results",
     `${resultId}.json`,
@@ -1267,10 +1333,51 @@ function gatewayDiscoveryRecordPath(projectRoot: string, serverId: string): stri
   return path.join(
     path.resolve(projectRoot),
     ".dev-nexus",
+    "runtime",
     "mcp-gateway",
     "discovery",
     `${safeIdPart(serverId)}.json`,
   );
+}
+
+function legacyGatewayResultRecordPath(projectRoot: string, resultId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "results",
+    `${resultId}.json`,
+  );
+}
+
+function legacyGatewayDiscoveryRecordPath(projectRoot: string, serverId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "discovery",
+    `${safeIdPart(serverId)}.json`,
+  );
+}
+
+function existingGatewayResultRecordPath(
+  projectRoot: string,
+  resultId: string,
+): string | null {
+  return [
+    gatewayResultRecordPath(projectRoot, resultId),
+    legacyGatewayResultRecordPath(projectRoot, resultId),
+  ].find((recordPath) => fs.existsSync(recordPath)) ?? null;
+}
+
+function existingGatewayDiscoveryRecordPath(
+  projectRoot: string,
+  serverId: string,
+): string | null {
+  return [
+    gatewayDiscoveryRecordPath(projectRoot, serverId),
+    legacyGatewayDiscoveryRecordPath(projectRoot, serverId),
+  ].find((recordPath) => fs.existsSync(recordPath)) ?? null;
 }
 
 function jsonRpcFrame(message: unknown): string {

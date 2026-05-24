@@ -56,6 +56,10 @@ function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
 }
 
+function safeGatewayFilePart(value: string): string {
+  return value.trim().replace(/[^A-Za-z0-9_.-]/gu, "_");
+}
+
 function writeEchoMcpServer(projectRoot: string): string {
   const serverPath = path.join(projectRoot, "echo-mcp-server.cjs");
   fs.writeFileSync(
@@ -396,6 +400,29 @@ describe("DevNexus MCP gateway", () => {
         decision: "allowed",
       },
     });
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "runtime",
+          "mcp-gateway",
+          "results",
+          `${called.resultId}.json`,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "mcp-gateway",
+          "results",
+          `${called.resultId}.json`,
+        ),
+      ),
+    ).toBe(false);
     const fetched = toolJson(await callDevNexusMcpGatewayTool(
       "mcp_gateway_result_fetch",
       { projectRoot, resultId: called.resultId },
@@ -447,6 +474,29 @@ describe("DevNexus MCP gateway", () => {
       toolName: "echo",
       schemaStatus: "discovered",
     });
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "runtime",
+          "mcp-gateway",
+          "discovery",
+          `${safeGatewayFilePart(search.matches[0].serverId)}.json`,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".dev-nexus",
+          "mcp-gateway",
+          "discovery",
+          `${safeGatewayFilePart(search.matches[0].serverId)}.json`,
+        ),
+      ),
+    ).toBe(false);
 
     const described = toolJson(await callDevNexusMcpGatewayTool(
       "mcp_gateway_describe",
@@ -469,6 +519,66 @@ describe("DevNexus MCP gateway", () => {
     ));
     expect(called.response).toMatchObject({
       content: [{ type: "text", text: "dynamic" }],
+    });
+  });
+
+  it("discovers schemas for declared gateway tool names", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-declared-schema-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+              tools: [
+                {
+                  name: "echo",
+                  description: "Declared echo entry.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "declared echo" },
+    ));
+
+    expect(search.matches[0]).toMatchObject({
+      serverName: "echo_runtime",
+      toolName: "echo",
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+    });
+
+    const described = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_describe",
+      { projectRoot, toolId: search.matches[0].toolId },
+    ));
+    expect(described.tool).toMatchObject({
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+      },
     });
   });
 
