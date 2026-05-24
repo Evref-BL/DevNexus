@@ -33,7 +33,7 @@ variables, files, or fixed argv entries instead.
 
 Sources:
 
-- Sonar rule `javascript:S4721`: <https://rules.sonarsource.com/javascript/RSPEC-4721/>
-- Node.js `child_process`: <https://nodejs.org/api/child_process.html>
+- Sonar rule `javascript:S4721`: [RSPEC-4721](https://rules.sonarsource.com/javascript/RSPEC-4721/)
+- Node.js `child_process`: [API reference](https://nodejs.org/api/child_process.html)
 - OWASP OS command injection defense cheat sheet:
-  <https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html>
+  [Command Injection Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html)

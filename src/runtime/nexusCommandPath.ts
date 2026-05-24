@@ -80,7 +80,7 @@ function commandCandidates(
     return [base];
   }
 
-  return pathext(env).map((extension) => `${base}${extension}`);
+  return [base, ...pathext(env).map((extension) => `${base}${extension}`)];
 }
 
 function pathext(env: NodeJS.ProcessEnv): string[] {
@@ -94,7 +94,17 @@ function pathext(env: NodeJS.ProcessEnv): string[] {
 function isUnsafePathDirectory(directory: string): boolean {
   try {
     const stats = fs.statSync(directory);
-    return !stats.isDirectory() || Boolean(stats.mode & 0o022);
+    if (!stats.isDirectory()) {
+      return true;
+    }
+
+    // Windows ACLs are not represented by POSIX writable mode bits; applying
+    // the POSIX check there rejects trusted system PATH directories in CI.
+    if (process.platform === "win32") {
+      return false;
+    }
+
+    return Boolean(stats.mode & 0o022);
   } catch {
     return true;
   }

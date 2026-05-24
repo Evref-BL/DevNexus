@@ -38,11 +38,11 @@ Triage order:
 
 References:
 
-- Sonar rule `typescript:S5852`: <https://rules.sonarsource.com/javascript/RSPEC-5852>
+- Sonar rule `typescript:S5852`: [RSPEC-5852](https://rules.sonarsource.com/javascript/RSPEC-5852)
 - OWASP Regular expression Denial of Service:
-  <https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS>
+  [Regular expression Denial of Service](https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS)
 - CWE-1333, Inefficient Regular Expression Complexity:
-  <https://cwe.mitre.org/data/definitions/1333.html>
+  [CWE-1333](https://cwe.mitre.org/data/definitions/1333.html)
 
 ## PATH command lookup
 
@@ -67,9 +67,9 @@ Do not scatter line-level suppressions before a shared resolver exists.
 
 References:
 
-- Sonar rule `typescript:S4036`: <https://rules.sonarsource.com/typescript/tag/cwe/rspec-4036/>
+- Sonar rule `typescript:S4036`: [RSPEC-4036](https://rules.sonarsource.com/typescript/tag/cwe/rspec-4036/)
 - CWE-426, Untrusted Search Path:
-  <https://cwe.mitre.org/data/definitions/426.html>
+  [CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 - CWE-427, Uncontrolled Search Path Element:
-  <https://cwe.mitre.org/data/definitions/427.html>
-- Node.js `child_process`: <https://nodejs.org/api/child_process.html>
+  [CWE-427](https://cwe.mitre.org/data/definitions/427.html)
+- Node.js `child_process`: [API reference](https://nodejs.org/api/child_process.html)
