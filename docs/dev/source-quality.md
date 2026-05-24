@@ -34,10 +34,10 @@ itself.
 
 ## CI SonarQube
 
-`.github/workflows/sonar.yml` runs the official SonarQube scan action when a
-`SONAR_TOKEN` repository secret is configured. Without the secret, the workflow
-exits successfully with a notice so the repository can merge before Sonar is
-set up.
+`.github/workflows/sonar.yml` runs the official SonarQube scan action when the
+required repository secret and variables are configured. Until they are ready,
+the workflow exits successfully with a notice so the repository can merge before
+Sonar is set up.
 
 For SonarQube Cloud, create a public/open-source project, add the repository
 secret `SONAR_TOKEN`, and set repository variable `SONAR_ORGANIZATION` when the
@@ -48,9 +48,10 @@ repository variable `SONAR_HOST_URL` to a server that GitHub Actions can reach.
 Do not set `SONAR_HOST_URL` for SonarQube Cloud; the official action uses the
 cloud service by default.
 
-The token is a GitHub Actions repository secret, not a checked-in value. Until a
-maintainer adds it under repository settings, the workflow will skip analysis.
-Pull requests from forks also do not receive repository secrets under the normal
+The token is a GitHub Actions repository secret, not a checked-in value. For
+SonarQube Cloud, the workflow also needs an organization key from
+`SONAR_ORGANIZATION` or `sonar-project.properties`; otherwise it skips analysis.
+Pull requests from forks do not receive repository secrets under the normal
 `pull_request` event, so those scans skip unless a maintainer reruns them from a
 trusted branch.
 

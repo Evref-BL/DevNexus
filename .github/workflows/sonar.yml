@@ -48,6 +48,10 @@ jobs:
           cp sonar-project.properties sonar-project.ci.properties
           if [[ -n "${SONAR_ORGANIZATION}" ]]; then
             echo "sonar.organization=${SONAR_ORGANIZATION}" >> sonar-project.ci.properties
+          elif [[ -z "${SONAR_HOST_URL}" ]] && ! grep -q '^sonar.organization=' sonar-project.properties; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SonarQube Cloud analysis is skipped because SONAR_ORGANIZATION is not configured."
+            exit 0
           fi
 
           echo "host_url=${SONAR_HOST_URL}" >> "$GITHUB_OUTPUT"

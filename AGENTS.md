@@ -69,7 +69,8 @@ worktrees, automation state, MCP tools, and publication policy.
 
 - `.github/workflows/ci.yml` is the normal build/test gate.
 - `.github/workflows/sonar.yml` is optional SonarQube analysis. It runs only
-  after a maintainer configures the GitHub Actions secret `SONAR_TOKEN`.
+  after a maintainer configures the GitHub Actions secret `SONAR_TOKEN` and,
+  for SonarQube Cloud, the repository variable `SONAR_ORGANIZATION`.
 - The npm package is published from `dist/` and selected docs/scripts through
   `package.json` `files`; do not add internal audit tooling to the package
   payload unless it is intentionally public.
