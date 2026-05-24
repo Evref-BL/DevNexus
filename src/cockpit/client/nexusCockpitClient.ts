@@ -47,6 +47,7 @@ import {
   threadsForGitBranches,
   trackedWorkForGitBranches,
 } from "./history/nexusCockpitWriteHistory.js";
+import { bindGitHistoryColumnResizers } from "./history/nexusCockpitHistoryColumns.js";
 import {
   cockpitTooltipText,
   installCockpitTooltips,

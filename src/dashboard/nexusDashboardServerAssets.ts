@@ -72,6 +72,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitWriteHistoryClientSource()}\n\n`,
     )
     .replace(
+      /^import \{\s*bindGitHistoryColumnResizers,?\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
+      "",
+    )
+    .replace(
       /^import \{\s*cockpitTooltipText,\s*installCockpitTooltips,\s*isCockpitTooltipTargetTruncated,\s*\} from ["'][^"']+nexusCockpitTooltips\.js["'];\s*/mu,
       `${renderNexusCockpitTooltipsClientSource()}\n\n`,
     )
