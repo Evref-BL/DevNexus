@@ -1,6 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 
 type QualityGateResult = {
   status: "passed" | "failed";
@@ -9,19 +12,10 @@ type QualityGateResult = {
   summary: Record<string, number | null>;
 };
 
-type EvaluateQualityGate = (input: unknown, options?: unknown) => QualityGateResult;
-
-let evaluateQualityGate: EvaluateQualityGate;
-
-beforeAll(async () => {
-  const testDirectory = path.dirname(fileURLToPath(import.meta.url));
-  const moduleUrl = pathToFileURL(
-    path.resolve(testDirectory, "../../scripts/sonar-quality-gate.mjs"),
-  ).href;
-  ({ evaluateQualityGate } = (await import(moduleUrl)) as {
-    evaluateQualityGate: EvaluateQualityGate;
-  });
-});
+const scriptPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../scripts/sonar-quality-gate.mjs",
+);
 
 function measures(values: Record<string, string | number>) {
   return {
@@ -36,7 +30,7 @@ function measures(values: Record<string, string | number>) {
 
 describe("evaluateQualityGate", () => {
   it("passes with the current local Sonar baseline shape", () => {
-    const result = evaluateQualityGate({
+    const result = runQualityGate({
       measures: measures({
         coverage: "76.6",
         branch_coverage: "70.7",
@@ -57,9 +51,10 @@ describe("evaluateQualityGate", () => {
       },
     });
 
-    expect(result.status).toBe("passed");
-    expect(result.failures).toEqual([]);
-    expect(result.warnings).toEqual(
+    expect(result.exitCode).toBe(0);
+    expect(result.output.status).toBe("passed");
+    expect(result.output.failures).toEqual([]);
+    expect(result.output.warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining("security hotspots"),
         expect.stringContaining("critical/blocker code-smell"),
@@ -68,7 +63,7 @@ describe("evaluateQualityGate", () => {
   });
 
   it("fails when coverage was not imported", () => {
-    const result = evaluateQualityGate({
+    const result = runQualityGate({
       measures: measures({
         coverage: "0.0",
         branch_coverage: "0.0",
@@ -78,12 +73,15 @@ describe("evaluateQualityGate", () => {
       issues: { issues: [] },
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("coverage")]));
+    expect(result.exitCode).toBe(1);
+    expect(result.output.status).toBe("failed");
+    expect(result.output.failures).toEqual(
+      expect.arrayContaining([expect.stringContaining("coverage")]),
+    );
   });
 
   it("fails on vulnerability measures", () => {
-    const result = evaluateQualityGate({
+    const result = runQualityGate({
       measures: measures({
         coverage: "80",
         branch_coverage: "70",
@@ -93,12 +91,15 @@ describe("evaluateQualityGate", () => {
       issues: { issues: [] },
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("vulnerabilities")]));
+    expect(result.exitCode).toBe(1);
+    expect(result.output.status).toBe("failed");
+    expect(result.output.failures).toEqual(
+      expect.arrayContaining([expect.stringContaining("vulnerabilities")]),
+    );
   });
 
   it("fails on bug measures", () => {
-    const result = evaluateQualityGate({
+    const result = runQualityGate({
       measures: measures({
         coverage: "80",
         branch_coverage: "70",
@@ -109,12 +110,15 @@ describe("evaluateQualityGate", () => {
       issues: { issues: [] },
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("bugs")]));
+    expect(result.exitCode).toBe(1);
+    expect(result.output.status).toBe("failed");
+    expect(result.output.failures).toEqual(
+      expect.arrayContaining([expect.stringContaining("bugs")]),
+    );
   });
 
   it("fails on any bug issue", () => {
-    const result = evaluateQualityGate({
+    const result = runQualityGate({
       measures: measures({
         coverage: "80",
         branch_coverage: "70",
@@ -134,7 +138,37 @@ describe("evaluateQualityGate", () => {
       },
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.failures).toEqual(expect.arrayContaining([expect.stringContaining("BUG")]));
+    expect(result.exitCode).toBe(1);
+    expect(result.output.status).toBe("failed");
+    expect(result.output.failures).toEqual(
+      expect.arrayContaining([expect.stringContaining("BUG")]),
+    );
   });
 });
+
+function runQualityGate(input: {
+  measures: unknown;
+  issues?: unknown;
+}): {
+  exitCode: number | null;
+  output: QualityGateResult;
+} {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-sonar-gate-"));
+  const measuresPath = path.join(root, "measures.json");
+  const issuesPath = path.join(root, "issues.json");
+  fs.writeFileSync(measuresPath, JSON.stringify(input.measures), "utf8");
+  fs.writeFileSync(issuesPath, JSON.stringify(input.issues ?? { issues: [] }), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [scriptPath, "--measures", measuresPath, "--issues", issuesPath],
+    { encoding: "utf8" },
+  );
+  expect(result.stderr).toBe("");
+  expect(result.stdout).not.toBe("");
+
+  return {
+    exitCode: result.status,
+    output: JSON.parse(result.stdout) as QualityGateResult,
+  };
+}
