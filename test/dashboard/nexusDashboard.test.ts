@@ -46,6 +46,10 @@ function fixedClock(timestamp: string): () => string {
   return () => timestamp;
 }
 
+function extractDashboardActionToken(html: string): string | undefined {
+  return html.match(/actionToken:\s*"([^"]+)"/u)?.[1];
+}
+
 async function loadDashboardClientTestHooks(): Promise<{
   cockpitThreadPrompt: (thread: {
     branchName?: string | null;
@@ -3724,9 +3728,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       expect(actionToken).toBeTruthy();
       const unauthenticatedResponse = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
@@ -3808,9 +3810,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       expect(actionToken).toBeTruthy();
       const before = await fetch(`${server.url}api/cockpit`).then((response) =>
         response.json(),
@@ -4686,9 +4686,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(
         `${server.url}api/codex/thread?workspace=chat-registered`,
         {
@@ -4762,9 +4760,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const openProject = await fetch(
         `${server.url}api/local/open?workspace=open-registered`,
         {
@@ -4920,9 +4916,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {
@@ -5027,9 +5021,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {
@@ -5069,9 +5061,7 @@ describe("nexus dashboard", () => {
 
     try {
       const html = await fetch(server.url).then((response) => response.text());
-      const actionToken = html.match(
-        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
-      )?.[1];
+      const actionToken = extractDashboardActionToken(html);
       const response = await fetch(`${server.url}api/codex/thread`, {
         method: "POST",
         headers: {

@@ -357,9 +357,9 @@ export function renderNexusDashboardHtml(options: {
 } = {}): string {
   const title = escapeHtml(options.title ?? "DevNexus Cockpit");
   const modulePath = escapeHtml(options.modulePath ?? "/assets/dev-nexus-cockpit.js");
-  const actionTokenScript = options.actionToken
-    ? `<script>globalThis.__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = ${safeJsonString(options.actionToken)}; globalThis.__DEV_NEXUS_COCKPIT_ACTION_TOKEN__ = ${safeJsonString(options.actionToken)};</script>`
-    : "";
+  const mountOptions = options.actionToken
+    ? `{ actionToken: ${safeJsonString(options.actionToken)} }`
+    : "{}";
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -370,8 +370,7 @@ export function renderNexusDashboardHtml(options: {
     "</head>",
     "<body>",
     '<main id="dev-nexus-cockpit-root"></main>',
-    actionTokenScript,
-    `<script type="module">import { mountDevNexusCockpit } from "${modulePath}"; mountDevNexusCockpit(document.getElementById("dev-nexus-cockpit-root"));</script>`,
+    `<script type="module">import { mountDevNexusCockpit } from "${modulePath}"; mountDevNexusCockpit(document.getElementById("dev-nexus-cockpit-root"), ${mountOptions});</script>`,
     "</body>",
     "</html>",
   ].join("\n");
