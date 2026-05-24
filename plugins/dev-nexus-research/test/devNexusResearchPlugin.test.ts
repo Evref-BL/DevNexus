@@ -8,8 +8,8 @@ import {
 import {
   projectPluginCapabilityProjections,
   projectPluginWorkerFragments,
-} from "../../../src/nexusPluginCapabilities.js";
-import { validateProjectConfig } from "../../../src/nexusProjectConfig.js";
+} from "../../../src/project/nexusPluginCapabilities.js";
+import { validateProjectConfig } from "../../../src/project/nexusProjectConfig.js";
 
 const fixturePath = new URL(
   "../fixtures/dev-nexus-research.project.json",

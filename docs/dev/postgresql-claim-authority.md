@@ -37,7 +37,7 @@ Done means:
 
 ## Current Architecture
 
-Current claim acquisition lives in `src/nexusWorkItemClaim.ts`. It:
+Current claim acquisition lives in `src/work-items/nexusWorkItemClaim.ts`. It:
 
 1. Lists eligible work through configured work-tracker providers.
 2. Re-reads the candidate from the tracker.
@@ -52,15 +52,15 @@ boundary below `claimNexusEligibleWorkItem`, not replace work tracking.
 
 Relevant files:
 
-- `src/nexusWorkItemClaim.ts`
-- `src/nexusWorkItemClaim.test.ts`
-- `src/nexusAutomationAgentLaunch.ts`
-- `src/nexusAutomationCoordinatorLoop.ts`
-- `src/nexusMcpServer.ts`
+- `src/work-items/nexusWorkItemClaim.ts`
+- `test/work-items/nexusWorkItemClaim.test.ts`
+- `src/automation/nexusAutomationAgentLaunch.ts`
+- `src/automation/nexusAutomationCoordinatorLoop.ts`
+- `src/mcp/nexusMcpServer.ts`
 - `src/cli.ts`
-- `src/nexusAutomationConfig.ts`
-- `src/nexusProjectConfig.ts`
-- `src/workTrackingTypes.ts`
+- `src/automation/nexusAutomationConfig.ts`
+- `src/project/nexusProjectConfig.ts`
+- `src/work-items/workTrackingTypes.ts`
 
 ## Target Design
 
@@ -138,8 +138,8 @@ Acceptance:
 
 Verification:
 
-- `npm test -- src/nexusWorkItemClaim.test.ts`
-- `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCoordinatorLoop.test.ts`
+- `npm test -- test/work-items/nexusWorkItemClaim.test.ts`
+- `npm test -- test/automation/nexusAutomationAgentLaunch.test.ts test/automation/nexusAutomationCoordinatorLoop.test.ts`
 - `npm run build`
 
 Progress:
@@ -175,7 +175,7 @@ Acceptance:
 
 Verification:
 
-- `npm test -- src/nexusPostgresWorkItemClaimAuthority.test.ts`
+- `npm test -- test/work-items/nexusPostgresWorkItemClaimAuthority.test.ts`
 - `npm run build`
 
 Progress:
@@ -275,7 +275,7 @@ Acceptance:
 
 Verification:
 
-- `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCoordinatorLoop.test.ts`
+- `npm test -- test/automation/nexusAutomationAgentLaunch.test.ts test/automation/nexusAutomationCoordinatorLoop.test.ts`
 - `npm run build`
 
 Progress:
@@ -350,8 +350,8 @@ Acceptance:
 
 Verification:
 
-- `npm test -- src/nexusAutomationCurrentAgentAdoption.test.ts`
-- `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusWorkItemClaim.test.ts`
+- `npm test -- test/automation/nexusAutomationCurrentAgentAdoption.test.ts`
+- `npm test -- test/automation/nexusAutomationAgentLaunch.test.ts test/work-items/nexusWorkItemClaim.test.ts`
 - `npm run build`
 
 Progress:

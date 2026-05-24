@@ -207,6 +207,14 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
   provider-backed trackers.
 - [Architecture notes](docs/dev/architecture.md) covers internal design.
 
+## Contributing And Security
+
+- [Contributing](CONTRIBUTING.md) explains local setup, checks, and pull request
+  expectations.
+- [Security policy](SECURITY.md) explains how to report vulnerabilities
+  privately.
+- DevNexus is licensed under the [Apache License 2.0](LICENSE).
+
 ## Source Development
 
 ```bash
@@ -218,6 +226,16 @@ npm run check
 package, installs it into a fresh temporary npm project, initializes a first
 workspace from an answer file, and verifies `workspace status` plus `setup
 check`.
+
+For quality audits and Sonar-driven refactors, use the opt-in local Sonar scan:
+
+```bash
+npm run quality:sonar-local
+```
+
+It requires Docker and uses a temporary SonarQube Community Build server. See
+[Source quality](docs/dev/source-quality.md) for the local gate and optional CI
+setup.
 
 DevNexus is infrastructure. It gives agents a shared operating context; it does
 not replace user judgment, workspace ownership, verification, or publication

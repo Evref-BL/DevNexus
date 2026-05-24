@@ -25,6 +25,9 @@
     "scripts/first-workspace-onboarding-smoke.mjs",
     "scripts/postgres-claim-authority-container-canary.mjs"
   ],
+  "workspaces": [
+    "plugins/dev-nexus-research"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -42,13 +45,19 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "coverage:plugins": "npm --prefix plugins/dev-nexus-research run coverage",
+    "coverage:all": "npm run coverage && npm run coverage:plugins",
+    "quality:sonar-gate": "node scripts/sonar-quality-gate.mjs",
+    "quality:sonar-local": "node scripts/run-local-sonar-audit.mjs",
     "check": "npm run build && npm test && npm run smoke:onboarding && npm run check:plugins",
     "smoke:onboarding": "node scripts/first-workspace-onboarding-smoke.mjs",
     "smoke:postgres-containers": "node scripts/postgres-claim-authority-container-canary.mjs",
-    "check:plugins": "npm --prefix plugins/dev-nexus-research run check"
+    "check:plugins": "npm --workspace @evref-bl/dev-nexus-research run check"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
+    "@vitest/coverage-v8": "^4.1.5",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
   }
