@@ -4774,59 +4774,22 @@ function summarizeTrackedWork(
   };
 }
 
-function summarizeLocalTrackedWork(options: {
+interface SummarizeLocalTrackedWorkOptions {
   generatedAt: string;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
   providerUrls: NexusDashboardProviderUrls;
-}): NexusDashboardTrackedWorkSummary {
+}
+
+function summarizeLocalTrackedWork(
+  options: SummarizeLocalTrackedWorkOptions,
+): NexusDashboardTrackedWorkSummary {
   const records: NexusDashboardTrackedWorkItem[] = [];
   const seen = new Set<string>();
-  const add = (item: NexusDashboardTrackedWorkItem): void => {
-    const key = `${item.componentId}:${item.id}`;
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    records.push(item);
-  };
-
   for (const component of options.components) {
-    for (const tracker of component.workTrackers) {
-      const localWorkTracking = tracker.workTracking;
-      if (!tracker.enabled || localWorkTracking.provider !== "local") {
-        continue;
-      }
-      const store = capture(() =>
-        loadLocalWorkTrackingStore(
-          resolveLocalWorkTrackingStorePath(options.projectRoot, localWorkTracking),
-          options.generatedAt,
-          "dashboardTrackedWorkLocalFallback",
-        ),
-      );
-      if (!store.ok) {
-        continue;
-      }
-      for (const item of store.value?.items ?? []) {
-        if (item.status === "done" || item.status === "wont_do") {
-          continue;
-        }
-        add(trackedWorkLocalItem({
-          item,
-          component,
-          trackerRef: {
-            componentId: component.id,
-            componentName: component.name,
-            trackerId: tracker.id,
-            trackerName: tracker.name,
-            provider: tracker.provider,
-            roles: tracker.roles,
-            default: tracker.default,
-          },
-          providerUrls: options.providerUrls,
-        }));
-      }
+    for (const item of localTrackedWorkItemsForComponent(options, component)) {
+      addUniqueTrackedWorkRecord(records, seen, item);
     }
   }
 
@@ -4843,6 +4806,79 @@ function summarizeLocalTrackedWork(options: {
     detail: "Showing local tracker records while provider work items finish loading.",
     records: records.slice(0, 30),
   };
+}
+
+function localTrackedWorkItemsForComponent(
+  options: SummarizeLocalTrackedWorkOptions,
+  component: ResolvedNexusProjectComponent,
+): NexusDashboardTrackedWorkItem[] {
+  return component.workTrackers.flatMap((tracker) =>
+    localTrackedWorkItemsForTracker(options, component, tracker),
+  );
+}
+
+function localTrackedWorkItemsForTracker(
+  options: SummarizeLocalTrackedWorkOptions,
+  component: ResolvedNexusProjectComponent,
+  tracker: ResolvedNexusProjectComponent["workTrackers"][number],
+): NexusDashboardTrackedWorkItem[] {
+  const localWorkTracking = tracker.workTracking;
+  if (!tracker.enabled || localWorkTracking.provider !== "local") {
+    return [];
+  }
+  const store = capture(() =>
+    loadLocalWorkTrackingStore(
+      resolveLocalWorkTrackingStorePath(options.projectRoot, localWorkTracking),
+      options.generatedAt,
+      "dashboardTrackedWorkLocalFallback",
+    ),
+  );
+  if (!store.ok) {
+    return [];
+  }
+
+  return (store.value?.items ?? [])
+    .filter(isVisibleLocalTrackedWorkItem)
+    .map((item) =>
+      trackedWorkLocalItem({
+        item,
+        component,
+        trackerRef: localTrackedWorkTrackerRef(component, tracker),
+        providerUrls: options.providerUrls,
+      }),
+    );
+}
+
+function isVisibleLocalTrackedWorkItem(item: WorkItem): boolean {
+  return item.status !== "done" && item.status !== "wont_do";
+}
+
+function localTrackedWorkTrackerRef(
+  component: ResolvedNexusProjectComponent,
+  tracker: ResolvedNexusProjectComponent["workTrackers"][number],
+): WorkTrackerRef {
+  return {
+    componentId: component.id,
+    componentName: component.name,
+    trackerId: tracker.id,
+    trackerName: tracker.name,
+    provider: tracker.provider,
+    roles: tracker.roles,
+    default: tracker.default,
+  };
+}
+
+function addUniqueTrackedWorkRecord(
+  records: NexusDashboardTrackedWorkItem[],
+  seen: Set<string>,
+  item: NexusDashboardTrackedWorkItem,
+): void {
+  const key = `${item.componentId}:${item.id}`;
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  records.push(item);
 }
 
 function trackedWorkLocalItem(options: {
