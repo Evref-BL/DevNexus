@@ -56,6 +56,7 @@ async function loadDashboardClientTestHooks(): Promise<{
     title: string;
     workItemId?: string | null;
   }) => string;
+  dashboardRenderSignature: (value: unknown) => string;
   historyRows: (snapshot: unknown) => {
     rows: Array<{ detail: string; lane: number; node: { id: string }; title: string }>;
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>;
@@ -127,7 +128,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, gitHistoryRows, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, dashboardRenderSignature, gitHistoryRows, historyRows, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1660,6 +1661,69 @@ describe("nexus dashboard", () => {
     expect(module).toContain("latestSnapshot = null;");
     expect(module).not.toContain("catch (error) {\n      latestSnapshot = null;");
     expect(module).not.toContain("catch {\n      latestHost = null;");
+  });
+
+  it("ignores refresh-clock activity timestamps in dashboard render signatures", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const firstSnapshot = {
+      generatedAt: "2026-05-21T10:00:00.000Z",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:00.000Z",
+          title: "Snapshot refreshed",
+        },
+        {
+          id: "automation-status",
+          time: "2026-05-21T10:00:00.000Z",
+          title: "Automation blocked",
+        },
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T09:45:00.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+    const secondSnapshot = {
+      ...firstSnapshot,
+      generatedAt: "2026-05-21T10:00:15.000Z",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:15.000Z",
+          title: "Snapshot refreshed",
+        },
+        {
+          id: "automation-status",
+          time: "2026-05-21T10:00:15.000Z",
+          title: "Automation blocked",
+        },
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T09:45:00.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+    const actualWorkChange = {
+      ...secondSnapshot,
+      events: [
+        ...secondSnapshot.events.slice(0, 2),
+        {
+          id: "worktree-lease-1",
+          time: "2026-05-21T10:00:10.000Z",
+          title: "Worktree working",
+        },
+      ],
+    };
+
+    expect(hooks.dashboardRenderSignature(firstSnapshot)).toBe(
+      hooks.dashboardRenderSignature(secondSnapshot),
+    );
+    expect(hooks.dashboardRenderSignature(secondSnapshot)).not.toBe(
+      hooks.dashboardRenderSignature(actualWorkChange),
+    );
   });
 
   it("audits static visual guardrails for light and dark cockpit modes", () => {
