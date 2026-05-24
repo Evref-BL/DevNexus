@@ -72,16 +72,26 @@ process.stdin.on("data", (chunk) => {
 });
 function processBuffer() {
   while (true) {
-    const headerEnd = buffer.indexOf("\\r\\n\\r\\n");
-    if (headerEnd < 0) return;
-    const header = buffer.slice(0, headerEnd).toString("utf8");
-    const match = /Content-Length:\\s*(\\d+)/i.exec(header);
-    if (!match) throw new Error("missing content length");
-    const bodyStart = headerEnd + 4;
-    const bodyEnd = bodyStart + Number(match[1]);
-    if (buffer.length < bodyEnd) return;
-    const message = JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8"));
-    buffer = buffer.slice(bodyEnd);
+    let message;
+    if (buffer.subarray(0, Math.min(buffer.length, "Content-Length:".length)).toString("utf8").toLowerCase() === "content-length:") {
+      const headerEnd = buffer.indexOf("\\r\\n\\r\\n");
+      if (headerEnd < 0) return;
+      const header = buffer.slice(0, headerEnd).toString("utf8");
+      const match = /Content-Length:\\s*(\\d+)/i.exec(header);
+      if (!match) throw new Error("missing content length");
+      const bodyStart = headerEnd + 4;
+      const bodyEnd = bodyStart + Number(match[1]);
+      if (buffer.length < bodyEnd) return;
+      message = JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8"));
+      buffer = buffer.slice(bodyEnd);
+    } else {
+      const newlineIndex = buffer.indexOf("\\n");
+      if (newlineIndex < 0) return;
+      const line = buffer.slice(0, newlineIndex).toString("utf8").trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line) continue;
+      message = JSON.parse(line);
+    }
     handle(message);
   }
 }

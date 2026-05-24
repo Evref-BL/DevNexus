@@ -30,6 +30,13 @@ afterEach(() => {
 });
 
 describe("nexus agent MCP config", () => {
+  it("resolves the runnable DevNexus CLI entrypoint", () => {
+    const cliPath = currentNexusCliScriptPath();
+
+    expect(path.basename(cliPath)).toBe("cli.js");
+    expect(fs.existsSync(cliPath)).toBe(true);
+  });
+
   it("materializes Codex MCP config while preserving unrelated TOML", () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     initGitInfo(projectRoot);
