@@ -35,6 +35,7 @@ import {
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
 import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
+import { renderNexusCockpitActionsClientSource } from "../cockpit/client/nexusCockpitActions.js";
 import { renderNexusCockpitFormatClientSource } from "../cockpit/client/nexusCockpitFormat.js";
 import { renderNexusCockpitStylesClientSource } from "../cockpit/client/nexusCockpitStyles.js";
 import { renderNexusCockpitTooltipsClientSource } from "../cockpit/client/nexusCockpitTooltips.js";
@@ -432,6 +433,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(
       /^import \{\s*compactPath,\s*countLabel,\s*escapeAttribute,\s*escapeHtml,\s*formatDisplayText,\s*formatTime,\s*truncate,\s*\} from ["'][^"']+nexusCockpitFormat\.js["'];\s*/mu,
       `${renderNexusCockpitFormatClientSource()}\n\n`,
+    )
+    .replace(
+      /^import \{\s*chatIcon,\s*chevronDownIcon,\s*clipboardIcon,\s*codeIcon,\s*finderIcon,\s*folderIcon,\s*localAppIcon,\s*renderActionStrip,\s*renderDisabledAction,\s*renderProviderAction,\s*signalIcon,\s*terminalIcon,\s*uniqueActions,\s*\} from ["'][^"']+nexusCockpitActions\.js["'];\s*/mu,
+      `${renderNexusCockpitActionsClientSource()}\n\n`,
     )
     .replace(
       /^import \{\s*bindGitHistoryColumnResizers,\s*gitHistoryColumnStyle,\s*readStoredGitHistoryColumnWidths,\s*renderGitHistoryColumnHeader,\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
