@@ -84,7 +84,7 @@ function standaloneNexusCockpitClientSource(source: string): string {
       `${renderNexusCockpitWorkMapClientSource()}\n\n`,
     )
     .replace(
-      /^import \{\s*featureGitBranches,\s*firstGitHistoryCommit,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*gitHistorySelectId,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
+      /^import \{\s*featureGitBranches,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitWriteHistoryClientSource()}\n\n`,
     )
     .replace(

@@ -306,6 +306,88 @@ describe("nexus dashboard history graph", () => {
     expect(pluginRendered).not.toContain("Update core cockpit");
   });
 
+  it("does not default-select a write event when history is available", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "core100000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "core100000000000000000000000000000000000000",
+                shortHash: "core100",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Update core cockpit",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      features: {
+        records: [],
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        lanes: [
+          {
+            id: "project",
+            label: "Project",
+          },
+        ],
+        nodes: [
+          {
+            id: "project",
+            kind: "project",
+            laneId: "project",
+            label: "Dashboard Demo",
+            status: "active",
+          },
+        ],
+      },
+    };
+
+    expect(hooks.defaultSelectedId(snapshot)).toBe("project");
+  });
+
+  it("toggles a selected write event closed when clicked again", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    expect(
+      hooks.nextDashboardSelectedId(
+        "history:primary:core100000000000000000000000000000000000000",
+        "history:primary:core100000000000000000000000000000000000000",
+      ),
+    ).toBeNull();
+    expect(
+      hooks.nextDashboardSelectedId(
+        "history:primary:core100000000000000000000000000000000000000",
+        "history:primary:core200000000000000000000000000000000000000",
+      ),
+    ).toBe("history:primary:core200000000000000000000000000000000000000");
+  });
+
   it("routes cross-lane git graph links through row corridors", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {

@@ -37,11 +37,9 @@ import {
 } from "./history/nexusCockpitWorkMap.js";
 import {
   featureGitBranches,
-  firstGitHistoryCommit,
   gitHistoryCommitBySelectId,
   gitHistoryDetail,
   gitHistoryRows,
-  gitHistorySelectId,
   isGitHistorySelection,
   normalizeGitHistoryFilter,
   renderGitHistory,
@@ -148,7 +146,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   }
   function setSelectedId(nextSelectedId) {
     if (disposed) return;
-    selectedId = String(nextSelectedId ?? '');
+    selectedId = nextDashboardSelectedId(selectedId, nextSelectedId);
     renderCurrent();
   }
   function setHostFocus(nextHostFocus) {
@@ -160,9 +158,9 @@ export function mountDevNexusDashboard(root, options = {}) {
     if (disposed) return;
     gitHistoryFilter = normalizeGitHistoryFilter(nextFilter);
     const graph = latestSnapshot ? gitHistoryRows(latestSnapshot, gitHistoryFilter) : null;
-    if (graph?.rows?.length) {
+    if (graph && isGitHistorySelection(selectedId)) {
       const visible = new Set(graph.rows.map((row) => row.selectId));
-      if (!visible.has(selectedId)) selectedId = graph.rows[0].selectId;
+      if (!visible.has(selectedId)) selectedId = null;
     }
     renderCurrent();
   }
@@ -659,6 +657,12 @@ function eventElementTarget(target) {
   return null;
 }
 
+function nextDashboardSelectedId(currentSelectedId, nextSelectedId) {
+  const next = String(nextSelectedId ?? '');
+  if (!next) return null;
+  return next === String(currentSelectedId ?? '') ? null : next;
+}
+
 function bindHostSignalControls(container, onSelect) {
   container.querySelectorAll('[data-host-focus]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -1032,8 +1036,6 @@ function renderBlockers(snapshot, selectedId) {
 function defaultSelectedId(snapshot) {
   const urgentFeature = (snapshot.features?.records ?? []).find((candidate) => candidate.status === 'blocked' || candidate.status === 'needs-review');
   if (urgentFeature) return urgentFeature.id;
-  const commit = firstGitHistoryCommit(snapshot);
-  if (commit) return gitHistorySelectId(commit.repository, commit.commit);
   const feature = (snapshot.features?.records ?? [])[0];
   if (feature) return feature.id;
   const node = snapshot.weave.nodes.find((candidate) => ['blocked', 'failed', 'dirty', 'missing'].includes(candidate.status)) ?? snapshot.weave.nodes.find((candidate) => candidate.kind === 'project') ?? snapshot.weave.nodes[0];
