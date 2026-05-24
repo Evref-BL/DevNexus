@@ -293,10 +293,26 @@ describe("nexus publication policy", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-project-");
     const sourceRoot = path.join(projectRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
+    const baseConfig = projectConfig();
     saveProjectConfig(projectRoot, projectConfig({
+      repo: {
+        ...baseConfig.repo,
+        remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
+      },
+      workTracking: {
+        provider: "github",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      },
       automation: {
-        ...projectConfig().automation!,
-        publication: appPublicationPolicy(),
+        ...baseConfig.automation!,
+        publication: {
+          ...appPublicationPolicy(),
+          remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
+          pushUrl: null,
+        },
       },
       authority: {
         actors: [
@@ -330,6 +346,7 @@ describe("nexus publication policy", () => {
       action: "provider_write",
       authProfiles: appAuthProfiles(),
       gitRunner: publicationGitRunner(sourceRoot, {
+        remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
         localUserName: "devnexus-automation[bot]",
         localUserEmail:
           "286661136+devnexus-automation[bot]@users.noreply.github.com",
@@ -356,6 +373,119 @@ describe("nexus publication policy", () => {
       expect.objectContaining({
         name: "publication:primary:actor",
         status: "passed",
+      }),
+    );
+    expect(actorCommands).toEqual([]);
+  });
+
+  it("uses the publication repository to disambiguate App auth profiles", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, projectConfig({
+      repo: {
+        ...baseConfig.repo,
+        remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
+      },
+      workTracking: {
+        provider: "github",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      },
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...appPublicationPolicy(),
+          strategy: "green_main",
+          remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
+          pushUrl: null,
+          sshHostAlias: "github.com-bot",
+          push: false,
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "dev-nexus-automation-app",
+            kind: "service_account",
+            provider: "github",
+            providerIdentity: "devnexus-automation",
+            displayName: "DevNexus Automation",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "dev-nexus-automation-app",
+            roles: ["maintainer"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+    const [appProfile] = appAuthProfiles();
+    const authProfiles: NexusHostingAuthProfileConfig[] = [
+      {
+        ...appProfile!,
+        id: "dev-nexus-app-github-verveinej",
+        githubApp: {
+          ...appProfile!.githubApp!,
+          installationAccount: "verveinej",
+          repositories: ["DevNexus"],
+        },
+      },
+      {
+        ...appProfile!,
+        id: "dev-nexus-app-github",
+        githubApp: {
+          ...appProfile!.githubApp!,
+          installationAccount: "Evref-BL",
+          repositories: ["DevNexus"],
+        },
+      },
+    ];
+    const actorCommands: Array<{ command: string; args: readonly string[] }> = [];
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "provider_write",
+      authProfiles,
+      gitRunner: publicationGitRunner(sourceRoot, {
+        remoteUrl: "https://github.com/Evref-BL/DevNexus.git",
+        localUserName: "devnexus-automation[bot]",
+        localUserEmail:
+          "286661136+devnexus-automation[bot]@users.noreply.github.com",
+      }),
+      actorRunner: (command, args) => {
+        actorCommands.push({ command, args });
+        return {
+          status: 1,
+          stdout: "",
+          stderr: "unexpected GitHub CLI actor check",
+        };
+      },
+    });
+
+    expect(status.blocking).toBe(false);
+    expect(status.actor).toMatchObject({
+      status: "matched",
+      observed: {
+        provider: "github",
+        handle: "devnexus-automation",
+        source: "authProfile:dev-nexus-app-github",
+      },
+    });
+    expect(status.checks).not.toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:sshHostAlias",
       }),
     );
     expect(actorCommands).toEqual([]);
