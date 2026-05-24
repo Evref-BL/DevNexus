@@ -100,109 +100,31 @@ export async function runNexusAutomationScheduler(
       break;
     }
 
-    const tickStartedAt = currentIso(options.now);
-    const status = await getNexusAutomationStatus({
+    const { tick, run, stopReason } = await runNexusAutomationSchedulerTick({
+      options,
       projectRoot,
-      provider: options.provider,
-      providerFactory: options.providerFactory,
-      providerOptions: options.providerOptions,
-      gitRunner: options.gitRunner,
-      now: options.now,
-    });
-    const intervalMs = intervalOverride ?? status.automationConfig?.schedule.intervalMs;
-    if (!status.automationConfig?.schedule.enabled || !intervalMs) {
-      const tick = schedulerTick({
-        index: ticks.length + 1,
-        startedAt: tickStartedAt,
-        finishedAt: currentIso(options.now),
-        status,
-        action: "stopped",
-        waitMs: null,
-        run: null,
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      stoppedReason = "disabled";
-      break;
-    }
-
-    let action: NexusAutomationSchedulerAction = "waited";
-    let waitMs: number | null = nextNexusAutomationSchedulerDelayMs(
-      status,
-      intervalMs,
-      tickStartedAt,
-    );
-    let run: NexusAutomationSchedulerRunResult | null = null;
-
-    if (status.status === "ready") {
-      const runId = schedulerRunId(
-        options.runIdPrefix,
-        ticks.length + 1,
-        tickStartedAt,
-      );
-      if (status.automationConfig?.mode === "agent_launch") {
-        if (!options.agentLauncher) {
-          throw new NexusAutomationSchedulerError(
-            "agentLauncher is required when automation.mode is agent_launch",
-          );
-        }
-        run = await runNexusAutomationAgentLaunchOnce({
-          projectRoot,
-          provider: options.provider,
-          providerFactory: options.providerFactory,
-          providerOptions: options.providerOptions,
-          gitRunner: options.gitRunner,
-          mcpRuntimeProcesses: options.mcpRuntimeProcesses,
-          now: options.now,
-          owner: options.owner ?? "scheduler",
-          runId,
-          launcher: options.agentLauncher,
-        });
-        waitMs = status.automationConfig.agent.relaunch.whileEligible &&
-          maxRuns !== undefined
-          ? 0
-          : intervalMs;
-      } else {
-        if (!options.executor) {
-          throw new NexusAutomationSchedulerError(
-            "executor is required when automation.mode is run_once",
-          );
-        }
-        run = await runNexusAutomationOnce({
-          projectRoot,
-          provider: options.provider,
-          providerFactory: options.providerFactory,
-          providerOptions: options.providerOptions,
-          gitRunner: options.gitRunner,
-          now: options.now,
-          owner: options.owner ?? "scheduler",
-          baseRef: options.baseRef,
-          runId,
-          executor: options.executor,
-        });
-      }
-      runs.push(run);
-      action = "ran";
-    }
-
-    const tick = schedulerTick({
-      index: ticks.length + 1,
-      startedAt: tickStartedAt,
-      finishedAt: currentIso(options.now),
-      status,
-      action,
-      waitMs,
-      run,
+      intervalOverride,
+      maxRuns,
+      tickIndex: ticks.length + 1,
     });
     ticks.push(tick);
+    if (run) {
+      runs.push(run);
+    }
     await options.onTick?.(tick);
-
-    if (maxRuns !== undefined && runs.length >= maxRuns) {
-      stoppedReason = "max_runs";
+    if (stopReason) {
+      stoppedReason = stopReason;
       break;
     }
-    if (maxTicks !== undefined && ticks.length >= maxTicks) {
-      stoppedReason = "max_ticks";
+
+    const limitStopReason = schedulerLimitStopReason({
+      maxRuns,
+      runCount: runs.length,
+      maxTicks,
+      tickCount: ticks.length,
+    });
+    if (limitStopReason) {
+      stoppedReason = limitStopReason;
       break;
     }
     if (options.shouldStop?.()) {
@@ -210,7 +132,7 @@ export async function runNexusAutomationScheduler(
       break;
     }
 
-    await sleep(waitMs);
+    await sleep(tick.waitMs ?? 0);
   }
 
   return {
@@ -221,6 +143,186 @@ export async function runNexusAutomationScheduler(
     runs,
     stoppedReason,
   };
+}
+
+interface NexusAutomationSchedulerTickRun {
+  tick: NexusAutomationSchedulerTick;
+  run: NexusAutomationSchedulerRunResult | null;
+  stopReason: NexusAutomationSchedulerStopReason | null;
+}
+
+async function runNexusAutomationSchedulerTick(options: {
+  options: RunNexusAutomationSchedulerOptions;
+  projectRoot: string;
+  intervalOverride: number | undefined;
+  maxRuns: number | undefined;
+  tickIndex: number;
+}): Promise<NexusAutomationSchedulerTickRun> {
+  const tickStartedAt = currentIso(options.options.now);
+  const status = await getNexusAutomationStatus({
+    projectRoot: options.projectRoot,
+    provider: options.options.provider,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    now: options.options.now,
+  });
+  const intervalMs = options.intervalOverride ?? status.automationConfig?.schedule.intervalMs;
+  if (!status.automationConfig?.schedule.enabled || !intervalMs) {
+    return {
+      tick: schedulerTick({
+        index: options.tickIndex,
+        startedAt: tickStartedAt,
+        finishedAt: currentIso(options.options.now),
+        status,
+        action: "stopped",
+        waitMs: null,
+        run: null,
+      }),
+      run: null,
+      stopReason: "disabled",
+    };
+  }
+
+  const run = status.status === "ready"
+    ? await runReadyNexusAutomationSchedulerTick({
+        options: options.options,
+        projectRoot: options.projectRoot,
+        status,
+        tickIndex: options.tickIndex,
+        tickStartedAt,
+      })
+    : null;
+  const waitMs = schedulerTickWaitMs({
+    status,
+    intervalMs,
+    tickStartedAt,
+    run,
+    maxRuns: options.maxRuns,
+  });
+
+  return {
+    tick: schedulerTick({
+      index: options.tickIndex,
+      startedAt: tickStartedAt,
+      finishedAt: currentIso(options.options.now),
+      status,
+      action: run ? "ran" : "waited",
+      waitMs,
+      run,
+    }),
+    run,
+    stopReason: null,
+  };
+}
+
+async function runReadyNexusAutomationSchedulerTick(options: {
+  options: RunNexusAutomationSchedulerOptions;
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  tickIndex: number;
+  tickStartedAt: string;
+}): Promise<NexusAutomationSchedulerRunResult> {
+  const runId = schedulerRunId(
+    options.options.runIdPrefix,
+    options.tickIndex,
+    options.tickStartedAt,
+  );
+  if (options.status.automationConfig?.mode === "agent_launch") {
+    return runNexusAutomationSchedulerAgentLaunch(options, runId);
+  }
+  return runNexusAutomationSchedulerOnce(options, runId);
+}
+
+function runNexusAutomationSchedulerAgentLaunch(
+  options: {
+    options: RunNexusAutomationSchedulerOptions;
+    projectRoot: string;
+  },
+  runId: string,
+): Promise<RunNexusAutomationAgentLaunchOnceResult> {
+  if (!options.options.agentLauncher) {
+    throw new NexusAutomationSchedulerError(
+      "agentLauncher is required when automation.mode is agent_launch",
+    );
+  }
+  return runNexusAutomationAgentLaunchOnce({
+    projectRoot: options.projectRoot,
+    provider: options.options.provider,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    mcpRuntimeProcesses: options.options.mcpRuntimeProcesses,
+    now: options.options.now,
+    owner: options.options.owner ?? "scheduler",
+    runId,
+    launcher: options.options.agentLauncher,
+  });
+}
+
+function runNexusAutomationSchedulerOnce(
+  options: {
+    options: RunNexusAutomationSchedulerOptions;
+    projectRoot: string;
+  },
+  runId: string,
+): Promise<RunNexusAutomationOnceResult> {
+  if (!options.options.executor) {
+    throw new NexusAutomationSchedulerError(
+      "executor is required when automation.mode is run_once",
+    );
+  }
+  return runNexusAutomationOnce({
+    projectRoot: options.projectRoot,
+    provider: options.options.provider,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    now: options.options.now,
+    owner: options.options.owner ?? "scheduler",
+    baseRef: options.options.baseRef,
+    runId,
+    executor: options.options.executor,
+  });
+}
+
+function schedulerTickWaitMs(options: {
+  status: NexusAutomationStatus;
+  intervalMs: number;
+  tickStartedAt: string;
+  run: NexusAutomationSchedulerRunResult | null;
+  maxRuns: number | undefined;
+}): number {
+  if (
+    options.run &&
+    options.status.automationConfig?.mode === "agent_launch" &&
+    options.status.automationConfig.agent.relaunch.whileEligible &&
+    options.maxRuns !== undefined
+  ) {
+    return 0;
+  }
+  return options.run
+    ? options.intervalMs
+    : nextNexusAutomationSchedulerDelayMs(
+        options.status,
+        options.intervalMs,
+        options.tickStartedAt,
+      );
+}
+
+function schedulerLimitStopReason(options: {
+  maxRuns: number | undefined;
+  runCount: number;
+  maxTicks: number | undefined;
+  tickCount: number;
+}): NexusAutomationSchedulerStopReason | null {
+  if (options.maxRuns !== undefined && options.runCount >= options.maxRuns) {
+    return "max_runs";
+  }
+  if (options.maxTicks !== undefined && options.tickCount >= options.maxTicks) {
+    return "max_ticks";
+  }
+  return null;
 }
 
 export function nextNexusAutomationSchedulerDelayMs(
