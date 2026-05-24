@@ -13,6 +13,7 @@ import {
   validateNexusHomeConfigBase,
   type GitCommandResult,
   type GitRunner,
+  type NexusHostingAuthProfileConfig,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
 } from "../../src/index.js";
@@ -986,6 +987,122 @@ describe("nexus automation status", () => {
     );
   });
 
+  it("allows App-backed publication readiness without a legacy SSH alias", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        repo: {
+          kind: "git",
+          remoteUrl: "git@github.com:example/project.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+        },
+        automation: {
+          ...projectConfig().automation!,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "green_main",
+            remote: "app",
+            targetBranch: "main",
+            push: false,
+            sshHostAlias: "github.com-bot",
+            actor: {
+              kind: "app",
+              provider: "github",
+              handle: "devnexus-automation",
+              id: "dev-nexus-automation-app",
+            },
+            gitIdentity: {
+              name: "devnexus-automation[bot]",
+              email:
+                "286661136+devnexus-automation[bot]@users.noreply.github.com",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "dev-nexus-automation-app",
+              kind: "service_account",
+              provider: "github",
+              providerIdentity: "devnexus-automation",
+              displayName: "DevNexus Automation",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "dev-nexus-automation-app",
+              roles: ["maintainer"],
+              scope: {
+                component: "primary",
+              },
+            },
+          ],
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "App-backed publication task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      authProfiles: [
+        appAuthProfile({
+          id: "dev-nexus-app",
+          installationAccount: "example",
+          repositories: ["project"],
+        }),
+        appAuthProfile({
+          id: "dev-nexus-app-other-repo",
+          installationAccount: "other-owner",
+          repositories: ["other-project"],
+        }),
+      ],
+      gitRunner: publicationGitRunner(sourceRoot, {
+        remoteName: "app",
+        remoteUrl: "git@github.com:example/project.git",
+        localUserName: "devnexus-automation[bot]",
+        localUserEmail:
+          "286661136+devnexus-automation[bot]@users.noreply.github.com",
+      }),
+      publicationActorRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr: "unexpected GitHub CLI actor check",
+      }),
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result.status, result.summary).toBe("ready");
+    expect(result.candidateCount).toBe(1);
+    expect(result.publication[0]).toMatchObject({
+      componentId: "primary",
+      blocking: false,
+      actor: {
+        status: "matched",
+        observed: {
+          source: "authProfile:dev-nexus-app",
+        },
+      },
+    });
+    expect(result.preflight).not.toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:sshHostAlias",
+      }),
+    );
+  });
+
   it("blocks readiness when automation commit identity is incomplete", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     const sourceRoot = path.join(projectRoot, "source");
@@ -1094,7 +1211,21 @@ describe("nexus automation status", () => {
   });
 });
 
-function publicationGitRunner(repositoryPath: string): GitRunner {
+function publicationGitRunner(
+  repositoryPath: string,
+  options: {
+    remoteName?: string;
+    remoteUrl?: string;
+    pushUrl?: string;
+    upstream?: string;
+    localUserName?: string | null;
+    localUserEmail?: string | null;
+  } = {},
+): GitRunner {
+  const remoteName = options.remoteName ?? "bot";
+  const remoteUrl = options.remoteUrl ?? "git@github.com-bot:example/project.git";
+  const pushUrl = options.pushUrl ?? remoteUrl;
+  const upstream = options.upstream ?? `${remoteName}/main`;
   return (args, cwd) => {
     const key = args.join(" ");
     if (key === "rev-parse --show-toplevel") {
@@ -1104,13 +1235,33 @@ function publicationGitRunner(repositoryPath: string): GitRunner {
       return gitResult(args, "feature/local-38\n", cwd);
     }
     if (key === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
-      return gitResult(args, "bot/main\n", cwd);
+      return gitResult(args, `${upstream}\n`, cwd);
     }
-    if (key === "remote get-url bot") {
-      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    if (key === `remote get-url ${remoteName}`) {
+      return gitResult(args, `${remoteUrl}\n`, cwd);
     }
-    if (key === "remote get-url --push bot") {
-      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    if (key === `remote get-url --push ${remoteName}`) {
+      return gitResult(args, `${pushUrl}\n`, cwd);
+    }
+    if (key === "config --local --get user.name") {
+      return options.localUserName
+        ? gitResult(args, `${options.localUserName}\n`, cwd)
+        : gitMissingResult(args, cwd);
+    }
+    if (key === "config --local --get user.email") {
+      return options.localUserEmail
+        ? gitResult(args, `${options.localUserEmail}\n`, cwd)
+        : gitMissingResult(args, cwd);
+    }
+    if (key === "config --get user.name") {
+      return options.localUserName
+        ? gitResult(args, `${options.localUserName}\n`, cwd)
+        : gitMissingResult(args, cwd);
+    }
+    if (key === "config --get user.email") {
+      return options.localUserEmail
+        ? gitResult(args, `${options.localUserEmail}\n`, cwd)
+        : gitMissingResult(args, cwd);
     }
 
     return {
@@ -1119,6 +1270,32 @@ function publicationGitRunner(repositoryPath: string): GitRunner {
       stderr: `unexpected git command ${key} from ${cwd ?? ""}`,
       exitCode: 1,
     };
+  };
+}
+
+function appAuthProfile(options: {
+  id: string;
+  installationAccount: string;
+  repositories: string[];
+}): NexusHostingAuthProfileConfig {
+  return {
+    id: options.id,
+    actorId: "dev-nexus-automation-app",
+    provider: "github",
+    kind: "app",
+    credentialKind: "github_app",
+    account: "devnexus-automation",
+    host: "github.com",
+    gitUserName: "devnexus-automation[bot]",
+    gitUserEmail: "286661136+devnexus-automation[bot]@users.noreply.github.com",
+    purposes: ["api", "cli", "git"],
+    environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
+    githubApp: {
+      slug: "devnexus-automation",
+      privateKeyPath: "/keys/devnexus-automation.private-key.pem",
+      installationAccount: options.installationAccount,
+      repositories: options.repositories,
+    },
   };
 }
 
@@ -1136,5 +1313,17 @@ function gitResult(
     stdout,
     stderr: "",
     exitCode: 0,
+  };
+}
+
+function gitMissingResult(
+  args: readonly string[],
+  _cwd: string | undefined,
+): GitCommandResult {
+  return {
+    args: [...args],
+    stdout: "",
+    stderr: "",
+    exitCode: 1,
   };
 }

@@ -32,6 +32,7 @@ import {
   normalizeNexusProjectAgentTargets,
   type NexusProjectConfig,
 } from "../project/nexusProjectConfig.js";
+import type { NexusHostingAuthProfileConfig } from "../project/nexusProjectHosting.js";
 import {
   projectPluginDependencyProjections,
   projectPluginWorkerFragments,
@@ -640,6 +641,7 @@ export function preflightNexusAutomationRunOnce(options: {
   provider: WorkTrackerProvider;
   pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
   homePath?: string;
+  authProfiles?: NexusHostingAuthProfileConfig[];
   gitRunner?: GitRunner;
   publicationActorRunner?: NexusPublicationActorRunner;
 }): NexusAutomationPreflightCheck[] {
@@ -660,6 +662,7 @@ export function preflightNexusAutomationRunOnce(options: {
           projectConfig: options.projectConfig,
           component: options.component,
           action: publicationAction,
+          authProfiles: options.authProfiles,
           homePath: options.homePath,
           gitRunner: options.gitRunner,
           actorRunner: options.publicationActorRunner,
