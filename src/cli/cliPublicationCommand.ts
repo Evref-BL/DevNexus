@@ -57,7 +57,10 @@ import {
   type NexusReleaseTrainProviderEvidenceInput,
   type NexusReleaseTrainReadinessReport,
 } from "../publication/nexusReleaseTrainReadiness.js";
-import type { NexusProviderCredentialCommandRunner } from "../providers/nexusProviderCredentialBroker.js";
+import {
+  NexusProviderCredentialBrokerError,
+  type NexusProviderCredentialCommandRunner,
+} from "../providers/nexusProviderCredentialBroker.js";
 import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
 import {
   parsePositiveInteger,
@@ -138,6 +141,26 @@ interface ParsedPublicationReviewHandoffCommand {
   dryRun?: boolean;
   json?: boolean;
 }
+
+interface PublicationPullRequestFailurePayload {
+  ok: false;
+  dryRun: boolean;
+  projectRoot: string;
+  componentId: string | null;
+  target: NexusPublicationBranchPushResult["target"];
+  repository: NexusPublicationBranchPushResult["repository"];
+  error: {
+    code: "pull_request_credential_unavailable" | "pull_request_upsert_failed";
+    message: string;
+    credentialCode?: string | null;
+    profileId?: string | null;
+  };
+  setupActions: string[];
+}
+
+type PublicationReviewHandoffPullRequestResult =
+  | NexusPublicationPullRequestUpsertResult
+  | PublicationPullRequestFailurePayload;
 
 interface ParsedPublicationPullRequestMergeCommand {
   projectRoot: string;
@@ -327,19 +350,11 @@ export async function handlePublicationCommand(
     });
     const branchPushOk = parsed.dryRun || branchPush.push.git.exitCode === 0;
     const pullRequest = branchPushOk
-      ? await upsertNexusPublicationPullRequestForComponent({
-          projectRoot: parsed.projectRoot,
-          componentId: parsed.componentId,
+      ? await reviewHandoffPullRequestResult({
+          parsed,
           projectRepository,
-          head: parsed.branch,
-          base: parsed.base,
-          title: parsed.title,
-          body: publicationPullRequestBody(parsed),
-          draft: parsed.draft,
-          dryRun: parsed.dryRun,
-          baseEnv: dependencies.env ?? process.env,
-          fetch: dependencies.fetch,
-          credentialCommandRunner: dependencies.credentialCommandRunner,
+          branchPush,
+          dependencies,
         })
       : null;
     printPublicationReviewHandoffResult(
@@ -347,7 +362,7 @@ export async function handlePublicationCommand(
       parsed,
       dependencies.stdout ?? process.stdout,
     );
-    return branchPushOk ? 0 : 1;
+    return branchPushOk && pullRequestOk(pullRequest) ? 0 : 1;
   }
 
   if (argv[1] === "pull-request" && argv[2] === "merge") {
@@ -1698,10 +1713,106 @@ function printPublicationPullRequestUpsertResult(
   writeLine(stdout, `  Backend: ${result.pullRequest?.metadata.backend ?? result.plan.backend}`);
 }
 
+async function reviewHandoffPullRequestResult(options: {
+  parsed: ParsedPublicationReviewHandoffCommand;
+  projectRepository: boolean | undefined;
+  branchPush: NexusPublicationBranchPushResult;
+  dependencies: PublicationCliDependencies;
+}): Promise<PublicationReviewHandoffPullRequestResult> {
+  try {
+    return await upsertNexusPublicationPullRequestForComponent({
+      projectRoot: options.parsed.projectRoot,
+      componentId: options.parsed.componentId,
+      projectRepository: options.projectRepository,
+      head: options.parsed.branch,
+      base: options.parsed.base,
+      title: options.parsed.title,
+      body: publicationPullRequestBody(options.parsed),
+      draft: options.parsed.draft,
+      dryRun: options.parsed.dryRun,
+      baseEnv: options.dependencies.env ?? process.env,
+      fetch: options.dependencies.fetch,
+      credentialCommandRunner: options.dependencies.credentialCommandRunner,
+    });
+  } catch (error) {
+    return publicationPullRequestFailurePayload({
+      error,
+      branchPush: options.branchPush,
+      dryRun: Boolean(options.parsed.dryRun),
+    });
+  }
+}
+
+function publicationPullRequestFailurePayload(options: {
+  error: unknown;
+  branchPush: NexusPublicationBranchPushResult;
+  dryRun: boolean;
+}): PublicationPullRequestFailurePayload {
+  const credentialError =
+    options.error instanceof NexusProviderCredentialBrokerError
+      ? options.error
+      : null;
+  const profileId =
+    credentialError?.profileId ??
+    options.branchPush.credential.profileId ??
+    null;
+  const message = options.error instanceof Error
+    ? options.error.message
+    : String(options.error);
+  const code = credentialError
+    ? "pull_request_credential_unavailable"
+    : "pull_request_upsert_failed";
+
+  return {
+    ok: false,
+    dryRun: options.dryRun,
+    projectRoot: options.branchPush.projectRoot,
+    componentId: options.branchPush.componentId,
+    target: options.branchPush.target,
+    repository: options.branchPush.repository,
+    error: {
+      code,
+      message,
+      ...(credentialError ? { credentialCode: credentialError.code } : {}),
+      ...(profileId ? { profileId } : {}),
+    },
+    setupActions: publicationPullRequestSetupActions({
+      branchPush: options.branchPush,
+      credentialError,
+      profileId,
+    }),
+  };
+}
+
+function publicationPullRequestSetupActions(options: {
+  branchPush: NexusPublicationBranchPushResult;
+  credentialError: NexusProviderCredentialBrokerError | null;
+  profileId: string | null;
+}): string[] {
+  const repository = `${options.branchPush.repository.owner}/${options.branchPush.repository.name}`;
+  if (!options.credentialError) {
+    return [
+      `Fix the pull request provider error for ${repository}, then rerun publication review-handoff.`,
+    ];
+  }
+
+  const profile = options.profileId ?? "the selected publication auth profile";
+  return [
+    `Update host-local auth profile ${profile} so it can create or update pull requests for ${repository}.`,
+    `Add an API-capable credential for pull request API operations, or run review handoff with a publication actor/auth profile that has pull_requests:write on ${repository}.`,
+  ];
+}
+
+function pullRequestOk(
+  pullRequest: PublicationReviewHandoffPullRequestResult | null,
+): pullRequest is NexusPublicationPullRequestUpsertResult {
+  return Boolean(pullRequest && !("ok" in pullRequest && pullRequest.ok === false));
+}
+
 function printPublicationReviewHandoffResult(
   result: {
     branchPush: NexusPublicationBranchPushResult;
-    pullRequest: NexusPublicationPullRequestUpsertResult | null;
+    pullRequest: PublicationReviewHandoffPullRequestResult | null;
   },
   parsed: ParsedPublicationReviewHandoffCommand,
   stdout: TextWriter,
@@ -1711,7 +1822,7 @@ function printPublicationReviewHandoffResult(
     Boolean(parsed.dryRun),
   );
   const payload = {
-    ok: branchPushPayload.ok && result.pullRequest !== null,
+    ok: branchPushPayload.ok && pullRequestOk(result.pullRequest),
     dryRun: Boolean(parsed.dryRun),
     projectRoot: result.branchPush.projectRoot,
     componentId: result.branchPush.componentId,
@@ -1719,7 +1830,7 @@ function printPublicationReviewHandoffResult(
     repository: result.branchPush.repository,
     branchPush: branchPushPayload,
     pullRequest: result.pullRequest
-      ? publicationPullRequestUpsertPayload(result.pullRequest)
+      ? publicationReviewHandoffPullRequestPayload(result.pullRequest)
       : null,
   };
   if (parsed.json) {
@@ -1735,13 +1846,19 @@ function printPublicationReviewHandoffResult(
   writeLine(stdout, `  Repository: ${result.branchPush.repository.owner}/${result.branchPush.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branchPush.branch}`);
   writeLine(stdout, `  Branch credential: ${result.branchPush.credential.profileId} (${result.branchPush.credential.kind})`);
-  if (result.pullRequest) {
+  if (result.pullRequest && pullRequestOk(result.pullRequest)) {
     writeLine(stdout, `  Pull request credential: ${result.pullRequest.credential.profileId} (${result.pullRequest.credential.kind})`);
     if (result.pullRequest.pullRequest) {
       writeLine(stdout, `  Pull request: #${result.pullRequest.pullRequest.number}`);
       if (result.pullRequest.pullRequest.url) {
         writeLine(stdout, `  URL: ${result.pullRequest.pullRequest.url}`);
       }
+    }
+  }
+  if (result.pullRequest && !pullRequestOk(result.pullRequest)) {
+    writeLine(stdout, `  Pull request blocked: ${result.pullRequest.error.message}`);
+    for (const setupAction of result.pullRequest.setupActions) {
+      writeLine(stdout, `  Setup action: ${setupAction}`);
     }
   }
 }
@@ -1791,6 +1908,14 @@ function publicationPullRequestUpsertPayload(
     plan: result.plan,
     pullRequest: result.pullRequest,
   };
+}
+
+function publicationReviewHandoffPullRequestPayload(
+  result: PublicationReviewHandoffPullRequestResult,
+) {
+  return pullRequestOk(result)
+    ? publicationPullRequestUpsertPayload(result)
+    : result;
 }
 
 function printPublicationPullRequestMergeResult(
