@@ -70,8 +70,14 @@ async function loadDashboardClientTestHooks(): Promise<{
   gitHistoryRows: (snapshot: unknown, filter?: string | null) => {
     maxLane: number;
     repository: unknown;
-    rows: Array<{ commit: { hash: string }; lane: number; selectId: string }>;
-    paths: Array<{ fromLane?: number; points?: Array<{ lane: number }>; toLane?: number }>;
+    rows: Array<{ commit: { hash: string }; index: number; lane: number; selectId: string }>;
+    paths: Array<{
+      fromIndex?: number;
+      fromLane?: number;
+      points?: Array<{ index: number; lane: number }>;
+      toIndex?: number;
+      toLane?: number;
+    }>;
   } | null;
   renderActionStrip: (
     actions: Array<{
@@ -2167,8 +2173,105 @@ describe("nexus dashboard", () => {
     const rendered = hooks.renderGitHistory(snapshot);
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toMatch(/M 22 15 V 28\.5 C .*40 40\.5 V 105/);
-    expect(rendered).not.toMatch(/M 22 15 C 22 36, 40 84, 40 105/);
+    expect(rendered).toContain("H 50 V 105");
+    expect(rendered).not.toMatch(/M 28 15 C .*50 .*105/);
+  });
+
+  it("anchors every git graph edge endpoint on a rendered commit row", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "merge000000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/corridor"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "merge000000000000000000000000000000000000000",
+                shortHash: "merge00",
+                parents: [
+                  "main20000000000000000000000000000000000000",
+                  "feature000000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge feature branch",
+                refs: [],
+              },
+              {
+                hash: "main20000000000000000000000000000000000000",
+                shortHash: "main200",
+                parents: ["main10000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:58:00.000Z",
+                subject: "Main corridor step",
+                refs: [],
+              },
+              {
+                hash: "main10000000000000000000000000000000000000",
+                shortHash: "main100",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:56:00.000Z",
+                subject: "Main base step",
+                refs: [],
+              },
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: ["base0000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Feature branch step",
+                refs: [],
+              },
+              {
+                hash: "base0000000000000000000000000000000000000",
+                shortHash: "base000",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const graph = hooks.gitHistoryRows(snapshot);
+    const rowIndexes = new Set(graph?.rows.map((row) => row.index));
+
+    expect(graph?.paths.length).toBeGreaterThan(0);
+    for (const path of graph?.paths ?? []) {
+      expect(rowIndexes.has(path.fromIndex)).toBe(true);
+      expect(rowIndexes.has(path.toIndex)).toBe(true);
+    }
   });
 
   it("reuses git graph lanes for side branches with separate lifetimes", async () => {
@@ -2440,8 +2543,8 @@ describe("nexus dashboard", () => {
     const sideB = rows?.rows.find((row) => row.commit.hash.startsWith("sideB"));
 
     expect(sideB?.lane).toBe(1);
-    expect(rows?.maxLane).toBe(2);
-    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane === 2))).toBe(true);
+    expect(rows?.maxLane).toBe(1);
+    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane > 1))).toBe(false);
   });
 
   it("keeps every loaded git history row visible in the graph", async () => {
@@ -2594,9 +2697,9 @@ describe("nexus dashboard", () => {
 
     const rendered = hooks.renderGitHistory(snapshot);
 
-    expect(rendered).toContain('width="118"');
+    expect(rendered).toContain('width="148"');
     expect(rendered).toContain('height="120"');
-    expect(rendered).toContain('viewBox="0 0 118 120"');
+    expect(rendered).toContain('viewBox="0 0 148 120"');
   });
 
   it("filters project git history by branch head ancestors", async () => {
