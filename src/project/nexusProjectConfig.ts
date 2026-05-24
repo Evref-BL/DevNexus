@@ -22,6 +22,8 @@ import {
   nexusPluginWorkerFragmentBodyMaxLength,
   nexusPluginWorkerFragmentProvenanceMaxLength,
   nexusPluginWorkerFragmentTitleMaxLength,
+  type NexusPluginAgentPackageKind,
+  type NexusPluginAgentPackageSurface,
   type NexusPluginCapabilityKind,
   type NexusPluginCapabilityRecord,
   type NexusPluginCleanupHookTrigger,
@@ -1418,6 +1420,7 @@ function validatePluginCapabilityKind(
   if (
     value === "projected_skill" ||
     value === "mcp_server" ||
+    value === "agent_package" ||
     value === "setup_obligation" ||
     value === "environment_hint" ||
     value === "cleanup_hook" ||
@@ -1430,7 +1433,7 @@ function validatePluginCapabilityKind(
   }
 
   throw new NexusConfigError(
-    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, agent_affordance, dependency_projection, worker_context_fragment, or worker_briefing_fragment`,
+    `${pathName} must be projected_skill, mcp_server, agent_package, setup_obligation, environment_hint, cleanup_hook, agent_affordance, dependency_projection, worker_context_fragment, or worker_briefing_fragment`,
   );
 }
 
@@ -1464,6 +1467,62 @@ function validatePluginDependencyProjectionSourceControl(
   }
 
   throw new NexusConfigError(`${pathName} must be support or source`);
+}
+
+function validatePluginAgentPackageKind(
+  value: unknown,
+  pathName: string,
+): NexusPluginAgentPackageKind {
+  if (
+    value === "native" ||
+    value === "shim" ||
+    value === "bundled_fallback" ||
+    value === "manual_guidance"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be native, shim, bundled_fallback, or manual_guidance`,
+  );
+}
+
+function validatePluginAgentPackageSurfaces(
+  value: unknown,
+  pathName: string,
+): NexusPluginAgentPackageSurface[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+
+  const validSurfaces = new Set<NexusPluginAgentPackageSurface>([
+    "skills",
+    "commands",
+    "hooks",
+    "mcp",
+    "scripts",
+    "adapters",
+    "schemas",
+    "templates",
+    "examples",
+    "tests",
+    "references",
+  ]);
+  for (const [index, surface] of value.entries()) {
+    if (
+      typeof surface !== "string" ||
+      !validSurfaces.has(surface as NexusPluginAgentPackageSurface)
+    ) {
+      throw new NexusConfigError(
+        `${pathName}[${index}] must be skills, commands, hooks, mcp, scripts, adapters, schemas, templates, examples, tests, or references`,
+      );
+    }
+  }
+
+  return value as NexusPluginAgentPackageSurface[];
 }
 
 function validatePluginMcpTools(
@@ -1631,6 +1690,15 @@ function validatePluginCapabilityRecord(
     };
   }
 
+  if (kind === "agent_package") {
+    return validatePluginAgentPackageCapabilityRecord({
+      record,
+      pathName,
+      id,
+      description,
+    });
+  }
+
   if (kind === "setup_obligation") {
     return {
       kind,
@@ -1741,6 +1809,56 @@ function validatePluginCapabilityRecord(
     kind,
     id,
     description: requiredString(record, "description", pathName),
+  };
+}
+
+function validatePluginAgentPackageCapabilityRecord(options: {
+  record: Record<string, unknown>;
+  pathName: string;
+  id: string;
+  description?: string;
+}): NexusPluginCapabilityRecord {
+  const { record, pathName } = options;
+  const repositoryUrl = optionalString(record, "repositoryUrl", pathName);
+  const installCommand = optionalString(record, "installCommand", pathName);
+  const checkCommand = optionalString(record, "checkCommand", pathName);
+  const versionPolicy = optionalString(record, "versionPolicy", pathName);
+  const license = optionalString(record, "license", pathName);
+  const provenance = optionalString(record, "provenance", pathName);
+  const targetAgents = optionalStringArray(record, "targetAgents", pathName);
+  const surfaces = validatePluginAgentPackageSurfaces(
+    record.surfaces,
+    `${pathName}.surfaces`,
+  );
+  const setupInstructions = optionalStringArray(
+    record,
+    "setupInstructions",
+    pathName,
+  );
+
+  return {
+    kind: "agent_package",
+    id: options.id,
+    ...(options.description !== undefined
+      ? { description: options.description }
+      : {}),
+    packageKind: validatePluginAgentPackageKind(
+      record.packageKind,
+      `${pathName}.packageKind`,
+    ),
+    packageName: requiredString(record, "packageName", pathName),
+    ...(repositoryUrl !== undefined
+      ? { repositoryUrl: validateHttpUrl(repositoryUrl, `${pathName}.repositoryUrl`) }
+      : {}),
+    ...(installCommand !== undefined ? { installCommand } : {}),
+    ...(checkCommand !== undefined ? { checkCommand } : {}),
+    ...(versionPolicy !== undefined ? { versionPolicy } : {}),
+    ...(license !== undefined ? { license } : {}),
+    ...(provenance !== undefined ? { provenance } : {}),
+    required: optionalBoolean(record, "required", pathName) ?? false,
+    ...(targetAgents !== undefined ? { targetAgents } : {}),
+    ...(surfaces !== undefined ? { surfaces } : {}),
+    ...(setupInstructions !== undefined ? { setupInstructions } : {}),
   };
 }
 
