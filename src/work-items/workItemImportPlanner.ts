@@ -873,7 +873,7 @@ function planImportCreate(options: {
   });
 }
 
-function planImportUpdate(options: {
+type PlanImportUpdateOptions = {
   plan: MutableWorkItemImportPlan;
   sourceItem: WorkItem;
   sourceSummary: WorkItemSyncItemSummary;
@@ -884,7 +884,9 @@ function planImportUpdate(options: {
   targetDetection: WorkItemImportTargetDetection;
   fingerprints: string[];
   policy: Required<WorkItemImportPolicyConfig>;
-}): void {
+};
+
+function planImportUpdate(options: PlanImportUpdateOptions): void {
   if (!options.targetItem) {
     return;
   }
@@ -900,29 +902,8 @@ function planImportUpdate(options: {
     options.targetReference && targetChangedAfterLink(options.targetItem, options.targetReference)
       ? fieldChanges
       : [];
-  if (conflictFields.length > 0) {
-    options.plan.conflicts.push({
-      source: options.sourceSummary,
-      target: targetSummary,
-      targetTrackerId: options.policy.targetTrackerId,
-      targetReference: options.targetReference,
-      fields: conflictFields,
-      policy: options.policy.conflictPolicy,
-    });
-    if (options.policy.conflictPolicy.mode === "block") {
-      return;
-    }
-    if (options.policy.conflictPolicy.mode === "target_wins") {
-      options.plan.skips.push({
-        reason: "conflict_target_wins",
-        message: "Local target changed after the source link was observed; conflict policy keeps local values.",
-        source: options.sourceSummary,
-        target: targetSummary,
-        targetTrackerId: options.policy.targetTrackerId,
-        targetReference: options.targetReference,
-      });
-      return;
-    }
+  if (handleImportUpdateConflict({ options, targetSummary, conflictFields })) {
+    return;
   }
 
   const needsLink = options.targetDetection === "fingerprint";
@@ -1004,6 +985,41 @@ function planImportUpdate(options: {
     }),
     fingerprints: options.fingerprints,
   });
+}
+
+function handleImportUpdateConflict(input: {
+  options: PlanImportUpdateOptions;
+  targetSummary: WorkItemSyncItemSummary;
+  conflictFields: WorkItemSyncFieldChange[];
+}): boolean {
+  if (input.conflictFields.length === 0) {
+    return false;
+  }
+
+  input.options.plan.conflicts.push({
+    source: input.options.sourceSummary,
+    target: input.targetSummary,
+    targetTrackerId: input.options.policy.targetTrackerId,
+    targetReference: input.options.targetReference,
+    fields: input.conflictFields,
+    policy: input.options.policy.conflictPolicy,
+  });
+  if (input.options.policy.conflictPolicy.mode === "block") {
+    return true;
+  }
+  if (input.options.policy.conflictPolicy.mode !== "target_wins") {
+    return false;
+  }
+
+  input.options.plan.skips.push({
+    reason: "conflict_target_wins",
+    message: "Local target changed after the source link was observed; conflict policy keeps local values.",
+    source: input.options.sourceSummary,
+    target: input.targetSummary,
+    targetTrackerId: input.options.policy.targetTrackerId,
+    targetReference: input.options.targetReference,
+  });
+  return true;
 }
 
 async function readWorkItems(options: {
