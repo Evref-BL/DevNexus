@@ -118,7 +118,7 @@ export function buildNexusCockpitHistoryGraphSvgModel(
         ...routes.flatMap((route) =>
           nexusCockpitHistoryGraphRoutePoints(route).map((point) => point.index),
         ),
-      ) + 1,
+      ) + 0.5,
     ),
   );
   const maxLane = Math.max(

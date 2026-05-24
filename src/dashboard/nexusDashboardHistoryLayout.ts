@@ -63,6 +63,7 @@ export interface NexusDashboardHistorySegment {
   readonly id: string;
   readonly edgeId?: string;
   readonly targetWriteEventId: string;
+  readonly truncated?: boolean;
   readonly trackId: string;
   readonly colorIndex: number;
   readonly fromLane: number;
@@ -105,6 +106,7 @@ interface ActiveHistoryRoute {
   readonly targetEventId: string;
   readonly trackId: string;
   readonly colorIndex: number;
+  readonly truncated: boolean;
   readonly points: NexusDashboardHistoryPoint[];
 }
 
@@ -150,6 +152,26 @@ export function buildWriteHistoryLayout(
       const parentId = event.parentIds[parentIndex];
       if (!knownIds.has(parentId)) {
         truncatedParentIds.push(parentId);
+        const preferredLane =
+          parentIndex === 0 ? lane : firstOpenHistoryLane(active);
+        const route = createHistoryRoute(
+          parentId,
+          undefined,
+          parentIndex === 0 ? colorIndex : preferredLane,
+          lane,
+          row,
+          true,
+        );
+        if (preferredLane !== lane) {
+          addHistoryLaneTransition(route, preferredLane, row + 0.85);
+        }
+        addHistoryRoutePoint(
+          route,
+          preferredLane,
+          Math.max(row + 0.5, writeEvents.length - 0.5),
+        );
+        segments.push(historySegmentFromRoute(route, segments.length));
+        rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
         continue;
       }
 
@@ -308,10 +330,12 @@ export function validateWriteHistoryLayout(
 
   for (const segment of layout.segments) {
     if (!nodeByWriteEventId.has(segment.targetWriteEventId)) {
-      violations.push({
-        code: "segment.target",
-        message: `History segment ${segment.id} targets an unknown write event.`,
-      });
+      if (!segment.truncated) {
+        violations.push({
+          code: "segment.target",
+          message: `History segment ${segment.id} targets an unknown write event.`,
+        });
+      }
     }
     if (segment.points.length < 2) {
       violations.push({
@@ -398,12 +422,14 @@ function createHistoryRoute(
   colorIndex: number,
   lane: number,
   row: number,
+  truncated = false,
 ): ActiveHistoryRoute {
   return {
     edgeId,
     targetEventId,
     trackId: `track:${targetEventId}:${colorIndex}`,
     colorIndex,
+    truncated,
     points: [{ lane, row }],
   };
 }
@@ -422,6 +448,7 @@ function historySegmentFromRoute(
     id: `segment:${segmentIndex}`,
     edgeId: route.edgeId,
     targetWriteEventId: route.targetEventId,
+    truncated: route.truncated || undefined,
     trackId: route.trackId,
     colorIndex: route.colorIndex,
     fromLane: first.lane,

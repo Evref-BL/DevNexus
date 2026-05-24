@@ -71,4 +71,30 @@ describe("nexus cockpit history graph SVG", () => {
       'data-history-write-event-id="history:primary:merge"',
     );
   });
+
+  it("keeps boundary continuations within the loaded row height", () => {
+    const model = buildNexusCockpitHistoryGraphSvgModel({
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:head" },
+        { lane: 0, index: 1, selectId: "history:primary:base" },
+      ],
+      paths: [
+        {
+          fromLane: 0,
+          toLane: 0,
+          fromIndex: 0,
+          toIndex: 1.5,
+          points: [
+            { lane: 0, index: 0 },
+            { lane: 0, index: 1.5 },
+          ],
+        },
+      ],
+    });
+
+    expect(model).toMatchObject({
+      rowCount: 2,
+      height: 60,
+    });
+  });
 });

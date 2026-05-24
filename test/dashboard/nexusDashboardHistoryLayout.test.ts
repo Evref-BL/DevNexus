@@ -65,7 +65,7 @@ describe("nexus dashboard history layout", () => {
     expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
-  it("records truncated parents without inventing write-event rows", () => {
+  it("continues truncated parent tracks without inventing write-event rows", () => {
     const layout = buildWriteHistoryLayout({
       writeEvents: [
         writeEvent("head", ["parent-outside-window"]),
@@ -74,8 +74,46 @@ describe("nexus dashboard history layout", () => {
 
     expect(layout.nodes).toHaveLength(1);
     expect(layout.edges).toEqual([]);
-    expect(layout.segments).toEqual([]);
+    expect(layout.segments).toEqual([
+      expect.objectContaining({
+        targetWriteEventId: "parent-outside-window",
+        truncated: true,
+        fromLane: 0,
+        toLane: 0,
+        fromRow: 0,
+        toRow: 0.5,
+        points: [
+          { lane: 0, row: 0 },
+          { lane: 0, row: 0.5 },
+        ],
+      }),
+    ]);
     expect(layout.truncatedParentIds).toEqual(["parent-outside-window"]);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+  });
+
+  it("connects a loaded branch head whose parent is outside the history window", () => {
+    const layout = buildWriteHistoryLayout({
+      writeEvents: [
+        writeEvent("merge", ["base"]),
+        writeEvent("side", ["parent-outside-window"]),
+        writeEvent("base", []),
+      ],
+    });
+    const side = layout.nodes.find((node) => node.writeEventId === "side");
+    const connectedSegments = layout.segments.filter((segment) =>
+      segment.points.some(
+        (point) => point.row === side?.row && point.lane === side?.lane,
+      ),
+    );
+
+    expect(side).toMatchObject({ row: 1, lane: 1 });
+    expect(connectedSegments).toEqual([
+      expect.objectContaining({
+        targetWriteEventId: "parent-outside-window",
+        truncated: true,
+      }),
+    ]);
     expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
