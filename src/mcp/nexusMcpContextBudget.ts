@@ -20,6 +20,7 @@ import {
 } from "./nexusMcpGateway.js";
 import type {
   NexusPluginMcpServerCapability,
+  NexusPluginMcpServerTransport,
   NexusProjectPluginConfig,
 } from "../project/nexusPluginCapabilities.js";
 import {
@@ -75,8 +76,10 @@ export interface NexusMcpContextBudgetPluginServer {
   pluginVersion: string | null;
   capabilityId: string;
   serverName: string;
+  transport: NexusPluginMcpServerTransport;
   command: string | null;
   args: string[];
+  url: string | null;
   targetAgents: string[];
   declaredToolCount: number;
   toolCount: number;
@@ -84,7 +87,11 @@ export interface NexusMcpContextBudgetPluginServer {
   estimatedBytes: number;
   estimatedTokens: number;
   metadataStatus: NexusMcpContextBudgetMetadataStatus;
-  materializationStatus: "declared" | "missing_command" | "no_matching_target";
+  materializationStatus:
+    | "declared"
+    | "missing_command"
+    | "missing_url"
+    | "no_matching_target";
   effectiveExposure: NexusResolvedMcpExposureMode;
   exposureSource: NexusMcpExposureSource;
   exposureReason: string;
@@ -333,8 +340,10 @@ function pluginMcpServers(
             pluginVersion: plugin.version ?? null,
             capabilityId: capability.id,
             serverName: capability.serverName,
+            transport: pluginMcpServerTransport(capability),
             command: capability.command ?? null,
             args: [...(capability.args ?? [])],
+            url: capability.url ?? null,
             targetAgents,
             declaredToolCount: capability.tools?.length ?? 0,
             toolCount: metadata.tools.length,
@@ -436,7 +445,7 @@ function readDiscoveredPluginTools(options: {
   plugin: NexusProjectPluginConfig;
   capability: NexusPluginMcpServerCapability;
 }): NexusMcpGatewayDiscoveryTool[] {
-  if (!options.agentTarget || !options.capability.command) {
+  if (!options.agentTarget || !pluginMcpServerHasCallableUpstream(options.capability)) {
     return [];
   }
   const record = readNexusMcpGatewayDiscoveryRecord(
@@ -452,6 +461,14 @@ function readDiscoveredPluginTools(options: {
   if (!record) {
     return [];
   }
+  const transport = pluginMcpServerTransport(options.capability);
+  const recordTransport = record.transport ?? "stdio";
+  if (recordTransport !== transport) {
+    return [];
+  }
+  if (transport === "http") {
+    return record.url === options.capability.url ? record.tools : [];
+  }
   if (
     record.command !== options.capability.command ||
     !sameStringArray(record.args, options.capability.args ?? [])
@@ -459,6 +476,20 @@ function readDiscoveredPluginTools(options: {
     return [];
   }
   return record.tools;
+}
+
+function pluginMcpServerTransport(
+  capability: NexusPluginMcpServerCapability,
+): NexusPluginMcpServerTransport {
+  return capability.transport ?? (capability.url ? "http" : "stdio");
+}
+
+function pluginMcpServerHasCallableUpstream(
+  capability: NexusPluginMcpServerCapability,
+): boolean {
+  const transport = pluginMcpServerTransport(capability);
+  return (transport === "stdio" && !!capability.command) ||
+    (transport === "http" && !!capability.url);
 }
 
 function pluginMetadataStatus(
@@ -539,8 +570,12 @@ function pluginMaterializationStatus(
   capability: NexusPluginMcpServerCapability,
   selectedAgents: readonly string[],
 ): NexusMcpContextBudgetPluginServer["materializationStatus"] {
-  if (!capability.command) {
+  const transport = pluginMcpServerTransport(capability);
+  if (transport === "stdio" && !capability.command) {
     return "missing_command";
+  }
+  if (transport === "http" && !capability.url) {
+    return "missing_url";
   }
   const targetAgents = capability.targetAgents ?? [];
   if (

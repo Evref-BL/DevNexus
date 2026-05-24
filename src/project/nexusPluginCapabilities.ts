@@ -134,12 +134,16 @@ export interface NexusPluginMcpToolCapability {
   description?: string;
 }
 
+export type NexusPluginMcpServerTransport = "stdio" | "http";
+
 export interface NexusPluginMcpServerCapability
   extends NexusPluginCapabilityBase {
   kind: "mcp_server";
   serverName: string;
+  transport?: NexusPluginMcpServerTransport;
   command?: string;
   args?: string[];
+  url?: string;
   targetAgents?: string[];
   exposure?: NexusMcpExposureMode;
   tools?: NexusPluginMcpToolCapability[];
@@ -231,7 +235,9 @@ export type NexusPluginCapabilityProjectionRecord =
       id: string;
       description: string | null;
       serverName: string;
+      transport: NexusPluginMcpServerTransport | null;
       exposure: NexusMcpExposureMode | null;
+      url: string | null;
       targetAgents: string[];
       tools: Array<{
         name: string;
@@ -432,7 +438,9 @@ function projectCapabilityRecord(
       id: capability.id,
       description: capability.description ?? null,
       serverName: capability.serverName,
+      transport: capability.transport ?? (capability.url ? "http" : null),
       exposure: capability.exposure ?? null,
+      url: capability.url ?? null,
       targetAgents: capability.targetAgents ?? [],
       tools: (capability.tools ?? []).map((tool) => ({
         name: tool.name,

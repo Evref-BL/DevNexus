@@ -92,11 +92,11 @@ removes tools even when a broader include matched. Tool names may be written as
 `tool_name`, `server_name.tool_name`, or `server_name__tool_name`.
 
 Plugin MCP servers connect to the gateway through their `mcp_server`
-capability. Declare `serverName`, `command`, and `args`; declare `tools` when the
-tool names are known at plugin install time. If no tools are declared, the
-gateway starts the command-based MCP server, runs MCP initialization and
-`tools/list`, caches the discovered metadata under `.dev-nexus/runtime/mcp-gateway/`,
-and uses that cache in future budget reports.
+capability. Declare `serverName`, then either a stdio `command` plus `args` or
+`transport: "http"` plus `url`. Declare `tools` when the tool names are known at
+plugin install time. If no tools are declared, the gateway initializes the
+upstream server, runs `tools/list`, caches the discovered metadata under
+`.dev-nexus/runtime/mcp-gateway/`, and uses that cache in future budget reports.
 
 Check the context effect before changing exposure:
 

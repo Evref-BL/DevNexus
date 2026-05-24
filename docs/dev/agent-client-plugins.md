@@ -113,7 +113,7 @@ default profile.
 Diagnostics should flag:
 
 - plugin MCP tools that duplicate core `dev_nexus` tools
-- stale or unexpected MCP command lines
+- stale or unexpected MCP command lines or HTTP endpoints
 - missing MCP config
 - stale MCP gateway discovery metadata
 - gateway groups that hide every routed tool

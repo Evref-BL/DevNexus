@@ -26,6 +26,7 @@ import {
   type NexusPluginCapabilityRecord,
   type NexusPluginCleanupHookTrigger,
   type NexusPluginDependencyProjectionSourceControl,
+  type NexusPluginMcpServerTransport,
   type NexusPluginMcpToolCapability,
   type NexusProjectPluginConfig,
   type NexusProjectPluginsConfig,
@@ -1488,6 +1489,39 @@ function validatePluginMcpTools(
   });
 }
 
+function validatePluginMcpServerTransport(
+  value: unknown,
+  pathName: string,
+): NexusPluginMcpServerTransport | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "stdio" || value === "http") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be stdio or http`);
+}
+
+function validateHttpUrl(value: string, pathName: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new NexusConfigError(`${pathName} must be an absolute HTTP URL`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new NexusConfigError(`${pathName} must use http or https`);
+  }
+  if (url.username || url.password || url.hash) {
+    throw new NexusConfigError(
+      `${pathName} must not include credentials or a fragment`,
+    );
+  }
+  return url.toString();
+}
+
 function validateMcpExposureMode(
   value: unknown,
   pathName: string,
@@ -1549,16 +1583,48 @@ function validatePluginCapabilityRecord(
   if (kind === "mcp_server") {
     const targetAgents = optionalStringArray(record, "targetAgents", pathName);
     const tools = validatePluginMcpTools(record.tools, `${pathName}.tools`);
+    const transport = validatePluginMcpServerTransport(
+      record.transport,
+      `${pathName}.transport`,
+    );
     const command = optionalString(record, "command", pathName);
     const args = optionalStringArray(record, "args", pathName);
+    const rawUrl = optionalString(record, "url", pathName);
+    const url = rawUrl !== undefined
+      ? validateHttpUrl(rawUrl, `${pathName}.url`)
+      : undefined;
+    const effectiveTransport =
+      transport ?? (url !== undefined ? "http" : undefined);
+    if (effectiveTransport === "http" && !url) {
+      throw new NexusConfigError(
+        `${pathName}.url is required when transport is http`,
+      );
+    }
+    if (effectiveTransport === "http" && command !== undefined) {
+      throw new NexusConfigError(
+        `${pathName}.command must be omitted when transport is http`,
+      );
+    }
+    if (effectiveTransport === "http" && args !== undefined) {
+      throw new NexusConfigError(
+        `${pathName}.args must be omitted when transport is http`,
+      );
+    }
+    if (effectiveTransport === "stdio" && url !== undefined) {
+      throw new NexusConfigError(
+        `${pathName}.url must be omitted when transport is stdio`,
+      );
+    }
     const exposure = validateMcpExposureMode(record.exposure, `${pathName}.exposure`);
     return {
       kind,
       id,
       ...(description !== undefined ? { description } : {}),
       serverName: requiredString(record, "serverName", pathName),
+      ...(effectiveTransport !== undefined ? { transport: effectiveTransport } : {}),
       ...(command !== undefined ? { command } : {}),
       ...(args !== undefined ? { args } : {}),
+      ...(url !== undefined ? { url } : {}),
       ...(targetAgents !== undefined ? { targetAgents } : {}),
       ...(exposure !== undefined ? { exposure } : {}),
       ...(tools !== undefined ? { tools } : {}),

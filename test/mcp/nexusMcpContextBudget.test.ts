@@ -124,4 +124,52 @@ describe("DevNexus MCP context budget", () => {
     ]);
     expect(report.contextImpact.gatewayRoutedToolCount).toBe(1);
   });
+
+  it("treats URL-backed plugin MCP servers as gateway-callable upstreams", () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-budget-http-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        exposure: "gateway",
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "http-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "http-mcp",
+              serverName: "http_runtime",
+              transport: "http",
+              url: "http://127.0.0.1:3050/mcp",
+              tools: [
+                {
+                  name: "http_probe",
+                  description: "Probe an HTTP MCP runtime.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const report = buildNexusMcpContextBudgetReport({ projectRoot });
+    const httpServer = report.pluginDeclaredServers.find(
+      (server) => server.serverName === "http_runtime",
+    );
+
+    expect(httpServer).toMatchObject({
+      transport: "http",
+      command: null,
+      url: "http://127.0.0.1:3050/mcp",
+      materializationStatus: "declared",
+      effectiveExposure: "gateway",
+      toolCount: 1,
+    });
+    expect(report.contextImpact.gatewayRoutedToolCount).toBeGreaterThanOrEqual(1);
+  });
 });

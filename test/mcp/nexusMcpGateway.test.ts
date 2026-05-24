@@ -1,7 +1,9 @@
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildNexusMcpGatewayIndex,
@@ -143,6 +145,122 @@ function handle(message) {
     "utf8",
   );
   return serverPath;
+}
+
+async function startHttpEchoMcpServer(): Promise<{
+  url: string;
+  requests: Array<{
+    method: string;
+    accept: string | null;
+    sessionId: string | null;
+    protocolVersion: string | null;
+  }>;
+  close: () => Promise<void>;
+}> {
+  const requests: Array<{
+    method: string;
+    accept: string | null;
+    sessionId: string | null;
+    protocolVersion: string | null;
+  }> = [];
+  const server = http.createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const message = chunks.length > 0
+        ? JSON.parse(Buffer.concat(chunks).toString("utf8"))
+        : null;
+      requests.push({
+        method: message?.method ?? request.method ?? "unknown",
+        accept: request.headers.accept ?? null,
+        sessionId: request.headers["mcp-session-id"]?.toString() ?? null,
+        protocolVersion: request.headers["mcp-protocol-version"]?.toString() ??
+          null,
+      });
+      if (request.method === "DELETE") {
+        response.writeHead(202);
+        response.end();
+        return;
+      }
+      if (request.method !== "POST" || !message) {
+        response.writeHead(405);
+        response.end();
+        return;
+      }
+      if (message.method === "notifications/initialized") {
+        response.writeHead(202);
+        response.end();
+        return;
+      }
+      response.setHeader("Content-Type", "application/json");
+      if (message.method === "initialize") {
+        response.setHeader("Mcp-Session-Id", "session-327");
+        response.end(JSON.stringify({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+            serverInfo: { name: "http-echo" },
+          },
+        }));
+        return;
+      }
+      if (message.method === "tools/list") {
+        response.end(JSON.stringify({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            tools: [
+              {
+                name: "http_echo",
+                description: "Echo text over Streamable HTTP.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    text: { type: "string" },
+                  },
+                },
+              },
+            ],
+          },
+        }));
+        return;
+      }
+      if (message.method === "tools/call") {
+        response.end(JSON.stringify({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: String(message.params?.arguments?.text ?? "ok"),
+              },
+            ],
+          },
+        }));
+        return;
+      }
+      response.end(JSON.stringify({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: { code: -32601, message: `unknown ${message.method}` },
+      }));
+    });
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${address.port}/mcp`,
+    requests,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      }),
+  };
 }
 
 afterEach(() => {
@@ -530,6 +648,94 @@ describe("DevNexus MCP gateway", () => {
     expect(called.response).toMatchObject({
       content: [{ type: "text", text: "dynamic" }],
     });
+  });
+
+  it("discovers and calls HTTP upstream tools dynamically", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-http-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const upstream = await startHttpEchoMcpServer();
+    try {
+      saveProjectConfig(projectRoot, projectConfig({
+        mcp: {
+          agentTargets: [{ agent: "codex" }],
+        },
+        plugins: [
+          {
+            id: "http-plugin",
+            enabled: true,
+            mcpExposure: "gateway",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "http-mcp",
+                serverName: "http_runtime",
+                transport: "http",
+                url: upstream.url,
+              },
+            ],
+          },
+        ],
+      }));
+
+      const search = toolJson(await callDevNexusMcpGatewayTool(
+        "mcp_gateway_search",
+        { projectRoot, query: "http echo" },
+      ));
+
+      expect(search.matches[0]).toMatchObject({
+        serverName: "http_runtime",
+        toolName: "http_echo",
+        schemaStatus: "discovered",
+      });
+
+      const described = toolJson(await callDevNexusMcpGatewayTool(
+        "mcp_gateway_describe",
+        { projectRoot, toolId: search.matches[0].toolId },
+      ));
+      expect(described.tool.inputSchema).toMatchObject({
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+      });
+
+      const called = toolJson(await callDevNexusMcpGatewayTool(
+        "mcp_gateway_call",
+        {
+          projectRoot,
+          toolId: search.matches[0].toolId,
+          arguments: { text: "http gateway" },
+        },
+      ));
+      expect(called).toMatchObject({
+        ok: true,
+        serverName: "http_runtime",
+        toolName: "http_echo",
+        response: {
+          content: [{ type: "text", text: "http gateway" }],
+        },
+      });
+      expect(upstream.requests).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            method: "initialize",
+            accept: expect.stringContaining("application/json"),
+          }),
+          expect.objectContaining({
+            method: "tools/list",
+            sessionId: "session-327",
+            protocolVersion: expect.any(String),
+          }),
+          expect.objectContaining({
+            method: "tools/call",
+            sessionId: "session-327",
+            protocolVersion: expect.any(String),
+          }),
+        ]),
+      );
+    } finally {
+      await upstream.close();
+    }
   });
 
   it("discovers schemas for declared gateway tool names", async () => {

@@ -1217,7 +1217,7 @@ describe("dev-nexus cli", () => {
         "    enabled: true,",
         "    capabilities: [",
         "      { kind: 'mcp_server', id: 'direct-mcp', serverName: 'direct_mcp', command: 'node', args: ['direct.js'], targetAgents: ['codex'], exposure: 'direct' },",
-        "      { kind: 'mcp_server', id: 'gateway-mcp', serverName: 'gateway_mcp', command: 'node', args: ['gateway.js'], targetAgents: ['codex'], exposure: 'gateway' },",
+        "      { kind: 'mcp_server', id: 'gateway-mcp', serverName: 'gateway_mcp', transport: 'http', url: 'http://127.0.0.1:3050/mcp', targetAgents: ['codex'], exposure: 'gateway' },",
         "      { kind: 'mcp_server', id: 'hidden-mcp', serverName: 'hidden_mcp', command: 'node', args: ['hidden.js'], targetAgents: ['codex'], exposure: 'hidden' }",
         "    ]",
         "  };",

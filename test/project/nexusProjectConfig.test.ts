@@ -3155,6 +3155,112 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts URL-backed plugin MCP servers", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                transport: "http",
+                url: "http://127.0.0.1:3050/mcp",
+                targetAgents: ["codex"],
+                tools: [
+                  {
+                    name: "inspect_facts",
+                    description: "Read plugin-supplied facts.",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }).plugins?.[0]?.capabilities[0],
+    ).toMatchObject({
+      kind: "mcp_server",
+      id: "analysis-mcp",
+      serverName: "analysis_tools",
+      transport: "http",
+      url: "http://127.0.0.1:3050/mcp",
+      targetAgents: ["codex"],
+    });
+  });
+
+  it("rejects invalid URL-backed plugin MCP server combinations", () => {
+    const config = {
+      version: 1,
+      id: "plugin-project",
+      name: "Plugin Project",
+      plugins: [
+        {
+          id: "analysis-tools",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "analysis-mcp",
+              serverName: "analysis_tools",
+              transport: "http",
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(() => validateProjectConfig(config)).toThrow(
+      "workspace config.plugins[0].capabilities[0].url is required when transport is http",
+    );
+    expect(() =>
+      validateProjectConfig({
+        ...config,
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                transport: "http",
+                url: "http://127.0.0.1:3050/mcp",
+                command: "node",
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow(
+      "workspace config.plugins[0].capabilities[0].command must be omitted when transport is http",
+    );
+    expect(() =>
+      validateProjectConfig({
+        ...config,
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                transport: "stdio",
+                url: "http://127.0.0.1:3050/mcp",
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow(
+      "workspace config.plugins[0].capabilities[0].url must be omitted when transport is stdio",
+    );
+  });
+
   it("rejects plugin MCP tools that duplicate work_item_list", () => {
     expect(() =>
       validateProjectConfig({
