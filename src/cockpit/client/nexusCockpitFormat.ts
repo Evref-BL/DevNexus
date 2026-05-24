@@ -82,6 +82,23 @@ export function toneForStatus(status: string | undefined, kind: string | undefin
   return "neutral";
 }
 
+export function displayTitle(node: any, snapshot: any): string {
+  if (!node) return snapshot.project.name;
+  if (node.kind === "run") return statusTitle("Run", node.status);
+  if (node.kind === "target-cycle") return statusTitle("Cycle", node.status);
+  if (node.kind === "authority") return "Approval";
+  return node.label;
+}
+
+export function displayBody(node: any, snapshot: any): string {
+  if (!node) return snapshot.summary;
+  if (node.kind === "authority") {
+    return node.detail || "A provider action needs approval before automation can continue.";
+  }
+  if (node.kind === "blocker") return readableBlocker(node.detail);
+  return node.detail ?? snapshot.summary;
+}
+
 export function renderNexusCockpitFormatClientSource(): string {
   return [
     countLabel,
@@ -93,7 +110,25 @@ export function renderNexusCockpitFormatClientSource(): string {
     escapeHtml,
     escapeAttribute,
     toneForStatus,
+    displayTitle,
+    displayBody,
+    statusTitle,
+    readableBlocker,
   ]
     .map((fn) => fn.toString())
     .join("\n\n");
+}
+
+function statusTitle(prefix: string, status: string | undefined): string {
+  const text = String(status ?? "").replace(/[-_]+/g, " ").trim();
+  return text ? `${prefix} ${text}` : prefix;
+}
+
+function readableBlocker(value: unknown): string {
+  const text = String(value ?? "Blocked");
+  return formatDisplayText(
+    text
+      .replace(/lease-[0-9a-f]+/giu, "a stale work record")
+      .replace(/codex\/[A-Za-z0-9/_-]+/gu, "a work branch"),
+  );
 }
