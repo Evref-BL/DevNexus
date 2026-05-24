@@ -2171,13 +2171,27 @@ describe("nexus dashboard", () => {
     };
 
     const rendered = hooks.renderGitHistory(snapshot);
+    const graph = hooks.gitHistoryRows(snapshot);
+    const delayedCrossLanePaths = graph?.paths.filter(
+      (path) => {
+        if (path.fromLane === path.toLane) return false;
+        const points = path.points ?? [];
+        const firstCrossLanePoint = points.find((point) => point.lane !== path.fromLane);
+        return firstCrossLanePoint
+          ? Math.abs(firstCrossLanePoint.index - (path.fromIndex ?? 0)) > 1.5
+          : false;
+      },
+    );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toContain("H 50 V 105");
+    expect(rendered).toContain("V 28.5");
+    expect(rendered).toContain("V 105");
+    expect(rendered).not.toContain("H 50 V 105");
     expect(rendered).not.toMatch(/M 28 15 C .*50 .*105/);
+    expect(delayedCrossLanePaths).toEqual([]);
   });
 
-  it("anchors every git graph edge endpoint on a rendered commit row", async () => {
+  it("anchors fractional git graph connector endpoints on routed lanes", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -2265,12 +2279,22 @@ describe("nexus dashboard", () => {
     };
 
     const graph = hooks.gitHistoryRows(snapshot);
-    const rowIndexes = new Set(graph?.rows.map((row) => row.index));
+    const allPoints =
+      graph?.paths.flatMap((path) => path.points ?? []) ?? [];
+    const fractionalEndpoints =
+      graph?.paths.flatMap((path) => {
+        const points = path.points ?? [];
+        const last = points.at(-1);
+        return last && !Number.isInteger(last.index) ? [last] : [];
+      }) ?? [];
 
     expect(graph?.paths.length).toBeGreaterThan(0);
-    for (const path of graph?.paths ?? []) {
-      expect(rowIndexes.has(path.fromIndex)).toBe(true);
-      expect(rowIndexes.has(path.toIndex)).toBe(true);
+    expect(fractionalEndpoints.length).toBeGreaterThan(0);
+    for (const endpoint of fractionalEndpoints) {
+      const matches = allPoints.filter(
+        (point) => point.lane === endpoint.lane && point.index === endpoint.index,
+      );
+      expect(matches.length).toBeGreaterThanOrEqual(2);
     }
   });
 
@@ -2543,8 +2567,9 @@ describe("nexus dashboard", () => {
     const sideB = rows?.rows.find((row) => row.commit.hash.startsWith("sideB"));
 
     expect(sideB?.lane).toBe(1);
-    expect(rows?.maxLane).toBe(1);
-    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane > 1))).toBe(false);
+    expect(Math.max(...(rows?.rows.map((row) => row.lane) ?? []))).toBe(1);
+    expect(rows?.maxLane).toBe(2);
+    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane > 2))).toBe(false);
   });
 
   it("keeps every loaded git history row visible in the graph", async () => {
