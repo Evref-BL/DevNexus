@@ -55,10 +55,6 @@ function writeProject(root: string, overrides: Partial<NexusProjectConfig> = {})
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     components: [
       {
         id: "dev-nexus",

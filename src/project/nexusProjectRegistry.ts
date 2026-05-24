@@ -66,8 +66,6 @@ export interface NexusProjectStatusBase {
   workTracking: WorkTrackingConfig | null;
   workTrackingCapabilities: TrackerCapabilities | null;
   workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
-  vibeKanbanProjectId: string | null;
-  vibeKanbanRepoId: string | null;
   hosts: NexusProjectHostStatus[];
   runnerProfiles: NexusRunnerProfileStatus[];
   authority: NexusAuthorityProjectSummary | null;
@@ -90,11 +88,6 @@ export interface BuildNexusProjectStatusOptions {
   homeConfig?: (NexusHomeHostOverlaySource & {
     authProfiles?: NexusHostingAuthProfileConfig[];
   }) | null;
-}
-
-export interface UpsertNexusProjectReferenceOptions {
-  vibeKanbanProjectId?: string | null;
-  vibeKanbanRepoId?: string | null;
 }
 
 export function projectRootFromInput(input: string): string {
@@ -164,9 +157,6 @@ export function buildNexusProjectStatus(
       primaryComponent?.workTrackingCapabilities ?? null,
     workTrackingCapabilityReport:
       primaryComponent?.workTrackingCapabilityReport ?? null,
-    vibeKanbanProjectId:
-      config?.kanban?.projectId ?? reference.vibeKanbanProjectId ?? null,
-    vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
     hosts: buildNexusProjectHostStatuses(config?.hosts, options.homeConfig),
     runnerProfiles: buildNexusRunnerProfileStatuses(
       config?.runnerProfiles,
@@ -227,9 +217,6 @@ export function buildNexusProjectStatusForPath(
       id: config.id,
       name: config.name,
       projectRoot,
-      ...(config.kanban?.projectId
-        ? { vibeKanbanProjectId: config.kanban.projectId }
-        : {}),
     },
     { ...options, projectConfig: config },
   );
@@ -239,30 +226,14 @@ export function upsertNexusProjectReference(
   registry: NexusProjectRegistry,
   projectRoot: string,
   projectConfig: NexusProjectConfig,
-  options: UpsertNexusProjectReferenceOptions = {},
 ): NexusProjectReference {
   const existingIndex = registry.projects.findIndex((project) =>
     samePath(project.projectRoot, projectRoot),
   );
-  const existing =
-    existingIndex >= 0 ? registry.projects[existingIndex] : undefined;
-  const resolvedVibeKanbanProjectId =
-    options.vibeKanbanProjectId ??
-    projectConfig.kanban?.projectId ??
-    existing?.vibeKanbanProjectId ??
-    null;
-  const resolvedVibeKanbanRepoId =
-    options.vibeKanbanRepoId ?? existing?.vibeKanbanRepoId ?? null;
   const reference: NexusProjectReference = {
     id: projectConfig.id,
     name: projectConfig.name,
     projectRoot,
-    ...(resolvedVibeKanbanProjectId
-      ? { vibeKanbanProjectId: resolvedVibeKanbanProjectId }
-      : {}),
-    ...(resolvedVibeKanbanRepoId
-      ? { vibeKanbanRepoId: resolvedVibeKanbanRepoId }
-      : {}),
   };
 
   if (existingIndex >= 0) {

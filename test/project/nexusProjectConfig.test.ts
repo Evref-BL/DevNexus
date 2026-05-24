@@ -96,10 +96,6 @@ describe("workspace config", () => {
         },
       ],
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban" as const,
-        projectId: "vk-project-1",
-      },
       workTracking: {
         provider: "github" as const,
         repository: {
@@ -238,9 +234,6 @@ describe("workspace config", () => {
       version: 1,
       id: "legacy-project",
       name: "Legacy Project",
-      kanban: {
-        provider: "vibe-kanban",
-      },
     });
 
     expect(config).toEqual({
@@ -267,10 +260,6 @@ describe("workspace config", () => {
       ],
       worktreesRoot: "worktrees",
       hosts: [],
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
     });
     expect(normalizeNexusAuthorityPolicy(config.authority)).toMatchObject({
       unknownActorFallbackRole: "observer",
@@ -1220,10 +1209,6 @@ describe("workspace config", () => {
         version: 1,
         id: "local-tracked-project",
         name: "Local Tracked Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         workTracking: {
           provider: "local",
           storePath: ".dev-nexus/work-items.json",
@@ -1239,10 +1224,6 @@ describe("workspace config", () => {
         version: 1,
         id: "jira-tracked-project",
         name: "Jira Tracked Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         workTracking: {
           provider: "jira",
           host: "example.atlassian.net",
@@ -1278,10 +1259,6 @@ describe("workspace config", () => {
         version: 1,
         id: "multi-tracker-project",
         name: "Multi Tracker Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         components: [
           {
             id: "core",
@@ -1584,10 +1561,6 @@ describe("workspace config", () => {
       version: 1,
       id: "invalid-component-tracker-project",
       name: "Invalid Component Tracker Project",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       components: [
         {
           id: "core",
@@ -1913,10 +1886,6 @@ describe("workspace config", () => {
         version: 1,
         id: "hosted-default-project",
         name: "Hosted Default Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "machine-user",
@@ -1954,10 +1923,6 @@ describe("workspace config", () => {
         version: 1,
         id: "automated-project",
         name: "Automated Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           selector: {
             statuses: ["ready"],
@@ -2493,10 +2458,6 @@ describe("workspace config", () => {
         version: 1,
         id: "publication-project",
         name: "Publication Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "direct_integration",
@@ -2565,10 +2526,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "green_main",
@@ -2601,10 +2558,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "green_main",
@@ -2618,10 +2571,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "green_main",
@@ -2639,10 +2588,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "green_main",
@@ -2658,10 +2603,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "review_handoff",
@@ -2678,10 +2619,6 @@ describe("workspace config", () => {
         version: 1,
         id: "green-main-project",
         name: "Green Main Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             strategy: "green_main",
@@ -2701,10 +2638,6 @@ describe("workspace config", () => {
         version: 1,
         id: "publication-project",
         name: "Publication Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           publication: {
             commandEnvironment: {
@@ -2722,10 +2655,6 @@ describe("workspace config", () => {
         version: 1,
         id: "agent-launch-project",
         name: "Agent Launch Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           mode: "agent_launch",
           agent: {
@@ -2825,10 +2754,6 @@ describe("workspace config", () => {
         version: 1,
         id: "app-server-agent-profile-project",
         name: "App Server Agent Profile Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           mode: "agent_launch",
           agent: {
@@ -2940,10 +2865,6 @@ describe("workspace config", () => {
       version: 1,
       id: "invalid-app-server-agent-profile",
       name: "Invalid App Server Agent Profile",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       automation: {
         agent: {
           profiles: [profile],
@@ -3017,10 +2938,6 @@ describe("workspace config", () => {
         version: 1,
         id: "plugin-project",
         name: "Plugin Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "analysis-tools",
@@ -3204,10 +3121,6 @@ describe("workspace config", () => {
         version: 1,
         id: "plugin-project",
         name: "Plugin Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "analysis-tools",
@@ -3248,10 +3161,6 @@ describe("workspace config", () => {
         version: 1,
         id: "plugin-project",
         name: "Plugin Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "analysis-tools",
@@ -3277,10 +3186,6 @@ describe("workspace config", () => {
         version: 1,
         id: "plugin-project",
         name: "Plugin Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "status-tools",
@@ -3306,10 +3211,6 @@ describe("workspace config", () => {
         version: 1,
         id: "plugin-project",
         name: "Plugin Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "analysis-tools",
@@ -3356,10 +3257,6 @@ describe("workspace config", () => {
       version: 1,
       id: "plugin-project",
       name: "Plugin Project",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       plugins: [
         {
           id: "typescript-tools",
@@ -3425,10 +3322,6 @@ describe("workspace config", () => {
         version: 1,
         id: "pharo-project",
         name: "Pharo Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         components: [
           {
             id: "dev-nexus-pharo",
@@ -3477,10 +3370,6 @@ describe("workspace config", () => {
         version: 1,
         id: "pharo-project",
         name: "Pharo Project",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         components: [
           {
             id: "dev-nexus-pharo",
@@ -3517,9 +3406,6 @@ describe("workspace config", () => {
         repo: {
           kind: "svn",
         },
-        kanban: {
-          provider: "vibe-kanban",
-        },
       }),
     ).toThrow(/repo\.kind/);
 
@@ -3528,10 +3414,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-provider",
         name: "Invalid Provider",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         workTracking: {
           provider: "trello",
         },
@@ -3543,10 +3425,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-github",
         name: "Invalid GitHub",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         workTracking: {
           provider: "github",
           repository: {
@@ -3561,10 +3439,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-provider",
         name: "Invalid Hosting Provider",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "gitlab",
           namespace: "example",
@@ -3577,10 +3451,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-remote",
         name: "Invalid Hosting Remote",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3601,10 +3471,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-name-policy",
         name: "Invalid Hosting Name Policy",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3621,10 +3487,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-access-kind",
         name: "Invalid Hosting Access Kind",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3645,10 +3507,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-access-permission",
         name: "Invalid Hosting Access Permission",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3669,10 +3527,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-app-permissions",
         name: "Invalid Hosting App Permissions",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3696,10 +3550,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-access-policy",
         name: "Invalid Hosting Access Policy",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3721,10 +3571,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-duplicate-access",
         name: "Invalid Hosting Duplicate Access",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3751,10 +3597,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-hosting-secret",
         name: "Invalid Hosting Secret",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         hosting: {
           provider: "github",
           namespace: "example",
@@ -3768,10 +3610,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-skills",
         name: "Invalid Skills",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         skills: {
           materialization: "install",
         },
@@ -3783,10 +3621,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-skill-agent-targets",
         name: "Invalid Skill Agent Targets",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         skills: {
           agentTargets: "codex",
         },
@@ -3798,10 +3632,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-skill-agent-target",
         name: "Invalid Skill Agent Target",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         skills: {
           agentTargets: [
             {
@@ -3818,10 +3648,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-mcp-agent-targets",
         name: "Invalid MCP Agent Targets",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         mcp: {
           agentTargets: "codex",
         },
@@ -3833,10 +3659,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-mcp-agent-target",
         name: "Invalid MCP Agent Target",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         mcp: {
           agentTargets: [
             {
@@ -3853,10 +3675,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-automation",
         name: "Invalid Automation",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           selector: {
             statuses: ["open"],
@@ -3870,10 +3688,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-automation-target",
         name: "Invalid Automation Target",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           target: {
             statePath: "../outside.md",
@@ -3887,10 +3701,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-automation-work-item-claims",
         name: "Invalid Automation Work Item Claims",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           workItemClaims: {
             staleClaimPolicy: "steal",
@@ -3904,10 +3714,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-automation-claim-authority",
         name: "Invalid Automation Claim Authority",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           workItemClaims: {
             authority: {
@@ -3923,10 +3729,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-automation-target-cycle",
         name: "Invalid Automation Target Cycle",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           target: {
             cycleLedgerPath: "../target-cycles.json",
@@ -3940,10 +3742,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-subagent-cap",
         name: "Invalid Subagent Cap",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           agent: {
             maxConcurrentSubagents: 0,
@@ -3957,10 +3755,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-agent-profile",
         name: "Invalid Agent Profile",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           agent: {
             coordinatorProfileId: "missing",
@@ -3980,10 +3774,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-agent-profile-use",
         name: "Invalid Agent Profile Use",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           agent: {
             profiles: [
@@ -4003,10 +3793,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-agent-profile-safety",
         name: "Invalid Agent Profile Safety",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         automation: {
           agent: {
             profiles: [
@@ -4028,10 +3814,6 @@ describe("workspace config", () => {
         version: 1,
         id: "invalid-plugin-capability",
         name: "Invalid Plugin Capability",
-        kanban: {
-          provider: "vibe-kanban",
-          projectId: null,
-        },
         plugins: [
           {
             id: "plugin-a",
@@ -4074,10 +3856,6 @@ describe("workspace config", () => {
       id: "custom-worktrees",
       name: "Custom Worktrees",
       worktreesRoot: path.join(".nexus", "worktrees"),
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
     });
 
     expect(projectWorktreesRootPath(projectRoot, config)).toBe(

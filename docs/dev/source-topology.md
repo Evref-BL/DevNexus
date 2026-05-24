@@ -30,7 +30,6 @@ Current production domains:
 - `extensions`
 - `git`
 - `hosts`
-- `integrations/vibe-kanban`
 - `mcp`
 - `operations`
 - `project`

@@ -976,9 +976,6 @@ function itemMatchesText(item: WorkItem, text: string): boolean {
 function configuredProjectIdentity(
   config: WorkTrackingConfig,
 ): string | null | undefined {
-  if (config.provider === "vibe-kanban") {
-    return config.projectId;
-  }
   if (config.provider === "jira") {
     return config.projectKey;
   }

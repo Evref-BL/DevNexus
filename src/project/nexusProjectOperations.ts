@@ -62,7 +62,6 @@ export interface CreateNexusProjectInRegistryOptions {
   root?: string;
   from?: string;
   gitInit?: boolean;
-  vibeKanbanProjectId?: string;
   gitRunner?: ProjectGitRunner;
   extensions?: NexusProjectExtensionsConfig;
   scaffoldExtensions?: NexusExtension<NexusProjectConfig>[];
@@ -74,7 +73,6 @@ export interface ImportNexusProjectInRegistryOptions {
   root: string;
   projectRoot?: string;
   name?: string;
-  vibeKanbanProjectId?: string;
   gitRunner?: ProjectGitRunner;
   extensions?: NexusProjectExtensionsConfig;
   replaceExtensions?: NexusProjectExtensionsConfig;
@@ -139,27 +137,11 @@ export interface ConfigureNexusProjectTrackerInRegistryResult {
   workTracking: WorkTrackingConfig;
 }
 
-export interface LinkNexusProjectTrackerInRegistryOptions {
-  registry: NexusProjectRegistry;
-  project: string;
-  trackerProjectId: string;
-}
-
-export interface LinkNexusProjectTrackerInRegistryResult {
-  projectRoot: string;
-  projectConfigPath: string;
-  projectConfig: NexusProjectConfig;
-  reference: NexusProjectReference;
-  vibeKanbanProjectId: string;
-  vibeKanbanRepoId: string | null;
-}
-
 export function buildProjectConfig(
   name: string,
   projectId: string,
   from: string | undefined,
   defaultBranch: string | null,
-  vibeKanbanProjectId: string | null = null,
   sourceRoot?: string | null,
   forceGit = false,
   extensions?: NexusProjectExtensionsConfig,
@@ -189,14 +171,6 @@ export function buildProjectConfig(
       },
     ],
     worktreesRoot: nexusProjectWorktreesDirectoryName,
-    ...(vibeKanbanProjectId
-      ? {
-          kanban: {
-            provider: "vibe-kanban" as const,
-            projectId: vibeKanbanProjectId,
-          },
-        }
-      : {}),
     ...(extensions ? { extensions } : {}),
   };
 }
@@ -478,9 +452,6 @@ export function createNexusProjectInRegistry(
   if (options.name.trim().length === 0) {
     throw new NexusProjectError("name must be a non-empty string");
   }
-  const vibeKanbanProjectId =
-    optionalNonEmptyString(options.vibeKanbanProjectId, "vibeKanbanProjectId") ??
-    null;
   if (options.from && options.gitInit) {
     throw new NexusProjectError("--from and --git-init are mutually exclusive");
   }
@@ -527,7 +498,6 @@ export function createNexusProjectInRegistry(
     projectId,
     options.from,
     defaultBranch,
-    vibeKanbanProjectId,
     sourceRoot ? pathForProjectConfig(projectRoot, sourceRoot) : null,
     false,
     options.extensions,
@@ -557,7 +527,6 @@ export function createNexusProjectInRegistry(
     options.registry,
     projectRoot,
     projectConfig,
-    { vibeKanbanProjectId },
   );
 
   return {
@@ -579,9 +548,6 @@ export function createNexusProjectInRegistry(
 export function importNexusProjectInRegistry(
   options: ImportNexusProjectInRegistryOptions,
 ): ImportNexusProjectInRegistryResult {
-  const vibeKanbanProjectId =
-    optionalNonEmptyString(options.vibeKanbanProjectId, "vibeKanbanProjectId") ??
-    null;
   const sourceRoot = path.resolve(options.root);
   if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
     throw new NexusProjectError(
@@ -626,24 +592,16 @@ export function importNexusProjectInRegistry(
         projectId,
         remoteUrl ?? undefined,
         defaultBranch,
-        vibeKanbanProjectId,
         pathForProjectConfig(projectRoot, sourceRoot),
         true,
         mergeProjectExtensionUpdates(undefined, options),
       );
-  if (existingProjectConfig && vibeKanbanProjectId) {
-    projectConfig.kanban = {
-      provider: "vibe-kanban",
-      projectId: vibeKanbanProjectId,
-    };
-  }
-
   const devNexusProjectConfigPath = projectConfigPath(projectRoot);
   const previousProjectConfigContents = fs.existsSync(devNexusProjectConfigPath)
     ? fs.readFileSync(devNexusProjectConfigPath, "utf8")
     : null;
   let savedProjectConfig = false;
-  if (!existingProjectConfig || vibeKanbanProjectId || projectExtensionUpdates) {
+  if (!existingProjectConfig || projectExtensionUpdates) {
     saveProjectConfig(projectRoot, projectConfig);
     savedProjectConfig = true;
   }
@@ -681,7 +639,6 @@ export function importNexusProjectInRegistry(
     options.registry,
     projectRoot,
     projectConfig,
-    { vibeKanbanProjectId: projectConfig.kanban?.projectId ?? null },
   );
 
   return {
@@ -717,9 +674,8 @@ export function configureNexusProjectTrackerInRegistry(
     );
   }
   const workTracking = buildConfiguredWorkTracking(options);
-  const { kanban: _kanban, ...projectConfigWithoutLegacyKanban } = projectConfig;
   const updatedProjectConfig: NexusProjectConfig = {
-    ...projectConfigWithoutLegacyKanban,
+    ...projectConfig,
     workTracking,
     components: projectConfig.components.map((component) =>
       component.role === "primary"
@@ -735,7 +691,6 @@ export function configureNexusProjectTrackerInRegistry(
     options.registry,
     projectRoot,
     updatedProjectConfig,
-    { vibeKanbanProjectId: null },
   );
 
   return {
@@ -744,52 +699,5 @@ export function configureNexusProjectTrackerInRegistry(
     projectConfig: updatedProjectConfig,
     reference,
     workTracking,
-  };
-}
-
-export function linkNexusProjectTrackerInRegistry(
-  options: LinkNexusProjectTrackerInRegistryOptions,
-): LinkNexusProjectTrackerInRegistryResult {
-  const vibeKanbanProjectId = optionalNonEmptyString(
-    options.trackerProjectId,
-    "trackerProjectId",
-  );
-  if (!vibeKanbanProjectId) {
-    throw new NexusProjectError("trackerProjectId must be a non-empty string");
-  }
-
-  const existingReference = findNexusProjectReference(
-    options.registry,
-    options.project,
-  );
-  const projectRoot = existingReference
-    ? path.resolve(existingReference.projectRoot)
-    : projectRootFromInput(options.project);
-  const projectConfig = loadProjectConfig(projectRoot);
-  const updatedProjectConfig: NexusProjectConfig = {
-    ...projectConfig,
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: vibeKanbanProjectId,
-    },
-  };
-  const projectConfigFilePath = saveProjectConfig(
-    projectRoot,
-    updatedProjectConfig,
-  );
-  const reference = upsertNexusProjectReference(
-    options.registry,
-    projectRoot,
-    updatedProjectConfig,
-    { vibeKanbanProjectId },
-  );
-
-  return {
-    projectRoot,
-    projectConfigPath: projectConfigFilePath,
-    projectConfig: updatedProjectConfig,
-    reference,
-    vibeKanbanProjectId,
-    vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
   };
 }

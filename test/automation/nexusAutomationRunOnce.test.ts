@@ -68,10 +68,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       sourceRoot: "source",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },

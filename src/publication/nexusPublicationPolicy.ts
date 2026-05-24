@@ -31,6 +31,9 @@ import {
   type NexusPublicationActorConfig,
 } from "../automation/nexusAutomationConfig.js";
 import {
+  parseGitHubRemoteUrl,
+} from "./nexusForgeRepositoryResolver.js";
+import {
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
   validateNexusHomeConfigBase,
@@ -47,7 +50,6 @@ import {
   resolveExpectedAutomationGitIdentity,
   type NexusGitIdentityStatus,
 } from "../git/nexusGitIdentity.js";
-import { parseGitHubRemoteUrl } from "./nexusForgeRepositoryResolver.js";
 
 export type NexusPublicationGuardAction =
   | "status"
@@ -234,12 +236,6 @@ interface NexusPublicationTarget {
     host?: string | null;
     repository?: { owner?: string; name?: string } | null;
   } | null;
-}
-
-interface NexusPublicationRepositoryRef {
-  host: string | null;
-  owner: string;
-  name: string;
 }
 
 export class NexusPublicationPolicyError extends Error {
@@ -444,6 +440,7 @@ function getNexusPublicationStatusForTarget(options: {
     gitIdentity,
     actor,
     authority,
+    authProfiles,
     strict,
   });
   const warnings = [
@@ -1181,12 +1178,9 @@ function readPublicationActorStatus(options: {
 
   const appProfileStatus = readGitHubAppActorStatusFromAuthProfile({
     expected,
+    target: options.target,
     commandEnvironment,
     authProfiles: options.authProfiles,
-    repository: publicationTargetRepository({
-      target: options.target,
-      policy: options.policy,
-    }),
   });
   if (appProfileStatus) {
     return appProfileStatus;
@@ -1260,31 +1254,48 @@ function readPublicationActorStatus(options: {
 
 function readGitHubAppActorStatusFromAuthProfile(options: {
   expected: NexusPublicationActorConfig;
+  target: NexusPublicationTarget;
   commandEnvironment: Record<string, string>;
   authProfiles: NexusHostingAuthProfileConfig[];
-  repository: NexusPublicationRepositoryRef | null;
 }): NexusPublicationActorStatus | null {
   if (options.expected.kind !== "app") {
     return null;
   }
   const profiles = options.authProfiles.filter((profile) =>
-    githubAppAuthProfileMatchesActor(profile, options.expected) &&
-      githubAppAuthProfileMatchesRepository(profile, options.repository)
+    githubAppAuthProfileMatchesActor(profile, options.expected)
   );
   if (profiles.length === 0) {
     return null;
   }
-  if (profiles.length > 1) {
+  const repository = githubRepositoryForPublicationTarget(options.target);
+  const repositoryProfiles = repository
+    ? profiles.filter((profile) =>
+        githubAppAuthProfileMatchesRepository(profile, repository)
+      )
+    : profiles;
+  if (repositoryProfiles.length === 0 && repository) {
     return {
       status: "unavailable",
       expected: options.expected,
       observed: null,
       commandEnvironment: options.commandEnvironment,
-      message: `Multiple host-local GitHub App auth profiles can satisfy publication actor ${options.expected.handle ?? options.expected.id ?? "unknown"}: ${profiles.map((profile) => profile.id).join(", ")}.`,
+      message: `No host-local GitHub App auth profile can satisfy publication actor ${options.expected.handle ?? options.expected.id ?? "unknown"} for repository ${repository.owner}/${repository.name}.`,
+    };
+  }
+  const selectedProfiles = repositoryProfiles.length > 0
+    ? repositoryProfiles
+    : profiles;
+  if (selectedProfiles.length > 1) {
+    return {
+      status: "unavailable",
+      expected: options.expected,
+      observed: null,
+      commandEnvironment: options.commandEnvironment,
+      message: `Multiple host-local GitHub App auth profiles can satisfy publication actor ${options.expected.handle ?? options.expected.id ?? "unknown"}: ${selectedProfiles.map((profile) => profile.id).join(", ")}.`,
     };
   }
 
-  const profile = profiles[0]!;
+  const profile = selectedProfiles[0]!;
   const handle =
     profile.githubApp?.slug?.trim() || profile.account?.trim() || null;
   if (!handle) {
@@ -1325,26 +1336,6 @@ function readGitHubAppActorStatusFromAuthProfile(options: {
   };
 }
 
-function publicationTargetRepository(options: {
-  target: NexusPublicationTarget;
-  policy: NexusAutomationPublicationConfig;
-}): NexusPublicationRepositoryRef | null {
-  const repository = options.target.workTracking?.repository;
-  if (repository?.owner?.trim() && repository.name?.trim()) {
-    return {
-      host: githubActorHost(options.target),
-      owner: repository.owner.trim(),
-      name: repository.name.trim(),
-    };
-  }
-
-  return (
-    parseGitHubRemoteUrl(options.target.remoteUrl) ??
-    parseGitHubRemoteUrl(options.policy.remoteUrl) ??
-    parseGitHubRemoteUrl(options.policy.pushUrl)
-  );
-}
-
 function githubAppAuthProfileMatchesActor(
   profile: NexusHostingAuthProfileConfig,
   expected: NexusPublicationActorConfig,
@@ -1364,43 +1355,6 @@ function githubAppAuthProfileMatchesActor(
   );
 }
 
-function githubAppAuthProfileMatchesRepository(
-  profile: NexusHostingAuthProfileConfig,
-  repository: NexusPublicationRepositoryRef | null,
-): boolean {
-  const githubApp = profile.githubApp;
-  if (!githubApp || !repository) {
-    return true;
-  }
-
-  const installationAccount = githubApp.installationAccount?.trim();
-  if (
-    installationAccount &&
-    installationAccount.toLowerCase() !== repository.owner.toLowerCase()
-  ) {
-    return false;
-  }
-
-  const selectedRepositories = githubApp.repositories;
-  if (!selectedRepositories || selectedRepositories.length === 0) {
-    return true;
-  }
-
-  return selectedRepositories.some((selectedRepository) => {
-    const normalized = selectedRepository.trim();
-    if (!normalized) {
-      return false;
-    }
-    const [owner, name] = normalized.includes("/")
-      ? normalized.split("/", 2)
-      : [installationAccount || repository.owner, normalized];
-    return (
-      (!owner || owner.toLowerCase() === repository.owner.toLowerCase()) &&
-      name?.toLowerCase() === repository.name.toLowerCase()
-    );
-  });
-}
-
 function profileCanRepresentGitHubApp(
   profile: NexusHostingAuthProfileConfig,
 ): boolean {
@@ -1410,6 +1364,77 @@ function profileCanRepresentGitHubApp(
       profile.credentialKind === "github_app" ||
       Boolean(profile.githubApp))
   );
+}
+
+function githubAppAuthProfileMatchesRepository(
+  profile: NexusHostingAuthProfileConfig,
+  repository: { host: string; owner: string; name: string },
+): boolean {
+  if (profile.provider.toLowerCase() !== "github") {
+    return false;
+  }
+  const profileHost = profile.host?.trim() || "github.com";
+  if (!githubHostsCompatible(profileHost, repository.host)) {
+    return false;
+  }
+  const githubApp = profile.githubApp;
+  if (!githubApp) {
+    return true;
+  }
+  const installationAccount = githubApp.installationAccount?.trim();
+  if (
+    installationAccount &&
+    !handlesEqual(installationAccount, repository.owner)
+  ) {
+    return false;
+  }
+  const selectedRepositories = githubApp.repositories ?? [];
+  if (selectedRepositories.length === 0) {
+    return true;
+  }
+
+  return selectedRepositories.some((entry) =>
+    githubRepositorySelectionMatches(entry, repository, installationAccount)
+  );
+}
+
+function githubHostsCompatible(left: string, right: string): boolean {
+  if (handlesEqual(left, right)) {
+    return true;
+  }
+  return (
+    isGitHubSshAlias(left) && handlesEqual(right, "github.com") ||
+    isGitHubSshAlias(right) && handlesEqual(left, "github.com")
+  );
+}
+
+function isGitHubSshAlias(host: string): boolean {
+  return /^github\.com[-\w]*$/iu.test(host.trim());
+}
+
+function githubRepositorySelectionMatches(
+  entry: string,
+  repository: { owner: string; name: string },
+  installationAccount: string | undefined,
+): boolean {
+  const normalized = entry.trim();
+  if (!normalized) {
+    return false;
+  }
+  const [owner, name] = normalized.includes("/")
+    ? normalized.split("/", 2)
+    : [installationAccount ?? repository.owner, normalized];
+  return (
+    Boolean(name) &&
+    (!owner || handlesEqual(owner, repository.owner)) &&
+    handlesEqual(name!, repository.name)
+  );
+}
+
+function githubRepositoryForPublicationTarget(
+  target: NexusPublicationTarget,
+): { host: string; owner: string; name: string } | null {
+  return parseGitHubRemoteUrl(target.remoteUrl);
 }
 
 function readPublicationGitIdentityStatus(options: {
@@ -1455,11 +1480,18 @@ function publicationPolicyChecks(options: {
   gitIdentity: NexusGitIdentityStatus;
   actor: NexusPublicationActorStatus;
   authority: NexusEffectiveAuthorityResolution | null;
+  authProfiles: NexusHostingAuthProfileConfig[];
   strict: boolean;
 }): NexusPublicationPolicyCheck[] {
   const checks: NexusPublicationPolicyCheck[] = [];
   const prefix = `publication:${options.target.label}`;
   const remoteName = options.policy.remote;
+  const hasAppTokenGitTransport = publicationHasAppTokenGitTransport({
+    target: options.target,
+    git: options.git,
+    policy: options.policy,
+    authProfiles: options.authProfiles,
+  });
   if (remoteName && options.strict) {
     checks.push(
       check(
@@ -1497,10 +1529,7 @@ function publicationPolicyChecks(options: {
     );
   }
 
-  if (
-    options.policy.sshHostAlias &&
-    !publicationUsesGitHubAppTransport(options.policy)
-  ) {
+  if (options.policy.sshHostAlias && !hasAppTokenGitTransport) {
     checks.push(
       check(
         `${prefix}:sshHostAlias`,
@@ -1560,14 +1589,45 @@ function publicationPolicyChecks(options: {
   return checks;
 }
 
-function publicationUsesGitHubAppTransport(
-  policy: NexusAutomationPublicationConfig,
-): boolean {
-  const actor = policy.actor;
-  return (
-    actor?.kind === "app" &&
-    actor.provider?.toLowerCase() === "github"
+function publicationHasAppTokenGitTransport(options: {
+  target: NexusPublicationTarget;
+  git: NexusPublicationGitStatus;
+  policy: NexusAutomationPublicationConfig;
+  authProfiles: NexusHostingAuthProfileConfig[];
+}): boolean {
+  const actor = options.policy.actor;
+  if (
+    actor?.kind !== "app" ||
+    actor.provider?.toLowerCase() !== "github"
+  ) {
+    return false;
+  }
+  const repository =
+    githubRepositoryForPublicationTarget(options.target) ??
+    parseGitHubRemoteUrl(options.git.pushUrl) ??
+    parseGitHubRemoteUrl(options.git.remoteUrl);
+  if (!repository) {
+    return false;
+  }
+
+  return options.authProfiles.some(
+    (profile) =>
+      githubAppAuthProfileMatchesActor(profile, actor) &&
+      githubAppAuthProfileMatchesRepository(profile, repository) &&
+      githubAppAuthProfileSupportsGitTransport(profile),
   );
+}
+
+function githubAppAuthProfileSupportsGitTransport(
+  profile: NexusHostingAuthProfileConfig,
+): boolean {
+  if (!profileCanRepresentGitHubApp(profile)) {
+    return false;
+  }
+  if (profile.purposes && profile.purposes.length > 0) {
+    return profile.purposes.includes("git");
+  }
+  return true;
 }
 
 function resolvePublicationAuthority(options: {

@@ -12,12 +12,6 @@ export interface NexusProjectStatusContext<ProjectConfig = unknown> {
   projectConfig: ProjectConfig;
 }
 
-export interface NexusProjectTrackerLinkContext<ProjectConfig = unknown> {
-  projectRoot: string;
-  projectConfig: ProjectConfig;
-  trackerProjectId: string;
-}
-
 export interface NexusProjectSkillsContext<ProjectConfig = unknown> {
   homePath: string;
   projectRoot: string;
@@ -31,7 +25,6 @@ export interface NexusExtension<
   ProjectConfig = unknown,
   ProjectScaffoldResult = unknown,
   ProjectStatusResult = unknown,
-  ProjectTrackerLinkResult = unknown,
 > {
   id: string;
   name: string;
@@ -44,7 +37,4 @@ export interface NexusExtension<
   projectStatus?(
     context: NexusProjectStatusContext<ProjectConfig>,
   ): ProjectStatusResult;
-  linkProjectTracker?(
-    context: NexusProjectTrackerLinkContext<ProjectConfig>,
-  ): ProjectTrackerLinkResult;
 }

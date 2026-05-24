@@ -292,12 +292,10 @@ import {
   createNexusProject,
   getNexusProjectStatus,
   importNexusProject,
-  linkNexusProjectTracker,
   listNexusProjects,
   type ConfigureNexusProjectTrackerResult,
   type CreateNexusProjectResult,
   type ImportNexusProjectResult,
-  type LinkNexusProjectTrackerResult,
   type ListNexusProjectsResult,
   type NexusProjectHomeStore,
 } from "./project/nexusProjectHomeService.js";
@@ -401,7 +399,6 @@ interface ParsedProjectCreateCommand {
   root?: string;
   from?: string;
   gitInit?: boolean;
-  trackerProjectId?: string;
   json?: boolean;
 }
 
@@ -426,7 +423,6 @@ interface ParsedProjectImportCommand {
   root: string;
   projectRoot?: string;
   name?: string;
-  trackerProjectId?: string;
   json?: boolean;
 }
 
@@ -513,13 +509,6 @@ interface ParsedProjectTrackerConfigureCommand {
   projectKey?: string;
   issueType?: string;
   storePath?: string;
-  json?: boolean;
-}
-
-interface ParsedProjectTrackerLinkCommand {
-  homePath?: string;
-  project: string;
-  trackerProjectId: string;
   json?: boolean;
 }
 
@@ -1164,9 +1153,6 @@ async function handleProjectCommand(
       ...(parsed.root !== undefined ? { root: parsed.root } : {}),
       ...(parsed.from !== undefined ? { from: parsed.from } : {}),
       ...(parsed.gitInit !== undefined ? { gitInit: parsed.gitInit } : {}),
-      ...(parsed.trackerProjectId !== undefined
-        ? { vibeKanbanProjectId: parsed.trackerProjectId }
-        : {}),
       ...(dependencies.projectGitRunner ? { gitRunner: dependencies.projectGitRunner } : {}),
     });
     printProjectCreateResult(result, parsed, dependencies.stdout ?? process.stdout);
@@ -1224,9 +1210,6 @@ async function handleProjectCommand(
       root: parsed.root,
       ...(parsed.projectRoot !== undefined ? { projectRoot: parsed.projectRoot } : {}),
       ...(parsed.name !== undefined ? { name: parsed.name } : {}),
-      ...(parsed.trackerProjectId !== undefined
-        ? { vibeKanbanProjectId: parsed.trackerProjectId }
-        : {}),
       ...(dependencies.projectGitRunner ? { gitRunner: dependencies.projectGitRunner } : {}),
     });
     printProjectImportResult(result, parsed, dependencies.stdout ?? process.stdout);
@@ -1533,11 +1516,7 @@ async function handleProjectTrackerCommand(
     return handleProjectTrackerConfigureCommand(argv, dependencies);
   }
 
-  if (command === "link") {
-    return handleProjectTrackerLinkCommand(argv, dependencies);
-  }
-
-  throw new Error("workspace tracker requires configure or link");
+  throw new Error("workspace tracker requires configure");
 }
 
 async function handleProjectTrackerConfigureCommand(
@@ -1559,25 +1538,6 @@ async function handleProjectTrackerConfigureCommand(
     ...(parsed.storePath !== undefined ? { storePath: parsed.storePath } : {}),
   });
   printProjectTrackerConfigureResult(
-    result,
-    parsed,
-    dependencies.stdout ?? process.stdout,
-  );
-  return 0;
-}
-
-async function handleProjectTrackerLinkCommand(
-  argv: string[],
-  dependencies: DevNexusCliDependencies,
-): Promise<number> {
-  const parsed = parseProjectTrackerLinkCommand(argv);
-  const result = linkNexusProjectTracker({
-    homePath: resolvedCommandHomePath(parsed.homePath),
-    homeStore: fileProjectHomeStore(),
-    project: parsed.project,
-    trackerProjectId: parsed.trackerProjectId,
-  });
-  printProjectTrackerLinkResult(
     result,
     parsed,
     dependencies.stdout ?? process.stdout,
@@ -1952,10 +1912,15 @@ async function handleWorkItemCommand(
   const command = argv[1];
   if (command === "create") {
     const parsed = parseWorkItemCreateCommand(argv);
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+    );
     assertCliMutationAllowed(dependencies, {
       projectRoot: path.resolve(parsed.projectRoot),
       command: "work-item create",
-      mutationClass: "local_tracker",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
       componentId: parsed.componentId,
     });
     const authorityBlock = cliWorkItemAuthorityBlock(
@@ -1971,11 +1936,7 @@ async function handleWorkItemCommand(
             parsed.assignees.length > 0 ? parsed.assignees : undefined,
           milestone: parsed.milestone,
         },
-        cliWorkItemTrackerProvider(
-          parsed.projectRoot,
-          parsed.componentId,
-          parsed.trackerId,
-        ),
+        provider,
       ),
     );
     if (authorityBlock) {
@@ -2088,29 +2049,30 @@ async function handleWorkItemCommand(
 
   if (command === "update") {
     const parsed = parseWorkItemUpdateCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item update",
-      mutationClass: "local_tracker",
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item update",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       workItemPatchAuthorityActions(
         parsed.patch,
-        cliWorkItemTrackerProvider(
-          parsed.projectRoot,
-          reference.componentId,
-          reference.trackerId,
-        ),
+        provider,
       ),
     );
     if (authorityBlock) {
@@ -2130,31 +2092,30 @@ async function handleWorkItemCommand(
 
   if (command === "comment") {
     const parsed = parseWorkItemCommentCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item comment",
-      mutationClass: "local_tracker",
-      targetPath: parsed.currentPath,
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item comment",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      targetPath: parsed.currentPath,
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       [
-        workItemCommentAuthorityAction(
-          cliWorkItemTrackerProvider(
-            parsed.projectRoot,
-            reference.componentId,
-            reference.trackerId,
-          ),
-        ),
+        workItemCommentAuthorityAction(provider),
       ],
     );
     if (authorityBlock) {
@@ -2178,31 +2139,30 @@ async function handleWorkItemCommand(
 
   if (command === "set-status") {
     const parsed = parseWorkItemSetStatusCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item set-status",
-      mutationClass: "local_tracker",
-      targetPath: parsed.currentPath,
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item set-status",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      targetPath: parsed.currentPath,
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       [
-        workItemStatusAuthorityAction(
-          cliWorkItemTrackerProvider(
-            parsed.projectRoot,
-            reference.componentId,
-            reference.trackerId,
-          ),
-        ),
+        workItemStatusAuthorityAction(provider),
       ],
     );
     if (authorityBlock) {
@@ -3025,6 +2985,14 @@ function cliWorkItemTrackerProvider(
   return tracker?.workTracking.provider ?? context.workTracking?.provider ?? "local";
 }
 
+function workItemMutationClassForTrackerProvider(
+  provider: string,
+): "local_tracker" | "provider_tracker" {
+  return provider.trim().toLowerCase() === "local"
+    ? "local_tracker"
+    : "provider_tracker";
+}
+
 function workItemPatchAuthorityActions(
   patch: WorkItemPatch,
   provider: string,
@@ -3360,9 +3328,6 @@ function parseProjectCreateCommand(argv: string[]): ParsedProjectCreateCommand {
       case "--git-init":
         parsed.gitInit = true;
         break;
-      case "--tracker-project-id":
-        parsed.trackerProjectId = next();
-        break;
       case "--json":
         parsed.json = true;
         break;
@@ -3488,9 +3453,6 @@ function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
         break;
       case "--name":
         parsed.name = next();
-        break;
-      case "--tracker-project-id":
-        parsed.trackerProjectId = next();
         break;
       case "--json":
         parsed.json = true;
@@ -3849,48 +3811,6 @@ function parseProjectTrackerConfigureCommand(
   }
 
   return parsed as ParsedProjectTrackerConfigureCommand;
-}
-
-function parseProjectTrackerLinkCommand(
-  argv: string[],
-): ParsedProjectTrackerLinkCommand {
-  const [, , , project, ...rest] = argv;
-  if (!project || project.startsWith("--")) {
-    throw new Error("workspace tracker link requires a workspace");
-  }
-
-  const parsed: Partial<ParsedProjectTrackerLinkCommand> = { project };
-  for (let index = 0; index < rest.length; index += 1) {
-    const arg = rest[index]!;
-    const next = (): string => {
-      index += 1;
-      if (index >= rest.length) {
-        throw new Error(`${arg} requires a value`);
-      }
-
-      return rest[index]!;
-    };
-
-    switch (arg) {
-      case "--home":
-        parsed.homePath = next();
-        break;
-      case "--tracker-project-id":
-        parsed.trackerProjectId = next();
-        break;
-      case "--json":
-        parsed.json = true;
-        break;
-      default:
-        throw new Error(`Unknown workspace tracker link option: ${arg}`);
-    }
-  }
-
-  if (!parsed.trackerProjectId) {
-    throw new Error("workspace tracker link requires --tracker-project-id");
-  }
-
-  return parsed as ParsedProjectTrackerLinkCommand;
 }
 
 function parseSetupListCommand(argv: string[]): ParsedSetupListCommand {
@@ -6992,22 +6912,6 @@ function printProjectTrackerConfigureResult(
   writeLine(stdout, "DevNexus workspace tracker configured.");
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Provider: ${result.workTracking.provider}`);
-}
-
-function printProjectTrackerLinkResult(
-  result: LinkNexusProjectTrackerResult,
-  parsed: ParsedProjectTrackerLinkCommand,
-  stdout: TextWriter,
-): void {
-  const payload = { ok: true, ...result };
-  if (parsed.json) {
-    writeJson(stdout, payload);
-    return;
-  }
-
-  writeLine(stdout, "DevNexus workspace tracker linked.");
-  writeLine(stdout, `  Project: ${result.project.id}`);
-  writeLine(stdout, `  Tracker project: ${result.vibeKanbanProjectId}`);
 }
 
 function printSetupFlowListResult(

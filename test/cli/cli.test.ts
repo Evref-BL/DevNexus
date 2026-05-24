@@ -133,10 +133,6 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       sourceRoot: "source",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: null,
-    },
     workTracking: {
       provider: "local",
     },
@@ -3758,7 +3754,6 @@ describe("dev-nexus cli", () => {
     fs.mkdirSync(sourceRoot, { recursive: true });
     const importOutput = captureOutput();
     const configureOutput = captureOutput();
-    const linkOutput = captureOutput();
     const gitCalls: string[][] = [];
 
     await main(["home", "init", homePath], {
@@ -3801,23 +3796,6 @@ describe("dev-nexus cli", () => {
         stdout: configureOutput.writer,
       },
     );
-    await main(
-      [
-        "workspace",
-        "tracker",
-        "link",
-        "imported",
-        "--home",
-        homePath,
-        "--tracker-project-id",
-        "tracker-1",
-        "--json",
-      ],
-      {
-        stdout: linkOutput.writer,
-      },
-    );
-
     expect(JSON.parse(importOutput.output())).toMatchObject({
       ok: true,
       projectConfig: {
@@ -3835,13 +3813,6 @@ describe("dev-nexus cli", () => {
       workTracking: {
         provider: "local",
         storePath: ".dev-nexus/work-items.json",
-      },
-    });
-    expect(JSON.parse(linkOutput.output())).toMatchObject({
-      ok: true,
-      vibeKanbanProjectId: "tracker-1",
-      project: {
-        id: "imported",
       },
     });
     expect(gitCalls).toContainEqual([

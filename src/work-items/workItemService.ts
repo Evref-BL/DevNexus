@@ -620,9 +620,6 @@ function externalRefMatchesTracker(
     }
   }
   if (externalRef.projectId) {
-    if (config.provider === "vibe-kanban") {
-      return !config.projectId || externalRef.projectId === config.projectId;
-    }
     if (config.provider === "jira") {
       return externalRef.projectId === config.projectKey;
     }
