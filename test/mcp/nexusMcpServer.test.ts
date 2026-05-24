@@ -369,6 +369,7 @@ describe("DevNexus MCP server", () => {
       "publication_feature_plan",
       "publication_feature_report",
       "publication_feature_finalization",
+      "publication_actor_verify",
       "publication_branch_push",
       "publication_pull_request_upsert",
       "publication_review_handoff",
@@ -741,6 +742,58 @@ describe("DevNexus MCP server", () => {
         command: path.join(homePath, "secrets/github-app-token.mjs"),
         args: ["--format", "token"],
       },
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+  });
+
+  it("verifies publication actors through MCP before provider mutations", async () => {
+    const { projectRoot, homePath } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_actor_verify",
+        {
+          projectRoot,
+          componentId: "primary",
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      componentId: "primary",
+      credential: {
+        profileId: "dev-nexus-app",
+        kind: "github_app",
+      },
+      actor: {
+        expected: {
+          handle: "devnexus-automation",
+          kind: "app",
+        },
+        observed: {
+          handle: "devnexus-automation",
+          source: "credential:dev-nexus-app",
+        },
+        matched: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
       {
         command: path.join(homePath, "secrets/github-app-token.mjs"),
         args: ["--format", "token"],

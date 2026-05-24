@@ -6,6 +6,7 @@ import {
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
+  verifyNexusPublicationActorForComponent,
   type NexusPublicationBranchPushResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "../publication/nexusPublicationOperations.js";
@@ -39,6 +40,7 @@ export interface NexusPublicationMcpToolContext {
 }
 
 export const nexusPublicationMcpToolNames = [
+  "publication_actor_verify",
   "publication_branch_push",
   "publication_pull_request_upsert",
   "publication_review_handoff",
@@ -50,6 +52,20 @@ export type NexusPublicationMcpToolName =
   typeof nexusPublicationMcpToolNames[number];
 
 export const nexusPublicationMcpTools: NexusPublicationMcpTool[] = [
+  {
+    name: "publication_actor_verify",
+    description: "Verify the configured publication actor through DevNexus publication policy and credentials.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        projectRepository: { type: "boolean" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "publication_branch_push",
     description: "Push a publication branch through configured DevNexus publication policy and credentials.",
@@ -167,6 +183,14 @@ export async function callNexusPublicationMcpTool(
   context: NexusPublicationMcpToolContext = {},
 ): Promise<unknown> {
   switch (name) {
+    case "publication_actor_verify":
+      return {
+        ok: true,
+        ...(await verifyNexusPublicationActorForComponent({
+          ...publicationTargetArgs(args),
+          ...publicationOperationRuntime(context),
+        })),
+      };
     case "publication_branch_push": {
       assertPublicationMutationAllowed(args, context, {
         command: name,
