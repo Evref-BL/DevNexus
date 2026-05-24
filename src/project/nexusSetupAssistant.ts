@@ -1851,12 +1851,11 @@ function agentMcpServerConfiguredCheck(
   if (exposure?.mode === "gateway") {
     return {
       ...checkBase,
-      status: "warning",
+      status: "passed",
       summary:
-        `DevNexus MCP server ${target.serverName} is planned for gateway projection for ${target.provider}; ` +
+        `DevNexus MCP server ${target.serverName} is routed through ${defaultNexusMcpGatewayServerName} for ${target.provider}; ` +
         `${mcpExposureSummary(exposure)}. Direct MCP config is not expected.`,
-      nextAction:
-        "Use the MCP gateway projection path once it is available, or change this target exposure to direct.",
+      nextAction: null,
     };
   }
 
