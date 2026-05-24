@@ -181,6 +181,7 @@ describe("postgres work item claim authority", () => {
       authority.releaseClaim({
         key: firstClaim.key,
         leaseToken: "expired-token",
+        fencingToken: firstClaim.fencingToken,
         now: date("2026-05-22T10:15:00.000Z"),
       }),
     ).resolves.toMatchObject({
@@ -204,6 +205,22 @@ describe("postgres work item claim authority", () => {
         }),
       ),
     );
+
+    await expect(
+      authority.releaseClaim({
+        key: staleClaim.key,
+        leaseToken: "stale-token",
+        fencingToken: staleClaim.fencingToken + 1,
+        now: date("2026-05-22T10:20:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      status: "rejected",
+      reason: "fencing_token_mismatch",
+      claim: {
+        fencingToken: staleClaim.fencingToken,
+        state: "active",
+      },
+    });
 
     await expect(
       authority.inspectClaims({

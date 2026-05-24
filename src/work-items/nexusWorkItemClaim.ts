@@ -60,6 +60,7 @@ import type {
   NexusWorkItemClaimAuthority,
   NexusWorkItemClaimAuthorityRecord,
   NexusWorkItemClaimAuthorityHeartbeatResult,
+  NexusWorkItemClaimAuthorityReleaseResult,
   NexusWorkItemClaimAuthorityVerifyResult,
   NexusWorkItemClaimObservation,
   NexusWorkItemClaimOwner,
@@ -69,9 +70,13 @@ import type {
   NexusWorkItemClaimSkippedCandidate,
   NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaimAuthority.js";
+import {
+  nexusWorkItemClaimAuthorityKeyForWorkItem,
+} from "./nexusWorkItemClaimAuthority.js";
 export {
   NexusMemoryWorkItemClaimAuthority,
   nexusWorkItemClaimAuthorityKey,
+  nexusWorkItemClaimAuthorityKeyForWorkItem,
 } from "./nexusWorkItemClaimAuthority.js";
 export type {
   NexusWorkItemClaimAuthority,
@@ -122,6 +127,36 @@ export interface ClaimNexusEligibleWorkItemOptions {
   staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   leaseTokenFactory?: () => string;
   now?: () => Date | string;
+}
+
+export interface ReleaseNexusWorkItemAuthorityClaimOptions {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  components: ResolvedNexusProjectComponent[];
+  automationConfig: NexusAutomationConfig;
+  componentId?: string | null;
+  trackerId?: string | null;
+  workItemId: string;
+  leaseToken: string;
+  fencingToken?: number | null;
+  provider?: WorkTrackerProvider;
+  providerFactory?: NexusEligibleWorkClaimProviderFactory;
+  providerOptions?: CreateWorkTrackerProviderOptions;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
+  now?: () => Date | string;
+}
+
+export interface NexusWorkItemAuthorityClaimReleaseResult {
+  projectRoot: string;
+  componentId: string;
+  trackerId: string;
+  workItem: WorkItem;
+  authorityKind: string;
+  release: NexusWorkItemClaimAuthorityReleaseResult;
 }
 
 const defaultLeaseDurationMs = 60 * 60 * 1000;
@@ -504,6 +539,52 @@ export async function heartbeatNexusWorkItemAuthorityClaim(options: {
     leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
     now: currentDate(options.now),
   });
+}
+
+export async function releaseNexusWorkItemAuthorityClaim(
+  options: ReleaseNexusWorkItemAuthorityClaimOptions,
+): Promise<NexusWorkItemAuthorityClaimReleaseResult> {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
+  const now = currentDate(options.now);
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
+  if (!claimAuthority.releaseClaim) {
+    throw new Error(
+      `Claim authority backend ${claimAuthority.kind} does not support claim release`,
+    );
+  }
+
+  const target = await resolveClaimReleaseTarget({
+    options,
+    projectRoot,
+    env,
+  });
+  const key = nexusWorkItemClaimAuthorityKeyForWorkItem({
+    projectId: options.projectConfig.id,
+    componentId: target.component.id,
+    tracker: target.tracker,
+    workItem: target.workItem,
+  });
+
+  return {
+    projectRoot,
+    componentId: target.component.id,
+    trackerId: target.tracker.id,
+    workItem: target.workItem,
+    authorityKind: claimAuthority.kind,
+    release: await claimAuthority.releaseClaim({
+      key,
+      leaseToken: requiredNonEmptyString(options.leaseToken, "leaseToken"),
+      fencingToken: options.fencingToken ?? null,
+      now,
+    }),
+  };
 }
 
 async function inspectExistingWorkItemClaims(options: {
@@ -958,6 +1039,99 @@ async function resolveCandidateTracker(
     tracker,
     provider,
   };
+}
+
+async function resolveClaimReleaseTarget(options: {
+  options: ReleaseNexusWorkItemAuthorityClaimOptions;
+  projectRoot: string;
+  env: NodeJS.ProcessEnv;
+}): Promise<{
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  provider: WorkTrackerProvider;
+  workItem: WorkItem;
+}> {
+  const component = claimReleaseComponent(options.options);
+  const tracker = claimReleaseTracker(component, options.options.trackerId);
+  const context: NexusEligibleWorkProviderContext = {
+    projectRoot: options.projectRoot,
+    projectConfig: options.options.projectConfig,
+    component,
+    tracker,
+    workTracking: tracker.workTracking,
+  };
+  const provider =
+    options.options.provider ??
+    (options.options.providerFactory
+      ? await options.options.providerFactory(context)
+      : await createWorkTrackerProviderAsync(tracker.workTracking, {
+          ...providerOptionsWithEnv(
+            automationWorkTrackerProviderOptions({
+              projectRoot: options.projectRoot,
+              projectConfig: options.options.projectConfig,
+              component,
+              workTrackingProvider: tracker.workTracking.provider,
+              baseOptions: options.options.providerOptions,
+              env: options.env,
+              now: options.options.now,
+            }),
+            options.env,
+          ),
+          projectRoot: options.projectRoot,
+          now: options.options.now,
+        }));
+  assertWorkTrackerCapability(provider, "get", "release work item claims");
+  const workItem = await provider.getWorkItem({
+    provider: tracker.workTracking.provider,
+    id: requiredNonEmptyString(options.options.workItemId, "workItemId"),
+  });
+
+  return {
+    component,
+    tracker,
+    provider,
+    workItem,
+  };
+}
+
+function claimReleaseComponent(
+  options: ReleaseNexusWorkItemAuthorityClaimOptions,
+): ResolvedNexusProjectComponent {
+  const componentId = optionalNonEmptyString(options.componentId);
+  const component = componentId
+    ? options.components.find((candidate) => candidate.id === componentId)
+    : options.components.find((candidate) => candidate.role === "primary") ??
+      options.components[0];
+  if (!component) {
+    throw new Error(
+      componentId
+        ? `Workspace component is not configured: ${componentId}`
+        : "Workspace has no configured components",
+    );
+  }
+
+  return component;
+}
+
+function claimReleaseTracker(
+  component: ResolvedNexusProjectComponent,
+  trackerId: string | null | undefined,
+): ResolvedNexusProjectWorkTracker {
+  const resolvedTrackerId =
+    optionalNonEmptyString(trackerId) ??
+    optionalNonEmptyString(component.defaultTrackerId);
+  const tracker = resolvedTrackerId
+    ? component.workTrackers.find((candidate) => candidate.id === resolvedTrackerId)
+    : component.workTrackers[0];
+  if (!tracker) {
+    throw new Error(
+      resolvedTrackerId
+        ? `Component ${component.id} work tracker is not configured: ${resolvedTrackerId}`
+        : `Component ${component.id} has no configured work trackers`,
+    );
+  }
+
+  return tracker;
 }
 
 function claimSelectableComponents(
