@@ -42,10 +42,6 @@ function projectConfig(id: string, name: string) {
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
-    kanban: {
-      provider: "vibe-kanban" as const,
-      projectId: null,
-    },
   };
 }
 
@@ -130,10 +126,6 @@ describe("project registry helpers", () => {
       workTracking: {
         provider: "local",
       },
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: "vk-project",
-      },
     });
 
     expect(
@@ -141,7 +133,6 @@ describe("project registry helpers", () => {
         id: "registry-id",
         name: "Registry Project",
         projectRoot: root,
-        vibeKanbanRepoId: "vk-repo",
       }),
     ).toMatchObject({
       id: "config-id",
@@ -229,8 +220,6 @@ describe("project registry helpers", () => {
       },
       workTrackingCapabilities: localWorkTrackingCapabilities,
       workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
-      vibeKanbanProjectId: "vk-project",
-      vibeKanbanRepoId: "vk-repo",
       hosts: [],
       runnerProfiles: [],
       agentTargets: expect.objectContaining({
@@ -561,7 +550,7 @@ describe("project registry helpers", () => {
     );
   });
 
-  it("upserts references while preserving provider ids", () => {
+  it("upserts references and rejects duplicate ids", () => {
     const firstRoot = path.join(makeTempDir("dev-nexus-project-"), "First");
     const secondRoot = path.join(makeTempDir("dev-nexus-project-"), "Second");
     const registry: NexusProjectRegistry = {
@@ -570,7 +559,6 @@ describe("project registry helpers", () => {
           id: "first",
           name: "First",
           projectRoot: firstRoot,
-          vibeKanbanRepoId: "vk-repo",
         },
       ],
     };
@@ -580,14 +568,11 @@ describe("project registry helpers", () => {
         registry,
         firstRoot,
         projectConfig("first", "First Renamed"),
-        { vibeKanbanProjectId: "vk-project" },
       ),
     ).toEqual({
       id: "first",
       name: "First Renamed",
       projectRoot: firstRoot,
-      vibeKanbanProjectId: "vk-project",
-      vibeKanbanRepoId: "vk-repo",
     });
 
     expect(() =>

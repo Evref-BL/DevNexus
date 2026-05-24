@@ -1,6 +1,5 @@
 export type WorkTrackingProviderName =
   | "local"
-  | "vibe-kanban"
   | "github"
   | "gitlab"
   | "jira";
@@ -45,12 +44,6 @@ export interface LocalWorkTrackingConfig extends BaseWorkTrackingConfig {
   storePath?: string | null;
 }
 
-export interface VibeKanbanWorkTrackingConfig extends BaseWorkTrackingConfig {
-  provider: "vibe-kanban";
-  projectId?: string | null;
-  repoId?: string | null;
-}
-
 export interface GitHubWorkTrackingConfig extends BaseWorkTrackingConfig {
   provider: "github";
   repository: WorkTrackingRepositoryConfig & {
@@ -74,7 +67,6 @@ export interface JiraWorkTrackingConfig extends BaseWorkTrackingConfig {
 
 export type WorkTrackingConfig =
   | LocalWorkTrackingConfig
-  | VibeKanbanWorkTrackingConfig
   | GitHubWorkTrackingConfig
   | GitLabWorkTrackingConfig
   | JiraWorkTrackingConfig;

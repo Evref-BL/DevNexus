@@ -452,7 +452,6 @@ describe("home config primitives", () => {
         id: "tool-a",
         name: "Tool A",
         projectRoot: "C:\\dev\\tools\\a",
-        vibeKanbanProjectId: "tracker-a",
       },
       {
         id: "tool-b",

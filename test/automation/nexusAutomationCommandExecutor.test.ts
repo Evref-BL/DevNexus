@@ -59,10 +59,6 @@ function executorInput(config: NexusAutomationConfig): NexusAutomationExecutorIn
         defaultBranch: "main",
       },
       worktreesRoot: "worktrees",
-      kanban: {
-        provider: "vibe-kanban",
-        projectId: null,
-      },
       automation: config,
     },
     automationConfig: config,
