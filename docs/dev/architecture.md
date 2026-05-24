@@ -102,6 +102,12 @@ servers expose additive domain surfaces; they are not alternate generic
 DevNexus servers. Generic workspace, setup, coordination, worktree, automation,
 and work-item operations belong to the core `dev_nexus` MCP server.
 
+Core exposes a curated plugin catalogue for DevNexus-maintained plugin packages.
+The catalogue is hardcoded metadata, not a scan of component source roots or a
+public marketplace. This keeps install and refresh guidance behind a reviewed
+allowlist until DevNexus has stronger plugin trust controls such as signed or
+pinned artifacts, permission diffs, update review, and revocation.
+
 Supported capability kinds include:
 
 - `projected_skill`
