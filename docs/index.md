@@ -46,6 +46,7 @@ publication rules agents need before they edit code.
   the argv execution policy for local automation commands.
 - [Security hotspot policy](dev/security-hotspot-policy.md) records the local
   Sonar hotspot handling policy and source references.
+- [Source quality](dev/source-quality.md) records local and CI quality checks.
 - [Source topology](dev/source-topology.md) records the TypeScript source and
   test directory layout.
 - [PostgreSQL claim authority initiative](dev/postgresql-claim-authority.md)
