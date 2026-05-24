@@ -476,6 +476,66 @@ describe("DevNexus MCP gateway", () => {
     });
   });
 
+  it("discovers schemas for declared gateway tool names", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-declared-schema-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+              tools: [
+                {
+                  name: "echo",
+                  description: "Declared echo entry.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "declared echo" },
+    ));
+
+    expect(search.matches[0]).toMatchObject({
+      serverName: "echo_runtime",
+      toolName: "echo",
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+    });
+
+    const described = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_describe",
+      { projectRoot, toolId: search.matches[0].toolId },
+    ));
+    expect(described.tool).toMatchObject({
+      description: "Declared echo entry.",
+      schemaStatus: "discovered",
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+      },
+    });
+  });
+
   it("applies gateway grouping policy to discovered tools before search and call", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-gateway-groups-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
