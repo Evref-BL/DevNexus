@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { nexusWorktreeLeaseStorePath } from "../worktrees/nexusWorktreeLease.js";
-import type { NexusDashboardThreadRecord } from "./nexusDashboard.js";
+import type { NexusDashboardThreadRecord } from "./nexusDashboardTypes.js";
 
 export type NexusDashboardThreadResolutionAction = "archive" | "forget";
 

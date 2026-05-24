@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { BuildNexusDashboardHostSnapshotOptions } from "./nexusDashboard.js";
+import type { BuildNexusDashboardHostSnapshotOptions } from "./nexusDashboardTypes.js";
 
 export interface DashboardCachePolicy {
   readonly freshMs: number;

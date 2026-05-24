@@ -8,12 +8,14 @@ import type {
   NexusDashboardFeatureRecord,
   NexusDashboardFeatureStatus,
   NexusDashboardFeatureSummary,
-  NexusDashboardGitHistorySummary,
   NexusDashboardSignalTone,
   NexusDashboardThreadSummary,
   NexusDashboardWorktreeSummary,
-} from "./nexusDashboard.js";
-import type { NexusDashboardGitHistoryBranchReference } from "./nexusDashboardGitHistory.js";
+} from "./nexusDashboardTypes.js";
+import type {
+  NexusDashboardGitHistoryBranchReference,
+  NexusDashboardGitHistorySummary,
+} from "./nexusDashboardGitHistory.js";
 
 export function summarizeFeatures(options: {
   projectRoot: string;
