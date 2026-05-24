@@ -27,6 +27,7 @@ export type NexusCheckoutClassification =
 export type NexusCheckoutMutationClass =
   | "read_only"
   | "local_tracker"
+  | "provider_work_item"
   | "target_state"
   | "project_state"
   | "skill_mcp_projection"
@@ -311,6 +312,9 @@ function mutationAllowed(
   classification: NexusCheckoutClassification,
 ): boolean {
   if (mutationClass === "read_only") {
+    return true;
+  }
+  if (mutationClass === "provider_work_item") {
     return true;
   }
   if (mutationClass === "local_remote_repair") {

@@ -1341,6 +1341,109 @@ describe("DevNexus MCP server", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("allows guarded provider-backed work item creation from the shared checkout", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const requests: Array<{ method: string | undefined; url: string; body: unknown }> = [];
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "MCP Demo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "mcp-demo",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const result = await callDevNexusMcpTool(
+      "work_item_create",
+      {
+        projectRoot,
+        componentId: "primary",
+        trackerId: "github",
+        title: "Provider backed task",
+        description: "Created through the provider tracker.",
+      },
+      {
+        gitRunner: fakeGitRunner(projectRoot),
+        sharedCheckoutGuard: "enforce",
+        workItemProviderOptions: {
+          github: {
+            credentialRunner: false,
+            fetch: (async (input, init = {}) => {
+              requests.push({
+                method: init.method,
+                url: String(input),
+                body: init.body ? JSON.parse(String(init.body)) : null,
+              });
+              return new Response(
+                JSON.stringify({
+                  id: 42,
+                  number: 42,
+                  title: "Provider backed task",
+                  body: "Created through the provider tracker.",
+                  state: "open",
+                  labels: [],
+                  html_url: "https://github.com/example/mcp-demo/issues/42",
+                }),
+                {
+                  status: 201,
+                  headers: { "content-type": "application/json" },
+                },
+              );
+            }) as typeof fetch,
+          },
+        },
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).toBeUndefined();
+    expect(payload.workItem).toMatchObject({
+      id: "github-42",
+      title: "Provider backed task",
+      provider: "github",
+      trackerRef: {
+        trackerId: "github",
+        provider: "github",
+      },
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      method: "POST",
+      body: {
+        title: "Provider backed task",
+        body: "Created through the provider tracker.",
+      },
+    });
+    expect(requests[0]?.url).toContain("/repos/example/mcp-demo/issues");
+  });
+
   it("returns guard details for guarded inbound import execution", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
