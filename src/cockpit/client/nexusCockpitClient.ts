@@ -18,6 +18,14 @@ export interface DevNexusDashboardMountHandle {
 const defaultRefreshMs = 15000;
 const themeStorageKey = 'dev-nexus-cockpit-theme';
 const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
+const gitHistoryColumnStorageKey = 'dev-nexus-cockpit-git-history-columns';
+const gitHistoryColumnSpecs = {
+  graph: { property: '--dn-git-graph-width', defaultWidth: 230, minWidth: 96, maxWidth: 520 },
+  description: { property: '--dn-git-description-width', defaultWidth: 360, minWidth: 150, maxWidth: 760 },
+  date: { property: '--dn-git-date-width', defaultWidth: 124, minWidth: 92, maxWidth: 230 },
+  author: { property: '--dn-git-author-width', defaultWidth: 170, minWidth: 96, maxWidth: 320 },
+  commit: { property: '--dn-git-commit-width', defaultWidth: 78, minWidth: 58, maxWidth: 150 },
+};
 const styles = `
 :root { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; color: var(--dn-text); background: var(--dn-bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-synthesis: none; }
 :root[data-dev-nexus-theme='dark'] { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; }
@@ -141,17 +149,28 @@ button, input, select { font: inherit; }
 .dn-feature-meta span { max-width: 100%; overflow: hidden; padding: 4px 7px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface-raised); font-size: 0.72rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .dn-feature-more { padding: 8px 10px; border: 1px dashed var(--dn-border-muted); border-radius: 8px; color: var(--dn-muted); background: var(--dn-surface-muted); font-size: 0.78rem; font-weight: 800; }
 .dn-git-panel { background: var(--dn-surface); }
-.dn-git-board { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0; overflow: hidden; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: var(--dn-weave-bg); }
+.dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px; display: grid; grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; overflow: hidden; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: var(--dn-weave-bg); }
 .dn-git-filters { display: flex; gap: 7px; margin: 0 0 10px; overflow-x: auto; padding-bottom: 2px; }
 .dn-git-filter { flex: 0 0 auto; max-width: 210px; overflow: hidden; padding: 5px 8px; border: 1px solid var(--dn-border-muted); border-radius: 7px; color: var(--dn-muted); background: var(--dn-surface); cursor: pointer; font-size: 0.72rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-filter:hover { color: var(--dn-strong); border-color: var(--dn-border-strong); background: var(--dn-control-hover); }
 .dn-git-filter[aria-pressed='true'] { color: var(--dn-strong); border-color: var(--dn-active); background: var(--dn-control-active); }
-.dn-git-graph { display: block; flex: 0 0 auto; min-width: 118px; min-height: 34px; border-right: 1px solid var(--dn-border-muted); }
+.dn-git-graph-column { display: grid; grid-template-rows: 30px auto; min-width: 0; overflow: hidden; border-right: 1px solid var(--dn-border-muted); }
+.dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: 0; overflow-x: auto; }
+.dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(150px, var(--dn-git-description-width)) minmax(92px, var(--dn-git-date-width)) minmax(96px, var(--dn-git-author-width)) minmax(58px, var(--dn-git-commit-width)); align-items: center; gap: 10px; }
+.dn-git-column-row { min-height: 30px; height: 30px; border-bottom: 1px solid var(--dn-border-muted); background: color-mix(in srgb, var(--dn-surface-raised) 72%, transparent); }
+.dn-git-column-header { position: relative; display: flex; align-items: center; min-width: 0; min-height: 30px; height: 30px; padding: 0 10px; color: var(--dn-label); font-size: 0.66rem; font-weight: 900; letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
+.dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }
+.dn-git-column-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dn-git-resize-handle { position: absolute; inset: 0 -5px 0 auto; z-index: 3; width: 10px; border-right: 1px solid transparent; cursor: col-resize; touch-action: none; }
+.dn-git-resize-handle::after { content: ''; position: absolute; top: 8px; bottom: 8px; right: 4px; width: 2px; border-radius: 999px; background: var(--dn-border-strong); opacity: 0; transition: opacity 120ms ease, background 120ms ease; }
+.dn-git-column-header:hover .dn-git-resize-handle::after, .dn-git-resize-handle:focus-visible::after { opacity: 1; background: var(--dn-active); }
+.dn-git-board.resizing { cursor: col-resize; user-select: none; }
+.dn-git-graph { display: block; flex: 0 0 auto; min-width: 118px; min-height: 34px; }
 .dn-git-graph path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 6; opacity: 0.42; }
 .dn-git-line { stroke-width: 3; opacity: 0.82; }
 .dn-git-rows { display: grid; min-width: 0; }
-.dn-git-history-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 0.34fr) 70px; align-items: center; gap: 10px; min-height: 30px; height: 30px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--dn-border-muted); color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.dn-git-history-row { min-height: 30px; height: 30px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--dn-border-muted); color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .dn-git-history-row:hover { background: var(--dn-control-hover); }
 .dn-git-history-row.selected { background: var(--dn-control-active); }
 .dn-git-subject { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -161,7 +180,7 @@ button, input, select { font: inherit; }
 .dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 38%; overflow: hidden; }
 .dn-git-badge { max-width: 130px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.66rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-badge.tone-good { border-color: color-mix(in srgb, var(--dn-good) 48%, var(--dn-border)); color: var(--dn-good); } .dn-git-badge.tone-active { border-color: color-mix(in srgb, var(--dn-active) 48%, var(--dn-border)); color: var(--dn-active); } .dn-git-badge.tone-warn { border-color: color-mix(in srgb, var(--dn-warn) 48%, var(--dn-border)); color: var(--dn-warn-soft); } .dn-git-badge.tone-danger { border-color: color-mix(in srgb, var(--dn-danger) 54%, var(--dn-border)); color: var(--dn-danger-soft); }
-.dn-git-meta, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }
 .dn-git-note { margin: 8px 0 0; color: var(--dn-muted); font-size: 0.8rem; }
 .dn-git-detail-panel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr); gap: 12px; margin: 0 0 10px; padding: 12px; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-raised) 82%, transparent); }
@@ -400,6 +419,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     bindSelectionControls(root, setSelectedId);
     bindHostSignalControls(root, setHostFocus);
     bindGitHistoryFilterControls(root, setGitHistoryFilter);
+    bindGitHistoryColumnResizers(root);
     bindWorkspaceControls(root, setWorkspaceId);
     bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));
   }
@@ -1003,6 +1023,65 @@ function bindGitHistoryFilterControls(container, onSelect) {
   });
 }
 
+function bindGitHistoryColumnResizers(container) {
+  container.querySelectorAll('[data-git-resize-column]').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => startGitHistoryColumnResize(event, handle));
+    handle.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      const board = handle.closest('[data-git-board]');
+      const column = handle.getAttribute('data-git-resize-column');
+      if (!board || !column) return;
+      const direction = event.key === 'ArrowRight' ? 1 : -1;
+      const step = event.shiftKey ? 32 : 12;
+      updateGitHistoryColumnWidth(board, column, gitHistoryColumnWidth(board, column) + direction * step, handle);
+    });
+  });
+}
+
+function startGitHistoryColumnResize(event, handle) {
+  if (event.button !== undefined && event.button !== 0) return;
+  const board = handle.closest('[data-git-board]');
+  const column = handle.getAttribute('data-git-resize-column');
+  if (!board || !column) return;
+  event.preventDefault();
+  const startX = event.clientX ?? 0;
+  const startWidth = gitHistoryColumnWidth(board, column);
+  board.classList.add('resizing');
+  const move = (moveEvent) => {
+    updateGitHistoryColumnWidth(board, column, startWidth + ((moveEvent.clientX ?? startX) - startX), handle);
+  };
+  const stop = () => {
+    board.classList.remove('resizing');
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', stop);
+    document.removeEventListener('pointercancel', stop);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', stop);
+  document.addEventListener('pointercancel', stop);
+}
+
+function updateGitHistoryColumnWidth(board, column, nextWidth, handle = null) {
+  const width = normalizeGitHistoryColumnWidth(column, nextWidth);
+  const spec = gitHistoryColumnSpecs[column];
+  if (!spec) return;
+  board.style.setProperty(spec.property, `${width}px`);
+  if (handle) handle.setAttribute('aria-valuenow', String(width));
+  writeStoredGitHistoryColumnWidths({ ...gitHistoryBoardColumnWidths(board), [column]: width });
+}
+
+function gitHistoryBoardColumnWidths(board) {
+  return Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => {
+    const value = Number.parseInt(board.style.getPropertyValue(spec.property), 10);
+    return [column, normalizeGitHistoryColumnWidth(column, Number.isFinite(value) ? value : spec.defaultWidth)];
+  }));
+}
+
+function gitHistoryColumnWidth(board, column) {
+  return gitHistoryBoardColumnWidths(board)[column] ?? gitHistoryColumnSpecs[column]?.defaultWidth ?? 120;
+}
+
 function scrollToDashboardSection(targetId) {
   requestAnimationFrame(() => {
     const target = document.getElementById(targetId);
@@ -1155,7 +1234,58 @@ function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const repository = graph.repository;
   const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
   const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} write events. Branch filters use the loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryDetailPanel(snapshot, graph, selectedId)}<div class="dn-git-board">${renderGitHistorySvg(graph)}<div class="dn-git-rows">${graph.rows.map((row) => renderGitHistoryRow(snapshot, row, selectedId)).join('')}</div></div>${note}</div>`;
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryDetailPanel(snapshot, graph, selectedId)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
+}
+
+function renderGitHistoryBoard(snapshot, graph, selectedId) {
+  const widths = readStoredGitHistoryColumnWidths();
+  return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(graph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${graph.rows.map((row) => renderGitHistoryRow(snapshot, row, selectedId)).join('')}</div></div></div>`;
+}
+
+function renderGitHistoryColumnHeader(column, label, widths) {
+  const spec = gitHistoryColumnSpecs[column];
+  const width = widths[column] ?? spec?.defaultWidth ?? 120;
+  const min = spec?.minWidth ?? 48;
+  const max = spec?.maxWidth ?? 999;
+  return `<span class="dn-git-column-header" data-git-column="${escapeAttribute(column)}"><span class="dn-git-column-label">${escapeHtml(label)}</span><span class="dn-git-resize-handle" role="separator" tabindex="0" aria-label="Resize ${escapeHtml(label)} column" aria-orientation="vertical" aria-valuemin="${escapeHtml(min)}" aria-valuemax="${escapeHtml(max)}" aria-valuenow="${escapeHtml(width)}" data-git-resize-column="${escapeAttribute(column)}"></span></span>`;
+}
+
+function gitHistoryColumnStyle(widths = readStoredGitHistoryColumnWidths()) {
+  return Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => `${spec.property}:${normalizeGitHistoryColumnWidth(column, widths[column])}px`).join(';');
+}
+
+function readStoredGitHistoryColumnWidths() {
+  const defaults = Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => [column, spec.defaultWidth]));
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const storage = window.localStorage;
+    if (!storage) return defaults;
+    const raw = storage.getItem(gitHistoryColumnStorageKey);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return Object.fromEntries(Object.entries(gitHistoryColumnSpecs).map(([column, spec]) => [column, normalizeGitHistoryColumnWidth(column, parsed?.[column] ?? spec.defaultWidth)]));
+  } catch {
+    return defaults;
+  }
+}
+
+function writeStoredGitHistoryColumnWidths(widths) {
+  if (typeof window === 'undefined') return;
+  try {
+    const storage = window.localStorage;
+    if (!storage) return;
+    storage.setItem(gitHistoryColumnStorageKey, JSON.stringify(Object.fromEntries(Object.keys(gitHistoryColumnSpecs).map((column) => [column, normalizeGitHistoryColumnWidth(column, widths?.[column])]))));
+  } catch {
+    // Column resizing is still useful without persistent storage.
+  }
+}
+
+function normalizeGitHistoryColumnWidth(column, value) {
+  const spec = gitHistoryColumnSpecs[column];
+  if (!spec) return Number(value) || 0;
+  const width = Number(value);
+  if (!Number.isFinite(width)) return spec.defaultWidth;
+  return Math.min(Math.max(Math.round(width), spec.minWidth), spec.maxWidth);
 }
 
 function normalizeGitHistoryFilter(value) {
@@ -1310,8 +1440,10 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
   const refChips = refs.map((ref) => `<span class="dn-git-ref" style="--dn-branch-color:var(--dn-branch-${(row.colorLane ?? row.lane) % 7});" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join('');
   const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
-  const meta = [row.commit.authorName, formatTime(row.commit.committedAt)].filter(Boolean).join(' · ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-scroll-target="selected-item"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-meta">${escapeHtml(meta)}</span><span class="dn-git-sha">${escapeHtml(row.commit.shortHash)}</span></button>`;
+  const date = formatTime(row.commit.committedAt);
+  const author = row.commit.authorName ?? '';
+  const authorTitle = [row.commit.authorName, row.commit.authorEmail].filter(Boolean).join(' · ');
+  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-scroll-target="selected-item"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {

@@ -2092,6 +2092,22 @@ describe("nexus dashboard", () => {
     expect(rendered.indexOf("dn-git-detail-panel")).toBeLessThan(
       rendered.indexOf("dn-git-board"),
     );
+    expect(rendered).toContain("data-git-board");
+    expect(rendered).toContain("data-git-column=\"graph\"");
+    expect(rendered).toContain("data-git-column=\"description\"");
+    expect(rendered).toContain("data-git-column=\"date\"");
+    expect(rendered).toContain("data-git-column=\"author\"");
+    expect(rendered).toContain("data-git-column=\"commit\"");
+    expect(rendered).toContain("data-git-resize-column=\"graph\"");
+    expect(rendered).toContain("data-git-resize-column=\"description\"");
+    expect(rendered).toContain("data-git-resize-column=\"date\"");
+    expect(rendered).toContain("data-git-resize-column=\"author\"");
+    expect(rendered).toContain("data-git-resize-column=\"commit\"");
+    expect(rendered).toContain("<span class=\"dn-git-date\"");
+    expect(rendered).toContain("<span class=\"dn-git-author\"");
+    expect(rendered).toContain("Codex</span>");
+    expect(rendered).toContain("<span class=\"dn-git-sha\"");
+    expect(rendered).toContain(">feature</span>");
     expect(rendered).toContain("<svg");
     expect(rendered).toContain("feat/cockpit-graph");
     expect(rendered).toContain("Add graph data");
