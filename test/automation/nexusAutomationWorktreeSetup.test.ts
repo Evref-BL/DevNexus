@@ -846,6 +846,20 @@ describe("nexus automation worktree setup", () => {
         root: projectRoot,
       },
       ownership,
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          binDirectoryPath: path.join(
+            worktreePath,
+            ".dev-nexus",
+            "guardrails",
+            "bin",
+          ),
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+        },
+      ],
     });
     expect(fs.readFileSync(briefingPath, "utf8")).toContain(
       "Source and Git commands run from the component checkout root",

@@ -70,6 +70,22 @@ describe("nexus worker context bundle", () => {
       baseRef: "origin/main",
       workItem,
       publication,
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          binDirectoryPath: path.join(
+            worktreePath,
+            ".dev-nexus",
+            "guardrails",
+            "bin",
+          ),
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+          message:
+            "Prepared worktree-local wrappers that block raw publication mutations.",
+        },
+      ],
       authority: summarizeNexusAuthorityForComponent({
         projectId: "worker-demo",
         componentId: "dev-nexus",
@@ -186,6 +202,14 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+        },
+      ],
       authority: {
         actor: {
           actorId: "example-bot-actor",
@@ -282,6 +306,15 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain("- manual remote: origin");
     expect(briefing).toContain("- manual actor: human:github:example-human");
     expect(briefing).toContain("- command environment keys: GH_CONFIG_DIR");
+    expect(briefing).toContain("Command guardrails:");
+    expect(briefing).toContain("- publication-command-guard: materialized");
+    expect(briefing).toContain(
+      `  PATH directory: ${path.join(worktreePath, ".dev-nexus", "guardrails", "bin")}`,
+    );
+    expect(briefing).toContain("  Guarded commands: git, gh, glab");
+    expect(briefing).toContain(
+      "  Environment keys: DEV_NEXUS_PUBLICATION_GUARD_BIN, PATH",
+    );
     expect(briefing).toContain("Publication facade:");
     expect(briefing).toContain(
       "- verify the configured actor before provider writes with `publication_actor_verify`.",

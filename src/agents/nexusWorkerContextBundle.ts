@@ -205,6 +205,7 @@ export interface NexusWorkerContextBundle {
   publicationScope: NexusWorkerContextPublicationScope;
   publication: NexusAutomationPublicationConfig | null;
   gitIdentity: NexusExpectedGitIdentity | null;
+  commandGuardrails: NexusWorkerContextCommandGuardrail[];
   authority: NexusAuthorityComponentSummary | null;
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy: NexusWorkerContextAgentTargetPolicy;
@@ -232,9 +233,19 @@ export interface NexusWorkerContextBundleOptions {
   publicationScope?: NexusWorkerContextPublicationScope;
   publication?: NexusAutomationPublicationConfig | null;
   gitIdentity?: NexusExpectedGitIdentity | null;
+  commandGuardrails?: NexusWorkerContextCommandGuardrail[];
   authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
+}
+
+export interface NexusWorkerContextCommandGuardrail {
+  id: string;
+  status: string;
+  binDirectoryPath: string | null;
+  guardedCommands: string[];
+  environmentKeys: string[];
+  message: string | null;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -324,6 +335,9 @@ export function buildNexusWorkerContextBundle(
   const publicationScope = options.publicationScope ?? "component";
   const publication = options.publication ?? null;
   const gitIdentity = options.gitIdentity ?? null;
+  const commandGuardrails = normalizeWorkerCommandGuardrails(
+    options.commandGuardrails,
+  );
   const authority = options.authority ?? null;
   const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
   const agentTargetPolicy = normalizeWorkerAgentTargetPolicy(
@@ -360,6 +374,7 @@ export function buildNexusWorkerContextBundle(
     publicationScope,
     publication,
     gitIdentity,
+    commandGuardrails,
     authority,
     runnerProfiles,
     agentTargetPolicy,
@@ -431,6 +446,8 @@ export function renderNexusWorkerBriefing(
     "",
     ...renderPublicationPolicyLines(context.publication, context.publicationScope),
     ...renderGitIdentityLines(context.gitIdentity),
+    "",
+    ...renderCommandGuardrailLines(context.commandGuardrails),
     "",
     ...renderAuthorityPolicyLines(context.authority),
     "",
@@ -1049,6 +1066,57 @@ function publicationActorLabel(
     actor.provider ?? "unknown-provider",
     actor.handle ?? actor.id ?? "unknown-actor",
   ].join(":");
+}
+
+function normalizeWorkerCommandGuardrails(
+  commandGuardrails: NexusWorkerContextCommandGuardrail[] | undefined,
+): NexusWorkerContextCommandGuardrail[] {
+  return (commandGuardrails ?? [])
+    .map((guardrail) => ({
+      id: requiredNonEmptyString(guardrail.id, "commandGuardrails.id"),
+      status: requiredNonEmptyString(
+        guardrail.status,
+        "commandGuardrails.status",
+      ),
+      binDirectoryPath:
+        optionalNullableString(
+          guardrail.binDirectoryPath,
+          "commandGuardrails.binDirectoryPath",
+        ) ?? null,
+      guardedCommands: normalizeStringArray(
+        guardrail.guardedCommands,
+        "commandGuardrails.guardedCommands",
+      ),
+      environmentKeys: normalizeStringArray(
+        guardrail.environmentKeys,
+        "commandGuardrails.environmentKeys",
+      ),
+      message:
+        optionalNullableString(
+          guardrail.message,
+          "commandGuardrails.message",
+        ) ?? null,
+    }))
+    .sort((left, right) => compareStrings(left.id, right.id));
+}
+
+function renderCommandGuardrailLines(
+  commandGuardrails: NexusWorkerContextCommandGuardrail[],
+): string[] {
+  if (commandGuardrails.length === 0) {
+    return ["Command guardrails:", "- publication command wrappers: none"];
+  }
+
+  return [
+    "Command guardrails:",
+    ...commandGuardrails.flatMap((guardrail) => [
+      `- ${guardrail.id}: ${guardrail.status}`,
+      `  PATH directory: ${guardrail.binDirectoryPath ?? "none"}`,
+      `  Guarded commands: ${guardrail.guardedCommands.join(", ") || "none"}`,
+      `  Environment keys: ${guardrail.environmentKeys.join(", ") || "none"}`,
+      ...(guardrail.message ? [`  Note: ${guardrail.message}`] : []),
+    ]),
+  ];
 }
 
 function renderAuthorityPolicyLines(
