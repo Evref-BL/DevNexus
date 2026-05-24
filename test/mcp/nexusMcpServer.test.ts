@@ -5,6 +5,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   callDevNexusMcpTool,
+  createOrRefreshNexusWorktreeLease,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
@@ -328,6 +329,72 @@ function fakeGitRunner(repositoryPath: string): GitRunner {
   };
 }
 
+function cleanupExecutionGitRunner(
+  fixture: { sourceRoot: string; worktreePath: string },
+  calls: Array<{ args: string[]; cwd?: string }>,
+): GitRunner {
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    calls.push({ args: argsArray, cwd });
+    const joined = argsArray.join(" ");
+    if (joined === "worktree list --porcelain") {
+      return ok(argsArray, [
+        `worktree ${fixture.sourceRoot}`,
+        "HEAD target123",
+        "branch refs/heads/main",
+        "",
+        `worktree ${fixture.worktreePath}`,
+        "HEAD branch123",
+        "branch refs/heads/codex/primary/merged",
+        "",
+      ].join("\n"));
+    }
+    if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
+      return ok(argsArray, "codex/primary/merged\n");
+    }
+    if (joined === "rev-parse --verify main") {
+      return ok(argsArray, "target123\n");
+    }
+    if (joined === "rev-parse codex/primary/merged") {
+      return ok(argsArray, "branch123\n");
+    }
+    if (joined === "merge-base --is-ancestor codex/primary/merged main") {
+      return ok(argsArray, "");
+    }
+    if (
+      joined ===
+      "rev-parse --abbrev-ref --symbolic-full-name codex/primary/merged@{u}"
+    ) {
+      return ok(argsArray, "origin/codex/primary/merged\n");
+    }
+    if (
+      joined ===
+      "rev-list --left-right --count codex/primary/merged...origin/codex/primary/merged"
+    ) {
+      return ok(argsArray, "0\t0\n");
+    }
+    if (joined === "rev-parse --is-inside-work-tree") {
+      return ok(argsArray, "true\n");
+    }
+    if (joined === "symbolic-ref --short HEAD") {
+      return cwd === fixture.worktreePath
+        ? ok(argsArray, "codex/primary/merged\n")
+        : fail(argsArray, "not a worktree");
+    }
+
+    return ok(argsArray, "");
+  };
+}
+
+function cleanupMcpCommands(
+  calls: Array<{ args: string[]; cwd?: string }>,
+): Array<{ args: string[]; cwd?: string }> {
+  return calls.filter(({ args }) =>
+    args[0] === "branch" ||
+    (args[0] === "worktree" && args[1] === "remove"),
+  );
+}
+
 function ok(args: string[], stdout: string): GitCommandResult {
   return {
     args,
@@ -411,6 +478,7 @@ describe("DevNexus MCP server", () => {
       "coordination_status",
       "coordination_handoff",
       "coordination_integrate",
+      "coordination_cleanup_execute",
       "coordination_request",
       "host_check",
       "remote_execution_request_create",
@@ -555,6 +623,97 @@ describe("DevNexus MCP server", () => {
           .detail,
       ).toBeUndefined();
     }
+  });
+
+  it("advertises cleanup execution with a bounded MCP schema", () => {
+    const cleanupExecute = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "coordination_cleanup_execute",
+    );
+
+    expect(cleanupExecute?.inputSchema).toMatchObject({
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        candidateId: { type: "string" },
+        includeProjectMeta: { type: "boolean" },
+        targetBranch: { type: "string" },
+        keepBranch: { type: "boolean" },
+        force: { type: "boolean" },
+        forceReason: { type: "string", maxLength: 500 },
+      },
+      required: ["candidateId"],
+      additionalProperties: false,
+    });
+  });
+
+  it("executes safe cleanup through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-cleanup-execute-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "merged");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      components: [
+        {
+          id: "primary",
+          name: "Primary",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:mcp/primary.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          worktreesRoot: "worktrees/primary",
+          workTracking: {
+            provider: "local",
+          },
+          relationships: [],
+        },
+      ],
+    }));
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "primary",
+      branchName: "codex/primary/merged",
+      worktreePath,
+      status: "merged",
+      gitFacts: { headCommit: "branch123", dirty: false, pushed: true },
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_cleanup_execute",
+        {
+          projectRoot,
+          componentId: "primary",
+          candidateId: "component:primary:worktree:merged",
+        },
+        {
+          gitRunner: cleanupExecutionGitRunner(
+            { sourceRoot, worktreePath },
+            calls,
+          ),
+          now: fixedClock("2026-05-18T10:00:00.000Z"),
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        mutatesSource: true,
+        actions: {
+          removedWorktree: worktreePath,
+          deletedBranch: "codex/primary/merged",
+          updatedLeaseIds: [lease.id],
+        },
+      },
+    });
+    expect(cleanupMcpCommands(calls)).toEqual([
+      { cwd: sourceRoot, args: ["worktree", "remove", worktreePath] },
+      { cwd: sourceRoot, args: ["branch", "-d", "codex/primary/merged"] },
+    ]);
   });
 
   it("exposes read-only feature branch delivery plan and report tools", async () => {

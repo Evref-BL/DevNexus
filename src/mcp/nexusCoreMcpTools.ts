@@ -34,6 +34,7 @@ export const devNexusCoreMcpToolNames = [
   "coordination_status",
   "coordination_handoff",
   "coordination_integrate",
+  "coordination_cleanup_execute",
   "coordination_request",
   "host_check",
   "remote_execution_request_create",

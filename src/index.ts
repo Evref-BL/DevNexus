@@ -29,6 +29,7 @@ export * from "./automation/nexusAutomationTargetReport.js";
 export * from "./coordination/nexusCoordination.js";
 export * from "./coordination/nexusCoordinationRequest.js";
 export * from "./operations/nexusCleanupPlan.js";
+export * from "./operations/nexusCleanupExecution.js";
 export * from "./cli/nexusCliVersionSkewDiagnostic.js";
 export * from "./operations/nexusCiFailureIntake.js";
 export * from "./dashboard/nexusDashboard.js";

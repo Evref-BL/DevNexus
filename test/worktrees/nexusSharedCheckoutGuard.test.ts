@@ -239,6 +239,28 @@ describe("shared checkout mutation guard", () => {
     });
   });
 
+  it("allows cleanup execution against generated worktrees", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "core", "codex-core-1");
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner = fakeGitRunner(new Map([[canonical(worktreePath), worktreePath]]));
+
+    expect(
+      evaluateNexusSharedCheckoutMutation({
+        projectRoot,
+        targetPath: worktreePath,
+        mutationClass: "cleanup_execution",
+        command: "coordination cleanup-execute",
+        gitRunner,
+      }),
+    ).toMatchObject({
+      ok: true,
+      classification: "generated_component_worktree",
+      componentId: "core",
+    });
+  });
+
   it("refuses coordination records from generated component worktrees with meta recovery", () => {
     const projectRoot = makeTempDir("dev-nexus-guard-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "core", "codex-core-1");

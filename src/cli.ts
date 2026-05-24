@@ -175,6 +175,11 @@ import {
   type NexusCleanupPlan,
 } from "./operations/nexusCleanupPlan.js";
 import {
+  executeNexusCleanup,
+  selectNexusCleanupCandidate,
+  type NexusCleanupExecutionResult,
+} from "./operations/nexusCleanupExecution.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -848,6 +853,18 @@ interface ParsedCoordinationCleanupPlanCommand {
   componentId?: string;
   includeProjectMeta?: boolean;
   targetBranch?: string;
+  json?: boolean;
+}
+
+interface ParsedCoordinationCleanupExecuteCommand {
+  projectRoot: string;
+  componentId?: string;
+  includeProjectMeta?: boolean;
+  targetBranch?: string;
+  candidateId: string;
+  keepBranch?: boolean;
+  force?: boolean;
+  forceReason?: string | null;
   json?: boolean;
 }
 
@@ -1731,6 +1748,47 @@ async function handleCoordinationCommand(
     return 0;
   }
 
+  if (command === "cleanup-execute") {
+    const parsed = parseCoordinationCleanupExecuteCommand(argv);
+    const selected = selectNexusCleanupCandidate({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      includeProjectMeta: parsed.includeProjectMeta,
+      targetBranch: parsed.targetBranch,
+      candidateId: parsed.candidateId,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "coordination cleanup-execute",
+      mutationClass: "cleanup_execution",
+      targetPath:
+        selected.candidate.worktreePath ??
+        selected.candidate.git.repositoryPath ??
+        parsed.projectRoot,
+      componentId: selected.candidate.componentId,
+    });
+    const result = executeNexusCleanup({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      includeProjectMeta: parsed.includeProjectMeta,
+      targetBranch: parsed.targetBranch,
+      candidateId: parsed.candidateId,
+      deleteBranch: parsed.keepBranch ? false : undefined,
+      force: parsed.force,
+      forceReason: parsed.forceReason,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationCleanupExecuteResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (command === "request") {
     const parsed = parseCoordinationRequestCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -1768,7 +1826,7 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status, handoff, integrate, cleanup-plan, or request");
+  throw new Error("coordination requires status, handoff, integrate, cleanup-plan, cleanup-execute, or request");
 }
 
 async function handleWorktreeCommand(
@@ -4200,6 +4258,66 @@ function parseCoordinationCleanupPlanCommand(
   }
 
   return parsed;
+}
+
+function parseCoordinationCleanupExecuteCommand(
+  argv: string[],
+): ParsedCoordinationCleanupExecuteCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination cleanup-execute requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedCoordinationCleanupExecuteCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--include-workspace-meta":
+      case "--include-project-meta":
+        parsed.includeProjectMeta = true;
+        break;
+      case "--target-branch":
+        parsed.targetBranch = next();
+        break;
+      case "--candidate":
+        parsed.candidateId = next();
+        break;
+      case "--keep-branch":
+        parsed.keepBranch = true;
+        break;
+      case "--force":
+        parsed.force = true;
+        break;
+      case "--force-reason":
+        parsed.forceReason = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination cleanup-execute option: ${arg}`);
+    }
+  }
+
+  if (!parsed.candidateId) {
+    throw new Error("coordination cleanup-execute requires --candidate");
+  }
+
+  return parsed as ParsedCoordinationCleanupExecuteCommand;
 }
 
 function parseCoordinationRequestCommand(
@@ -7200,6 +7318,41 @@ function printCoordinationCleanupPlan(
       `    ${candidate.id}: ${candidate.classifications.join(", ")} - ${
         candidate.safeToDelete ? "safe" : "blocked"
       }`,
+    );
+  }
+}
+
+function printCoordinationCleanupExecuteResult(
+  result: NexusCleanupExecutionResult,
+  parsed: ParsedCoordinationCleanupExecuteCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination cleanup executed.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Candidate: ${result.candidate.id}`);
+  writeLine(stdout, `  Forced: ${String(result.forced)}`);
+  if (result.actions.removedWorktree) {
+    writeLine(stdout, `  Removed worktree: ${result.actions.removedWorktree}`);
+  }
+  if (result.actions.deletedBranch) {
+    writeLine(stdout, `  Deleted branch: ${result.actions.deletedBranch}`);
+  }
+  if (result.actions.updatedLeaseIds.length > 0) {
+    writeLine(
+      stdout,
+      `  Updated leases: ${result.actions.updatedLeaseIds.join(", ")}`,
+    );
+  }
+  for (const command of result.git.commands) {
+    writeLine(
+      stdout,
+      `  Git: git ${command.args.join(" ")}`,
     );
   }
 }
