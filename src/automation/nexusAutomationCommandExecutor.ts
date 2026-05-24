@@ -20,6 +20,7 @@ import type {
   WorktreeVerificationStatus,
 } from "../worktrees/worktreeExecutionMetadata.js";
 import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
+import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
 
 export interface NexusAutomationCommandRunOptions {
   cwd: string;
@@ -152,8 +153,9 @@ export function defaultNexusAutomationCommandRunner(
 
   const capture = createCommandCaptureFiles();
   let result: ReturnType<typeof spawnSync> | null = null;
+  const spawnTarget = resolveCommandSpawnTarget(commandSpec, options.env);
   try {
-    result = spawnSync(commandSpec.command, commandSpec.args, {
+    result = spawnSync(spawnTarget.command, spawnTarget.args, {
       cwd: options.cwd,
       env: options.env,
       shell: false,
@@ -372,6 +374,68 @@ function finishCommandExpressionParse(
 
   flushCommandExpressionToken(state);
   return state.words;
+}
+
+function resolveCommandSpawnTarget(
+  commandSpec: NexusAutomationCommandSpec,
+  env: NodeJS.ProcessEnv,
+): NexusAutomationCommandSpec {
+  if (process.platform !== "win32") {
+    return commandSpec;
+  }
+
+  const executable = resolveWindowsCommandExecutable(commandSpec.command, env);
+  if (!isWindowsCommandScript(executable)) {
+    return {
+      ...commandSpec,
+      command: executable,
+    };
+  }
+
+  return {
+    ...commandSpec,
+    command: windowsCommandShell(env),
+    args: ["/d", "/s", "/c", executable, ...commandSpec.args],
+  };
+}
+
+function resolveWindowsCommandExecutable(
+  command: string,
+  env: NodeJS.ProcessEnv,
+): string {
+  if (path.isAbsolute(command) || isPathQualifiedCommand(command)) {
+    return command;
+  }
+
+  try {
+    return resolveNexusCommandPath(command, env);
+  } catch {
+    return command;
+  }
+}
+
+function isPathQualifiedCommand(command: string): boolean {
+  return command.includes("/") || command.includes("\\");
+}
+
+function isWindowsCommandScript(command: string): boolean {
+  const extension = path.extname(command).toLowerCase();
+  return extension === ".bat" || extension === ".cmd";
+}
+
+function windowsCommandShell(env: NodeJS.ProcessEnv): string {
+  return caseInsensitiveEnvValue(env, "COMSPEC") ?? "cmd.exe";
+}
+
+function caseInsensitiveEnvValue(
+  env: NodeJS.ProcessEnv,
+  key: string,
+): string | undefined {
+  const match = Object.entries(env).find(
+    ([envKey]) => envKey.toLowerCase() === key.toLowerCase(),
+  );
+
+  return match?.[1];
 }
 
 function isUnsupportedShellControlCharacter(char: string): boolean {

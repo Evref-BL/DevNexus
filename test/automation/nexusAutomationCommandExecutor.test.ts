@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { describe, expect, it } from "vitest";
@@ -273,6 +275,33 @@ describe("nexus automation command executor", () => {
     expect(result.error).toBeUndefined();
     expect(result.stdout).toContain("argv ok");
   });
+
+  it.runIf(process.platform === "win32")(
+    "runs PATH-resolved Windows command shims",
+    () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-cmd-shim-"));
+      const bin = path.join(root, "bin");
+      fs.mkdirSync(bin, { recursive: true });
+      fs.writeFileSync(
+        path.join(bin, "dev-nexus.cmd"),
+        "@echo off\r\necho shim ok\r\n",
+        "utf8",
+      );
+
+      const result = defaultNexusAutomationCommandRunner("dev-nexus --help", {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: bin,
+          PATHEXT: ".CMD",
+        },
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain("shim ok");
+    },
+  );
 
   it("rejects legacy command strings that rely on implicit shell control syntax", () => {
     const result = defaultNexusAutomationCommandRunner(
