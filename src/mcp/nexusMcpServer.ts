@@ -1501,6 +1501,28 @@ export function listDevNexusMcpTools(): McpTool[] {
   return providerCompatibleMcpTools(tools);
 }
 
+type DevNexusMcpToolHandler = (
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+) => Promise<DevNexusMcpToolResult | undefined> | DevNexusMcpToolResult | undefined;
+
+const devNexusMcpToolHandlers: DevNexusMcpToolHandler[] = [
+  callProjectMcpTool,
+  callAutomationMcpTool,
+  callSetupMcpTool,
+  callTargetMcpTool,
+  callPublicationPlanningMcpTool,
+  callCurrentAgentMcpTool,
+  callWorktreeMcpTool,
+  callCoordinationMcpTool,
+  callHostAndRemoteExecutionMcpTool,
+  callWorkItemReadMcpTool,
+  callWorkItemMutationMcpTool,
+  callWorkItemLinkMcpTool,
+  callWorkItemSyncMcpTool,
+];
+
 export async function callDevNexusMcpTool(
   name: string,
   argsValue: unknown,
@@ -1511,1023 +1533,11 @@ export async function callDevNexusMcpTool(
     if (isNexusPublicationMcpToolName(name)) {
       return toolResult(await callNexusPublicationMcpTool(name, args, context));
     }
-    switch (name) {
-      case "project_status": {
-        const detail = mcpDetailFromArgs(args);
-        const project = projectStatusFromArgs(args);
-        return toolResult({
-          ok: true,
-          detail,
-          project: detail === "full" ? project : summarizeProjectStatus(project),
-        });
-      }
-      case "project_hosting_status":
-        return toolResult({
-          ok: true,
-          ...(await projectHostingStatusFromArgs(args, context)),
-        });
-      case "project_hosting_plan": {
-        const hostingStatus = await projectHostingStatusFromArgs(args, context);
-        const config = loadProjectConfig(hostingStatus.projectRoot);
-        return toolResult({
-          ok: true,
-          ...hostingStatus,
-          plan: planNexusProjectHosting({
-            hosting: config.hosting,
-            status: hostingStatus.status,
-          }),
-        });
-      }
-      case "project_hosting_apply": {
-        const hostingStatus = await projectHostingStatusFromArgs(args, context);
-        assertMcpMutationAllowed(args, context, {
-          command: "project_hosting_apply",
-          mutationClass: "local_remote_repair",
-        });
-        const config = loadProjectConfig(hostingStatus.projectRoot);
-        const authProfiles = projectHostingAuthProfiles(
-          config,
-          optionalString(args, "homePath", "arguments"),
-        );
-        const apply = await applyNexusProjectHosting({
-          hosting: config.hosting,
-          status: hostingStatus.status,
-          ...(authProfiles.length > 0 ? { authProfiles } : {}),
-          ...(context.hostingProvider ? { provider: context.hostingProvider } : {}),
-          runLocalRemoteCommand: projectHostingLocalRemoteCommandRunner(
-            hostingStatus.projectRoot,
-            context.gitRunner,
-          ),
-          refreshStatus: () =>
-            projectHostingStatusFromArgs(args, context).then(
-              (result) => result.status,
-            ),
-        });
-        return toolResult({
-          ok: apply.ok,
-          ...hostingStatus,
-          apply,
-        });
-      }
-      case "automation_status": {
-        const detail = mcpDetailFromArgs(args);
-        const projectRoot = projectRootFromArgs(args);
-        const status = await getNexusAutomationStatus({
-          projectRoot,
-          homePath: optionalString(args, "homePath", "arguments"),
-          now: context.now,
-        });
-        return toolResult({
-          ok: true,
-          detail,
-          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
-          ...(detail === "full" ? status : summarizeAutomationStatus(status)),
-        });
-      }
-      case "eligible_work": {
-        const projectRoot = projectRootFromArgs(args);
-        return toolResult({
-          ok: true,
-          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
-          ...(await getNexusEligibleWorkSummary({
-            projectRoot,
-            eligibleWorkMode: optionalEligibleWorkMode(args, "mode", "arguments"),
-            now: context.now,
-          })),
-        });
-      }
-      case "agent_profiles":
-        return toolResult({
-          ok: true,
-          ...getNexusAutomationAgentProfileSummary(projectRootFromArgs(args)),
-        });
-      case "codex_app_server_probe": {
-        const probe = await probeCodexAppServerInitialize({
-          projectRoot: projectRootFromArgs(args),
-          profileId: optionalString(args, "profileId", "arguments"),
-        });
-        return toolResult({
-          ok: probe.status === "ready",
-          probe,
-        });
-      }
-      case "automation_heartbeat_prepare":
-        return toolResult({
-          ok: true,
-          ...prepareNexusAutomationHeartbeat({
-            projectRoot: projectRootFromArgs(args),
-            name: optionalNullableString(args, "name", "arguments"),
-            intervalMinutes: optionalPositiveInteger(
-              args,
-              "intervalMinutes",
-              "arguments",
-            ),
-            status: optionalHeartbeatStatus(args, "status", "arguments"),
-          }),
-        });
-      case "setup_flow_list":
-        return toolResult({
-          ok: true,
-          flows: listNexusSetupFlows(),
-        });
-      case "setup_plan":
-        return toolResult({
-          ok: true,
-          plan: buildNexusSetupPlan({
-            projectRoot: projectRootFromArgs(args),
-            flowId: requiredString(args, "flowId", "arguments"),
-            platform: optionalString(args, "platform", "arguments"),
-          }),
-        });
-      case "setup_check":
-        return toolResult({
-          ok: true,
-          check: buildNexusSetupCheck({
-            projectRoot: projectRootFromArgs(args),
-            flowId: requiredString(args, "flowId", "arguments"),
-            platform: optionalString(args, "platform", "arguments"),
-          }),
-        });
-      case "setup_record":
-        assertMcpMutationAllowed(args, context, {
-          command: "setup_record",
-          mutationClass: "project_state",
-        });
-        return toolResult({
-          ok: true,
-          ...recordNexusSetupStep({
-            projectRoot: projectRootFromArgs(args),
-            flowId: requiredString(args, "flowId", "arguments"),
-            stepId: requiredString(args, "stepId", "arguments"),
-            status: parseNexusSetupRecordedStepStatus(
-              requiredString(args, "status", "arguments"),
-              "arguments.status",
-            ),
-            note: optionalNullableString(args, "note", "arguments"),
-            now: context.now,
-          }),
-        });
-      case "target_cycle_list":
-        {
-          const detail = mcpDetailFromArgs(args);
-          return toolResult({
-            ok: true,
-            detail,
-            ...targetCycleLedgerFromArgs(args, detail),
-          });
-        }
-      case "target_cycle_record": {
-        const detail = mcpDetailFromArgs(args);
-        assertMcpMutationAllowed(args, context, {
-          command: "target_cycle_record",
-          mutationClass: "target_state",
-        });
-        const result = appendTargetCycleFromArgs(args, context);
-        return toolResult({
-          ok: true,
-          detail,
-          ...summarizeTargetCycleRecordResult(result, detail),
-        });
-      }
-      case "target_report": {
-        const detail = mcpDetailFromArgs(args);
-        const projectRoot = projectRootFromArgs(args);
-        const report = buildNexusAutomationTargetReport({
-          projectRoot,
-          now: context.now?.(),
-        });
-        return toolResult({
-          ok: true,
-          detail,
-          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
-          report: detail === "full" ? report : summarizeTargetReport(report),
-        });
-      }
-      case "publication_feature_plan":
-        return toolResult({
-          ok: true,
-          plan: buildNexusFeatureBranchDeliveryPlan({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            featureId: optionalNullableString(args, "featureId", "arguments"),
-          }),
-        });
-      case "publication_feature_report":
-        return toolResult({
-          ok: true,
-          report: buildNexusFeatureBranchDeliveryReport({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            featureId: optionalNullableString(args, "featureId", "arguments"),
-            providerEvidence: providerEvidenceFromArgs(args),
-            fullMatrixBudgetAvailable: optionalBoolean(
-              args,
-              "fullMatrixBudgetAvailable",
-              "arguments",
-            ),
-            now: context.now,
-          }),
-        });
-      case "publication_feature_finalization":
-        return toolResult({
-          ok: true,
-          plan: buildNexusFeatureFinalizationPlan({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            featureId: optionalNullableString(args, "featureId", "arguments"),
-            providerEvidence: providerEvidenceFromArgs(args),
-            fullMatrixBudgetAvailable: optionalBoolean(
-              args,
-              "fullMatrixBudgetAvailable",
-              "arguments",
-            ),
-            now: context.now,
-          }),
-        });
-      case "review_plan":
-        return toolResult({
-          ok: true,
-          plan: reviewPlanFromArgs(args),
-        });
-      case "current_agent_adopt": {
-        const coordinatorLoop =
-          optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
-        const adoptOptions = {
-          projectRoot: projectRootFromArgs(args),
-          runId: optionalString(args, "runId", "arguments"),
-          owner: optionalNullableString(args, "owner", "arguments"),
-          now: context.now,
-        };
-        return toolResult({
-          ok: true,
-          ...(coordinatorLoop
-            ? await adoptNexusAutomationCurrentAgentFromCoordinatorLoop({
-                ...adoptOptions,
-                runIdPrefix: optionalString(args, "runIdPrefix", "arguments"),
-              })
-            : await adoptNexusAutomationCurrentAgent(adoptOptions)),
-        });
-      }
-      case "current_agent_heartbeat":
-        return toolResult({
-          ok: true,
-          ...(await heartbeatNexusAgentClaim({
-            projectRoot: projectRootFromArgs(args),
-            env: process.env,
-            claimAuthority: context.workItemClaimAuthority,
-            leaseDurationMs: optionalPositiveInteger(
-              args,
-              "leaseDurationMs",
-              "arguments",
-            ),
-            now: context.now,
-          })),
-        });
-      case "current_agent_record":
-        assertMcpMutationAllowed(args, context, {
-          command: "current_agent_record",
-          mutationClass: "target_state",
-        });
-        {
-          const result = currentAgentResultFromArgs(args);
-          if (result.status === "completed") {
-            await verifyNexusAgentClaimForMutation({
-              projectRoot: projectRootFromArgs(args),
-              env: process.env,
-              claimAuthority: context.workItemClaimAuthority,
-              now: context.now,
-            });
-          }
-          return toolResult({
-            ok: true,
-            ...recordNexusAutomationCurrentAgentAdoptionResult({
-              projectRoot: projectRootFromArgs(args),
-              runId: requiredString(args, "runId", "arguments"),
-              result,
-              now: context.now,
-            }),
-          });
-        }
-      case "worktree_prepare": {
-        const projectRoot = projectRootFromArgs(args);
-        const componentId = optionalString(args, "componentId", "arguments");
-        assertMcpMutationAllowed(args, context, {
-          command: "worktree_prepare",
-          mutationClass: "worktree_bootstrap",
-          componentId,
-        });
-        const projectMeta = optionalBoolean(args, "projectMeta", "arguments");
-        const workItemId = optionalNullableString(
-          args,
-          "workItemId",
-          "arguments",
-        );
-        const workItemTitle = optionalNullableString(
-          args,
-          "workItemTitle",
-          "arguments",
-        );
-        const topic = optionalNullableString(args, "topic", "arguments");
-        const resolvedWorkItem = await resolveNexusManualWorktreeWorkItem({
-          projectRoot,
-          componentId,
-          projectMeta,
-          workItemId,
-          workItemTitle,
-          topic,
-          now: context.now,
-        });
-        await verifyNexusAgentClaimForMutation({
-          projectRoot,
-          componentId: resolvedWorkItem.componentId ?? componentId ?? null,
-          workItemId: resolvedWorkItem.itemId ?? workItemId ?? null,
-          env: process.env,
-          claimAuthority: context.workItemClaimAuthority,
-          now: context.now,
-        });
-        const prepared = prepareNexusManualWorktree({
-          projectRoot,
-          componentId: resolvedWorkItem.componentId ?? componentId,
-          projectMeta,
-          workItemId: resolvedWorkItem.itemId ?? workItemId,
-          workItemTitle:
-            workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
-          workItemDescription: resolvedWorkItem.workItem?.description ?? null,
-          topic,
-          branchName: optionalString(args, "branchName", "arguments"),
-          worktreeName: optionalString(args, "worktreeName", "arguments"),
-          baseRef: optionalNullableString(args, "baseRef", "arguments"),
-          featureId: optionalNullableString(args, "featureId", "arguments"),
-          featureChange: optionalNullableString(
-            args,
-            "featureChange",
-            "arguments",
-          ),
-          featureParentBranch: optionalNullableString(
-            args,
-            "featureParentBranch",
-            "arguments",
-          ),
-          featureStackPosition: optionalPositiveInteger(
-            args,
-            "featureStackPosition",
-            "arguments",
-          ),
-          branchIntent: optionalNullableString(args, "branchIntent", "arguments"),
-          hostId: optionalNullableString(args, "hostId", "arguments"),
-          agentId: optionalNullableString(args, "agentId", "arguments"),
-          workerAgentProvider: optionalNullableString(
-            args,
-            "workerAgentProvider",
-            "arguments",
-          ),
-          writeScope: optionalStringArray(args, "writeScope", "arguments") ?? [],
-          leaseNotes: optionalStringArray(args, "leaseNotes", "arguments") ?? [],
-          gitRunner: context.gitRunner,
-          now: context.now,
-        });
-        return toolResult({
-          ok: true,
-          ...summarizeNexusManualWorktreeResult(prepared),
-        });
-      }
-      case "coordination_status": {
-        const detail = mcpDetailFromArgs(args);
-        const status = await getNexusCoordinationStatus({
-          projectRoot: projectRootFromArgs(args),
-          componentId: optionalString(args, "componentId", "arguments"),
-          workItemId: optionalString(args, "workItemId", "arguments"),
-          trackerId: optionalString(args, "trackerId", "arguments"),
-          trackerRole: optionalString(args, "trackerRole", "arguments"),
-          currentPath: optionalString(args, "currentPath", "arguments"),
-          gitRunner: context.gitRunner,
-          now: context.now,
-        });
-        return toolResult({
-          ok: true,
-          detail,
-          status: detail === "full" ? status : summarizeCoordinationStatus(status),
-        });
-      }
-      case "coordination_handoff":
-        assertMcpMutationAllowed(args, context, {
-          command: "coordination_handoff",
-          mutationClass: "coordination_record",
-          targetPath: optionalString(args, "currentPath", "arguments"),
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          ...(await createNexusCoordinationHandoff({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            workItemId: requiredString(args, "workItemId", "arguments"),
-            trackerId: optionalString(args, "trackerId", "arguments"),
-            trackerRole: optionalString(args, "trackerRole", "arguments"),
-            status: parseNexusCoordinationHandoffStatus(
-              requiredString(args, "status", "arguments"),
-              "arguments.status",
-            ),
-            hostId: optionalString(args, "hostId", "arguments"),
-            agentId: optionalString(args, "agentId", "arguments"),
-            changedAreas:
-              optionalStringArray(args, "changedAreas", "arguments") ?? [],
-            decisions: optionalStringArray(args, "decisions", "arguments") ?? [],
-            verificationSummary: optionalNullableString(
-              args,
-              "verificationSummary",
-              "arguments",
-            ),
-            integrationPreference: optionalNullableString(
-              args,
-              "integrationPreference",
-              "arguments",
-            ),
-            note: optionalNullableString(args, "note", "arguments"),
-            currentPath: optionalString(args, "currentPath", "arguments"),
-            gitRunner: context.gitRunner,
-            now: context.now,
-          })),
-        });
-      case "coordination_integrate":
-        return toolResult({
-          ok: true,
-          plan: await getNexusCoordinationIntegrationPlan({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            workItemId: optionalString(args, "workItemId", "arguments"),
-            trackerId: optionalString(args, "trackerId", "arguments"),
-            trackerRole: optionalString(args, "trackerRole", "arguments"),
-            targetBranch: optionalString(args, "targetBranch", "arguments"),
-            fetch: optionalBoolean(args, "fetch", "arguments"),
-            currentPath: optionalString(args, "currentPath", "arguments"),
-            gitRunner: context.gitRunner,
-            now: context.now,
-          }),
-        });
-      case "coordination_cleanup_execute": {
-        const projectRoot = projectRootFromArgs(args);
-        const componentId = optionalString(args, "componentId", "arguments");
-        const selected = selectNexusCleanupCandidate({
-          projectRoot,
-          componentId,
-          includeProjectMeta: optionalBoolean(
-            args,
-            "includeProjectMeta",
-            "arguments",
-          ),
-          targetBranch: optionalString(args, "targetBranch", "arguments"),
-          candidateId: requiredString(args, "candidateId", "arguments"),
-          gitRunner: context.gitRunner,
-          now: context.now,
-        });
-        assertMcpMutationAllowed(args, context, {
-          command: "coordination_cleanup_execute",
-          mutationClass: "cleanup_execution",
-          targetPath:
-            selected.candidate.worktreePath ??
-            selected.candidate.git.repositoryPath ??
-            projectRoot,
-          componentId: selected.candidate.componentId,
-        });
-        return toolResult({
-          ok: true,
-          result: executeNexusCleanup({
-            projectRoot,
-            componentId,
-            includeProjectMeta: optionalBoolean(
-              args,
-              "includeProjectMeta",
-              "arguments",
-            ),
-            targetBranch: optionalString(args, "targetBranch", "arguments"),
-            candidateId: requiredString(args, "candidateId", "arguments"),
-            deleteBranch: optionalBoolean(args, "keepBranch", "arguments")
-              ? false
-              : undefined,
-            force: optionalBoolean(args, "force", "arguments"),
-            forceReason: optionalNullableString(args, "forceReason", "arguments"),
-            gitRunner: context.gitRunner,
-            now: context.now,
-          }),
-        });
-      }
-      case "coordination_request":
-        assertMcpMutationAllowed(args, context, {
-          command: "coordination_request",
-          mutationClass: "coordination_record",
-          targetPath: optionalString(args, "currentPath", "arguments"),
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          ...(await createNexusCoordinationRequest({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            workItemId: optionalString(args, "workItemId", "arguments"),
-            trackerId: optionalString(args, "trackerId", "arguments"),
-            trackerRole: optionalString(args, "trackerRole", "arguments"),
-            intent: parseNexusCoordinationRequestIntent(
-              requiredString(args, "intent", "arguments"),
-              "arguments.intent",
-            ),
-            question: optionalNullableString(args, "question", "arguments"),
-            note: optionalNullableString(args, "note", "arguments"),
-            target: optionalNullableString(args, "target", "arguments"),
-            hostId: optionalString(args, "hostId", "arguments"),
-            agentId: optionalString(args, "agentId", "arguments"),
-            responseStatus: hasOwn(args, "responseStatus")
-              ? parseNexusCoordinationRequestStatus(
-                  requiredString(args, "responseStatus", "arguments"),
-                  "arguments.responseStatus",
-                )
-              : undefined,
-            responseSummary: optionalNullableString(
-              args,
-              "responseSummary",
-              "arguments",
-            ),
-            responder: optionalNullableString(args, "responder", "arguments"),
-            requestedChanges:
-              optionalStringArray(args, "requestedChanges", "arguments") ?? [],
-            currentPath: optionalString(args, "currentPath", "arguments"),
-            gitRunner: context.gitRunner,
-            now: context.now,
-          })),
-        });
-      case "host_check":
-        return toolResult({
-          ok: true,
-          result: checkNexusHostCapabilities({
-            projectRoot: projectRootFromArgs(args),
-            hostId: optionalString(args, "hostId", "arguments"),
-            mode: hostCheckModeFromArgs(args),
-            mockFacts: hostCheckMockFactsFromArgs(args),
-            commandRunner: context.commandRunner,
-            now: context.now,
-          }),
-        });
-      case "remote_execution_request_create":
-        assertMcpMutationAllowed(args, context, {
-          command: "remote_execution_request_create",
-          mutationClass: "coordination_record",
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          localOnly: true,
-          request: createNexusRemoteExecutionRequest({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            workItemId: optionalNullableString(args, "workItemId", "arguments"),
-            requestingHostId: requiredString(
-              args,
-              "requestingHostId",
-              "arguments",
-            ),
-            requestingAgentId: optionalNullableString(
-              args,
-              "requestingAgentId",
-              "arguments",
-            ),
-            targetHostId: optionalNullableString(
-              args,
-              "targetHostId",
-              "arguments",
-            ),
-            requiredCapabilities:
-              optionalStringArray(args, "requiredCapabilities", "arguments") ??
-              [],
-            runnerProfileId: requiredString(
-              args,
-              "runnerProfileId",
-              "arguments",
-            ),
-            repository: requiredString(args, "repository", "arguments"),
-            ref: requiredString(args, "ref", "arguments"),
-            commandProfileId: requiredString(
-              args,
-              "commandProfileId",
-              "arguments",
-            ),
-            timeoutMs: requiredPositiveInteger(args, "timeoutMs", "arguments"),
-            expectedArtifacts:
-              optionalStringArray(args, "expectedArtifacts", "arguments") ?? [],
-            mutationClass: remoteExecutionMutationClassFromArgs(args),
-            initialStatus: optionalString(args, "initialStatus", "arguments"),
-            attachmentRefs: remoteExecutionAttachmentRefsFromArgs(args),
-            now: context.now,
-          }),
-        });
-      case "remote_execution_result_record":
-        assertMcpMutationAllowed(args, context, {
-          command: "remote_execution_result_record",
-          mutationClass: "coordination_record",
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          localOnly: true,
-          result: recordNexusRemoteExecutionResult({
-            projectRoot: projectRootFromArgs(args),
-            requestId: requiredString(args, "requestId", "arguments"),
-            status: requiredString(args, "status", "arguments"),
-            hostId: requiredString(args, "hostId", "arguments"),
-            runnerProfileId: requiredString(
-              args,
-              "runnerProfileId",
-              "arguments",
-            ),
-            actualRef: optionalNullableString(args, "actualRef", "arguments"),
-            actualCommit: optionalNullableString(
-              args,
-              "actualCommit",
-              "arguments",
-            ),
-            commands:
-              optionalStringArray(args, "commands", "arguments") ?? [],
-            exitCode: optionalNullableInteger(args, "exitCode", "arguments"),
-            verificationOutcome: requiredString(
-              args,
-              "verificationOutcome",
-              "arguments",
-            ),
-            outputTail: optionalNullableString(args, "outputTail", "arguments"),
-            artifactRefs:
-              optionalStringArray(args, "artifactRefs", "arguments") ?? [],
-            cleanupStatus: requiredString(
-              args,
-              "cleanupStatus",
-              "arguments",
-            ),
-            blockerSafetyReason: optionalNullableString(
-              args,
-              "blockerSafetyReason",
-              "arguments",
-            ),
-            now: context.now,
-          }),
-        });
-      case "remote_execution_result_get":
-        return toolResult({
-          ok: true,
-          localOnly: true,
-          record: getNexusRemoteExecutionRecord({
-            projectRoot: projectRootFromArgs(args),
-            requestId: requiredString(args, "requestId", "arguments"),
-          }),
-        });
-      case "remote_execution_ssh_plan":
-        return toolResult({
-          ok: true,
-          localOnly: true,
-          plan: planNexusSshExecution({
-            projectRoot: projectRootFromArgs(args),
-            requestId: requiredString(args, "requestId", "arguments"),
-            homePath: optionalString(args, "homePath", "arguments"),
-          }),
-        });
-      case "work_item_create": {
-        const provider = workItemTrackerProviderFromArgs(args);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_create",
-          mutationClass: workItemMutationClassForTrackerProvider(provider),
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemCreateAuthorityActions(args, provider),
-        ]);
-        return toolResult({
-          ok: true,
-          workItem: await workItemServiceFromArgs(args, context).createWorkItem({
-            ...projectSelectorFromArgs(args),
-            title: requiredString(args, "title", "arguments"),
-            description: optionalNullableString(args, "description", "arguments"),
-            status: optionalWorkStatus(args, "status", "arguments"),
-            labels: optionalStringArray(args, "labels", "arguments") ?? [],
-            assignees: optionalStringArray(args, "assignees", "arguments") ?? [],
-            milestone: optionalNullableString(args, "milestone", "arguments"),
-          }),
-        });
-      }
-      case "work_item_discovery_status":
-        return toolResult({
-          ok: true,
-          ...getNexusWorkItemDiscoveryStatus({
-            projectRoot: projectRootFromArgs(args),
-            homePath: optionalString(args, "homePath", "arguments"),
-          }),
-        });
-      case "work_item_claim_next": {
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_claim_next",
-          mutationClass: "local_tracker",
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        const provider = workItemTrackerProviderFromArgs(args, {
-          ...projectSelectorFromArgs(args),
-          trackerId: optionalString(args, "trackerId", "arguments"),
-        });
-        assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemPatchAuthorityActions(
-            {
-              status: "in_progress",
-              description: "DevNexus optimistic claim metadata",
-            },
-            provider,
-          ),
-          workItemCommentAuthorityAction(provider),
-        ]);
-        const projectRoot = projectRootFromArgs(args);
-        const projectConfig = loadProjectConfig(projectRoot);
-        return toolResult({
-          ok: true,
-          claim: await claimNexusEligibleWorkItem({
-            projectRoot,
-            projectConfig,
-            components: resolveProjectComponents(projectRoot, projectConfig),
-            automationConfig:
-              projectConfig.automation ?? defaultNexusAutomationConfig,
-            componentId: optionalString(args, "componentId", "arguments"),
-            trackerId: optionalString(args, "trackerId", "arguments"),
-            mode: optionalEligibleWorkMode(args, "mode", "arguments"),
-            owner: {
-              hostId: requiredString(args, "hostId", "arguments"),
-              agentId: optionalNullableString(args, "agentId", "arguments"),
-              ownerId: optionalNullableString(args, "ownerId", "arguments"),
-            },
-            homePath: optionalString(args, "homePath", "arguments"),
-            leaseDurationMs: optionalPositiveInteger(
-              args,
-              "leaseDurationMs",
-              "arguments",
-            ),
-            staleClaimPolicy: optionalStaleClaimPolicy(
-              args,
-              "staleClaimPolicy",
-              "arguments",
-            ),
-            providerFactory: context.workItemClaimProviderFactory,
-            leaseTokenFactory: context.workItemClaimLeaseTokenFactory,
-            now: context.now,
-          }),
-        });
-      }
-      case "work_item_list": {
-        const detail = optionalString(args, "detail", "arguments") ?? "summary";
-        if (detail !== "summary" && detail !== "full") {
-          throw new Error("arguments.detail must be summary or full");
-        }
-        const limit = optionalPositiveInteger(args, "limit", "arguments") ?? 50;
-        if (limit > 100) {
-          throw new Error("arguments.limit must be at most 100");
-        }
-        const workItems = await workItemServiceFromArgs(args, context).listWorkItems({
-          ...projectSelectorFromArgs(args),
-          status: optionalWorkStatusQuery(args, "status", "arguments"),
-          labels: optionalStringArray(args, "labels", "arguments"),
-          assignees: optionalStringArray(args, "assignees", "arguments"),
-          search: optionalString(args, "search", "arguments"),
-          limit,
-        });
-        return toolResult({
-          ok: true,
-          detail,
-          limit,
-          workItems:
-            detail === "full" ? workItems : workItems.map(summarizeWorkItem),
-        });
-      }
-      case "work_item_get": {
-        const { selector, ref } = workItemSelectorRefFromArgs(args);
-        return toolResult({
-          ok: true,
-          workItem: await workItemServiceFromArgs(args, context).getWorkItem({
-            ...selector,
-            ...ref,
-          }),
-        });
-      }
-      case "work_item_update": {
-        const { selector, ref } = workItemSelectorRefFromArgs(args);
-        const patch = workItemPatchFromArgs(args);
-        const provider = workItemTrackerProviderFromArgs(args, selector);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_update",
-          mutationClass: workItemMutationClassForTrackerProvider(provider),
-          targetPath: optionalString(args, "currentPath", "arguments"),
-          componentId: selector.componentId,
-        });
-        assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemPatchAuthorityActions(patch, provider),
-        ]);
-        return toolResult({
-          ok: true,
-          workItem: await workItemServiceFromArgs(args, context).updateWorkItem({
-            ...selector,
-            ref,
-            patch,
-          }),
-        });
-      }
-      case "work_item_comment": {
-        const { selector, ref } = workItemSelectorRefFromArgs(args);
-        const provider = workItemTrackerProviderFromArgs(args, selector);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_comment",
-          mutationClass: workItemMutationClassForTrackerProvider(provider),
-          targetPath: optionalString(args, "currentPath", "arguments"),
-          componentId: selector.componentId,
-        });
-        assertMcpWorkItemAuthorityAllowed(args, [
-          workItemCommentAuthorityAction(provider),
-        ]);
-        return toolResult({
-          ok: true,
-          comment: await workItemServiceFromArgs(args, context).addComment({
-            ...selector,
-            ref,
-            body: requiredString(args, "body", "arguments"),
-          }),
-        });
-      }
-      case "work_item_set_status": {
-        const { selector, ref } = workItemSelectorRefFromArgs(args);
-        const provider = workItemTrackerProviderFromArgs(args, selector);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_set_status",
-          mutationClass: workItemMutationClassForTrackerProvider(provider),
-          targetPath: optionalString(args, "currentPath", "arguments"),
-          componentId: selector.componentId,
-        });
-        assertMcpWorkItemAuthorityAllowed(args, [
-          workItemStatusAuthorityAction(provider),
-        ]);
-        return toolResult({
-          ok: true,
-          workItem: await workItemServiceFromArgs(args, context).setStatus({
-            ...selector,
-            ref,
-            status: parseWorkStatus(
-              requiredString(args, "status", "arguments"),
-              "arguments.status",
-            ),
-          }),
-        });
-      }
-      case "work_item_link": {
-        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_link",
-          mutationClass: "local_tracker",
-          componentId: selector.componentId,
-        });
-        return toolResult({
-          ok: true,
-          ...(await workItemTrackerLinkServiceFromArgs(
-            args,
-            context,
-          ).linkReference({
-            ...selector,
-            logicalItemId,
-            trackerId: requiredString(args, "trackerId", "arguments"),
-            provider: optionalString(args, "provider", "arguments"),
-            host: optionalNullableString(args, "host", "arguments"),
-            repositoryId: optionalNullableString(
-              args,
-              "repositoryId",
-              "arguments",
-            ),
-            repositoryOwner: optionalNullableString(
-              args,
-              "repositoryOwner",
-              "arguments",
-            ),
-            repositoryName: optionalNullableString(
-              args,
-              "repositoryName",
-              "arguments",
-            ),
-            projectId: optionalNullableString(args, "projectId", "arguments"),
-            boardId: optionalNullableString(args, "boardId", "arguments"),
-            itemId: requiredString(args, "itemId", "arguments"),
-            itemNumber:
-              optionalPositiveInteger(args, "itemNumber", "arguments") ?? null,
-            itemKey: optionalNullableString(args, "itemKey", "arguments"),
-            nodeId: optionalNullableString(args, "nodeId", "arguments"),
-            webUrl: optionalNullableString(args, "webUrl", "arguments"),
-            observedAt: optionalNullableString(args, "observedAt", "arguments"),
-          })),
-        });
-      }
-      case "work_item_show_links": {
-        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
-        return toolResult({
-          ok: true,
-          ...(await workItemTrackerLinkServiceFromArgs(
-            args,
-            context,
-          ).showLinks({
-            ...selector,
-            logicalItemId,
-          })),
-        });
-      }
-      case "work_item_unlink": {
-        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_unlink",
-          mutationClass: "local_tracker",
-          componentId: selector.componentId,
-        });
-        return toolResult({
-          ok: true,
-          ...(await workItemTrackerLinkServiceFromArgs(
-            args,
-            context,
-          ).unlinkReference({
-            ...selector,
-            logicalItemId,
-            trackerId: requiredString(args, "trackerId", "arguments"),
-            itemId: requiredString(args, "itemId", "arguments"),
-            reason: optionalNullableString(args, "reason", "arguments"),
-          })),
-        });
-      }
-      case "work_item_sync_plan": {
-        const homePath = homePathFromArgs(args);
-        return toolResult({
-          ok: true,
-          plan: await createWorkItemSyncPlan({
-            ...projectSelectorFromArgs(args),
-            policy: workItemSyncPolicyFromArgs(args),
-            resolveProject: (selector) =>
-              resolveWorkItemProject(selector, homePath),
-            now: context.now,
-          }),
-        });
-      }
-      case "work_item_import_plan": {
-        const homePath = homePathFromArgs(args);
-        return toolResult({
-          ok: true,
-          plan: await createWorkItemImportPlan({
-            ...projectSelectorFromArgs(args),
-            policy: workItemImportPolicyFromArgs(args),
-            resolveProject: (selector) =>
-              resolveWorkItemProject(selector, homePath),
-            now: context.now,
-          }),
-        });
-      }
-      case "work_item_import_execute": {
-        const homePath = homePathFromArgs(args);
-        requiredString(args, "direction", "arguments");
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_import_execute",
-          mutationClass: "local_tracker",
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          run: await executeWorkItemImport({
-            ...projectSelectorFromArgs(args),
-            policy: workItemImportPolicyFromArgs(args),
-            authority: workItemImportExecutionAuthorityFromArgs(args, homePath),
-            resolveProject: (selector) =>
-              resolveWorkItemProject(selector, homePath),
-            now: context.now,
-          }),
-        });
-      }
-      case "work_item_sync_execute": {
-        const homePath = homePathFromArgs(args);
-        assertMcpMutationAllowed(args, context, {
-          command: "work_item_sync_execute",
-          mutationClass: "provider_sync",
-          componentId: optionalString(args, "componentId", "arguments"),
-        });
-        return toolResult({
-          ok: true,
-          run: await executeWorkItemSync({
-            ...projectSelectorFromArgs(args),
-            policy: workItemSyncPolicyFromArgs(args),
-            resolveProject: (selector) =>
-              resolveWorkItemProject(selector, homePath),
-            recordRun: optionalBoolean(args, "recordRun", "arguments"),
-            now: context.now,
-          }),
-        });
-      }
-      default:
-        return toolResult(
-          {
-            ok: false,
-            error: `Unknown DevNexus MCP tool: ${name}`,
-          },
-          true,
-        );
+    const handlerResult = await callDevNexusMcpToolHandler(name, args, context);
+    if (handlerResult) {
+      return handlerResult;
     }
+    return unknownDevNexusMcpToolResult(name);
   } catch (error) {
     return toolResult(
       {
@@ -2539,6 +1549,1180 @@ export async function callDevNexusMcpTool(
       },
       true,
     );
+  }
+}
+
+async function callDevNexusMcpToolHandler(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  for (const handler of devNexusMcpToolHandlers) {
+    const result = await handler(name, args, context);
+    if (result) {
+      return result;
+    }
+  }
+  return undefined;
+}
+
+function unknownDevNexusMcpToolResult(name: string): DevNexusMcpToolResult {
+  return toolResult(
+    {
+      ok: false,
+      error: `Unknown DevNexus MCP tool: ${name}`,
+    },
+    true,
+  );
+}
+
+async function callProjectMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "project_status": {
+      const detail = mcpDetailFromArgs(args);
+      const project = projectStatusFromArgs(args);
+      return toolResult({
+        ok: true,
+        detail,
+        project: detail === "full" ? project : summarizeProjectStatus(project),
+      });
+    }
+    case "project_hosting_status":
+      return toolResult({
+        ok: true,
+        ...(await projectHostingStatusFromArgs(args, context)),
+      });
+    case "project_hosting_plan": {
+      const hostingStatus = await projectHostingStatusFromArgs(args, context);
+      const config = loadProjectConfig(hostingStatus.projectRoot);
+      return toolResult({
+        ok: true,
+        ...hostingStatus,
+        plan: planNexusProjectHosting({
+          hosting: config.hosting,
+          status: hostingStatus.status,
+        }),
+      });
+    }
+    case "project_hosting_apply": {
+      const hostingStatus = await projectHostingStatusFromArgs(args, context);
+      assertMcpMutationAllowed(args, context, {
+        command: "project_hosting_apply",
+        mutationClass: "local_remote_repair",
+      });
+      const config = loadProjectConfig(hostingStatus.projectRoot);
+      const authProfiles = projectHostingAuthProfiles(
+        config,
+        optionalString(args, "homePath", "arguments"),
+      );
+      const apply = await applyNexusProjectHosting({
+        hosting: config.hosting,
+        status: hostingStatus.status,
+        ...(authProfiles.length > 0 ? { authProfiles } : {}),
+        ...(context.hostingProvider ? { provider: context.hostingProvider } : {}),
+        runLocalRemoteCommand: projectHostingLocalRemoteCommandRunner(
+          hostingStatus.projectRoot,
+          context.gitRunner,
+        ),
+        refreshStatus: () =>
+          projectHostingStatusFromArgs(args, context).then(
+            (result) => result.status,
+          ),
+      });
+      return toolResult({
+        ok: apply.ok,
+        ...hostingStatus,
+        apply,
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callAutomationMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "automation_status": {
+      const detail = mcpDetailFromArgs(args);
+      const projectRoot = projectRootFromArgs(args);
+      const status = await getNexusAutomationStatus({
+        projectRoot,
+        homePath: optionalString(args, "homePath", "arguments"),
+        now: context.now,
+      });
+      return toolResult({
+        ok: true,
+        detail,
+        mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
+        ...(detail === "full" ? status : summarizeAutomationStatus(status)),
+      });
+    }
+    case "eligible_work": {
+      const projectRoot = projectRootFromArgs(args);
+      return toolResult({
+        ok: true,
+        mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
+        ...(await getNexusEligibleWorkSummary({
+          projectRoot,
+          eligibleWorkMode: optionalEligibleWorkMode(args, "mode", "arguments"),
+          now: context.now,
+        })),
+      });
+    }
+    case "agent_profiles":
+      return toolResult({
+        ok: true,
+        ...getNexusAutomationAgentProfileSummary(projectRootFromArgs(args)),
+      });
+    case "codex_app_server_probe": {
+      const probe = await probeCodexAppServerInitialize({
+        projectRoot: projectRootFromArgs(args),
+        profileId: optionalString(args, "profileId", "arguments"),
+      });
+      return toolResult({
+        ok: probe.status === "ready",
+        probe,
+      });
+    }
+    case "automation_heartbeat_prepare":
+      return toolResult({
+        ok: true,
+        ...prepareNexusAutomationHeartbeat({
+          projectRoot: projectRootFromArgs(args),
+          name: optionalNullableString(args, "name", "arguments"),
+          intervalMinutes: optionalPositiveInteger(
+            args,
+            "intervalMinutes",
+            "arguments",
+          ),
+          status: optionalHeartbeatStatus(args, "status", "arguments"),
+        }),
+      });
+    default:
+      return undefined;
+  }
+}
+
+async function callSetupMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "setup_flow_list":
+      return toolResult({
+        ok: true,
+        flows: listNexusSetupFlows(),
+      });
+    case "setup_plan":
+      return toolResult({
+        ok: true,
+        plan: buildNexusSetupPlan({
+          projectRoot: projectRootFromArgs(args),
+          flowId: requiredString(args, "flowId", "arguments"),
+          platform: optionalString(args, "platform", "arguments"),
+        }),
+      });
+    case "setup_check":
+      return toolResult({
+        ok: true,
+        check: buildNexusSetupCheck({
+          projectRoot: projectRootFromArgs(args),
+          flowId: requiredString(args, "flowId", "arguments"),
+          platform: optionalString(args, "platform", "arguments"),
+        }),
+      });
+    case "setup_record":
+      assertMcpMutationAllowed(args, context, {
+        command: "setup_record",
+        mutationClass: "project_state",
+      });
+      return toolResult({
+        ok: true,
+        ...recordNexusSetupStep({
+          projectRoot: projectRootFromArgs(args),
+          flowId: requiredString(args, "flowId", "arguments"),
+          stepId: requiredString(args, "stepId", "arguments"),
+          status: parseNexusSetupRecordedStepStatus(
+            requiredString(args, "status", "arguments"),
+            "arguments.status",
+          ),
+          note: optionalNullableString(args, "note", "arguments"),
+          now: context.now,
+        }),
+      });
+    default:
+      return undefined;
+  }
+}
+
+async function callTargetMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "target_cycle_list":
+      {
+        const detail = mcpDetailFromArgs(args);
+        return toolResult({
+          ok: true,
+          detail,
+          ...targetCycleLedgerFromArgs(args, detail),
+        });
+      }
+    case "target_cycle_record": {
+      const detail = mcpDetailFromArgs(args);
+      assertMcpMutationAllowed(args, context, {
+        command: "target_cycle_record",
+        mutationClass: "target_state",
+      });
+      const result = appendTargetCycleFromArgs(args, context);
+      return toolResult({
+        ok: true,
+        detail,
+        ...summarizeTargetCycleRecordResult(result, detail),
+      });
+    }
+    case "target_report": {
+      const detail = mcpDetailFromArgs(args);
+      const projectRoot = projectRootFromArgs(args);
+      const report = buildNexusAutomationTargetReport({
+        projectRoot,
+        now: context.now?.(),
+      });
+      return toolResult({
+        ok: true,
+        detail,
+        mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
+        report: detail === "full" ? report : summarizeTargetReport(report),
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callPublicationPlanningMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "publication_feature_plan":
+      return toolResult({
+        ok: true,
+        plan: buildNexusFeatureBranchDeliveryPlan({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          featureId: optionalNullableString(args, "featureId", "arguments"),
+        }),
+      });
+    case "publication_feature_report":
+      return toolResult({
+        ok: true,
+        report: buildNexusFeatureBranchDeliveryReport({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          featureId: optionalNullableString(args, "featureId", "arguments"),
+          providerEvidence: providerEvidenceFromArgs(args),
+          fullMatrixBudgetAvailable: optionalBoolean(
+            args,
+            "fullMatrixBudgetAvailable",
+            "arguments",
+          ),
+          now: context.now,
+        }),
+      });
+    case "publication_feature_finalization":
+      return toolResult({
+        ok: true,
+        plan: buildNexusFeatureFinalizationPlan({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          featureId: optionalNullableString(args, "featureId", "arguments"),
+          providerEvidence: providerEvidenceFromArgs(args),
+          fullMatrixBudgetAvailable: optionalBoolean(
+            args,
+            "fullMatrixBudgetAvailable",
+            "arguments",
+          ),
+          now: context.now,
+        }),
+      });
+    case "review_plan":
+      return toolResult({
+        ok: true,
+        plan: reviewPlanFromArgs(args),
+      });
+    default:
+      return undefined;
+  }
+}
+
+async function callCurrentAgentMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "current_agent_adopt": {
+      const coordinatorLoop =
+        optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
+      const adoptOptions = {
+        projectRoot: projectRootFromArgs(args),
+        runId: optionalString(args, "runId", "arguments"),
+        owner: optionalNullableString(args, "owner", "arguments"),
+        now: context.now,
+      };
+      return toolResult({
+        ok: true,
+        ...(coordinatorLoop
+          ? await adoptNexusAutomationCurrentAgentFromCoordinatorLoop({
+              ...adoptOptions,
+              runIdPrefix: optionalString(args, "runIdPrefix", "arguments"),
+            })
+          : await adoptNexusAutomationCurrentAgent(adoptOptions)),
+      });
+    }
+    case "current_agent_heartbeat":
+      return toolResult({
+        ok: true,
+        ...(await heartbeatNexusAgentClaim({
+          projectRoot: projectRootFromArgs(args),
+          env: process.env,
+          claimAuthority: context.workItemClaimAuthority,
+          leaseDurationMs: optionalPositiveInteger(
+            args,
+            "leaseDurationMs",
+            "arguments",
+          ),
+          now: context.now,
+        })),
+      });
+    case "current_agent_record":
+      assertMcpMutationAllowed(args, context, {
+        command: "current_agent_record",
+        mutationClass: "target_state",
+      });
+      {
+        const result = currentAgentResultFromArgs(args);
+        if (result.status === "completed") {
+          await verifyNexusAgentClaimForMutation({
+            projectRoot: projectRootFromArgs(args),
+            env: process.env,
+            claimAuthority: context.workItemClaimAuthority,
+            now: context.now,
+          });
+        }
+        return toolResult({
+          ok: true,
+          ...recordNexusAutomationCurrentAgentAdoptionResult({
+            projectRoot: projectRootFromArgs(args),
+            runId: requiredString(args, "runId", "arguments"),
+            result,
+            now: context.now,
+          }),
+        });
+      }
+    default:
+      return undefined;
+  }
+}
+
+async function callWorktreeMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "worktree_prepare": {
+      const projectRoot = projectRootFromArgs(args);
+      const componentId = optionalString(args, "componentId", "arguments");
+      assertMcpMutationAllowed(args, context, {
+        command: "worktree_prepare",
+        mutationClass: "worktree_bootstrap",
+        componentId,
+      });
+      const projectMeta = optionalBoolean(args, "projectMeta", "arguments");
+      const workItemId = optionalNullableString(
+        args,
+        "workItemId",
+        "arguments",
+      );
+      const workItemTitle = optionalNullableString(
+        args,
+        "workItemTitle",
+        "arguments",
+      );
+      const topic = optionalNullableString(args, "topic", "arguments");
+      const resolvedWorkItem = await resolveNexusManualWorktreeWorkItem({
+        projectRoot,
+        componentId,
+        projectMeta,
+        workItemId,
+        workItemTitle,
+        topic,
+        now: context.now,
+      });
+      await verifyNexusAgentClaimForMutation({
+        projectRoot,
+        componentId: resolvedWorkItem.componentId ?? componentId ?? null,
+        workItemId: resolvedWorkItem.itemId ?? workItemId ?? null,
+        env: process.env,
+        claimAuthority: context.workItemClaimAuthority,
+        now: context.now,
+      });
+      const prepared = prepareNexusManualWorktree({
+        projectRoot,
+        componentId: resolvedWorkItem.componentId ?? componentId,
+        projectMeta,
+        workItemId: resolvedWorkItem.itemId ?? workItemId,
+        workItemTitle:
+          workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
+        workItemDescription: resolvedWorkItem.workItem?.description ?? null,
+        topic,
+        branchName: optionalString(args, "branchName", "arguments"),
+        worktreeName: optionalString(args, "worktreeName", "arguments"),
+        baseRef: optionalNullableString(args, "baseRef", "arguments"),
+        featureId: optionalNullableString(args, "featureId", "arguments"),
+        featureChange: optionalNullableString(
+          args,
+          "featureChange",
+          "arguments",
+        ),
+        featureParentBranch: optionalNullableString(
+          args,
+          "featureParentBranch",
+          "arguments",
+        ),
+        featureStackPosition: optionalPositiveInteger(
+          args,
+          "featureStackPosition",
+          "arguments",
+        ),
+        branchIntent: optionalNullableString(args, "branchIntent", "arguments"),
+        hostId: optionalNullableString(args, "hostId", "arguments"),
+        agentId: optionalNullableString(args, "agentId", "arguments"),
+        workerAgentProvider: optionalNullableString(
+          args,
+          "workerAgentProvider",
+          "arguments",
+        ),
+        writeScope: optionalStringArray(args, "writeScope", "arguments") ?? [],
+        leaseNotes: optionalStringArray(args, "leaseNotes", "arguments") ?? [],
+        gitRunner: context.gitRunner,
+        now: context.now,
+      });
+      return toolResult({
+        ok: true,
+        ...summarizeNexusManualWorktreeResult(prepared),
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callCoordinationMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "coordination_status": {
+      const detail = mcpDetailFromArgs(args);
+      const status = await getNexusCoordinationStatus({
+        projectRoot: projectRootFromArgs(args),
+        componentId: optionalString(args, "componentId", "arguments"),
+        workItemId: optionalString(args, "workItemId", "arguments"),
+        trackerId: optionalString(args, "trackerId", "arguments"),
+        trackerRole: optionalString(args, "trackerRole", "arguments"),
+        currentPath: optionalString(args, "currentPath", "arguments"),
+        gitRunner: context.gitRunner,
+        now: context.now,
+      });
+      return toolResult({
+        ok: true,
+        detail,
+        status: detail === "full" ? status : summarizeCoordinationStatus(status),
+      });
+    }
+    case "coordination_handoff":
+      assertMcpMutationAllowed(args, context, {
+        command: "coordination_handoff",
+        mutationClass: "coordination_record",
+        targetPath: optionalString(args, "currentPath", "arguments"),
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        ...(await createNexusCoordinationHandoff({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          workItemId: requiredString(args, "workItemId", "arguments"),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          trackerRole: optionalString(args, "trackerRole", "arguments"),
+          status: parseNexusCoordinationHandoffStatus(
+            requiredString(args, "status", "arguments"),
+            "arguments.status",
+          ),
+          hostId: optionalString(args, "hostId", "arguments"),
+          agentId: optionalString(args, "agentId", "arguments"),
+          changedAreas:
+            optionalStringArray(args, "changedAreas", "arguments") ?? [],
+          decisions: optionalStringArray(args, "decisions", "arguments") ?? [],
+          verificationSummary: optionalNullableString(
+            args,
+            "verificationSummary",
+            "arguments",
+          ),
+          integrationPreference: optionalNullableString(
+            args,
+            "integrationPreference",
+            "arguments",
+          ),
+          note: optionalNullableString(args, "note", "arguments"),
+          currentPath: optionalString(args, "currentPath", "arguments"),
+          gitRunner: context.gitRunner,
+          now: context.now,
+        })),
+      });
+    case "coordination_integrate":
+      return toolResult({
+        ok: true,
+        plan: await getNexusCoordinationIntegrationPlan({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          workItemId: optionalString(args, "workItemId", "arguments"),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          trackerRole: optionalString(args, "trackerRole", "arguments"),
+          targetBranch: optionalString(args, "targetBranch", "arguments"),
+          fetch: optionalBoolean(args, "fetch", "arguments"),
+          currentPath: optionalString(args, "currentPath", "arguments"),
+          gitRunner: context.gitRunner,
+          now: context.now,
+        }),
+      });
+    case "coordination_cleanup_execute": {
+      const projectRoot = projectRootFromArgs(args);
+      const componentId = optionalString(args, "componentId", "arguments");
+      const selected = selectNexusCleanupCandidate({
+        projectRoot,
+        componentId,
+        includeProjectMeta: optionalBoolean(
+          args,
+          "includeProjectMeta",
+          "arguments",
+        ),
+        targetBranch: optionalString(args, "targetBranch", "arguments"),
+        candidateId: requiredString(args, "candidateId", "arguments"),
+        gitRunner: context.gitRunner,
+        now: context.now,
+      });
+      assertMcpMutationAllowed(args, context, {
+        command: "coordination_cleanup_execute",
+        mutationClass: "cleanup_execution",
+        targetPath:
+          selected.candidate.worktreePath ??
+          selected.candidate.git.repositoryPath ??
+          projectRoot,
+        componentId: selected.candidate.componentId,
+      });
+      return toolResult({
+        ok: true,
+        result: executeNexusCleanup({
+          projectRoot,
+          componentId,
+          includeProjectMeta: optionalBoolean(
+            args,
+            "includeProjectMeta",
+            "arguments",
+          ),
+          targetBranch: optionalString(args, "targetBranch", "arguments"),
+          candidateId: requiredString(args, "candidateId", "arguments"),
+          deleteBranch: optionalBoolean(args, "keepBranch", "arguments")
+            ? false
+            : undefined,
+          force: optionalBoolean(args, "force", "arguments"),
+          forceReason: optionalNullableString(args, "forceReason", "arguments"),
+          gitRunner: context.gitRunner,
+          now: context.now,
+        }),
+      });
+    }
+    case "coordination_request":
+      assertMcpMutationAllowed(args, context, {
+        command: "coordination_request",
+        mutationClass: "coordination_record",
+        targetPath: optionalString(args, "currentPath", "arguments"),
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        ...(await createNexusCoordinationRequest({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          workItemId: optionalString(args, "workItemId", "arguments"),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          trackerRole: optionalString(args, "trackerRole", "arguments"),
+          intent: parseNexusCoordinationRequestIntent(
+            requiredString(args, "intent", "arguments"),
+            "arguments.intent",
+          ),
+          question: optionalNullableString(args, "question", "arguments"),
+          note: optionalNullableString(args, "note", "arguments"),
+          target: optionalNullableString(args, "target", "arguments"),
+          hostId: optionalString(args, "hostId", "arguments"),
+          agentId: optionalString(args, "agentId", "arguments"),
+          responseStatus: hasOwn(args, "responseStatus")
+            ? parseNexusCoordinationRequestStatus(
+                requiredString(args, "responseStatus", "arguments"),
+                "arguments.responseStatus",
+              )
+            : undefined,
+          responseSummary: optionalNullableString(
+            args,
+            "responseSummary",
+            "arguments",
+          ),
+          responder: optionalNullableString(args, "responder", "arguments"),
+          requestedChanges:
+            optionalStringArray(args, "requestedChanges", "arguments") ?? [],
+          currentPath: optionalString(args, "currentPath", "arguments"),
+          gitRunner: context.gitRunner,
+          now: context.now,
+        })),
+      });
+    default:
+      return undefined;
+  }
+}
+
+async function callHostAndRemoteExecutionMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "host_check":
+      return toolResult({
+        ok: true,
+        result: checkNexusHostCapabilities({
+          projectRoot: projectRootFromArgs(args),
+          hostId: optionalString(args, "hostId", "arguments"),
+          mode: hostCheckModeFromArgs(args),
+          mockFacts: hostCheckMockFactsFromArgs(args),
+          commandRunner: context.commandRunner,
+          now: context.now,
+        }),
+      });
+    case "remote_execution_request_create":
+      assertMcpMutationAllowed(args, context, {
+        command: "remote_execution_request_create",
+        mutationClass: "coordination_record",
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        localOnly: true,
+        request: createNexusRemoteExecutionRequest({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          workItemId: optionalNullableString(args, "workItemId", "arguments"),
+          requestingHostId: requiredString(
+            args,
+            "requestingHostId",
+            "arguments",
+          ),
+          requestingAgentId: optionalNullableString(
+            args,
+            "requestingAgentId",
+            "arguments",
+          ),
+          targetHostId: optionalNullableString(
+            args,
+            "targetHostId",
+            "arguments",
+          ),
+          requiredCapabilities:
+            optionalStringArray(args, "requiredCapabilities", "arguments") ??
+            [],
+          runnerProfileId: requiredString(
+            args,
+            "runnerProfileId",
+            "arguments",
+          ),
+          repository: requiredString(args, "repository", "arguments"),
+          ref: requiredString(args, "ref", "arguments"),
+          commandProfileId: requiredString(
+            args,
+            "commandProfileId",
+            "arguments",
+          ),
+          timeoutMs: requiredPositiveInteger(args, "timeoutMs", "arguments"),
+          expectedArtifacts:
+            optionalStringArray(args, "expectedArtifacts", "arguments") ?? [],
+          mutationClass: remoteExecutionMutationClassFromArgs(args),
+          initialStatus: optionalString(args, "initialStatus", "arguments"),
+          attachmentRefs: remoteExecutionAttachmentRefsFromArgs(args),
+          now: context.now,
+        }),
+      });
+    case "remote_execution_result_record":
+      assertMcpMutationAllowed(args, context, {
+        command: "remote_execution_result_record",
+        mutationClass: "coordination_record",
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        localOnly: true,
+        result: recordNexusRemoteExecutionResult({
+          projectRoot: projectRootFromArgs(args),
+          requestId: requiredString(args, "requestId", "arguments"),
+          status: requiredString(args, "status", "arguments"),
+          hostId: requiredString(args, "hostId", "arguments"),
+          runnerProfileId: requiredString(
+            args,
+            "runnerProfileId",
+            "arguments",
+          ),
+          actualRef: optionalNullableString(args, "actualRef", "arguments"),
+          actualCommit: optionalNullableString(
+            args,
+            "actualCommit",
+            "arguments",
+          ),
+          commands:
+            optionalStringArray(args, "commands", "arguments") ?? [],
+          exitCode: optionalNullableInteger(args, "exitCode", "arguments"),
+          verificationOutcome: requiredString(
+            args,
+            "verificationOutcome",
+            "arguments",
+          ),
+          outputTail: optionalNullableString(args, "outputTail", "arguments"),
+          artifactRefs:
+            optionalStringArray(args, "artifactRefs", "arguments") ?? [],
+          cleanupStatus: requiredString(
+            args,
+            "cleanupStatus",
+            "arguments",
+          ),
+          blockerSafetyReason: optionalNullableString(
+            args,
+            "blockerSafetyReason",
+            "arguments",
+          ),
+          now: context.now,
+        }),
+      });
+    case "remote_execution_result_get":
+      return toolResult({
+        ok: true,
+        localOnly: true,
+        record: getNexusRemoteExecutionRecord({
+          projectRoot: projectRootFromArgs(args),
+          requestId: requiredString(args, "requestId", "arguments"),
+        }),
+      });
+    case "remote_execution_ssh_plan":
+      return toolResult({
+        ok: true,
+        localOnly: true,
+        plan: planNexusSshExecution({
+          projectRoot: projectRootFromArgs(args),
+          requestId: requiredString(args, "requestId", "arguments"),
+          homePath: optionalString(args, "homePath", "arguments"),
+        }),
+      });
+    default:
+      return undefined;
+  }
+}
+
+async function callWorkItemReadMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "work_item_discovery_status":
+      return toolResult({
+        ok: true,
+        ...getNexusWorkItemDiscoveryStatus({
+          projectRoot: projectRootFromArgs(args),
+          homePath: optionalString(args, "homePath", "arguments"),
+        }),
+      });
+    case "work_item_claim_next": {
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_claim_next",
+        mutationClass: "local_tracker",
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      const provider = workItemTrackerProviderFromArgs(args, {
+        ...projectSelectorFromArgs(args),
+        trackerId: optionalString(args, "trackerId", "arguments"),
+      });
+      assertMcpWorkItemAuthorityAllowed(args, [
+        ...workItemPatchAuthorityActions(
+          {
+            status: "in_progress",
+            description: "DevNexus optimistic claim metadata",
+          },
+          provider,
+        ),
+        workItemCommentAuthorityAction(provider),
+      ]);
+      const projectRoot = projectRootFromArgs(args);
+      const projectConfig = loadProjectConfig(projectRoot);
+      return toolResult({
+        ok: true,
+        claim: await claimNexusEligibleWorkItem({
+          projectRoot,
+          projectConfig,
+          components: resolveProjectComponents(projectRoot, projectConfig),
+          automationConfig:
+            projectConfig.automation ?? defaultNexusAutomationConfig,
+          componentId: optionalString(args, "componentId", "arguments"),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          mode: optionalEligibleWorkMode(args, "mode", "arguments"),
+          owner: {
+            hostId: requiredString(args, "hostId", "arguments"),
+            agentId: optionalNullableString(args, "agentId", "arguments"),
+            ownerId: optionalNullableString(args, "ownerId", "arguments"),
+          },
+          homePath: optionalString(args, "homePath", "arguments"),
+          leaseDurationMs: optionalPositiveInteger(
+            args,
+            "leaseDurationMs",
+            "arguments",
+          ),
+          staleClaimPolicy: optionalStaleClaimPolicy(
+            args,
+            "staleClaimPolicy",
+            "arguments",
+          ),
+          providerFactory: context.workItemClaimProviderFactory,
+          leaseTokenFactory: context.workItemClaimLeaseTokenFactory,
+          now: context.now,
+        }),
+      });
+    }
+    case "work_item_list": {
+      const detail = optionalString(args, "detail", "arguments") ?? "summary";
+      if (detail !== "summary" && detail !== "full") {
+        throw new Error("arguments.detail must be summary or full");
+      }
+      const limit = optionalPositiveInteger(args, "limit", "arguments") ?? 50;
+      if (limit > 100) {
+        throw new Error("arguments.limit must be at most 100");
+      }
+      const workItems = await workItemServiceFromArgs(args, context).listWorkItems({
+        ...projectSelectorFromArgs(args),
+        status: optionalWorkStatusQuery(args, "status", "arguments"),
+        labels: optionalStringArray(args, "labels", "arguments"),
+        assignees: optionalStringArray(args, "assignees", "arguments"),
+        search: optionalString(args, "search", "arguments"),
+        limit,
+      });
+      return toolResult({
+        ok: true,
+        detail,
+        limit,
+        workItems:
+          detail === "full" ? workItems : workItems.map(summarizeWorkItem),
+      });
+    }
+    case "work_item_get": {
+      const { selector, ref } = workItemSelectorRefFromArgs(args);
+      return toolResult({
+        ok: true,
+        workItem: await workItemServiceFromArgs(args, context).getWorkItem({
+          ...selector,
+          ...ref,
+        }),
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callWorkItemMutationMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "work_item_create": {
+      const provider = workItemTrackerProviderFromArgs(args);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_create",
+        mutationClass: workItemMutationClassForTrackerProvider(provider),
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      assertMcpWorkItemAuthorityAllowed(args, [
+        ...workItemCreateAuthorityActions(args, provider),
+      ]);
+      return toolResult({
+        ok: true,
+        workItem: await workItemServiceFromArgs(args, context).createWorkItem({
+          ...projectSelectorFromArgs(args),
+          title: requiredString(args, "title", "arguments"),
+          description: optionalNullableString(args, "description", "arguments"),
+          status: optionalWorkStatus(args, "status", "arguments"),
+          labels: optionalStringArray(args, "labels", "arguments") ?? [],
+          assignees: optionalStringArray(args, "assignees", "arguments") ?? [],
+          milestone: optionalNullableString(args, "milestone", "arguments"),
+        }),
+      });
+    }
+    case "work_item_update": {
+      const { selector, ref } = workItemSelectorRefFromArgs(args);
+      const patch = workItemPatchFromArgs(args);
+      const provider = workItemTrackerProviderFromArgs(args, selector);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_update",
+        mutationClass: workItemMutationClassForTrackerProvider(provider),
+        targetPath: optionalString(args, "currentPath", "arguments"),
+        componentId: selector.componentId,
+      });
+      assertMcpWorkItemAuthorityAllowed(args, [
+        ...workItemPatchAuthorityActions(patch, provider),
+      ]);
+      return toolResult({
+        ok: true,
+        workItem: await workItemServiceFromArgs(args, context).updateWorkItem({
+          ...selector,
+          ref,
+          patch,
+        }),
+      });
+    }
+    case "work_item_comment": {
+      const { selector, ref } = workItemSelectorRefFromArgs(args);
+      const provider = workItemTrackerProviderFromArgs(args, selector);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_comment",
+        mutationClass: workItemMutationClassForTrackerProvider(provider),
+        targetPath: optionalString(args, "currentPath", "arguments"),
+        componentId: selector.componentId,
+      });
+      assertMcpWorkItemAuthorityAllowed(args, [
+        workItemCommentAuthorityAction(provider),
+      ]);
+      return toolResult({
+        ok: true,
+        comment: await workItemServiceFromArgs(args, context).addComment({
+          ...selector,
+          ref,
+          body: requiredString(args, "body", "arguments"),
+        }),
+      });
+    }
+    case "work_item_set_status": {
+      const { selector, ref } = workItemSelectorRefFromArgs(args);
+      const provider = workItemTrackerProviderFromArgs(args, selector);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_set_status",
+        mutationClass: workItemMutationClassForTrackerProvider(provider),
+        targetPath: optionalString(args, "currentPath", "arguments"),
+        componentId: selector.componentId,
+      });
+      assertMcpWorkItemAuthorityAllowed(args, [
+        workItemStatusAuthorityAction(provider),
+      ]);
+      return toolResult({
+        ok: true,
+        workItem: await workItemServiceFromArgs(args, context).setStatus({
+          ...selector,
+          ref,
+          status: parseWorkStatus(
+            requiredString(args, "status", "arguments"),
+            "arguments.status",
+          ),
+        }),
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callWorkItemLinkMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "work_item_link": {
+      const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_link",
+        mutationClass: "local_tracker",
+        componentId: selector.componentId,
+      });
+      return toolResult({
+        ok: true,
+        ...(await workItemTrackerLinkServiceFromArgs(
+          args,
+          context,
+        ).linkReference({
+          ...selector,
+          logicalItemId,
+          trackerId: requiredString(args, "trackerId", "arguments"),
+          provider: optionalString(args, "provider", "arguments"),
+          host: optionalNullableString(args, "host", "arguments"),
+          repositoryId: optionalNullableString(
+            args,
+            "repositoryId",
+            "arguments",
+          ),
+          repositoryOwner: optionalNullableString(
+            args,
+            "repositoryOwner",
+            "arguments",
+          ),
+          repositoryName: optionalNullableString(
+            args,
+            "repositoryName",
+            "arguments",
+          ),
+          projectId: optionalNullableString(args, "projectId", "arguments"),
+          boardId: optionalNullableString(args, "boardId", "arguments"),
+          itemId: requiredString(args, "itemId", "arguments"),
+          itemNumber:
+            optionalPositiveInteger(args, "itemNumber", "arguments") ?? null,
+          itemKey: optionalNullableString(args, "itemKey", "arguments"),
+          nodeId: optionalNullableString(args, "nodeId", "arguments"),
+          webUrl: optionalNullableString(args, "webUrl", "arguments"),
+          observedAt: optionalNullableString(args, "observedAt", "arguments"),
+        })),
+      });
+    }
+    case "work_item_show_links": {
+      const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+      return toolResult({
+        ok: true,
+        ...(await workItemTrackerLinkServiceFromArgs(
+          args,
+          context,
+        ).showLinks({
+          ...selector,
+          logicalItemId,
+        })),
+      });
+    }
+    case "work_item_unlink": {
+      const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_unlink",
+        mutationClass: "local_tracker",
+        componentId: selector.componentId,
+      });
+      return toolResult({
+        ok: true,
+        ...(await workItemTrackerLinkServiceFromArgs(
+          args,
+          context,
+        ).unlinkReference({
+          ...selector,
+          logicalItemId,
+          trackerId: requiredString(args, "trackerId", "arguments"),
+          itemId: requiredString(args, "itemId", "arguments"),
+          reason: optionalNullableString(args, "reason", "arguments"),
+        })),
+      });
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function callWorkItemSyncMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<DevNexusMcpToolResult | undefined> {
+  switch (name) {
+    case "work_item_sync_plan": {
+      const homePath = homePathFromArgs(args);
+      return toolResult({
+        ok: true,
+        plan: await createWorkItemSyncPlan({
+          ...projectSelectorFromArgs(args),
+          policy: workItemSyncPolicyFromArgs(args),
+          resolveProject: (selector) =>
+            resolveWorkItemProject(selector, homePath),
+          now: context.now,
+        }),
+      });
+    }
+    case "work_item_import_plan": {
+      const homePath = homePathFromArgs(args);
+      return toolResult({
+        ok: true,
+        plan: await createWorkItemImportPlan({
+          ...projectSelectorFromArgs(args),
+          policy: workItemImportPolicyFromArgs(args),
+          resolveProject: (selector) =>
+            resolveWorkItemProject(selector, homePath),
+          now: context.now,
+        }),
+      });
+    }
+    case "work_item_import_execute": {
+      const homePath = homePathFromArgs(args);
+      requiredString(args, "direction", "arguments");
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_import_execute",
+        mutationClass: "local_tracker",
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        run: await executeWorkItemImport({
+          ...projectSelectorFromArgs(args),
+          policy: workItemImportPolicyFromArgs(args),
+          authority: workItemImportExecutionAuthorityFromArgs(args, homePath),
+          resolveProject: (selector) =>
+            resolveWorkItemProject(selector, homePath),
+          now: context.now,
+        }),
+      });
+    }
+    case "work_item_sync_execute": {
+      const homePath = homePathFromArgs(args);
+      assertMcpMutationAllowed(args, context, {
+        command: "work_item_sync_execute",
+        mutationClass: "provider_sync",
+        componentId: optionalString(args, "componentId", "arguments"),
+      });
+      return toolResult({
+        ok: true,
+        run: await executeWorkItemSync({
+          ...projectSelectorFromArgs(args),
+          policy: workItemSyncPolicyFromArgs(args),
+          resolveProject: (selector) =>
+            resolveWorkItemProject(selector, homePath),
+          recordRun: optionalBoolean(args, "recordRun", "arguments"),
+          now: context.now,
+        }),
+      });
+    }
+    default:
+      return undefined;
   }
 }
 
