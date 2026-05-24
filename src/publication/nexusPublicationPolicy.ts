@@ -548,6 +548,7 @@ export function publicationProcessEnvironment(
         authProfiles: options.authProfiles,
       }),
     ),
+    DEV_NEXUS_PUBLICATION_FACADE: "1",
   };
 
   if (shouldUseIsolatedGitHubCliProfile(policy, commandEnvironment)) {

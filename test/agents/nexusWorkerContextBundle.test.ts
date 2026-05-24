@@ -70,6 +70,22 @@ describe("nexus worker context bundle", () => {
       baseRef: "origin/main",
       workItem,
       publication,
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          binDirectoryPath: path.join(
+            worktreePath,
+            ".dev-nexus",
+            "guardrails",
+            "bin",
+          ),
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+          message:
+            "Prepared worktree-local wrappers that block raw publication mutations.",
+        },
+      ],
       authority: summarizeNexusAuthorityForComponent({
         projectId: "worker-demo",
         componentId: "dev-nexus",
@@ -186,6 +202,14 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      commandGuardrails: [
+        {
+          id: "publication-command-guard",
+          status: "materialized",
+          guardedCommands: ["git", "gh", "glab"],
+          environmentKeys: ["DEV_NEXUS_PUBLICATION_GUARD_BIN", "PATH"],
+        },
+      ],
       authority: {
         actor: {
           actorId: "example-bot-actor",
@@ -282,6 +306,31 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain("- manual remote: origin");
     expect(briefing).toContain("- manual actor: human:github:example-human");
     expect(briefing).toContain("- command environment keys: GH_CONFIG_DIR");
+    expect(briefing).toContain("Command guardrails:");
+    expect(briefing).toContain("- publication-command-guard: materialized");
+    expect(briefing).toContain(
+      `  PATH directory: ${path.join(worktreePath, ".dev-nexus", "guardrails", "bin")}`,
+    );
+    expect(briefing).toContain("  Guarded commands: git, gh, glab");
+    expect(briefing).toContain(
+      "  Environment keys: DEV_NEXUS_PUBLICATION_GUARD_BIN, PATH",
+    );
+    expect(briefing).toContain("Publication facade:");
+    expect(briefing).toContain(
+      "- verify the configured actor before provider writes with `publication_actor_verify`.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_review_handoff` for branch push plus PR handoff.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_branch_push` and `publication_pull_request_upsert` when push and PR steps must be separate.",
+    );
+    expect(briefing).toContain(
+      "- use `publication_pull_request_evidence` for PR checks; use `publication_pull_request_merge` only with explicit merge authority.",
+    );
+    expect(briefing).toContain(
+      "- do not use raw `git push`, `gh`, or `glab` for provider mutations; read-only diagnostics are allowed.",
+    );
     expect(briefing).not.toContain("home:.config/gh-example-bot");
   });
 
@@ -310,6 +359,9 @@ describe("nexus worker context bundle", () => {
       path: targetStatePath,
       access: "read_only",
     });
+    expect(result.briefingMarkdown).toContain(
+      "- status: unavailable; no publication policy is configured for this worker.",
+    );
   });
 
   it("records planning docs referenced by work item descriptions as read-only root context", () => {

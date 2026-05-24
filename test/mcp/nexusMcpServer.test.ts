@@ -197,6 +197,86 @@ function featureProjectConfig(): NexusProjectConfig {
   });
 }
 
+function createMcpPublicationProject(): {
+  projectRoot: string;
+  homePath: string;
+  sourceRoot: string;
+} {
+  const projectRoot = makeTempDir("dev-nexus-mcp-publication-");
+  const homePath = path.join(projectRoot, "home");
+  const sourceRoot = path.join(projectRoot, "source");
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  saveHomeConfig(homePath, [
+    {
+      id: "dev-nexus-app",
+      actorId: "dev-nexus-automation-app",
+      provider: "github",
+      kind: "app",
+      credentialKind: "github_app",
+      account: "devnexus-automation",
+      host: "github.com",
+      purposes: ["api", "git"],
+      command: "home:secrets/github-app-token.mjs --format token",
+      environmentKeys: ["GH_TOKEN"],
+    },
+  ]);
+  saveProjectConfig(
+    projectRoot,
+    projectConfig({
+      home: homePath,
+      repo: {
+        kind: "git",
+        remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+      },
+      workTracking: {
+        provider: "github",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      },
+      automation: {
+        ...defaultNexusAutomationConfig,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          remote: "app",
+          targetBranch: "main",
+          push: false,
+          actor: {
+            id: "dev-nexus-automation-app",
+            kind: "app",
+            provider: "github",
+            handle: "devnexus-automation",
+          },
+        },
+      },
+      components: [
+        {
+          id: "primary",
+          name: "MCP Publication Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          workTracking: {
+            provider: "github",
+            repository: {
+              owner: "Evref-BL",
+              name: "DevNexus",
+            },
+          },
+          relationships: [],
+        },
+      ],
+    }),
+  );
+  return { projectRoot, homePath, sourceRoot };
+}
+
 function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
 }
@@ -289,6 +369,12 @@ describe("DevNexus MCP server", () => {
       "publication_feature_plan",
       "publication_feature_report",
       "publication_feature_finalization",
+      "publication_actor_verify",
+      "publication_branch_push",
+      "publication_pull_request_upsert",
+      "publication_review_handoff",
+      "publication_pull_request_evidence",
+      "publication_pull_request_merge",
       "review_plan",
       "current_agent_adopt",
       "current_agent_heartbeat",
@@ -581,6 +667,227 @@ describe("DevNexus MCP server", () => {
         ],
       },
     });
+  });
+
+  it("dry-runs publication review handoffs through configured App credentials", async () => {
+    const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_review_handoff",
+        {
+          projectRoot,
+          componentId: "primary",
+          repositoryPath: sourceRoot,
+          branch: "codex/dev-nexus/mcp-publication-facade",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          dryRun: true,
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      dryRun: true,
+      componentId: "primary",
+      repository: {
+        owner: "Evref-BL",
+        name: "DevNexus",
+      },
+      branchPush: {
+        ok: true,
+        dryRun: true,
+        credential: {
+          profileId: "dev-nexus-app",
+          kind: "github_app",
+        },
+        push: {
+          git: {
+            exitCode: null,
+            stderr: "dry-run: git push was not executed",
+          },
+          plan: {
+            transport: "https_token",
+            remote: "https://github.com/Evref-BL/DevNexus.git",
+            refspec: "codex/dev-nexus/mcp-publication-facade",
+          },
+        },
+      },
+      pullRequest: {
+        ok: true,
+        dryRun: true,
+        pullRequest: null,
+        plan: {
+          head: "codex/dev-nexus/mcp-publication-facade",
+          base: "main",
+          title: "Expose publication facade through MCP",
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+  });
+
+  it("verifies publication actors through MCP before provider mutations", async () => {
+    const { projectRoot, homePath } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_actor_verify",
+        {
+          projectRoot,
+          componentId: "primary",
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      componentId: "primary",
+      credential: {
+        profileId: "dev-nexus-app",
+        kind: "github_app",
+      },
+      actor: {
+        expected: {
+          handle: "devnexus-automation",
+          kind: "app",
+        },
+        observed: {
+          handle: "devnexus-automation",
+          source: "credential:dev-nexus-app",
+        },
+        matched: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+  });
+
+  it("upserts publication pull requests through MCP with configured App API credentials", async () => {
+    const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+    const requests: Array<{ url: string; authorization: string | null; body: unknown }> = [];
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "publication_pull_request_upsert",
+        {
+          projectRoot,
+          componentId: "primary",
+          repositoryPath: sourceRoot,
+          head: "codex/dev-nexus/mcp-publication-facade",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          draft: true,
+        },
+        {
+          publicationCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+          publicationFetch: (async (input, init = {}) => {
+            requests.push({
+              url: String(input),
+              authorization:
+                ((init.headers as Record<string, string> | undefined)
+                  ?.Authorization ?? null),
+              body: init.body ? JSON.parse(String(init.body)) : null,
+            });
+            return new Response(
+              JSON.stringify({
+                number: 311,
+                html_url: "https://github.com/Evref-BL/DevNexus/pull/311",
+                state: "open",
+                title: "Expose publication facade through MCP",
+              }),
+              { status: 201 },
+            );
+          }) as typeof fetch,
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      dryRun: false,
+      credential: {
+        profileId: "dev-nexus-app",
+        kind: "github_app",
+      },
+      plan: {
+        operation: "create",
+        head: "codex/dev-nexus/mcp-publication-facade",
+        base: "main",
+        title: "Expose publication facade through MCP",
+        draft: true,
+      },
+      pullRequest: {
+        number: 311,
+        url: "https://github.com/Evref-BL/DevNexus/pull/311",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("installation-token");
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        authorization: "Bearer installation-token",
+        body: {
+          head: "codex/dev-nexus/mcp-publication-facade",
+          base: "main",
+          title: "Expose publication facade through MCP",
+          body: "Use the configured App identity.",
+          draft: true,
+        },
+      },
+    ]);
   });
 
   it("exposes read-only review plans through MCP", async () => {
@@ -1339,6 +1646,49 @@ describe("DevNexus MCP server", () => {
       },
     });
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
+  it("allows guarded work-item comments from generated workspace-meta worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "mcp-demo",
+      "comment-meta",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Comment from meta worktree",
+      status: "in_progress",
+    });
+
+    const result = await callDevNexusMcpTool(
+      "work_item_comment",
+      {
+        projectRoot,
+        id: "local-1",
+        body: "Ready for review.",
+        currentPath: generatedMetaWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(generatedMetaWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(payload.comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for review.",
+    });
   });
 
   it("returns guard details for guarded inbound import execution", async () => {

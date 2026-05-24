@@ -10,6 +10,7 @@ import type {
 } from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   createNexusForgePublicationAdapter,
+  type NexusForgeActorVerificationResult,
   type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
   type NexusForgePullRequestResult,
@@ -123,6 +124,15 @@ export interface NexusPublicationBranchPushFeatureSummary {
   remoteSelection: NexusPublicationBranchPushRemoteSelection;
 }
 
+export interface NexusPublicationActorVerificationForComponentResult {
+  projectRoot: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
+  repository: NexusGitHubRepositorySelection;
+  credential: NexusPublicationCredentialSummary;
+  actor: NexusForgeActorVerificationResult;
+}
+
 export type NexusPublicationBranchPushRemoteSelectionStatus =
   | "not_required"
   | "push_remote_writable"
@@ -232,6 +242,13 @@ export interface PushNexusPublicationBranchForComponentOptions
   remoteProbeRunner?: NexusPublicationGitPushRunner;
 }
 
+export interface VerifyNexusPublicationActorForComponentOptions
+  extends NexusPublicationOperationRuntimeOptions {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+}
+
 export interface UpsertNexusPublicationPullRequestForComponentOptions
   extends NexusPublicationOperationRuntimeOptions {
   projectRoot: string;
@@ -335,6 +352,37 @@ export function resolveNexusPublicationTargetContext(options: {
     publication,
     authProfiles,
     repository,
+  };
+}
+
+export async function verifyNexusPublicationActorForComponent(
+  options: VerifyNexusPublicationActorForComponentOptions,
+): Promise<NexusPublicationActorVerificationForComponentResult> {
+  const context = resolveNexusPublicationTargetContext(options);
+  const credential = await resolvePublicationCredential({
+    context,
+    purpose: "api",
+    requiredPermissions: {},
+    runtime: options,
+  });
+  const adapter = createNexusForgePublicationAdapter({
+    repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
+    credential,
+    preferredBackend: "github_rest",
+    fetch: options.fetch,
+    baseEnv: options.baseEnv,
+  });
+  const actor = await adapter.verifyActor({
+    expected: context.publication.actor ?? null,
+  });
+
+  return {
+    projectRoot: context.projectRoot,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
+    repository: context.repository,
+    credential: summarizePublicationCredential(credential),
+    actor,
   };
 }
 

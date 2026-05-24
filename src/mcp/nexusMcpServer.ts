@@ -83,6 +83,7 @@ import {
 import {
   loadNexusPublicationAuthProfiles,
   resolveNexusPublicationPolicy,
+  type NexusPublicationGitPushRunner,
 } from "../publication/nexusPublicationPolicy.js";
 import {
   getNexusEligibleWorkSummary,
@@ -212,6 +213,11 @@ import {
 } from "../work-items/workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "../worktrees/gitWorktreeService.js";
+import {
+  callNexusPublicationMcpTool,
+  isNexusPublicationMcpToolName,
+  nexusPublicationMcpTools,
+} from "./nexusMcpPublicationTools.js";
 import type {
   WorkItem,
   WorkItemPatch,
@@ -241,6 +247,10 @@ export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
   commandRunner?: NexusAutomationCommandRunner;
+  publicationFetch?: typeof fetch;
+  publicationCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
+  publicationGitPushRunner?: NexusPublicationGitPushRunner;
+  publicationRemoteProbeRunner?: NexusPublicationGitPushRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
   mcpRuntimeStartedAt?: Date | string;
@@ -613,6 +623,7 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  ...nexusPublicationMcpTools,
   {
     name: "review_plan",
     description: "Build a read-only component review plan from review policy, local authorization, and optional provider evidence.",
@@ -760,6 +771,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         projectMeta: { type: "boolean" },
         workItemId: { type: ["string", "null"] },
@@ -810,6 +822,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -825,7 +838,6 @@ const tools: McpTool[] = [
         verificationSummary: { type: ["string", "null"] },
         integrationPreference: { type: ["string", "null"] },
         note: { type: ["string", "null"] },
-        currentPath: { type: "string" },
       },
       required: ["workItemId", "status"],
       additionalProperties: false,
@@ -840,13 +852,13 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
         trackerRole: { type: "string" },
         targetBranch: { type: "string" },
         fetch: { type: "boolean" },
-        currentPath: { type: "string" },
       },
       additionalProperties: false,
     },
@@ -860,6 +872,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },
@@ -887,7 +900,6 @@ const tools: McpTool[] = [
         responseSummary: { type: ["string", "null"] },
         responder: { type: ["string", "null"] },
         requestedChanges: { type: "array", items: { type: "string" } },
-        currentPath: { type: "string" },
       },
       required: ["intent"],
       additionalProperties: false,
@@ -1154,6 +1166,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1179,6 +1192,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1200,6 +1214,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        currentPath: { type: "string" },
         componentId: { type: "string" },
         trackerId: { type: "string" },
         id: { type: "string" },
@@ -1468,6 +1483,9 @@ export async function callDevNexusMcpTool(
 ): Promise<DevNexusMcpToolResult> {
   try {
     const args = argsValue === undefined ? {} : asRecord(argsValue, "arguments");
+    if (isNexusPublicationMcpToolName(name)) {
+      return toolResult(await callNexusPublicationMcpTool(name, args, context));
+    }
     switch (name) {
       case "project_status": {
         const detail = mcpDetailFromArgs(args);
@@ -2225,6 +2243,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_update",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
@@ -2247,6 +2266,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_comment",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
@@ -2266,6 +2286,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "work_item_set_status",
           mutationClass: "local_tracker",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
