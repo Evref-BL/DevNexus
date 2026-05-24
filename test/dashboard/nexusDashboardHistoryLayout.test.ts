@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildWriteHistoryLayout,
+  validateWriteHistoryLayout,
   type NexusDashboardHistoryMarker,
   type NexusDashboardWriteEvent,
 } from "../../src/dashboard/nexusDashboardHistoryLayout.js";
@@ -25,6 +26,15 @@ describe("nexus dashboard history layout", () => {
     });
 
     expect(layout.nodes).toHaveLength(5);
+    expect(layout.edges.map((edge) => [edge.fromWriteEventId, edge.toWriteEventId]))
+      .toEqual([
+        ["merge", "main2"],
+        ["merge", "feature"],
+        ["main2", "main1"],
+        ["main1", "base"],
+        ["feature", "base"],
+      ]);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
     expect(merge).toMatchObject({ eventClass: "write", lane: 0, row: 0 });
     expect(feature).toMatchObject({ eventClass: "write", lane: 1, row: 3 });
     expect(delayedCrossLaneSegments).toEqual([]);
@@ -39,6 +49,7 @@ describe("nexus dashboard history layout", () => {
     expect(sideB?.lane).toBe(1);
     expect(layout.maxNodeLane).toBe(1);
     expect(layout.maxRouteLane).toBe(2);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
   it("reuses lanes for non-overlapping side-branch write events", () => {
@@ -51,6 +62,7 @@ describe("nexus dashboard history layout", () => {
     expect(sideA?.lane).toBe(1);
     expect(sideB?.lane).toBe(1);
     expect(layout.maxNodeLane).toBe(1);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
   it("records truncated parents without inventing write-event rows", () => {
@@ -61,8 +73,10 @@ describe("nexus dashboard history layout", () => {
     });
 
     expect(layout.nodes).toHaveLength(1);
+    expect(layout.edges).toEqual([]);
     expect(layout.segments).toEqual([]);
     expect(layout.truncatedParentIds).toEqual(["parent-outside-window"]);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
   it("attaches decision events as markers and detail rows", () => {
@@ -94,6 +108,7 @@ describe("nexus dashboard history layout", () => {
         markerIds: ["approval-1"],
       }),
     ]);
+    expect(validateWriteHistoryLayout(layout)).toEqual([]);
   });
 
   it("is stable across refreshes for the same write-event graph", () => {

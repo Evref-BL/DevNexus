@@ -50,8 +50,19 @@ export interface NexusDashboardHistoryTrack {
   readonly colorIndex: number;
 }
 
+export type NexusDashboardHistoryEdgeKind = "parent";
+
+export interface NexusDashboardHistoryEdge {
+  readonly id: string;
+  readonly kind: NexusDashboardHistoryEdgeKind;
+  readonly fromWriteEventId: string;
+  readonly toWriteEventId: string;
+}
+
 export interface NexusDashboardHistorySegment {
   readonly id: string;
+  readonly edgeId?: string;
+  readonly targetWriteEventId: string;
   readonly trackId: string;
   readonly colorIndex: number;
   readonly fromLane: number;
@@ -74,6 +85,7 @@ export interface NexusDashboardHistoryDetailRow {
 
 export interface NexusDashboardHistoryLayout {
   readonly nodes: readonly NexusDashboardHistoryNode[];
+  readonly edges: readonly NexusDashboardHistoryEdge[];
   readonly tracks: readonly NexusDashboardHistoryTrack[];
   readonly segments: readonly NexusDashboardHistorySegment[];
   readonly markers: readonly NexusDashboardPlacedHistoryMarker[];
@@ -83,7 +95,13 @@ export interface NexusDashboardHistoryLayout {
   readonly truncatedParentIds: readonly string[];
 }
 
+export interface NexusDashboardHistoryInvariantViolation {
+  readonly code: string;
+  readonly message: string;
+}
+
 interface ActiveHistoryRoute {
+  readonly edgeId?: string;
   readonly targetEventId: string;
   readonly trackId: string;
   readonly colorIndex: number;
@@ -97,6 +115,7 @@ export function buildWriteHistoryLayout(
   const knownIds = new Set(writeEvents.map((event) => event.id));
   const active: Array<ActiveHistoryRoute | null> = [];
   const nodes: NexusDashboardHistoryNode[] = [];
+  const edges: NexusDashboardHistoryEdge[] = [];
   const segments: NexusDashboardHistorySegment[] = [];
   const tracks = new Map<string, NexusDashboardHistoryTrack>();
   const truncatedParentIds: string[] = [];
@@ -134,6 +153,14 @@ export function buildWriteHistoryLayout(
         continue;
       }
 
+      const edgeId = historyEdgeId(event.id, parentId, parentIndex);
+      edges.push({
+        id: edgeId,
+        kind: "parent",
+        fromWriteEventId: event.id,
+        toWriteEventId: parentId,
+      });
+
       const existingLane = active.findIndex(
         (entry) => entry?.targetEventId === parentId,
       );
@@ -142,6 +169,7 @@ export function buildWriteHistoryLayout(
         addHistoryRoutePoint(existing, existingLane, row + 0.85);
         const route = createHistoryRoute(
           parentId,
+          edgeId,
           parentIndex === 0 ? colorIndex : existing?.colorIndex ?? existingLane,
           lane,
           row,
@@ -156,6 +184,7 @@ export function buildWriteHistoryLayout(
         parentIndex === 0 && !active[lane] ? lane : firstOpenHistoryLane(active);
       const route = createHistoryRoute(
         parentId,
+        edgeId,
         parentIndex === 0 ? colorIndex : preferredLane,
         lane,
         row,
@@ -194,6 +223,7 @@ export function buildWriteHistoryLayout(
 
   return {
     nodes,
+    edges,
     tracks: [...tracks.values()],
     segments,
     markers,
@@ -207,6 +237,7 @@ export function buildWriteHistoryLayout(
 export function renderNexusDashboardHistoryLayoutClientSource(): string {
   return [
     firstOpenHistoryLane,
+    historyEdgeId,
     createHistoryRoute,
     historySegmentFromRoute,
     rememberHistoryTrack,
@@ -219,13 +250,157 @@ export function renderNexusDashboardHistoryLayoutClientSource(): string {
     .join("\n\n");
 }
 
+export function validateWriteHistoryLayout(
+  layout: NexusDashboardHistoryLayout,
+): NexusDashboardHistoryInvariantViolation[] {
+  const violations: NexusDashboardHistoryInvariantViolation[] = [];
+  const nodeByWriteEventId = new Map(
+    layout.nodes.map((node) => [node.writeEventId, node]),
+  );
+  const nodeSlots = new Set<string>();
+
+  layout.nodes.forEach((node, index) => {
+    if (node.eventClass !== "write") {
+      violations.push({
+        code: "node.eventClass",
+        message: `History node ${node.id} is not a write event.`,
+      });
+    }
+    if (!Number.isInteger(node.row) || node.row !== index) {
+      violations.push({
+        code: "node.row",
+        message: `Write event ${node.writeEventId} is not on its instant slice.`,
+      });
+    }
+    if (!Number.isInteger(node.lane) || node.lane < 0) {
+      violations.push({
+        code: "node.lane",
+        message: `Write event ${node.writeEventId} has an invalid lane.`,
+      });
+    }
+    const slot = `${node.row}:${node.lane}`;
+    if (nodeSlots.has(slot)) {
+      violations.push({
+        code: "node.slot",
+        message: `Multiple write events occupy row ${node.row}, lane ${node.lane}.`,
+      });
+    }
+    nodeSlots.add(slot);
+  });
+
+  for (const edge of layout.edges) {
+    const from = nodeByWriteEventId.get(edge.fromWriteEventId);
+    const to = nodeByWriteEventId.get(edge.toWriteEventId);
+    if (!from || !to) {
+      violations.push({
+        code: "edge.endpoint",
+        message: `History edge ${edge.id} has a missing endpoint.`,
+      });
+      continue;
+    }
+    if (from.row > to.row) {
+      violations.push({
+        code: "edge.time",
+        message: `History edge ${edge.id} points backward in time.`,
+      });
+    }
+  }
+
+  for (const segment of layout.segments) {
+    if (!nodeByWriteEventId.has(segment.targetWriteEventId)) {
+      violations.push({
+        code: "segment.target",
+        message: `History segment ${segment.id} targets an unknown write event.`,
+      });
+    }
+    if (segment.points.length < 2) {
+      violations.push({
+        code: "segment.points",
+        message: `History segment ${segment.id} has too few route points.`,
+      });
+      continue;
+    }
+    const first = segment.points[0]!;
+    const last = segment.points[segment.points.length - 1]!;
+    if (first.lane !== segment.fromLane || first.row !== segment.fromRow) {
+      violations.push({
+        code: "segment.start",
+        message: `History segment ${segment.id} does not start on its first point.`,
+      });
+    }
+    if (last.lane !== segment.toLane || last.row !== segment.toRow) {
+      violations.push({
+        code: "segment.end",
+        message: `History segment ${segment.id} does not end on its last point.`,
+      });
+    }
+    for (let index = 1; index < segment.points.length; index++) {
+      const previous = segment.points[index - 1]!;
+      const current = segment.points[index]!;
+      if (current.row < previous.row) {
+        violations.push({
+          code: "segment.time",
+          message: `History segment ${segment.id} is not monotone in time.`,
+        });
+      }
+      if (current.lane < 0 || previous.lane < 0) {
+        violations.push({
+          code: "segment.lane",
+          message: `History segment ${segment.id} uses an invalid lane.`,
+        });
+      }
+    }
+  }
+
+  for (const marker of layout.markers) {
+    const target = nodeByWriteEventId.get(marker.targetWriteEventId);
+    if (!target) {
+      violations.push({
+        code: "marker.target",
+        message: `History marker ${marker.id} targets an unknown write event.`,
+      });
+      continue;
+    }
+    if (marker.row !== target.row || marker.lane !== target.lane) {
+      violations.push({
+        code: "marker.anchor",
+        message: `History marker ${marker.id} is not anchored to its write event.`,
+      });
+    }
+  }
+
+  const maxNodeLane = Math.max(0, ...layout.nodes.map((node) => node.lane));
+  const maxRouteLane = Math.max(
+    maxNodeLane,
+    ...layout.segments.flatMap((segment) =>
+      segment.points.map((point) => point.lane),
+    ),
+  );
+  if (layout.maxNodeLane !== maxNodeLane) {
+    violations.push({
+      code: "maxNodeLane",
+      message: "History maxNodeLane does not match the write-event lanes.",
+    });
+  }
+  if (layout.maxRouteLane !== maxRouteLane) {
+    violations.push({
+      code: "maxRouteLane",
+      message: "History maxRouteLane does not match the routed lanes.",
+    });
+  }
+
+  return violations;
+}
+
 function createHistoryRoute(
   targetEventId: string,
+  edgeId: string | undefined,
   colorIndex: number,
   lane: number,
   row: number,
 ): ActiveHistoryRoute {
   return {
+    edgeId,
     targetEventId,
     trackId: `track:${targetEventId}:${colorIndex}`,
     colorIndex,
@@ -245,6 +420,8 @@ function historySegmentFromRoute(
   const last = points[points.length - 1] ?? first;
   return {
     id: `segment:${segmentIndex}`,
+    edgeId: route.edgeId,
+    targetWriteEventId: route.targetEventId,
     trackId: route.trackId,
     colorIndex: route.colorIndex,
     fromLane: first.lane,
@@ -253,6 +430,14 @@ function historySegmentFromRoute(
     toRow: last.row,
     points,
   };
+}
+
+function historyEdgeId(
+  fromWriteEventId: string,
+  toWriteEventId: string,
+  parentIndex: number,
+): string {
+  return `edge:${fromWriteEventId}->${toWriteEventId}:${parentIndex}`;
 }
 
 function rememberHistoryTrack(
