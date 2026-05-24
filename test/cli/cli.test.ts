@@ -710,6 +710,55 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("Provider mutations are not part of component add.");
   });
 
+  it("prints focused work-item create help before positional validation", async () => {
+    const outputWithoutRoot = captureOutput();
+    const outputWithRoot = captureOutput();
+
+    await expect(
+      main(["work-item", "create", "--help"], { stdout: outputWithoutRoot.writer }),
+    ).resolves.toBe(0);
+    await expect(
+      main(["work-item", "create", "/tmp/demo-workspace", "--help"], {
+        stdout: outputWithRoot.writer,
+      }),
+    ).resolves.toBe(0);
+
+    for (const text of [outputWithoutRoot.output(), outputWithRoot.output()]) {
+      expect(text).toContain("Usage:");
+      expect(text).toContain(
+        "dev-nexus work-item create <workspace-root> --title <title> [options]",
+      );
+      expect(text).toContain("Options for work-item create:");
+      expect(text).toContain("--title <title>");
+      expect(text).toContain("--component <id>");
+      expect(text).toContain("--tracker <id>");
+      expect(text).not.toContain("Options for work-item update:");
+    }
+  });
+
+  it("still rejects unknown non-help options for nested work-item commands", async () => {
+    await expect(
+      main(["work-item", "create", "/tmp/demo-workspace", "--bad-option"]),
+    ).rejects.toThrow("Unknown work-item create option: --bad-option");
+  });
+
+  it("prints focused help for nested publication commands before positional validation", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["publication", "review-handoff", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain(
+      "dev-nexus publication review-handoff <workspace-root> --branch <branch> --title <title> [options]",
+    );
+    expect(output.output()).toContain("Options for publication review-handoff:");
+    expect(output.output()).toContain("--branch <branch>");
+    expect(output.output()).toContain("--title <text>");
+    expect(output.output()).not.toContain("Options for publication pull-request merge:");
+  });
+
   it("prints JSON errors when --json is present", async () => {
     const output = captureOutput();
 

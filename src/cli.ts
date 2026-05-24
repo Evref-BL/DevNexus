@@ -16,11 +16,13 @@ import {
 export type { DevNexusCliDependencies } from "./cli/cliCommandContext.js";
 import { handleCiFailureIntakeCommand } from "./cli/cliCiFailureIntakeCommand.js";
 import {
+  focusedCommandUsageForArgv,
   projectComponentAddUsage,
   projectSetupUsage,
   usage,
 } from "./cli/cliUsage.js";
 export {
+  focusedCommandUsageForArgv,
   projectComponentAddUsage,
   projectSetupUsage,
   usage,
@@ -988,6 +990,12 @@ async function mainUnchecked(
   const stdout = dependencies.stdout ?? process.stdout;
   if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     writeLine(stdout, usage());
+    return 0;
+  }
+
+  const focusedHelp = focusedCommandUsageForArgv(argv);
+  if (focusedHelp) {
+    writeLine(stdout, focusedHelp);
     return 0;
   }
 
