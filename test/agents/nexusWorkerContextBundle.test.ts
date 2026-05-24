@@ -68,6 +68,9 @@ describe("nexus worker context bundle", () => {
       worktreePath,
       branchName: "codex/local-19-worker-context",
       baseRef: "origin/main",
+      requestedBaseRef: "origin/main",
+      resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      baseRefKind: "remote_branch",
       workItem,
       publication,
       commandGuardrails: [
@@ -176,6 +179,9 @@ describe("nexus worker context bundle", () => {
         worktreePath,
         branchName: "codex/local-19-worker-context",
         baseRef: "origin/main",
+        requestedBaseRef: "origin/main",
+        resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        baseRefKind: "remote_branch",
         workItem: {
           id: "local-19",
           title: "Materialize worker context bundles for component worktrees",
@@ -282,6 +288,10 @@ describe("nexus worker context bundle", () => {
 
     const briefing = fs.readFileSync(briefingPath, "utf8");
     expect(briefing).toContain("# DevNexus Worker Context");
+    expect(briefing).toContain("Base ref: origin/main (remote_branch)");
+    expect(briefing).toContain(
+      "Resolved base commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
     expect(briefing).toContain(`Run source and git commands in: ${worktreePath}`);
     expect(briefing).toContain(
       "Treat workspace context files as read-only unless the coordinator explicitly assigns project-state ownership.",

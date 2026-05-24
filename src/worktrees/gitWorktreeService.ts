@@ -44,6 +44,28 @@ export interface PreparedGitWorktreeIdentity {
   email: string;
 }
 
+export type PreparedGitWorktreeBaseRefKind =
+  | "none"
+  | "branch"
+  | "remote_branch"
+  | "tag"
+  | "commit"
+  | "other";
+
+export type PreparedGitWorktreeBaseRefFreshnessStatus =
+  | "none"
+  | "fresh"
+  | "stale"
+  | "unchecked"
+  | "immutable";
+
+export interface PreparedGitWorktreeBaseRefFreshness {
+  status: PreparedGitWorktreeBaseRefFreshnessStatus;
+  comparedRef: string | null;
+  comparedCommit: string | null;
+  warnings: string[];
+}
+
 export interface PrepareGitWorktreeResult {
   componentId: string;
   sourceRoot: string;
@@ -51,6 +73,10 @@ export interface PrepareGitWorktreeResult {
   worktreePath: string;
   branchName: string;
   baseRef: string | null;
+  requestedBaseRef: string | null;
+  resolvedBaseCommit: string | null;
+  baseRefKind: PreparedGitWorktreeBaseRefKind;
+  baseRefFreshness: PreparedGitWorktreeBaseRefFreshness;
   workItem: PreparedGitWorktreeWorkItem | null;
   gitIdentity: PreparedGitWorktreeIdentity | null;
   git: {
@@ -133,6 +159,14 @@ export function prepareGitWorktree(
       `Branch ${branchName} is already checked out at ${localBranch.checkedOutAt}. Reuse that worktree or choose a different branch name.`,
     );
   }
+  const base = localBranch.exists
+    ? existingBranchBaseRef(baseRef)
+    : resolvePreparedBaseRef({
+        gitRunner,
+        commands,
+        sourceRoot,
+        baseRef,
+      });
   fs.mkdirSync(worktreesRoot, { recursive: true });
   const addArgs = localBranch.exists
     ? ["worktree", "add", worktreePath, branchName]
@@ -167,6 +201,10 @@ export function prepareGitWorktree(
     worktreePath,
     branchName,
     baseRef,
+    requestedBaseRef: base.requestedRef,
+    resolvedBaseCommit: base.resolvedCommit,
+    baseRefKind: base.kind,
+    baseRefFreshness: base.freshness,
     workItem,
     gitIdentity,
     git: {
@@ -382,6 +420,307 @@ function worktreePathForBranch(
   return null;
 }
 
+interface ResolvedPreparedBaseRef {
+  requestedRef: string | null;
+  resolvedCommit: string | null;
+  kind: PreparedGitWorktreeBaseRefKind;
+  freshness: PreparedGitWorktreeBaseRefFreshness;
+}
+
+function existingBranchBaseRef(baseRef: string | null): ResolvedPreparedBaseRef {
+  return {
+    requestedRef: baseRef,
+    resolvedCommit: null,
+    kind: baseRef ? "other" : "none",
+    freshness: {
+      status: baseRef ? "unchecked" : "none",
+      comparedRef: null,
+      comparedCommit: null,
+      warnings: baseRef
+        ? [
+            "Base ref was recorded but not applied because the local branch already exists.",
+          ]
+        : [],
+    },
+  };
+}
+
+function resolvePreparedBaseRef(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string | null;
+}): ResolvedPreparedBaseRef {
+  if (!options.baseRef) {
+    return {
+      requestedRef: null,
+      resolvedCommit: null,
+      kind: "none",
+      freshness: {
+        status: "none",
+        comparedRef: null,
+        comparedCommit: null,
+        warnings: [],
+      },
+    };
+  }
+
+  const baseRef = options.baseRef;
+  const kind = classifyPreparedBaseRef({ ...options, baseRef });
+  const upstreamRef = kind === "branch"
+    ? localBranchUpstreamRef({
+        gitRunner: options.gitRunner,
+        commands: options.commands,
+        sourceRoot: options.sourceRoot,
+        baseRef,
+      })
+    : null;
+  const warnings = refreshMutableBaseRef({
+    gitRunner: options.gitRunner,
+    commands: options.commands,
+    sourceRoot: options.sourceRoot,
+    baseRef,
+    kind,
+    upstreamRef,
+  });
+  const resolvedCommit = resolveBaseCommit({
+    gitRunner: options.gitRunner,
+    commands: options.commands,
+    sourceRoot: options.sourceRoot,
+    baseRef,
+  });
+
+  if (kind === "branch") {
+    const comparedCommit = upstreamRef
+      ? optionalBaseCommit({
+          gitRunner: options.gitRunner,
+          commands: options.commands,
+          sourceRoot: options.sourceRoot,
+          baseRef: upstreamRef,
+        })
+      : null;
+    if (comparedCommit && comparedCommit !== resolvedCommit) {
+      throw new GitWorktreeServiceError(
+        `Base ref ${baseRef} is stale relative to ${upstreamRef}: ` +
+          `${baseRef}=${shortCommit(resolvedCommit)} ` +
+          `${upstreamRef}=${shortCommit(comparedCommit)}. ` +
+          "Fetch or fast-forward the base branch before preparing a worktree, " +
+          `or use ${upstreamRef} or a pinned commit as --base-ref.`,
+      );
+    }
+
+    return {
+      requestedRef: baseRef,
+      resolvedCommit,
+      kind,
+      freshness: {
+        status: comparedCommit ? "fresh" : "unchecked",
+        comparedRef: upstreamRef,
+        comparedCommit,
+        warnings,
+      },
+    };
+  }
+
+  return {
+    requestedRef: baseRef,
+    resolvedCommit,
+    kind,
+    freshness: {
+      status: immutableBaseRefKind(kind)
+        ? "immutable"
+        : warnings.length === 0 && kind === "remote_branch"
+          ? "fresh"
+          : "unchecked",
+      comparedRef: null,
+      comparedCommit: null,
+      warnings,
+    },
+  };
+}
+
+function classifyPreparedBaseRef(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string;
+}): PreparedGitWorktreeBaseRefKind {
+  if (isFortyCharacterHexSha(options.baseRef)) {
+    return "commit";
+  }
+  if (refExists(options, `refs/heads/${options.baseRef}`)) {
+    return "branch";
+  }
+  if (refExists(options, `refs/remotes/${options.baseRef}`)) {
+    return "remote_branch";
+  }
+  if (refExists(options, `refs/tags/${options.baseRef}`)) {
+    return "tag";
+  }
+
+  return "other";
+}
+
+function refExists(
+  options: {
+    gitRunner: GitRunner;
+    commands: GitCommandResult[];
+    sourceRoot: string;
+  },
+  refName: string,
+): boolean {
+  const result = runGitCommandNoThrow(
+    options.gitRunner,
+    options.commands,
+    ["show-ref", "--verify", "--quiet", refName],
+    options.sourceRoot,
+  );
+
+  return result?.exitCode === 0;
+}
+
+function localBranchUpstreamRef(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string;
+}): string | null {
+  const result = runGitCommandNoThrow(
+    options.gitRunner,
+    options.commands,
+    [
+      "rev-parse",
+      "--abbrev-ref",
+      "--symbolic-full-name",
+      `${options.baseRef}@{upstream}`,
+    ],
+    options.sourceRoot,
+  );
+
+  return result?.exitCode === 0 ? firstOutputLine(result.stdout) : null;
+}
+
+function refreshMutableBaseRef(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string;
+  kind: PreparedGitWorktreeBaseRefKind;
+  upstreamRef: string | null;
+}): string[] {
+  const remoteBranch = options.kind === "branch" && options.upstreamRef
+    ? remoteBranchFromTrackingRef(options.upstreamRef)
+    : options.kind === "remote_branch"
+      ? remoteBranchFromTrackingRef(options.baseRef)
+      : null;
+  if (!remoteBranch) {
+    return [];
+  }
+
+  const result = runGitCommandNoThrow(
+    options.gitRunner,
+    options.commands,
+    [
+      "fetch",
+      "--prune",
+      remoteBranch.remote,
+      `refs/heads/${remoteBranch.branch}:refs/remotes/${remoteBranch.remote}/${remoteBranch.branch}`,
+    ],
+    options.sourceRoot,
+  );
+  if (!result) {
+    return [
+      `Fetch for base ref ${options.baseRef} from ${remoteBranch.remote}/${remoteBranch.branch} could not run.`,
+    ];
+  }
+  if (result.exitCode === 0) {
+    return [];
+  }
+
+  return [
+    `Fetch for base ref ${options.baseRef} from ${remoteBranch.remote}/${remoteBranch.branch} failed: ${
+      result.stderr.trim() || result.stdout.trim() || `exit code ${result.exitCode}`
+    }`,
+  ];
+}
+
+function remoteBranchFromTrackingRef(
+  ref: string,
+): { remote: string; branch: string } | null {
+  const normalized = ref
+    .replace(/^refs\/remotes\//u, "")
+    .trim();
+  const slash = normalized.indexOf("/");
+  if (slash <= 0 || slash === normalized.length - 1) {
+    return null;
+  }
+
+  return {
+    remote: normalized.slice(0, slash),
+    branch: normalized.slice(slash + 1),
+  };
+}
+
+function resolveBaseCommit(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string;
+}): string {
+  const result = runGitCommand(
+    options.gitRunner,
+    options.commands,
+    ["rev-parse", "--verify", "--quiet", `${options.baseRef}^{commit}`],
+    options.sourceRoot,
+  );
+  const commit = firstOutputLine(result.stdout);
+  if (!commit) {
+    throw new GitWorktreeServiceError(
+      `Base ref ${options.baseRef} did not resolve to a commit.`,
+    );
+  }
+
+  return commit;
+}
+
+function optionalBaseCommit(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  sourceRoot: string;
+  baseRef: string;
+}): string | null {
+  const result = runGitCommandNoThrow(
+    options.gitRunner,
+    options.commands,
+    ["rev-parse", "--verify", "--quiet", `${options.baseRef}^{commit}`],
+    options.sourceRoot,
+  );
+  if (result?.exitCode !== 0) {
+    return null;
+  }
+
+  return firstOutputLine(result.stdout);
+}
+
+function immutableBaseRefKind(kind: PreparedGitWorktreeBaseRefKind): boolean {
+  return kind === "commit" || kind === "tag";
+}
+
+function firstOutputLine(output: string): string | null {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .find(Boolean) ?? null;
+}
+
+function isFortyCharacterHexSha(value: string): boolean {
+  return /^[0-9a-f]{40}$/iu.test(value);
+}
+
+function shortCommit(value: string): string {
+  return value.length > 12 ? value.slice(0, 12) : value;
+}
+
 export function runGitCommand(
   gitRunner: GitRunner,
   commands: GitCommandResult[],
@@ -400,6 +739,21 @@ export function runGitCommand(
   }
 
   return result;
+}
+
+function runGitCommandNoThrow(
+  gitRunner: GitRunner,
+  commands: GitCommandResult[],
+  args: readonly string[],
+  cwd?: string,
+): GitCommandResult | null {
+  try {
+    const result = gitRunner(args, cwd);
+    commands.push(result);
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 function normalizePreparedWorktreeWorkItem(

@@ -230,6 +230,42 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
         exitCode: 0,
       };
     }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet" &&
+      argsArray[3]?.endsWith("^{commit}")
+    ) {
+      return {
+        args: argsArray,
+        stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+    if (
+      argsArray[0] === "show-ref" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet"
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode: argsArray[3] === "refs/heads/main" ? 0 : 1,
+      };
+    }
+    if (
+      argsArray.join(" ") ===
+      "rev-parse --abbrev-ref --symbolic-full-name main@{upstream}"
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+      };
+    }
     if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
       return {
         args: argsArray,
@@ -3010,6 +3046,9 @@ describe("dev-nexus cli", () => {
         componentId: "primary",
         branchName: "codex/primary/local-42",
         baseRef: "main",
+        requestedBaseRef: "main",
+        resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        baseRefKind: "branch",
         workItem: {
           id: "local-42",
         },
@@ -3019,6 +3058,10 @@ describe("dev-nexus cli", () => {
         agentId: "codex",
         workItemId: "local-42",
         branchName: "codex/primary/local-42",
+        baseRef: "main",
+        requestedBaseRef: "main",
+        resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        baseRefKind: "branch",
         status: "working",
         worktree: {
           kind: "component_worktree",
@@ -3121,6 +3164,9 @@ describe("dev-nexus cli", () => {
         componentId: "demo-project",
         branchName: "codex/demo-project/project-state-cleanup",
         baseRef: "main",
+        requestedBaseRef: "main",
+        resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        baseRefKind: "branch",
         workItem: null,
       },
       lease: {

@@ -362,6 +362,9 @@ function materializeWorkerContext(options: {
     worktreePath: ownershipWorktreePath,
     branchName: ownership.branchName,
     baseRef: ownership.baseRef,
+    requestedBaseRef: ownership.requestedBaseRef,
+    resolvedBaseCommit: ownership.resolvedBaseCommit,
+    baseRefKind: ownership.baseRefKind,
     workItem: ownership.workItem,
     featureBranchDelivery: options.context.featureBranchDelivery ?? null,
     targetStatePath:
