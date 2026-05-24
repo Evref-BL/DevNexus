@@ -337,6 +337,38 @@ function ok(args: string[], stdout: string): GitCommandResult {
   };
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function githubIssueResponse(options: {
+  number: number;
+  title: string;
+  state: string;
+  stateReason?: string | null;
+  labels?: string[];
+}): Record<string, unknown> {
+  return {
+    id: options.number,
+    number: options.number,
+    title: options.title,
+    body: null,
+    state: options.state,
+    state_reason:
+      options.stateReason ?? (options.state === "closed" ? "completed" : null),
+    labels: options.labels ?? [],
+    assignees: [],
+    created_at: "2026-05-20T09:00:00.000Z",
+    updated_at: "2026-05-20T10:00:00.000Z",
+    closed_at:
+      options.state === "closed" ? "2026-05-20T10:00:00.000Z" : null,
+    html_url: `https://github.com/example/demo/issues/${options.number}`,
+  };
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -1642,6 +1674,137 @@ describe("DevNexus MCP server", () => {
       },
     });
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
+  it("allows guarded provider-backed MCP work-item mutations from shared checkouts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, githubClaimProjectConfig());
+    const requests: Array<{
+      method: string;
+      url: string;
+      body: Record<string, unknown> | null;
+    }> = [];
+    const githubFetch = (async (input, init = {}) => {
+      const request = {
+        method: init.method ?? "GET",
+        url: String(input),
+        body: init.body
+          ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+          : null,
+      };
+      requests.push(request);
+
+      if (
+        request.method === "POST" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7/comments"
+      ) {
+        return jsonResponse({
+          id: 101,
+          body: "Provider-backed comment.",
+          html_url: "https://github.com/example/demo/issues/7#issuecomment-101",
+        });
+      }
+
+      if (
+        request.method === "GET" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7"
+      ) {
+        return jsonResponse(githubIssueResponse({
+          number: 7,
+          title: "Provider-backed issue",
+          state: "open",
+          labels: ["ready"],
+        }));
+      }
+
+      if (
+        request.method === "PATCH" &&
+        request.url === "https://api.github.com/repos/example/demo/issues/7"
+      ) {
+        return jsonResponse(githubIssueResponse({
+          number: 7,
+          title: String(request.body?.title ?? "Provider-backed issue"),
+          state: String(request.body?.state ?? "open"),
+          labels: request.body?.labels as string[] | undefined,
+        }));
+      }
+
+      return jsonResponse(
+        { message: `unexpected ${request.method} ${request.url}` },
+        500,
+      );
+    }) as typeof fetch;
+
+    const context = {
+      gitRunner: fakeGitRunner(projectRoot),
+      sharedCheckoutGuard: "enforce" as const,
+      workItemProviderOptions: {
+        github: {
+          credentialRunner: false,
+          fetch: githubFetch,
+        },
+      },
+    };
+
+    const comment = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_comment",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          body: "Provider-backed comment.",
+        },
+        context,
+      ),
+    );
+    const updated = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_update",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          title: "Provider-backed issue renamed",
+        },
+        context,
+      ),
+    );
+    const closed = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_set_status",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          id: "github-7",
+          status: "done",
+        },
+        context,
+      ),
+    );
+
+    expect(comment.comment).toMatchObject({
+      id: "github-comment-101",
+      body: "Provider-backed comment.",
+    });
+    expect(updated.workItem).toMatchObject({
+      id: "github-7",
+      title: "Provider-backed issue renamed",
+    });
+    expect(closed.workItem).toMatchObject({
+      id: "github-7",
+      status: "done",
+    });
+    expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
+      "POST https://api.github.com/repos/example/demo/issues/7/comments",
+      "PATCH https://api.github.com/repos/example/demo/issues/7",
+      "GET https://api.github.com/repos/example/demo/issues/7",
+      "PATCH https://api.github.com/repos/example/demo/issues/7",
+    ]);
   });
 
   it("allows guarded work-item comments from generated workspace-meta worktrees", async () => {
