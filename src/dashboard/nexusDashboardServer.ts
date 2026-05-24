@@ -35,6 +35,7 @@ import {
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
 import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
+import { renderNexusCockpitStylesClientSource } from "../cockpit/client/nexusCockpitStyles.js";
 import { renderNexusCockpitTooltipsClientSource } from "../cockpit/client/nexusCockpitTooltips.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "../work-items/nexusEligibleWorkSummary.js";
@@ -422,6 +423,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(
       /^import \{ buildWriteHistoryLayout \} from ["'][^"']+["'];\s*/mu,
       `${renderNexusDashboardHistoryLayoutClientSource()}\n\n`,
+    )
+    .replace(
+      /^import \{ cockpitStyles \} from ["'][^"']+nexusCockpitStyles\.js["'];\s*/mu,
+      `${renderNexusCockpitStylesClientSource()}\n\n`,
     )
     .replace(
       /^import \{\s*bindGitHistoryColumnResizers,\s*gitHistoryColumnStyle,\s*readStoredGitHistoryColumnWidths,\s*renderGitHistoryColumnHeader,\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
