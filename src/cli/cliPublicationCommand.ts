@@ -31,6 +31,13 @@ import {
   type NexusFeatureFinalizationPlan,
 } from "../publication/nexusFeatureFinalizationPlan.js";
 import {
+  NexusForgePublicationError,
+  type NexusForgePublicationCapability,
+  type NexusForgePublicationErrorCode,
+  type NexusForgePublicationBackend,
+  type NexusForgePublicationOperationMetadata,
+} from "../publication/nexusForgePublication.js";
+import {
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   NexusPublicationBranchPushBlockedError,
@@ -154,6 +161,13 @@ interface PublicationPullRequestFailurePayload {
     message: string;
     credentialCode?: string | null;
     profileId?: string | null;
+    actorId?: string | null;
+    account?: string | null;
+    credentialKind?: string | null;
+    provider?: string | null;
+    providerErrorCode?: NexusForgePublicationErrorCode | null;
+    backend?: NexusForgePublicationBackend | null;
+    capability?: NexusForgePublicationCapability | null;
   };
   setupActions: string[];
 }
@@ -1752,10 +1766,21 @@ function publicationPullRequestFailurePayload(options: {
     options.error instanceof NexusProviderCredentialBrokerError
       ? options.error
       : null;
+  const forgeError =
+    options.error instanceof NexusForgePublicationError
+      ? options.error
+      : null;
   const profileId =
     credentialError?.profileId ??
+    forgePublicationErrorMetadataString(forgeError, "profileId") ??
     options.branchPush.credential.profileId ??
     null;
+  const credentialContext = publicationPullRequestFailureCredentialContext({
+    forgeError,
+    branchPush: options.branchPush,
+    profileId,
+  });
+  const forgeMetadata = forgePublicationErrorMetadata(forgeError);
   const message = options.error instanceof Error
     ? options.error.message
     : String(options.error);
@@ -1775,6 +1800,17 @@ function publicationPullRequestFailurePayload(options: {
       message,
       ...(credentialError ? { credentialCode: credentialError.code } : {}),
       ...(profileId ? { profileId } : {}),
+      ...(credentialContext.actorId
+        ? { actorId: credentialContext.actorId }
+        : {}),
+      ...(credentialContext.account
+        ? { account: credentialContext.account }
+        : {}),
+      credentialKind: credentialContext.credentialKind,
+      provider: credentialContext.provider,
+      ...(forgeError ? { providerErrorCode: forgeError.code } : {}),
+      ...(forgeMetadata.backend ? { backend: forgeMetadata.backend } : {}),
+      ...(forgeMetadata.capability ? { capability: forgeMetadata.capability } : {}),
     },
     setupActions: publicationPullRequestSetupActions({
       branchPush: options.branchPush,
@@ -1782,6 +1818,83 @@ function publicationPullRequestFailurePayload(options: {
       profileId,
     }),
   };
+}
+
+function publicationPullRequestFailureCredentialContext(options: {
+  forgeError: NexusForgePublicationError | null;
+  branchPush: NexusPublicationBranchPushResult;
+  profileId: string | null;
+}): {
+  profileId: string | null;
+  actorId: string | null;
+  account: string | null;
+  credentialKind: string | null;
+  provider: string | null;
+} {
+  return {
+    profileId: options.profileId,
+    actorId:
+      forgePublicationErrorMetadataString(options.forgeError, "actorId") ??
+      options.branchPush.credential.actorId ??
+      null,
+    account:
+      forgePublicationErrorMetadataString(options.forgeError, "account") ??
+      options.branchPush.credential.account ??
+      null,
+    credentialKind:
+      forgePublicationErrorMetadataString(options.forgeError, "credentialKind") ??
+      options.branchPush.credential.kind ??
+      null,
+    provider:
+      forgePublicationErrorMetadataString(options.forgeError, "provider") ??
+      options.branchPush.credential.provider ??
+      null,
+  };
+}
+
+function forgePublicationErrorMetadataString(
+  error: NexusForgePublicationError | null,
+  key: string,
+): string | null {
+  const value = error?.metadata[key];
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function forgePublicationErrorMetadata(
+  error: NexusForgePublicationError | null,
+): Partial<NexusForgePublicationOperationMetadata> {
+  if (!error) {
+    return {};
+  }
+
+  return {
+    ...(isNexusForgePublicationBackend(error.metadata.backend)
+      ? { backend: error.metadata.backend }
+      : {}),
+    ...(isNexusForgePublicationCapability(error.metadata.capability)
+      ? { capability: error.metadata.capability }
+      : {}),
+  };
+}
+
+function isNexusForgePublicationBackend(
+  value: unknown,
+): value is NexusForgePublicationBackend {
+  return value === "github_rest" ||
+    value === "github_cli" ||
+    value === "unsupported";
+}
+
+function isNexusForgePublicationCapability(
+  value: unknown,
+): value is NexusForgePublicationCapability {
+  return value === "actor.verify" ||
+    value === "pull_request.upsert" ||
+    value === "pull_request.checks" ||
+    value === "pull_request.merge" ||
+    value === "issue.close";
 }
 
 function publicationPullRequestSetupActions(options: {
