@@ -4040,6 +4040,214 @@ describe("nexus dashboard", () => {
     expect(stopped).toEqual([process.pid]);
   });
 
+  it("shares provider freshness across cockpit server routes", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-provider-freshness-");
+    const homePath = makeTempDir("dev-nexus-dashboard-provider-freshness-home-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [],
+        authProfiles: [
+          {
+            id: "bot-github",
+            actorId: "example-bot-actor",
+            provider: "github",
+            kind: "app",
+            credentialKind: "github_app",
+            account: "example-bot",
+            host: "github.com",
+            sshHost: "github.com-bot",
+            githubCliConfigDir: "home:.config/gh-example-bot",
+            gitUserName: "Example Bot",
+            gitUserEmail: "bot@example.invalid",
+            environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        selector: {
+          ...defaultNexusAutomationConfig.selector,
+          statuses: ["ready"],
+          limit: 5,
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          remoteUrl: "git@github.com-bot:example/project.git",
+          sshHostAlias: "github.com-bot",
+          targetBranch: "main",
+          push: true,
+          actor: {
+            kind: "app",
+            provider: "github",
+            handle: "example-bot",
+            id: null,
+          },
+          commandEnvironment: {
+            GH_CONFIG_DIR: "home:.config/gh-example-bot",
+          },
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "service_account",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["maintainer"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+      components: [
+        {
+          id: "primary",
+          name: "Dashboard Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:example/project.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "github",
+          workTrackers: [
+            {
+              id: "github",
+              name: "GitHub Issues",
+              enabled: true,
+              roles: ["primary", "eligible_source"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "project",
+                },
+              },
+            },
+          ],
+          trackerDiscovery: {
+            scannedRoles: ["primary", "eligible_source"],
+            directExternalSelection: "allowed",
+            importRequiredFirst: false,
+            providerFilters: ["github"],
+            queryLimit: 5,
+            conflictWinner: "scanned_tracker",
+            missingCredentialBehavior: "skip",
+          },
+          relationships: [],
+        },
+      ],
+    }));
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "remote get-url bot") {
+        return ok([...args], "git@github.com-bot:example/project.git\n");
+      }
+      if (command === "remote get-url --push bot") {
+        return ok([...args], "git@github.com-bot:example/project.git\n");
+      }
+      if (
+        command === "config --local --get user.name" ||
+        command === "config --get user.name"
+      ) {
+        return ok([...args], "Example Bot\n");
+      }
+      if (
+        command === "config --local --get user.email" ||
+        command === "config --get user.email"
+      ) {
+        return ok([...args], "bot@example.invalid\n");
+      }
+      return baseGitRunner(args, cwd);
+    };
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fetcher: typeof fetch = async (input, init = {}) => {
+      const headers = init.headers as Record<string, string>;
+      calls.push({ url: String(input), headers });
+      if (headers["If-None-Match"] === "\"dashboard-issues\"") {
+        return new Response(null, { status: 304 });
+      }
+      return new Response(
+        JSON.stringify([
+          {
+            id: 42,
+            number: 42,
+            title: "Ready cockpit task",
+            body: "Provider-backed task",
+            state: "open",
+            labels: [{ name: "status:ready" }],
+            assignees: [],
+            created_at: "2026-05-21T09:40:00.000Z",
+            updated_at: "2026-05-21T09:45:00.000Z",
+            html_url: "https://github.com/example/project/issues/42",
+          },
+        ]),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            etag: "\"dashboard-issues\"",
+          },
+        },
+      );
+    };
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      homePath,
+      gitRunner,
+      env: {
+        GH_TOKEN: "github-token",
+        GITHUB_TOKEN: "github-token",
+      },
+      providerOptions: {
+        github: {
+          fetch: fetcher,
+          token: "github-token",
+          apiBaseUrl: "https://api.github.test",
+        },
+      },
+      now: fixedClock("2026-05-21T10:26:45.000Z"),
+    });
+
+    try {
+      const host = await fetch(
+        `${server.url}api/host?workspace=dashboard-demo`,
+      ).then((response) => response.json());
+      const cockpit = await fetch(
+        `${server.url}api/cockpit?workspace=dashboard-demo`,
+      ).then((response) => response.json());
+
+      expect(host.actionQueue).toEqual(expect.any(Array));
+      expect(cockpit.project.id).toBe("dashboard-demo");
+      expect(calls.length).toBeGreaterThan(1);
+      expect(calls.slice(1).some((call) =>
+        call.headers["If-None-Match"] === "\"dashboard-issues\""
+      )).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("archives dashboard threads locally without deleting worktrees", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-thread-action-");
     const worktreesRoot = makeTempDir("dev-nexus-dashboard-thread-action-worktrees-");
