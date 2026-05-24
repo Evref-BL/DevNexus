@@ -34,6 +34,7 @@ export * from "./operations/nexusCiFailureIntake.js";
 export * from "./dashboard/nexusDashboard.js";
 export * from "./dashboard/nexusDashboardCodexChat.js";
 export * from "./dashboard/nexusDashboardServer.js";
+export * from "./dashboard/nexusDashboardServerRegistry.js";
 export * from "./operations/nexusCiTierPolicy.js";
 export * from "./mcp/nexusCoreMcpTools.js";
 export * from "./agents/nexusWorkerContextBundle.js";

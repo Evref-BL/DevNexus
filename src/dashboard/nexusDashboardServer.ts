@@ -32,6 +32,13 @@ import {
   NexusDashboardCodexChatError,
   type NexusDashboardCodexChatStarter,
 } from "./nexusDashboardCodexChat.js";
+import {
+  dashboardPortInUseMessage,
+  publicNexusDashboardServerRecord,
+  removeNexusDashboardServerRecord,
+  saveNexusDashboardServerRecord,
+  type NexusDashboardServerRecord,
+} from "./nexusDashboardServerRegistry.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "../work-items/nexusEligibleWorkSummary.js";
 
@@ -293,12 +300,19 @@ export async function startNexusDashboardServer(
   options: StartNexusDashboardServerOptions,
 ): Promise<NexusDashboardServerHandle> {
   const projectRoot = options.projectRoot ? path.resolve(options.projectRoot) : null;
+  const currentProjectRoot =
+    options.currentProjectRoot === undefined
+      ? undefined
+      : options.currentProjectRoot
+        ? path.resolve(options.currentProjectRoot)
+        : null;
+  const registryProjectRoot = projectRoot ?? currentProjectRoot ?? null;
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 0;
   const snapshotOptions: BuildNexusDashboardHostSnapshotOptions = {
     ...(projectRoot ? { projectRoot } : {}),
-    ...(options.currentProjectRoot !== undefined
-      ? { currentProjectRoot: options.currentProjectRoot }
+    ...(currentProjectRoot !== undefined
+      ? { currentProjectRoot }
       : {}),
     homePath: options.homePath,
     env: options.env,
@@ -316,6 +330,7 @@ export async function startNexusDashboardServer(
     options.localResourceOpener ?? openDashboardLocalResource;
   const actionToken = randomBytes(24).toString("base64url");
   const dashboardCache = createDashboardServerCache();
+  let serverRecord: NexusDashboardServerRecord | null = null;
   const server = http.createServer((request, response) => {
     void routeDashboardRequest(
       request,
@@ -325,16 +340,54 @@ export async function startNexusDashboardServer(
       localResourceOpener,
       actionToken,
       dashboardCache,
+      serverRecord,
     );
   });
 
-  await listen(server, port, host);
+  try {
+    await listen(server, port, host);
+  } catch (error) {
+    if (isAddressInUseError(error)) {
+      throw new Error(
+        await dashboardPortInUseMessage({
+          projectRoot: registryProjectRoot,
+          host,
+          port,
+        }),
+      );
+    }
+    throw error;
+  }
   const address = server.address();
   if (!address || typeof address === "string") {
     throw new Error("Dashboard server did not expose a TCP address");
   }
 
   const url = `http://${host}:${address.port}/`;
+  const startedAt = dashboardTimestamp(options.now);
+  serverRecord = {
+    id: `dashboard-${randomBytes(12).toString("hex")}`,
+    pid: process.pid,
+    projectRoot,
+    currentProjectRoot: currentProjectRoot ?? null,
+    host,
+    port: address.port,
+    url,
+    startedAt,
+    updatedAt: startedAt,
+    verificationToken: randomBytes(24).toString("base64url"),
+  };
+  if (registryProjectRoot) {
+    try {
+      saveNexusDashboardServerRecord(registryProjectRoot, serverRecord, {
+        now: options.now,
+      });
+    } catch (error) {
+      await close(server);
+      await codexChatStarter.close();
+      throw error;
+    }
+  }
   return {
     projectRoot,
     host,
@@ -342,8 +395,16 @@ export async function startNexusDashboardServer(
     url,
     server,
     close: async () => {
-      await close(server);
-      await codexChatStarter.close();
+      try {
+        await close(server);
+      } finally {
+        if (registryProjectRoot && serverRecord) {
+          removeNexusDashboardServerRecord(registryProjectRoot, serverRecord.id, {
+            now: options.now,
+          });
+        }
+        await codexChatStarter.close();
+      }
     },
   };
 }
@@ -2732,6 +2793,7 @@ async function routeDashboardRequest(
   localResourceOpener: NexusDashboardLocalResourceOpener,
   actionToken: string,
   dashboardCache: NexusDashboardServerCache,
+  serverRecord: NexusDashboardServerRecord | null,
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -2798,6 +2860,20 @@ async function routeDashboardRequest(
     if (url.pathname === "/api/local/app-icon") {
       const icon = await dashboardLocalAppIcon(localOpenAppFromUrl(url));
       sendBinary(response, icon.contentType, icon.body);
+      return;
+    }
+    if (url.pathname === "/api/dashboard/server-info") {
+      sendJson(response, {
+        ok: true,
+        dashboard: serverRecord
+          ? publicNexusDashboardServerRecord(serverRecord)
+          : null,
+        verified: Boolean(
+          serverRecord &&
+            request.headers["x-dev-nexus-dashboard-verification"] ===
+              serverRecord.verificationToken,
+        ),
+      });
       return;
     }
     if (url.pathname === "/api/dashboard/shell") {
@@ -3917,6 +3993,19 @@ function listen(server: Server, port: number, host: string): Promise<void> {
     server.once("listening", onListening);
     server.listen(port, host);
   });
+}
+
+function isAddressInUseError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      (error as NodeJS.ErrnoException).code === "EADDRINUSE",
+  );
+}
+
+function dashboardTimestamp(now?: () => Date | string): string {
+  const value = now?.() ?? new Date();
+  return typeof value === "string" ? value : value.toISOString();
 }
 
 function close(server: Server): Promise<void> {
