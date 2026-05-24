@@ -72,6 +72,12 @@ required evidence, provider mutations, blocked actions, and next action. Local
 human approval is action-scoped: if the branch, head commit, or requested action
 changes, the review plan should ask for fresh authorization.
 
+DevNexus does not store local approval ledgers in the workspace repository.
+Provider reviews are the durable record when the review happens in a pull
+request or merge request. Local authorization is current-action input; teams
+that need audit-grade local approvals should use a future opt-in backend
+ledger, not source-controlled JSON.
+
 Publication commands enforce configured component review policy only at final
 actions. Opening or updating a pull request remains allowed because it creates
 the review surface. Pull-request merge and direct target-branch push are blocked

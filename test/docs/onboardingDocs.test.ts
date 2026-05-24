@@ -214,6 +214,21 @@ describe("README onboarding guardrails", () => {
     }
   });
 
+  it("documents review authorization ledger defaults and backend-only opt-in", () => {
+    const design = repoFile("docs/dev/review-policy.md");
+    const publication = repoFile("docs/user/publication-workflows.md");
+
+    expect(design).toContain("## Authorization Ledger Decision");
+    expect(design).toContain("The default storage mode is therefore `none`");
+    expect(design).toContain("append-only and scoped to the action");
+    expect(design).toContain("DevNexus should never prune audit records");
+    expect(design).toContain("another provider-backed surface");
+    expect(publication).toContain(
+      "DevNexus does not store local approval ledgers in the workspace repository.",
+    );
+    expect(publication).toContain("audit-grade local approvals");
+  });
+
   it("documents opt-in agent targets and projection cleanup", () => {
     const guide = repoFile("docs/user/agent-targets.md");
     const gettingStarted = repoFile("docs/user/getting-started.md");
