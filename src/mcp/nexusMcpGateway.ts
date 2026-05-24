@@ -1219,7 +1219,9 @@ function readGatewayResultRecord(
   if (!/^mcp-result-[A-Za-z0-9TZ-]+$/u.test(resultId)) {
     throw new Error("arguments.resultId must be a gateway result id");
   }
-  const recordPath = gatewayResultRecordPath(projectRoot, resultId);
+  const recordPath =
+    existingGatewayResultRecordPath(projectRoot, resultId) ??
+      gatewayResultRecordPath(projectRoot, resultId);
   if (!fs.existsSync(recordPath)) {
     throw new Error(`Gateway result record not found: ${resultId}`);
   }
@@ -1230,7 +1232,9 @@ export function readNexusMcpGatewayDiscoveryRecord(
   projectRoot: string,
   serverId: string,
 ): NexusMcpGatewayDiscoveryRecord | null {
-  const recordPath = gatewayDiscoveryRecordPath(projectRoot, serverId);
+  const recordPath =
+    existingGatewayDiscoveryRecordPath(projectRoot, serverId) ??
+      gatewayDiscoveryRecordPath(projectRoot, serverId);
   if (!fs.existsSync(recordPath)) {
     return null;
   }
@@ -1257,6 +1261,7 @@ function gatewayResultRecordPath(projectRoot: string, resultId: string): string 
   return path.join(
     path.resolve(projectRoot),
     ".dev-nexus",
+    "runtime",
     "mcp-gateway",
     "results",
     `${resultId}.json`,
@@ -1267,10 +1272,51 @@ function gatewayDiscoveryRecordPath(projectRoot: string, serverId: string): stri
   return path.join(
     path.resolve(projectRoot),
     ".dev-nexus",
+    "runtime",
     "mcp-gateway",
     "discovery",
     `${safeIdPart(serverId)}.json`,
   );
+}
+
+function legacyGatewayResultRecordPath(projectRoot: string, resultId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "results",
+    `${resultId}.json`,
+  );
+}
+
+function legacyGatewayDiscoveryRecordPath(projectRoot: string, serverId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "discovery",
+    `${safeIdPart(serverId)}.json`,
+  );
+}
+
+function existingGatewayResultRecordPath(
+  projectRoot: string,
+  resultId: string,
+): string | null {
+  return [
+    gatewayResultRecordPath(projectRoot, resultId),
+    legacyGatewayResultRecordPath(projectRoot, resultId),
+  ].find((recordPath) => fs.existsSync(recordPath)) ?? null;
+}
+
+function existingGatewayDiscoveryRecordPath(
+  projectRoot: string,
+  serverId: string,
+): string | null {
+  return [
+    gatewayDiscoveryRecordPath(projectRoot, serverId),
+    legacyGatewayDiscoveryRecordPath(projectRoot, serverId),
+  ].find((recordPath) => fs.existsSync(recordPath)) ?? null;
 }
 
 function jsonRpcFrame(message: unknown): string {
