@@ -34,6 +34,9 @@ import {
 } from "./nexusDashboardCodexChat.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "../work-items/nexusEligibleWorkSummary.js";
+import {
+  providerOptionsWithFreshnessCache,
+} from "../providers/nexusProviderFreshness.js";
 
 export interface StartNexusDashboardServerOptions {
   projectRoot?: string;
@@ -295,6 +298,7 @@ export async function startNexusDashboardServer(
   const projectRoot = options.projectRoot ? path.resolve(options.projectRoot) : null;
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 0;
+  const providerOptions = providerOptionsWithFreshnessCache(options.providerOptions);
   const snapshotOptions: BuildNexusDashboardHostSnapshotOptions = {
     ...(projectRoot ? { projectRoot } : {}),
     ...(options.currentProjectRoot !== undefined
@@ -305,7 +309,7 @@ export async function startNexusDashboardServer(
     credentialResolver: options.credentialResolver,
     provider: options.provider,
     providerFactory: options.providerFactory,
-    providerOptions: options.providerOptions,
+    providerOptions,
     eligibleWorkMode: options.eligibleWorkMode,
     gitRunner: options.gitRunner,
     now: options.now,
@@ -775,6 +779,8 @@ export function renderNexusDashboardClientModule(): string {
     "          latestError = null;",
     "          renderCurrent();",
     "        }",
+    "        const hostIsFreshEnough = latestHost && latestHost.partial !== true && Date.now() - lastHostRefreshAt < hostRefreshMs;",
+    "        if (!force && hostIsFreshEnough) return;",
     "        const host = await fetchDevNexusDashboardHost(baseUrl);",
     "        if (workspaceId !== selectedWorkspaceId) return;",
     "        latestHost = host;",
