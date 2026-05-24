@@ -31,6 +31,8 @@ diagnostics mode.
 - [UX principles](ux-principles.md) records source-backed design constraints.
 - [Host cockpit](host-cockpit.md) describes the host-wide page.
 - [Workspace cockpit](workspace-cockpit.md) describes the workspace drill-down.
+- [History widget](history-widget.md) records the reusable write-event graph
+  model for project history.
 - [Cockpit actions](actions.md) describes approvals, provider links, and chat
   actions.
 - [Data contracts](data-contracts.md) describes routes and embeddable payloads.
