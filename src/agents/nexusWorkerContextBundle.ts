@@ -965,7 +965,12 @@ function renderPublicationPolicyLines(
   scope: NexusWorkerContextPublicationScope,
 ): string[] {
   if (!publication) {
-    return ["Publication policy:", `- scope: ${scope}`, "- automation remote: none"];
+    return [
+      "Publication policy:",
+      `- scope: ${scope}`,
+      "- automation remote: none",
+      ...renderPublicationFacadeGuidanceLines(false),
+    ];
   }
 
   const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
@@ -989,6 +994,27 @@ function renderPublicationPolicyLines(
     `- manual remote: ${publication.manualRemote ?? "none"}`,
     `- manual actor: ${publicationActorLabel(publication.manualActor)}`,
     `- command environment keys: ${commandEnvironmentKeys || "none"}`,
+    ...renderPublicationFacadeGuidanceLines(true),
+  ];
+}
+
+function renderPublicationFacadeGuidanceLines(
+  policyConfigured: boolean,
+): string[] {
+  if (!policyConfigured) {
+    return [
+      "Publication facade:",
+      "- status: unavailable; no publication policy is configured for this worker.",
+    ];
+  }
+
+  return [
+    "Publication facade:",
+    "- verify the configured actor before provider writes with `publication_actor_verify`.",
+    "- use `publication_review_handoff` for branch push plus PR handoff.",
+    "- use `publication_branch_push` and `publication_pull_request_upsert` when push and PR steps must be separate.",
+    "- use `publication_pull_request_evidence` for PR checks; use `publication_pull_request_merge` only with explicit merge authority.",
+    "- do not use raw `git push`, `gh`, or `glab` for provider mutations; read-only diagnostics are allowed.",
   ];
 }
 
