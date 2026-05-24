@@ -235,112 +235,73 @@ interface ParsedPublicationMergeQueueReadinessCommand {
   json?: boolean;
 }
 
+type PublicationCliCommandHandler = (
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+) => Promise<number>;
+
+const twoSegmentPublicationCommandFamilies = new Set([
+  "pull-request",
+  "green-main",
+  "evidence",
+]);
+
+const publicationCliCommandHandlers: Partial<Record<string, PublicationCliCommandHandler>> = {
+  "branch-push": handlePublicationBranchPushCommand,
+  "pull-request upsert": handlePublicationPullRequestUpsertCommand,
+  "review-handoff": handlePublicationReviewHandoffCommand,
+  "pull-request merge": handlePublicationPullRequestMergeCommand,
+  "pull-request evidence": handlePublicationPullRequestEvidenceCommand,
+  "green-main plan": handlePublicationGreenMainPlanCommand,
+  "evidence normalize": handlePublicationEvidenceNormalizeCommand,
+  "merge-queue-readiness": handlePublicationMergeQueueReadinessCommand,
+  "release-train-readiness": handlePublicationReleaseTrainReadinessCommand,
+  "candidate-plan": handlePublicationCandidatePlanCommand,
+  "feature-plan": handlePublicationFeaturePlanCommand,
+  "feature-report": handlePublicationFeatureReportCommand,
+  "feature-finalization": handlePublicationFeatureFinalizationCommand,
+};
+
 
 export async function handlePublicationCommand(
   argv: string[],
   dependencies: PublicationCliDependencies,
 ): Promise<number> {
-  if (argv[1] === "branch-push") {
-    const parsed = parsePublicationBranchPushCommand(argv);
-    const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
-    const projectRepository = inferProjectRepositoryPublicationTarget({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      repositoryPath,
-    });
-    let result: NexusPublicationBranchPushResult;
-    try {
-      result = await pushNexusPublicationBranchForComponent({
-        projectRoot: parsed.projectRoot,
-        componentId: parsed.componentId,
-        projectRepository,
-        repositoryPath,
-        branch: parsed.branch,
-        targetBranch: parsed.targetBranch,
-        featureId: parsed.featureId,
-        forceWithLease: parsed.forceWithLease,
-        forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
-        localAuthorization: publicationLocalAuthorization(parsed),
-        baseEnv: dependencies.env ?? process.env,
-        fetch: dependencies.fetch,
-        credentialCommandRunner: dependencies.credentialCommandRunner,
-        gitRunner: parsed.dryRun
-          ? dryRunPublicationGitPushRunner
-          : dependencies.publicationGitPushRunner,
-        remoteProbeRunner: dependencies.publicationGitPushRunner,
-      });
-    } catch (error) {
-      if (parsed.json && error instanceof NexusPublicationBranchPushBlockedError) {
-        printPublicationBranchPushBlockedError(
-          error,
-          parsed,
-          dependencies.stdout ?? process.stdout,
-        );
-        return 1;
-      }
-      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
-        printPublicationReviewPolicyBlockedError(
-          error,
-          Boolean(parsed.dryRun),
-          dependencies.stdout ?? process.stdout,
-        );
-        return 1;
-      }
-      throw error;
-    }
-    printPublicationBranchPushResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return result.push.git.exitCode === 0 || parsed.dryRun ? 0 : 1;
+  const handler = publicationCliCommandHandlers[publicationCliCommandKey(argv)];
+  if (handler) {
+    return handler(argv, dependencies);
   }
+  throw new Error(
+    "publication requires branch-push, pull-request upsert, pull-request merge, review-handoff, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
+  );
+}
 
-  if (argv[1] === "pull-request" && argv[2] === "upsert") {
-    const parsed = parsePublicationPullRequestUpsertCommand(argv);
-    const result = await upsertNexusPublicationPullRequestForComponent({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      number: parsed.number,
-      head: parsed.head,
-      base: parsed.base,
-      title: parsed.title,
-      body: publicationPullRequestBody(parsed),
-      draft: parsed.draft,
-      dryRun: parsed.dryRun,
-      baseEnv: dependencies.env ?? process.env,
-      fetch: dependencies.fetch,
-      credentialCommandRunner: dependencies.credentialCommandRunner,
-    });
-    printPublicationPullRequestUpsertResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "review-handoff") {
-    const parsed = parsePublicationReviewHandoffCommand(argv);
-    const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
-    const projectRepository = inferProjectRepositoryPublicationTarget({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      repositoryPath,
-    });
-    const branchPush = await pushNexusPublicationBranchForComponent({
+async function handlePublicationBranchPushCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationBranchPushCommand(argv);
+  const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
+  const projectRepository = inferProjectRepositoryPublicationTarget({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository: parsed.projectRepository,
+    repositoryPath,
+  });
+  let result: NexusPublicationBranchPushResult;
+  try {
+    result = await pushNexusPublicationBranchForComponent({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
       projectRepository,
       repositoryPath,
       branch: parsed.branch,
+      targetBranch: parsed.targetBranch,
       featureId: parsed.featureId,
       forceWithLease: parsed.forceWithLease,
       forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
-      baseEnv: dependencies.env ?? process.env,
+      localAuthorization: publicationLocalAuthorization(parsed),
+      baseEnv: publicationBaseEnv(dependencies),
       fetch: dependencies.fetch,
       credentialCommandRunner: dependencies.credentialCommandRunner,
       gitRunner: parsed.dryRun
@@ -348,243 +309,323 @@ export async function handlePublicationCommand(
         : dependencies.publicationGitPushRunner,
       remoteProbeRunner: dependencies.publicationGitPushRunner,
     });
-    const branchPushOk = parsed.dryRun || branchPush.push.git.exitCode === 0;
-    const pullRequest = branchPushOk
-      ? await reviewHandoffPullRequestResult({
-          parsed,
-          projectRepository,
-          branchPush,
-          dependencies,
-        })
-      : null;
-    printPublicationReviewHandoffResult(
-      { branchPush, pullRequest },
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return branchPushOk && pullRequestOk(pullRequest) ? 0 : 1;
+  } catch (error) {
+    return handlePublicationBranchPushError(error, parsed, dependencies);
   }
+  printPublicationBranchPushResult(result, parsed, publicationStdout(dependencies));
+  return result.push.git.exitCode === 0 || parsed.dryRun ? 0 : 1;
+}
 
-  if (argv[1] === "pull-request" && argv[2] === "merge") {
-    const parsed = parsePublicationPullRequestMergeCommand(argv);
-    const result = await mergeNexusPublicationPullRequestForComponent({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      number: parsed.number,
-      method: parsed.method,
-      branchRole: parsed.branchRole,
-      localAuthorization: publicationLocalAuthorization(parsed),
-      baseEnv: dependencies.env ?? process.env,
-      fetch: dependencies.fetch,
-      credentialCommandRunner: dependencies.credentialCommandRunner,
-    }).catch((error: unknown) => {
-      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
-        printPublicationReviewPolicyBlockedError(
-          error,
-          false,
-          dependencies.stdout ?? process.stdout,
-        );
-        return null;
-      }
-      throw error;
-    });
-    if (!result) {
-      return 1;
-    }
-    printPublicationPullRequestMergeResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return result.merge.merged ? 0 : 1;
-  }
+async function handlePublicationPullRequestUpsertCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationPullRequestUpsertCommand(argv);
+  const result = await upsertNexusPublicationPullRequestForComponent({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository: parsed.projectRepository,
+    number: parsed.number,
+    head: parsed.head,
+    base: parsed.base,
+    title: parsed.title,
+    body: publicationPullRequestBody(parsed),
+    draft: parsed.draft,
+    dryRun: parsed.dryRun,
+    baseEnv: publicationBaseEnv(dependencies),
+    fetch: dependencies.fetch,
+    credentialCommandRunner: dependencies.credentialCommandRunner,
+  });
+  printPublicationPullRequestUpsertResult(result, parsed, publicationStdout(dependencies));
+  return 0;
+}
 
-  if (argv[1] === "pull-request" && argv[2] === "evidence") {
-    const parsed = parsePublicationPullRequestEvidenceCommand(argv);
-    const result = await inspectNexusPublicationPullRequestForComponent({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      number: parsed.number,
-      baseEnv: dependencies.env ?? process.env,
-      fetch: dependencies.fetch,
-      credentialCommandRunner: dependencies.credentialCommandRunner,
-    });
-    printPublicationPullRequestEvidenceResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "green-main" && argv[2] === "plan") {
-    const parsed = parsePublicationGreenMainPlanCommand(argv);
-    const checks = readGreenMainChecksInput(parsed.checksFile);
-    const plan = buildNexusGreenMainPublicationPlan({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      prNumber: parsed.prNumber,
-      prUrl: parsed.prUrl,
-      headBranch: parsed.headBranch,
-      checks,
-      rerunPolicy: {
-        allowed: parsed.allowRerun ?? false,
-        alreadyAttempted: parsed.rerunAttempted ?? false,
-        reason: parsed.rerunReason ?? null,
-      },
-    });
-    printPublicationGreenMainPlan(
-      plan,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "evidence" && argv[2] === "normalize") {
-    const parsed = parsePublicationEvidenceNormalizeCommand(argv);
-    const evidence = normalizeNexusPublicationProviderEvidence(
-      readReleaseTrainEvidenceInput(parsed.evidenceFile),
-    );
-    const classifications = parsed.requiredChecks.length > 0
-      ? evidence.map((item) =>
-          classifyNexusPublicationProviderEvidenceChecks({
-            evidence: item,
-            requiredChecks: parsed.requiredChecks,
-          }),
-        )
-      : [];
-    printPublicationEvidenceNormalizeResult(
-      evidence,
-      classifications,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "merge-queue-readiness") {
-    const parsed = parsePublicationMergeQueueReadinessCommand(argv);
-    const report = buildNexusMergeQueueReadinessReport({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      mergeQueueEnabled: parsed.mergeQueueEnabled,
-      workflowTriggers: parsed.workflowTriggersFile
-        ? readPublicationWorkflowTriggersInput(parsed.workflowTriggersFile)
-        : [],
-      providerEvidence: parsed.evidenceFile
-        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
-        : [],
-      now: dependencies.now,
-    });
-    printPublicationMergeQueueReadinessReport(
-      report,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "release-train-readiness") {
-    const parsed = parseReleaseTrainReadinessCommand(argv);
-    const report = buildNexusReleaseTrainReadinessReport({
-      projectRoot: parsed.projectRoot,
-      versionId: parsed.versionId,
-      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
-      providerEvidence: parsed.evidenceFile
-        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
-        : [],
-      now: dependencies.now,
-    });
-    printReleaseTrainReadinessReport(
-      report,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "candidate-plan") {
-    const parsed = parsePublicationCandidatePlanCommand(argv);
-    const plan = buildNexusCandidateBranchPlan({
-      projectRoot: parsed.projectRoot,
-      versionId: parsed.versionId,
-      integrationBranchName: parsed.integrationBranchName,
-      candidateBranchName: parsed.candidateBranchName,
-      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
-      providerEvidence: parsed.evidenceFile
-        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
-        : [],
-      now: dependencies.now,
-    });
-    printPublicationCandidatePlan(
-      plan,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "feature-plan") {
-    const parsed = parsePublicationFeaturePlanCommand(argv);
-    const plan = buildNexusFeatureBranchDeliveryPlan({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      featureId: parsed.featureId,
-    });
-    printPublicationFeaturePlan(
-      plan,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "feature-report") {
-    const parsed = parsePublicationFeatureReportCommand(argv);
-    const report = buildNexusFeatureBranchDeliveryReport({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      featureId: parsed.featureId,
-      providerEvidence: parsed.evidenceFile
-        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
-        : [],
-      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
-      now: dependencies.now,
-    });
-    printPublicationFeatureReport(
-      report,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  if (argv[1] === "feature-finalization") {
-    const parsed = parsePublicationFeatureFinalizationCommand(argv);
-    const plan = buildNexusFeatureFinalizationPlan({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      featureId: parsed.featureId,
-      providerEvidence: parsed.evidenceFile
-        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
-        : [],
-      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
-      now: dependencies.now,
-    });
-    printPublicationFeatureFinalizationPlan(
-      plan,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, review-handoff, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
+async function handlePublicationReviewHandoffCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationReviewHandoffCommand(argv);
+  const repositoryPath = path.resolve(parsed.repositoryPath ?? process.cwd());
+  const projectRepository = inferProjectRepositoryPublicationTarget({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository: parsed.projectRepository,
+    repositoryPath,
+  });
+  const branchPush = await pushNexusPublicationBranchForComponent({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository,
+    repositoryPath,
+    branch: parsed.branch,
+    featureId: parsed.featureId,
+    forceWithLease: parsed.forceWithLease,
+    forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+    baseEnv: publicationBaseEnv(dependencies),
+    fetch: dependencies.fetch,
+    credentialCommandRunner: dependencies.credentialCommandRunner,
+    gitRunner: parsed.dryRun
+      ? dryRunPublicationGitPushRunner
+      : dependencies.publicationGitPushRunner,
+    remoteProbeRunner: dependencies.publicationGitPushRunner,
+  });
+  const branchPushOk = parsed.dryRun || branchPush.push.git.exitCode === 0;
+  const pullRequest = branchPushOk
+    ? await reviewHandoffPullRequestResult({
+        parsed,
+        projectRepository,
+        branchPush,
+        dependencies,
+      })
+    : null;
+  printPublicationReviewHandoffResult(
+    { branchPush, pullRequest },
+    parsed,
+    publicationStdout(dependencies),
   );
+  return branchPushOk && pullRequestOk(pullRequest) ? 0 : 1;
+}
+
+async function handlePublicationPullRequestMergeCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationPullRequestMergeCommand(argv);
+  const result = await mergeNexusPublicationPullRequestForComponent({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository: parsed.projectRepository,
+    number: parsed.number,
+    method: parsed.method,
+    branchRole: parsed.branchRole,
+    localAuthorization: publicationLocalAuthorization(parsed),
+    baseEnv: publicationBaseEnv(dependencies),
+    fetch: dependencies.fetch,
+    credentialCommandRunner: dependencies.credentialCommandRunner,
+  }).catch((error: unknown) => {
+    if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+      printPublicationReviewPolicyBlockedError(error, false, publicationStdout(dependencies));
+      return null;
+    }
+    throw error;
+  });
+  if (!result) {
+    return 1;
+  }
+  printPublicationPullRequestMergeResult(result, parsed, publicationStdout(dependencies));
+  return result.merge.merged ? 0 : 1;
+}
+
+async function handlePublicationPullRequestEvidenceCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationPullRequestEvidenceCommand(argv);
+  const result = await inspectNexusPublicationPullRequestForComponent({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectRepository: parsed.projectRepository,
+    number: parsed.number,
+    baseEnv: publicationBaseEnv(dependencies),
+    fetch: dependencies.fetch,
+    credentialCommandRunner: dependencies.credentialCommandRunner,
+  });
+  printPublicationPullRequestEvidenceResult(result, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationGreenMainPlanCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationGreenMainPlanCommand(argv);
+  const plan = buildNexusGreenMainPublicationPlan({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    prNumber: parsed.prNumber,
+    prUrl: parsed.prUrl,
+    headBranch: parsed.headBranch,
+    checks: readGreenMainChecksInput(parsed.checksFile),
+    rerunPolicy: {
+      allowed: parsed.allowRerun ?? false,
+      alreadyAttempted: parsed.rerunAttempted ?? false,
+      reason: parsed.rerunReason ?? null,
+    },
+  });
+  printPublicationGreenMainPlan(plan, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationEvidenceNormalizeCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationEvidenceNormalizeCommand(argv);
+  const evidence = normalizeNexusPublicationProviderEvidence(
+    readReleaseTrainEvidenceInput(parsed.evidenceFile),
+  );
+  const classifications = parsed.requiredChecks.length > 0
+    ? evidence.map((item) =>
+        classifyNexusPublicationProviderEvidenceChecks({
+          evidence: item,
+          requiredChecks: parsed.requiredChecks,
+        }),
+      )
+    : [];
+  printPublicationEvidenceNormalizeResult(
+    evidence,
+    classifications,
+    parsed,
+    publicationStdout(dependencies),
+  );
+  return 0;
+}
+
+async function handlePublicationMergeQueueReadinessCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationMergeQueueReadinessCommand(argv);
+  const report = buildNexusMergeQueueReadinessReport({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    mergeQueueEnabled: parsed.mergeQueueEnabled,
+    workflowTriggers: parsed.workflowTriggersFile
+      ? readPublicationWorkflowTriggersInput(parsed.workflowTriggersFile)
+      : [],
+    providerEvidence: parsed.evidenceFile
+      ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+      : [],
+    now: dependencies.now,
+  });
+  printPublicationMergeQueueReadinessReport(report, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationReleaseTrainReadinessCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parseReleaseTrainReadinessCommand(argv);
+  const report = buildNexusReleaseTrainReadinessReport({
+    projectRoot: parsed.projectRoot,
+    versionId: parsed.versionId,
+    fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+    providerEvidence: parsed.evidenceFile
+      ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+      : [],
+    now: dependencies.now,
+  });
+  printReleaseTrainReadinessReport(report, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationCandidatePlanCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationCandidatePlanCommand(argv);
+  const plan = buildNexusCandidateBranchPlan({
+    projectRoot: parsed.projectRoot,
+    versionId: parsed.versionId,
+    integrationBranchName: parsed.integrationBranchName,
+    candidateBranchName: parsed.candidateBranchName,
+    fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+    providerEvidence: parsed.evidenceFile
+      ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+      : [],
+    now: dependencies.now,
+  });
+  printPublicationCandidatePlan(plan, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationFeaturePlanCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationFeaturePlanCommand(argv);
+  const plan = buildNexusFeatureBranchDeliveryPlan({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    featureId: parsed.featureId,
+  });
+  printPublicationFeaturePlan(plan, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationFeatureReportCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationFeatureReportCommand(argv);
+  const report = buildNexusFeatureBranchDeliveryReport({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    featureId: parsed.featureId,
+    providerEvidence: parsed.evidenceFile
+      ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+      : [],
+    fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+    now: dependencies.now,
+  });
+  printPublicationFeatureReport(report, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+async function handlePublicationFeatureFinalizationCommand(
+  argv: string[],
+  dependencies: PublicationCliDependencies,
+): Promise<number> {
+  const parsed = parsePublicationFeatureFinalizationCommand(argv);
+  const plan = buildNexusFeatureFinalizationPlan({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    featureId: parsed.featureId,
+    providerEvidence: parsed.evidenceFile
+      ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+      : [],
+    fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+    now: dependencies.now,
+  });
+  printPublicationFeatureFinalizationPlan(plan, parsed, publicationStdout(dependencies));
+  return 0;
+}
+
+function handlePublicationBranchPushError(
+  error: unknown,
+  parsed: ParsedPublicationBranchPushCommand,
+  dependencies: PublicationCliDependencies,
+): number {
+  if (parsed.json && error instanceof NexusPublicationBranchPushBlockedError) {
+    printPublicationBranchPushBlockedError(error, parsed, publicationStdout(dependencies));
+    return 1;
+  }
+  if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+    printPublicationReviewPolicyBlockedError(
+      error,
+      Boolean(parsed.dryRun),
+      publicationStdout(dependencies),
+    );
+    return 1;
+  }
+  throw error;
+}
+
+function publicationCliCommandKey(argv: string[]): string {
+  const family = argv[1] ?? "";
+  if (!twoSegmentPublicationCommandFamilies.has(family)) {
+    return family;
+  }
+  return [family, argv[2]].filter(Boolean).join(" ");
+}
+
+function publicationStdout(dependencies: PublicationCliDependencies): TextWriter {
+  return dependencies.stdout ?? process.stdout;
+}
+
+function publicationBaseEnv(dependencies: PublicationCliDependencies): NodeJS.ProcessEnv {
+  return dependencies.env ?? process.env;
 }
 
 
@@ -1548,6 +1589,17 @@ function printPublicationGreenMainPlan(
   }
 
   writeLine(stdout, "DevNexus green-main publication plan.");
+  printGreenMainPlanSummary(plan, stdout);
+  printGreenMainWarnings(plan.warnings, stdout);
+  printGreenMainRequiredChecks(plan.requiredChecks, stdout);
+  printGreenMainFailedJobs(plan.failedJobs, stdout);
+  printGreenMainCommands(plan.commands, stdout);
+}
+
+function printGreenMainPlanSummary(
+  plan: NexusGreenMainPublicationPlan,
+  stdout: TextWriter,
+): void {
   writeLine(
     stdout,
     `  Pull request: ${plan.pullRequest.repository}#${plan.pullRequest.number}`,
@@ -1562,40 +1614,74 @@ function printPublicationGreenMainPlan(
     stdout,
     `  Rerun: ${plan.rerun.decision}${plan.rerun.reason ? ` - ${plan.rerun.reason}` : ""}`,
   );
-  if (plan.warnings.length > 0) {
-    for (const warning of plan.warnings) {
-      writeLine(stdout, `  Warning: ${warning}`);
-    }
+}
+
+function printGreenMainWarnings(
+  warnings: readonly string[],
+  stdout: TextWriter,
+): void {
+  for (const warning of warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
   }
+}
+
+function printGreenMainRequiredChecks(
+  checks: NexusGreenMainPublicationPlan["requiredChecks"],
+  stdout: TextWriter,
+): void {
   writeLine(stdout, "  Required checks:");
-  for (const check of plan.requiredChecks) {
+  for (const check of checks) {
     writeLine(stdout, `    ${check.name}: ${check.status}`);
   }
-  if (plan.failedJobs.length > 0) {
-    writeLine(stdout, "  Failed jobs:");
-    for (const job of plan.failedJobs) {
-      const details = [
-        job.platform ? `platform=${job.platform}` : null,
-        job.workflow ? `workflow=${job.workflow}` : null,
-        job.url ? `url=${job.url}` : null,
-      ].filter((item): item is string => item !== null);
-      writeLine(
-        stdout,
-        `    ${job.name}: ${job.classification}${details.length > 0 ? ` ${details.join(" ")}` : ""}`,
-      );
-      if (job.failingStep) {
-        writeLine(stdout, `      Step: ${job.failingStep}`);
-      }
-      if (job.failingTest) {
-        writeLine(stdout, `      Test: ${job.failingTest}`);
-      }
-      if (job.message) {
-        writeLine(stdout, `      Message: ${job.message}`);
-      }
-    }
+}
+
+function printGreenMainFailedJobs(
+  jobs: NexusGreenMainPublicationPlan["failedJobs"],
+  stdout: TextWriter,
+): void {
+  if (jobs.length === 0) {
+    return;
   }
+  writeLine(stdout, "  Failed jobs:");
+  for (const job of jobs) {
+    printGreenMainFailedJob(job, stdout);
+  }
+}
+
+function printGreenMainFailedJob(
+  job: NexusGreenMainPublicationPlan["failedJobs"][number],
+  stdout: TextWriter,
+): void {
+  const details = [
+    job.platform ? `platform=${job.platform}` : null,
+    job.workflow ? `workflow=${job.workflow}` : null,
+    job.url ? `url=${job.url}` : null,
+  ].filter((item): item is string => item !== null);
+  writeLine(
+    stdout,
+    `    ${job.name}: ${job.classification}${details.length > 0 ? ` ${details.join(" ")}` : ""}`,
+  );
+  printOptionalGreenMainFailedJobLine(stdout, "Step", job.failingStep);
+  printOptionalGreenMainFailedJobLine(stdout, "Test", job.failingTest);
+  printOptionalGreenMainFailedJobLine(stdout, "Message", job.message);
+}
+
+function printOptionalGreenMainFailedJobLine(
+  stdout: TextWriter,
+  label: string,
+  value: string | null | undefined,
+): void {
+  if (value) {
+    writeLine(stdout, `      ${label}: ${value}`);
+  }
+}
+
+function printGreenMainCommands(
+  commands: NexusGreenMainPublicationPlan["commands"],
+  stdout: TextWriter,
+): void {
   writeLine(stdout, "  Commands:");
-  for (const step of Object.values(plan.commands)) {
+  for (const step of Object.values(commands)) {
     writeLine(stdout, `    ${step.title}: ${formatGreenMainStep(step)}`);
   }
 }
@@ -2315,59 +2401,92 @@ function printPublicationFeatureFinalizationPlan(
     `  Features: ${plan.summary.itemCount}; safeToReview=${plan.summary.safeToReviewCount}; readyForPublication=${plan.summary.readyForPublicationCount}; needsReview=${plan.summary.needsReviewCount}; blocked=${plan.summary.blockedCount}`,
   );
   for (const item of plan.items) {
+    printFeatureFinalizationItem(item, stdout);
+  }
+}
+
+function printFeatureFinalizationItem(
+  item: NexusFeatureFinalizationPlan["items"][number],
+  stdout: TextWriter,
+): void {
+  writeLine(
+    stdout,
+    `  ${item.componentId}: active=${item.featureId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
+  );
+  writeLine(
+    stdout,
+    `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
+  );
+  printFeatureFinalizationPullRequestAction(item, stdout);
+  printFeatureFinalizationBranchUpdate(item, stdout);
+  printFeatureFinalizationReadinessReasons(item, stdout);
+}
+
+function printFeatureFinalizationPullRequestAction(
+  item: NexusFeatureFinalizationPlan["items"][number],
+  stdout: TextWriter,
+): void {
+  writeLine(
+    stdout,
+    `    finalPRAction=${item.finalPullRequestAction.status} humanInTheLoop=${item.finalPullRequestAction.humanInTheLoop}`,
+  );
+  if (item.finalPullRequestAction.providerAction) {
+    const action = item.finalPullRequestAction.providerAction;
     writeLine(
       stdout,
-      `  ${item.componentId}: active=${item.featureId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
+      `    finalPR=${action.head} -> ${action.base} title=${action.title}`,
     );
+  }
+  if (item.finalPullRequestAction.cliCommand) {
     writeLine(
       stdout,
-      `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
+      `    command: ${item.finalPullRequestAction.cliCommand}`,
     );
+  }
+}
+
+function printFeatureFinalizationBranchUpdate(
+  item: NexusFeatureFinalizationPlan["items"][number],
+  stdout: TextWriter,
+): void {
+  if (item.branchUpdateDecision.status === "not_required") {
+    return;
+  }
+  writeLine(
+    stdout,
+    `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
+  );
+  if (item.branchUpdateDecision.reasons.length > 0) {
     writeLine(
       stdout,
-      `    finalPRAction=${item.finalPullRequestAction.status} humanInTheLoop=${item.finalPullRequestAction.humanInTheLoop}`,
+      `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
     );
-    if (item.finalPullRequestAction.providerAction) {
-      const action = item.finalPullRequestAction.providerAction;
-      writeLine(
-        stdout,
-        `    finalPR=${action.head} -> ${action.base} title=${action.title}`,
-      );
-    }
-    if (item.finalPullRequestAction.cliCommand) {
-      writeLine(
-        stdout,
-        `    command: ${item.finalPullRequestAction.cliCommand}`,
-      );
-    }
-    if (item.branchUpdateDecision.status !== "not_required") {
-      writeLine(
-        stdout,
-        `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
-      );
-      if (item.branchUpdateDecision.reasons.length > 0) {
-        writeLine(
-          stdout,
-          `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
-        );
-      }
-      const command = recommendedBranchUpdateCommand(item);
-      if (command) {
-        writeLine(stdout, `    branchUpdate command: ${command}`);
-      }
-    }
-    if (item.reviewReadiness.reasons.length > 0) {
-      writeLine(
-        stdout,
-        `    review reasons: ${item.reviewReadiness.reasons.join("; ")}`,
-      );
-    }
-    if (item.publicationReadiness.reasons.length > 0) {
-      writeLine(
-        stdout,
-        `    publication reasons: ${item.publicationReadiness.reasons.join("; ")}`,
-      );
-    }
+  }
+  const command = recommendedBranchUpdateCommand(item);
+  if (command) {
+    writeLine(stdout, `    branchUpdate command: ${command}`);
+  }
+}
+
+function printFeatureFinalizationReadinessReasons(
+  item: NexusFeatureFinalizationPlan["items"][number],
+  stdout: TextWriter,
+): void {
+  printFeatureFinalizationReasonLine("review", item.reviewReadiness.reasons, stdout);
+  printFeatureFinalizationReasonLine(
+    "publication",
+    item.publicationReadiness.reasons,
+    stdout,
+  );
+}
+
+function printFeatureFinalizationReasonLine(
+  label: string,
+  reasons: readonly string[],
+  stdout: TextWriter,
+): void {
+  if (reasons.length > 0) {
+    writeLine(stdout, `    ${label} reasons: ${reasons.join("; ")}`);
   }
 }
 
