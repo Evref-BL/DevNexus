@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     globalThis: "window",
+    "process.env.NODE_ENV": JSON.stringify("production"),
   },
   build: {
     target: "es2022",
