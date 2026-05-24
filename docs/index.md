@@ -49,6 +49,8 @@ publication rules agents need before they edit code.
 - [Source quality](dev/source-quality.md) records local and CI quality checks.
 - [Source topology](dev/source-topology.md) records the TypeScript source and
   test directory layout.
+- [Release versioning](dev/release-versioning.md) records the release-stage
+  labels used before the first stable public API.
 - [PostgreSQL claim authority initiative](dev/postgresql-claim-authority.md)
   tracks the long-lived design and slice plan for strong multi-host claim
   coordination.
