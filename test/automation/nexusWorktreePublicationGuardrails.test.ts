@@ -116,7 +116,11 @@ function runGuarded(
   args: string[],
   env: NodeJS.ProcessEnv = {},
 ): ReturnType<typeof spawnSync> {
-  return spawnSync(guardedCommandPath(binDirectoryPath, command), args, {
+  const spawnTarget = guardedCommandSpawnTarget(
+    guardedCommandPath(binDirectoryPath, command),
+    args,
+  );
+  return spawnSync(spawnTarget.command, spawnTarget.args, {
     env: {
       ...process.env,
       PATH: `${binDirectoryPath}${path.delimiter}${process.env.PATH ?? ""}`,
@@ -125,6 +129,23 @@ function runGuarded(
     encoding: "utf8",
     windowsHide: true,
   });
+}
+
+function guardedCommandSpawnTarget(
+  commandPath: string,
+  args: string[],
+): { command: string; args: string[] } {
+  if (process.platform === "win32") {
+    return {
+      command: process.env.ComSpec ?? "cmd.exe",
+      args: ["/d", "/s", "/c", commandPath, ...args],
+    };
+  }
+
+  return {
+    command: commandPath,
+    args,
+  };
 }
 
 function guardedCommandPath(binDirectoryPath: string, command: string): string {
