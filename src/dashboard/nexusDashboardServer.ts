@@ -8,6 +8,7 @@ import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildNexusDashboardHostActionQueue,
   buildNexusDashboardHostProjectIndex,
@@ -461,7 +462,7 @@ function readNexusCockpitBuiltClientModuleSource(): string | null {
     new URL("../cockpit-client/dev-nexus-cockpit.js", import.meta.url),
   ];
   for (const candidate of candidates) {
-    const candidatePath = candidate.pathname;
+    const candidatePath = fileURLToPath(candidate);
     if (fs.existsSync(candidatePath)) {
       return fs.readFileSync(candidatePath, "utf8");
     }
@@ -475,7 +476,7 @@ function readNexusCockpitLegacyClientModuleSource(): string {
     new URL("../cockpit/client/nexusCockpitClient.ts", import.meta.url),
   ];
   for (const candidate of candidates) {
-    const candidatePath = candidate.pathname;
+    const candidatePath = fileURLToPath(candidate);
     if (!fs.existsSync(candidatePath)) continue;
     const source = fs.readFileSync(candidatePath, "utf8");
     return candidatePath.endsWith(".ts")
