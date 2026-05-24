@@ -57,6 +57,7 @@ try {
   );
   assertInstalledBin(runtimeRoot);
   record("npm-install", "Installed the packed package into an isolated temp project.");
+  const installedDevNexusBin = installedBinPath(runtimeRoot);
 
   const smokeEnv = {
     ...process.env,
@@ -72,7 +73,13 @@ try {
   const skew = parseJson(
     runDevNexus(
       runtimeRoot,
-      ["diagnostics", "cli-version-skew", "--installed-command", "dev-nexus", "--json"],
+      [
+        "diagnostics",
+        "cli-version-skew",
+        "--installed-command",
+        installedDevNexusBin,
+        "--json",
+      ],
       smokeEnv,
     ).stdout,
     "cli-version-skew JSON output",
@@ -411,8 +418,12 @@ function parseJson(text, source) {
 }
 
 function assertInstalledBin(runtimeRoot) {
+  assertFile(installedBinPath(runtimeRoot), "dev-nexus npm bin");
+}
+
+function installedBinPath(runtimeRoot) {
   const binName = process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus";
-  assertFile(path.join(runtimeRoot, "node_modules", ".bin", binName), "dev-nexus npm bin");
+  return path.join(runtimeRoot, "node_modules", ".bin", binName);
 }
 
 function assertFile(filePath, label) {
