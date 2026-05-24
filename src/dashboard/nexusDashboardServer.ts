@@ -34,6 +34,7 @@ import {
 } from "./nexusDashboardCodexChat.js";
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
+import { renderNexusCockpitTooltipsClientSource } from "../cockpit/client/nexusCockpitTooltips.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "../work-items/nexusEligibleWorkSummary.js";
 
@@ -424,6 +425,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(
       /^import \{ renderNexusCockpitHistoryGraphSvg \} from ["'][^"']+["'];\s*/mu,
       `${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n`,
+    )
+    .replace(
+      /^import \{\s*cockpitTooltipText,\s*installCockpitTooltips,\s*isCockpitTooltipTargetTruncated,\s*\} from ["'][^"']+nexusCockpitTooltips\.js["'];\s*/mu,
+      `${renderNexusCockpitTooltipsClientSource()}\n\n`,
     )
     .replace(/^export async function /gmu, "async function ")
     .replace(/^export function /gmu, "function ")
