@@ -1952,10 +1952,15 @@ async function handleWorkItemCommand(
   const command = argv[1];
   if (command === "create") {
     const parsed = parseWorkItemCreateCommand(argv);
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+    );
     assertCliMutationAllowed(dependencies, {
       projectRoot: path.resolve(parsed.projectRoot),
       command: "work-item create",
-      mutationClass: "local_tracker",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
       componentId: parsed.componentId,
     });
     const authorityBlock = cliWorkItemAuthorityBlock(
@@ -1971,11 +1976,7 @@ async function handleWorkItemCommand(
             parsed.assignees.length > 0 ? parsed.assignees : undefined,
           milestone: parsed.milestone,
         },
-        cliWorkItemTrackerProvider(
-          parsed.projectRoot,
-          parsed.componentId,
-          parsed.trackerId,
-        ),
+        provider,
       ),
     );
     if (authorityBlock) {
@@ -2088,29 +2089,30 @@ async function handleWorkItemCommand(
 
   if (command === "update") {
     const parsed = parseWorkItemUpdateCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item update",
-      mutationClass: "local_tracker",
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item update",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       workItemPatchAuthorityActions(
         parsed.patch,
-        cliWorkItemTrackerProvider(
-          parsed.projectRoot,
-          reference.componentId,
-          reference.trackerId,
-        ),
+        provider,
       ),
     );
     if (authorityBlock) {
@@ -2130,31 +2132,30 @@ async function handleWorkItemCommand(
 
   if (command === "comment") {
     const parsed = parseWorkItemCommentCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item comment",
-      mutationClass: "local_tracker",
-      targetPath: parsed.currentPath,
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item comment",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      targetPath: parsed.currentPath,
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       [
-        workItemCommentAuthorityAction(
-          cliWorkItemTrackerProvider(
-            parsed.projectRoot,
-            reference.componentId,
-            reference.trackerId,
-          ),
-        ),
+        workItemCommentAuthorityAction(provider),
       ],
     );
     if (authorityBlock) {
@@ -2178,31 +2179,30 @@ async function handleWorkItemCommand(
 
   if (command === "set-status") {
     const parsed = parseWorkItemSetStatusCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "work-item set-status",
-      mutationClass: "local_tracker",
-      targetPath: parsed.currentPath,
-      componentId: parsed.componentId,
-    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
       parsed.trackerId,
       parsed.itemId,
     );
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+    );
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item set-status",
+      mutationClass: workItemMutationClassForTrackerProvider(provider),
+      targetPath: parsed.currentPath,
+      componentId: reference.componentId,
+    });
     const authorityBlock = cliWorkItemAuthorityBlock(
       parsed.projectRoot,
       reference.componentId,
       reference.trackerId,
       [
-        workItemStatusAuthorityAction(
-          cliWorkItemTrackerProvider(
-            parsed.projectRoot,
-            reference.componentId,
-            reference.trackerId,
-          ),
-        ),
+        workItemStatusAuthorityAction(provider),
       ],
     );
     if (authorityBlock) {
@@ -3023,6 +3023,14 @@ function cliWorkItemTrackerProvider(
     ? context.workTrackers?.find((candidate) => candidate.id === selectedTrackerId)
     : null;
   return tracker?.workTracking.provider ?? context.workTracking?.provider ?? "local";
+}
+
+function workItemMutationClassForTrackerProvider(
+  provider: string,
+): "local_tracker" | "provider_tracker" {
+  return provider.trim().toLowerCase() === "local"
+    ? "local_tracker"
+    : "provider_tracker";
 }
 
 function workItemPatchAuthorityActions(

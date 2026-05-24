@@ -2115,17 +2115,15 @@ export async function callDevNexusMcpTool(
             homePath: optionalString(args, "homePath", "arguments"),
           }),
         });
-      case "work_item_create":
+      case "work_item_create": {
+        const provider = workItemTrackerProviderFromArgs(args);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_create",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
           componentId: optionalString(args, "componentId", "arguments"),
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemCreateAuthorityActions(
-            args,
-            workItemTrackerProviderFromArgs(args),
-          ),
+          ...workItemCreateAuthorityActions(args, provider),
         ]);
         return toolResult({
           ok: true,
@@ -2139,6 +2137,7 @@ export async function callDevNexusMcpTool(
             milestone: optionalNullableString(args, "milestone", "arguments"),
           }),
         });
+      }
       case "work_item_discovery_status":
         return toolResult({
           ok: true,
@@ -2240,17 +2239,15 @@ export async function callDevNexusMcpTool(
       case "work_item_update": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
         const patch = workItemPatchFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_update",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
           targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          ...workItemPatchAuthorityActions(
-            patch,
-            workItemTrackerProviderFromArgs(args, selector),
-          ),
+          ...workItemPatchAuthorityActions(patch, provider),
         ]);
         return toolResult({
           ok: true,
@@ -2263,14 +2260,15 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_comment": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_comment",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
           targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          workItemCommentAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+          workItemCommentAuthorityAction(provider),
         ]);
         return toolResult({
           ok: true,
@@ -2283,14 +2281,15 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_set_status": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        const provider = workItemTrackerProviderFromArgs(args, selector);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_set_status",
-          mutationClass: "local_tracker",
+          mutationClass: workItemMutationClassForTrackerProvider(provider),
           targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: selector.componentId,
         });
         assertMcpWorkItemAuthorityAllowed(args, [
-          workItemStatusAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+          workItemStatusAuthorityAction(provider),
         ]);
         return toolResult({
           ok: true,
@@ -2717,6 +2716,14 @@ function workItemTrackerProviderFromResolved(
     ? resolved.workTrackers?.find((candidate) => candidate.id === trackerId)
     : null;
   return tracker?.workTracking.provider ?? resolved.workTracking?.provider ?? "local";
+}
+
+function workItemMutationClassForTrackerProvider(
+  provider: string,
+): NexusCheckoutMutationClass {
+  return provider.trim().toLowerCase() === "local"
+    ? "local_tracker"
+    : "provider_tracker";
 }
 
 function workItemCreateAuthorityActions(
