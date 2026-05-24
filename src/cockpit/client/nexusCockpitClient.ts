@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { buildWriteHistoryLayout } from "../../dashboard/nexusDashboardHistoryLayout.js";
 import { cockpitStyles } from "./nexusCockpitStyles.js";
 import {
   chatIcon,
@@ -17,21 +16,28 @@ import {
   uniqueActions,
 } from "./nexusCockpitActions.js";
 import {
+  compactBranchName,
   compactPath,
   countLabel,
   escapeAttribute,
   escapeHtml,
   formatDisplayText,
   formatTime,
+  toneForStatus,
   truncate,
 } from "./nexusCockpitFormat.js";
 import {
-  bindGitHistoryColumnResizers,
-  gitHistoryColumnStyle,
-  readStoredGitHistoryColumnWidths,
-  renderGitHistoryColumnHeader,
-} from "./history/nexusCockpitHistoryColumns.js";
-import { renderNexusCockpitHistoryGraphSvg } from "./history/nexusCockpitHistoryGraphSvg.js";
+  featureGitBranches,
+  firstGitHistoryCommit,
+  gitHistoryCommitBySelectId,
+  gitHistoryDetail,
+  gitHistoryRows,
+  gitHistorySelectId,
+  isGitHistorySelection,
+  renderGitHistory,
+  threadsForGitBranches,
+  trackedWorkForGitBranches,
+} from "./history/nexusCockpitWriteHistory.js";
 import {
   cockpitTooltipText,
   installCockpitTooltips,
@@ -54,7 +60,6 @@ export interface DevNexusDashboardMountHandle {
 const defaultRefreshMs = 15000;
 const themeStorageKey = 'dev-nexus-cockpit-theme';
 const legacyThemeStorageKey = 'dev-nexus-dashboard-theme';
-const gitHistoryInlineDetailRows = 7;
 export async function fetchDevNexusDashboard(baseUrl = '', workspaceId = '') {
   const response = await fetch(`${baseUrl}/api/cockpit${workspaceQuery(workspaceId)}`, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Cockpit API returned ${response.status}`);
@@ -792,303 +797,6 @@ function renderEvent(event, selectedId) {
   return `<article class="dn-event-card"><button class="dn-event ${relatedId === selectedId ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(relatedId)}"><span class="dn-label">${escapeHtml(formatTime(event.time))} · ${escapeHtml(event.source)}</span><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatDisplayText(event.body))}</p></button>${renderActionStrip(event.actions, 'compact')}</article>`;
 }
 
-function isGitHistorySelection(selectedId) {
-  return String(selectedId ?? '').startsWith('history:');
-}
-
-function renderGitHistory(snapshot, selectedId, filter = 'all') {
-  const activeFilter = normalizeGitHistoryFilter(filter);
-  const graph = gitHistoryRows(snapshot, activeFilter);
-  if (!graph) return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2></div><span class="dn-count">0 write events</span></div><p>No write history loaded.</p></div>`;
-  const repository = graph.repository;
-  const count = `${countLabel(graph.rows.length, 'write event')} · ${countLabel(repository.branchNames?.length ?? 0, 'branch', 'branches')}`;
-  const note = repository.moreAvailable ? `<p class="dn-git-note">Showing the newest ${repository.commits.length} write events. Branch filters use the loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Write history</span><h2>Project Writes</h2><p class="dn-history-note">Git commits are write events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repository, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
-}
-
-function renderGitHistoryBoard(snapshot, graph, selectedId) {
-  const widths = readStoredGitHistoryColumnWidths();
-  const visualGraph = gitHistoryVisualGraph(graph, selectedId);
-  return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
-}
-
-function normalizeGitHistoryFilter(value) {
-  const text = String(value ?? '').trim();
-  if (!text || text === 'all') return 'all';
-  if (text.startsWith('branch:') && text.slice('branch:'.length).trim()) return `branch:${text.slice('branch:'.length).trim()}`;
-  if (text.startsWith('feature:') && text.slice('feature:'.length).trim()) return `feature:${text.slice('feature:'.length).trim()}`;
-  return 'all';
-}
-
-function renderGitHistoryFilters(snapshot, repository, activeFilter) {
-  const filters = gitHistoryFilters(snapshot, repository);
-  if (filters.length <= 1) return '';
-  return `<div class="dn-git-filters" aria-label="Write history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
-}
-
-function gitHistoryFilters(snapshot, repository) {
-  const filters = [{ id: 'all', label: 'All writes', title: 'Show the loaded project write history' }];
-  const seen = new Set(filters.map((filter) => filter.id));
-  const push = (id, label, title = label) => {
-    const normalized = normalizeGitHistoryFilter(id);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    filters.push({ id: normalized, label, title });
-  };
-  if (repository.defaultBranch) push(`branch:${repository.defaultBranch}`, repository.defaultBranch, `Show ${repository.defaultBranch} and its loaded write ancestors`);
-  for (const feature of snapshot.features?.records ?? []) {
-    const branches = featureGitBranches(feature);
-    if (!branches.length) continue;
-    push(`feature:${feature.id}`, feature.title, `Show write events reachable from ${feature.title}`);
-  }
-  const branchNames = gitHistoryBranchNames(repository);
-  for (const branch of branchNames) push(`branch:${branch}`, compactBranchName(branch), `Show ${branch} and its loaded write ancestors`);
-  return filters.slice(0, 18);
-}
-
-function gitHistoryBranchNames(repository) {
-  const names = [];
-  const seen = new Set();
-  const remember = (name) => {
-    const normalized = normalizeGitBranchName(name);
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    names.push(normalized);
-  };
-  for (const commit of repository.commits ?? []) {
-    for (const ref of commit.refs ?? []) {
-      if (ref.kind === 'branch' || ref.kind === 'remote') remember(ref.name);
-    }
-  }
-  for (const branch of repository.branchNames ?? []) remember(branch);
-  return names;
-}
-
-function featureGitBranches(feature) {
-  return [...new Set([feature.featureBranch, ...(feature.branches ?? [])].filter(Boolean).map((branch) => String(branch).trim()).filter(Boolean))];
-}
-
-function normalizeGitBranchName(value) {
-  return String(value ?? '').trim().replace(/^refs\/heads\//, '').replace(/^refs\/remotes\//, '').replace(/^remotes\//, '');
-}
-
-function filteredGitHistoryCommits(snapshot, repository, filter) {
-  const commits = repository.commits ?? [];
-  if (filter === 'all') return commits;
-  const headHashes = gitHistoryFilterHeadHashes(snapshot, repository, filter);
-  if (!headHashes.size) return [];
-  const reachable = collectGitAncestorHashes(commits, headHashes);
-  return commits.filter((commit) => reachable.has(commit.hash));
-}
-
-function gitHistoryFilterHeadHashes(snapshot, repository, filter) {
-  const headHashes = new Set();
-  if (filter.startsWith('branch:')) {
-    for (const hash of branchHeadHashes(repository, filter.slice('branch:'.length))) headHashes.add(hash);
-  } else if (filter.startsWith('feature:')) {
-    const id = filter.slice('feature:'.length);
-    const feature = (snapshot.features?.records ?? []).find((candidate) => candidate.id === id);
-    for (const branch of featureGitBranches(feature ?? {})) {
-      for (const hash of branchHeadHashes(repository, branch)) headHashes.add(hash);
-    }
-  }
-  return headHashes;
-}
-
-function branchHeadHashes(repository, branchName) {
-  const wanted = normalizeGitBranchName(branchName);
-  const hashes = new Set();
-  if (!wanted) return hashes;
-  for (const commit of repository.commits ?? []) {
-    for (const ref of commit.refs ?? []) {
-      if (ref.kind !== 'branch' && ref.kind !== 'remote') continue;
-      const refName = normalizeGitBranchName(ref.name);
-      if (refName === wanted || refName.endsWith(`/${wanted}`)) hashes.add(ref.hash || commit.hash);
-    }
-  }
-  if (!hashes.size && repository.defaultBranch === wanted && repository.head) hashes.add(repository.head);
-  return hashes;
-}
-
-function collectGitAncestorHashes(commits, headHashes) {
-  const byHash = new Map(commits.map((commit) => [commit.hash, commit]));
-  const reachable = new Set();
-  const queue = [...headHashes];
-  while (queue.length) {
-    const hash = queue.shift();
-    if (!hash || reachable.has(hash)) continue;
-    reachable.add(hash);
-    const commit = byHash.get(hash);
-    if (!commit) continue;
-    for (const parent of commit.parents ?? []) queue.push(parent);
-  }
-  return reachable;
-}
-
-function gitHistoryRows(snapshot, filter = 'all') {
-  const repository = (snapshot.history?.repositories ?? []).find((candidate) => (candidate.commits ?? []).length > 0) ?? null;
-  if (!repository) return null;
-  const commits = filteredGitHistoryCommits(snapshot, repository, normalizeGitHistoryFilter(filter));
-  const commitsByHash = new Map(commits.map((commit) => [commit.hash, commit]));
-  const layout = buildWriteHistoryLayout({
-    writeEvents: commits.map((commit) => ({
-      id: commit.hash,
-      parentIds: commit.parents ?? [],
-      subject: commit.subject ?? commit.shortHash ?? commit.hash,
-    })),
-  });
-  const rows = layout.nodes.map((node) => {
-    const commit = commitsByHash.get(node.writeEventId);
-    if (!commit) return null;
-    return { repository, commit, lane: node.lane, colorLane: node.colorIndex, index: node.row, selectId: gitHistorySelectId(repository, commit) };
-  }).filter(Boolean);
-  const paths = layout.segments.map((segment) => ({
-    colorLane: segment.colorIndex,
-    fromLane: segment.fromLane,
-    toLane: segment.toLane,
-    fromIndex: segment.fromRow,
-    toIndex: segment.toRow,
-    points: segment.points.map((point) => ({ lane: point.lane, index: point.row })),
-  }));
-  return { repository, rows, paths, maxLane: layout.maxRouteLane, layout };
-}
-
-function renderGitHistorySvg(graph) {
-  return renderNexusCockpitHistoryGraphSvg(graph, {
-    ariaLabel: 'Git write history graph',
-  });
-}
-
-function renderGitHistoryRows(snapshot, graph, selectedId) {
-  return graph.rows.map((row) => {
-    const detail = row.selectId === selectedId ? renderGitHistoryDetailPanel(snapshot, graph, selectedId) : '';
-    return `${renderGitHistoryRow(snapshot, row, selectedId)}${detail}`;
-  }).join('');
-}
-
-function gitHistoryVisualGraph(graph, selectedId) {
-  if (!isGitHistorySelection(selectedId)) return graph;
-  const selectedRow = graph.rows.find((row) => row.selectId === selectedId);
-  if (!selectedRow) return graph;
-  const pivot = selectedRow.index;
-  const shiftIndex = (index) => {
-    const value = Number(index);
-    if (!Number.isFinite(value)) return index;
-    return value > pivot ? value + gitHistoryInlineDetailRows : value;
-  };
-  return {
-    ...graph,
-    rows: graph.rows.map((row) => ({ ...row, index: shiftIndex(row.index) })),
-    paths: (graph.paths ?? []).map((path) => ({
-      ...path,
-      fromIndex: path.fromIndex === undefined ? path.fromIndex : shiftIndex(path.fromIndex),
-      toIndex: path.toIndex === undefined ? path.toIndex : shiftIndex(path.toIndex),
-      points: (path.points ?? []).map((point) => ({ ...point, index: shiftIndex(point.index) })),
-    })),
-  };
-}
-
-function renderGitHistoryRow(snapshot, row, selectedId) {
-  const selected = row.selectId === selectedId ? ' selected' : '';
-  const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
-  const refChips = refs.map((ref) => `<span class="dn-git-ref" style="--dn-branch-color:var(--dn-branch-${(row.colorLane ?? row.lane) % 7});" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join('');
-  const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
-  const date = formatTime(row.commit.committedAt);
-  const author = row.commit.authorName ?? '';
-  const authorTitle = [row.commit.authorName, row.commit.authorEmail].filter(Boolean).join(' · ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}"><span class="dn-git-subject"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
-}
-
-function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
-  if (!selectedId || !String(selectedId).startsWith('history:')) return '';
-  const row = graph.rows.find((candidate) => candidate.selectId === selectedId);
-  if (!row) return '';
-  const commit = row.commit;
-  const parents = gitHistoryParentCommits(row.repository, commit);
-  const children = gitHistoryChildCommits(row.repository, commit);
-  const annotations = gitHistoryAnnotations(snapshot, row.repository, commit);
-  const actions = uniqueActions(annotations.flatMap((annotation) => annotation.actions ?? []));
-  const markers = annotations.length
-    ? `<div class="dn-history-marker-list">${annotations.map((annotation) => `<span class="dn-history-marker tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('')}</div>`
-    : '<p>No attached decision, review, or tracked-work markers.</p>';
-  const actionStrip = actions.length ? renderActionStrip(actions, 'compact') : '<p>No direct action for this write event.</p>';
-  const facts = [
-    ['Parents', parents.length ? parents.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
-    ['Children', children.length ? children.map(gitHistoryWriteEventLabel).join(', ') : 'none'],
-    ['Source', commit.shortHash ?? commit.hash],
-  ];
-  return `<section class="dn-git-detail-panel dn-git-inline-detail" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Selected write event</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ') || 'Git commit write event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl></article><aside class="dn-git-detail-side"><span class="dn-label">Attached details</span>${markers}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
-}
-
-function gitHistoryParentCommits(repository, commit) {
-  const byHash = new Map((repository.commits ?? []).map((candidate) => [candidate.hash, candidate]));
-  return (commit.parents ?? []).map((parent) => byHash.get(parent)).filter(Boolean);
-}
-
-function gitHistoryChildCommits(repository, commit) {
-  return (repository.commits ?? []).filter((candidate) => (candidate.parents ?? []).includes(commit.hash));
-}
-
-function gitHistoryWriteEventLabel(commit) {
-  return [commit.shortHash, commit.subject].filter(Boolean).join(' ');
-}
-
-function gitHistoryAnnotations(snapshot, repository, commit) {
-  const branchNames = gitCommitBranchNames(commit);
-  const features = featuresForGitBranches(snapshot, branchNames);
-  const threads = threadsForGitBranches(snapshot, branchNames);
-  const trackedWork = trackedWorkForGitBranches(snapshot, branchNames);
-  const annotations = [];
-  for (const feature of features.slice(0, 2)) {
-    annotations.push({ kind: 'feature', label: feature.statusLabel ?? feature.status ?? 'Feature', title: feature.title, tone: toneForStatus(feature.status, 'feature'), feature, actions: [] });
-  }
-  if (threads.length) {
-    const needsDecision = threads.filter((thread) => thread.decision === 'review' || thread.decision === 'rescue' || thread.decision === 'blocked').length;
-    annotations.push({ kind: 'thread', label: countLabel(threads.length, 'thread'), title: needsDecision ? countLabel(needsDecision, 'action') + ' needed' : 'Active thread', tone: needsDecision ? 'warn' : 'active', threads, actions: threads.flatMap((thread) => thread.actions ?? []) });
-  }
-  if (trackedWork.length) {
-    const blocked = trackedWork.filter((item) => item.kind === 'blocked').length;
-    annotations.push({ kind: 'tracked-work', label: countLabel(trackedWork.length, 'issue'), title: blocked ? countLabel(blocked, 'blocker') : 'Tracked work', tone: blocked ? 'danger' : 'active', trackedWork, actions: trackedWork.flatMap((item) => item.actions ?? []) });
-  }
-  return annotations;
-}
-
-function gitCommitBranchNames(commit) {
-  return [...new Set((commit.refs ?? []).filter((ref) => ref.kind === 'branch' || ref.kind === 'remote').map((ref) => normalizeGitBranchName(ref.name)).filter(Boolean))];
-}
-
-function featuresForGitBranches(snapshot, branchNames) {
-  return (snapshot.features?.records ?? []).filter((feature) => branchSetsIntersect(branchNames, featureGitBranches(feature)));
-}
-
-function threadsForGitBranches(snapshot, branchNames) {
-  return (snapshot.threads?.records ?? []).filter((thread) => branchSetsIntersect(branchNames, [thread.branchName]));
-}
-
-function trackedWorkForGitBranches(snapshot, branchNames) {
-  return (snapshot.trackedWork?.records ?? []).filter((item) => branchNames.some((branch) => trackedWorkMentionsBranch(item, branch)));
-}
-
-function trackedWorkMentionsBranch(item, branch) {
-  const normalized = normalizeBranchSearchToken(branch);
-  if (!normalized) return false;
-  const text = normalizeBranchSearchToken([item.id, item.logicalItemId, item.title, item.detail, item.webUrl].filter(Boolean).join(' '));
-  return text.includes(normalized) || normalized.split('-').some((token) => token.length > 3 && text.includes(token));
-}
-
-function normalizeBranchSearchToken(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-function branchSetsIntersect(left, right) {
-  const normalizedRight = new Set((right ?? []).map(normalizeGitBranchName).filter(Boolean));
-  return (left ?? []).map(normalizeGitBranchName).some((branch) => normalizedRight.has(branch) || [...normalizedRight].some((candidate) => candidate.endsWith(`/${branch}`) || branch.endsWith(`/${candidate}`)));
-}
-
-function gitHistorySelectId(repository, commit) {
-  return `history:${repository.componentId}:${commit.hash}`;
-}
-
 function renderFeatureOverview(snapshot, selectedId) {
   const features = snapshot.features;
   const records = features?.records ?? [];
@@ -1441,12 +1149,6 @@ function worktreeLaneKey(worktree) {
   return `worktree:${worktree.branchName ?? worktree.id}`;
 }
 
-function compactBranchName(value) {
-  const text = String(value ?? 'worktree');
-  const parts = text.split('/').filter(Boolean);
-  return parts.length > 2 ? parts.slice(-2).join('/') : text;
-}
-
 function defaultSelectedId(snapshot) {
   const urgentFeature = (snapshot.features?.records ?? []).find((candidate) => candidate.status === 'blocked' || candidate.status === 'needs-review');
   if (urgentFeature) return urgentFeature.id;
@@ -1484,46 +1186,6 @@ function selectedDetail(snapshot, selectedId) {
   const actions = uniqueActions([...(node?.actions ?? []), ...events.flatMap((event) => event.actions ?? [])]);
   const detail = { title: displayTitle(node, snapshot), body: displayBody(node, snapshot), facts, events, actions };
   return { ...detail, chat: detailChat(node, detail) };
-}
-
-function firstGitHistoryCommit(snapshot) {
-  const repository = (snapshot.history?.repositories ?? []).find((candidate) => (candidate.commits ?? []).length > 0) ?? null;
-  const commit = repository?.commits?.[0] ?? null;
-  return repository && commit ? { repository, commit } : null;
-}
-
-function gitHistoryCommitBySelectId(snapshot, id) {
-  const parts = String(id).split(':');
-  const componentId = parts[1];
-  const hash = parts.slice(2).join(':');
-  const repository = (snapshot.history?.repositories ?? []).find((candidate) => candidate.componentId === componentId) ?? null;
-  const commit = repository?.commits?.find((candidate) => candidate.hash === hash) ?? null;
-  return repository && commit ? { repository, commit } : null;
-}
-
-function gitHistoryDetail(snapshot, id) {
-  const match = gitHistoryCommitBySelectId(snapshot, id);
-  const commit = match?.commit;
-  const repository = match?.repository;
-  const refs = (commit?.refs ?? []).filter((ref) => ref.kind !== 'head').map((ref) => ref.name).join(', ') || 'none';
-  const annotations = commit && repository ? gitHistoryAnnotations(snapshot, repository, commit) : [];
-  const facts = [
-    ['Type', 'write event'],
-    ['Component', repository?.componentName ?? repository?.componentId ?? 'workspace'],
-    ['Commit', commit?.shortHash ?? 'unknown'],
-    ['Parents', String(commit?.parents?.length ?? 0)],
-    ['Author', commit?.authorName ?? 'unknown'],
-    ['Refs', refs],
-  ];
-  const featureNames = annotations.filter((annotation) => annotation.kind === 'feature').map((annotation) => annotation.title).filter(Boolean);
-  const threadCount = annotations.filter((annotation) => annotation.kind === 'thread').reduce((total, annotation) => total + (annotation.threads?.length ?? 0), 0);
-  const issueCount = annotations.filter((annotation) => annotation.kind === 'tracked-work').reduce((total, annotation) => total + (annotation.trackedWork?.length ?? 0), 0);
-  if (featureNames.length) facts.push(['Feature', featureNames.join(', ')]);
-  if (threadCount) facts.push(['Threads', String(threadCount)]);
-  if (issueCount) facts.push(['Tracked work', String(issueCount)]);
-  if (commit?.committedAt) facts.push(['Time', formatTime(commit.committedAt)]);
-  const actions = uniqueActions(annotations.flatMap((annotation) => annotation.actions ?? []));
-  return { title: commit?.subject ?? 'Write event', body: commit?.subject ?? 'Git commit recorded as a write event.', facts, events: [], actions, chat: null };
 }
 
 function featureBySelectId(snapshot, id) {
@@ -1689,14 +1351,6 @@ function enrichNodeFacts(snapshot, node, facts) {
 
 function relatedEvents(snapshot, nodeId) {
   return nodeId ? snapshot.events.filter((event) => event.relatedNodeIds.includes(nodeId)) : [];
-}
-
-function toneForStatus(status, kind) {
-  if (['ready', 'clean', 'completed', 'configured'].includes(status)) return 'good';
-  if (['working', 'active', 'head', 'dispatched'].includes(status) || kind === 'project') return 'active';
-  if (['blocked', 'failed', 'dirty', 'missing'].includes(status)) return 'danger';
-  if (['stale', 'warning'].includes(status) || kind === 'blocker') return 'warn';
-  return 'neutral';
 }
 
 function renderWeave(weave) {

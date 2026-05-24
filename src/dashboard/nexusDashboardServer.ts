@@ -35,6 +35,7 @@ import {
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
 import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
+import { renderNexusCockpitWriteHistoryClientSource } from "../cockpit/client/history/nexusCockpitWriteHistory.js";
 import { renderNexusCockpitActionsClientSource } from "../cockpit/client/nexusCockpitActions.js";
 import { renderNexusCockpitFormatClientSource } from "../cockpit/client/nexusCockpitFormat.js";
 import { renderNexusCockpitStylesClientSource } from "../cockpit/client/nexusCockpitStyles.js";
@@ -423,15 +424,11 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(/^\/\/ @ts-nocheck\s*/u, "")
     .replace(/^export interface \w+ \{[^}]*\}\s*/gmu, "")
     .replace(
-      /^import \{ buildWriteHistoryLayout \} from ["'][^"']+["'];\s*/mu,
-      `${renderNexusDashboardHistoryLayoutClientSource()}\n\n`,
-    )
-    .replace(
       /^import \{ cockpitStyles \} from ["'][^"']+nexusCockpitStyles\.js["'];\s*/mu,
       `${renderNexusCockpitStylesClientSource()}\n\n`,
     )
     .replace(
-      /^import \{\s*compactPath,\s*countLabel,\s*escapeAttribute,\s*escapeHtml,\s*formatDisplayText,\s*formatTime,\s*truncate,\s*\} from ["'][^"']+nexusCockpitFormat\.js["'];\s*/mu,
+      /^import \{\s*compactBranchName,\s*compactPath,\s*countLabel,\s*escapeAttribute,\s*escapeHtml,\s*formatDisplayText,\s*formatTime,\s*toneForStatus,\s*truncate,\s*\} from ["'][^"']+nexusCockpitFormat\.js["'];\s*/mu,
       `${renderNexusCockpitFormatClientSource()}\n\n`,
     )
     .replace(
@@ -439,12 +436,8 @@ function standaloneNexusCockpitClientSource(source: string): string {
       `${renderNexusCockpitActionsClientSource()}\n\n`,
     )
     .replace(
-      /^import \{\s*bindGitHistoryColumnResizers,\s*gitHistoryColumnStyle,\s*readStoredGitHistoryColumnWidths,\s*renderGitHistoryColumnHeader,\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
-      `${renderNexusCockpitHistoryColumnsClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{ renderNexusCockpitHistoryGraphSvg \} from ["'][^"']+["'];\s*/mu,
-      `${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n`,
+      /^import \{\s*featureGitBranches,\s*firstGitHistoryCommit,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*gitHistorySelectId,\s*isGitHistorySelection,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
+      `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitWriteHistoryClientSource()}\n\n`,
     )
     .replace(
       /^import \{\s*cockpitTooltipText,\s*installCockpitTooltips,\s*isCockpitTooltipTargetTruncated,\s*\} from ["'][^"']+nexusCockpitTooltips\.js["'];\s*/mu,
