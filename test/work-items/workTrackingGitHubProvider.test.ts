@@ -19,7 +19,8 @@ interface FetchCall {
 
 interface QueuedResponse {
   status?: number;
-  body: unknown;
+  body?: unknown;
+  headers?: Record<string, string>;
 }
 
 function githubConfig(
@@ -94,12 +95,16 @@ function queuedFetch(responses: QueuedResponse[]): {
           : undefined,
     });
 
-    return new Response(JSON.stringify(response.body), {
-      status: response.status ?? 200,
-      headers: {
-        "content-type": "application/json",
+    return new Response(
+      response.body === undefined ? null : JSON.stringify(response.body),
+      {
+        status: response.status ?? 200,
+        headers: {
+          "content-type": "application/json",
+          ...(response.headers ?? {}),
+        },
       },
-    });
+    );
   };
 
   return { calls, fetch: fetchFn };
@@ -695,6 +700,50 @@ describe("GitHub work tracker provider", () => {
 
     expect(fake.calls[0]?.url).toBe(
       "https://github.enterprise.test/api/v3/repos/example/project/issues/7",
+    );
+  });
+
+  it("sends conditional headers and reuses cached GitHub issue data on 304", async () => {
+    const fake = queuedFetch([
+      {
+        body: issue({ title: "Cached task" }),
+        headers: { etag: "\"issue-7\"" },
+      },
+      { status: 304 },
+    ]);
+    const provider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      token: "github-token",
+      fetch: fake.fetch,
+    });
+
+    const first = await provider.getWorkItem({ id: "github-7" });
+    const second = await provider.getWorkItem({ id: "github-7" });
+
+    expect(first.title).toBe("Cached task");
+    expect(second).toEqual(first);
+    expect(fake.calls[1]?.headers["If-None-Match"]).toBe("\"issue-7\"");
+  });
+
+  it("surfaces GitHub rate-limit responses instead of returning empty data", async () => {
+    const fake = queuedFetch([
+      {
+        status: 403,
+        body: { message: "API rate limit exceeded" },
+        headers: {
+          "x-ratelimit-remaining": "0",
+          "x-ratelimit-reset": "1770000000",
+        },
+      },
+    ]);
+    const provider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      token: "github-token",
+      fetch: fake.fetch,
+    });
+
+    await expect(provider.getWorkItem({ id: "github-7" })).rejects.toThrow(
+      /rate limit.*2026-02-02T02:40:00.000Z/u,
     );
   });
 

@@ -5,6 +5,12 @@ import type { NexusPublicationActorConfig } from "../automation/nexusAutomationC
 import type { NexusPublicationProviderEvidenceInput } from "./nexusPublicationProviderEvidence.js";
 import type { NexusResolvedProviderCredential } from "../providers/nexusProviderCredentialBroker.js";
 import {
+  createNexusProviderHttpClient,
+  type NexusProviderHttpClient,
+  type NexusProviderHttpJsonResponse,
+  type NexusProviderRateLimit,
+} from "../providers/nexusProviderHttpClient.js";
+import {
   stripHttpScheme,
   stripTrailingSlashes,
 } from "../runtime/nexusTextNormalization.js";
@@ -322,6 +328,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
   private readonly credential: NexusResolvedProviderCredential | null;
   private readonly commandRunner: NexusForgePublicationCommandRunner;
   private readonly fetchFn: typeof fetch;
+  private readonly httpClient: NexusProviderHttpClient;
   private readonly baseEnv: NodeJS.ProcessEnv;
   private readonly cwd: string | undefined;
 
@@ -336,6 +343,10 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     this.commandRunner =
       options.commandRunner ?? defaultForgePublicationCommandRunner;
     this.fetchFn = options.fetch ?? fetch;
+    this.httpClient = createNexusProviderHttpClient({
+      fetch: this.fetchFn,
+      concurrency: 1,
+    });
     this.baseEnv = options.baseEnv ?? process.env;
     this.cwd = options.cwd;
   }
@@ -835,8 +846,9 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       pathAndQuery.replace(/^\/+/, ""),
       `${githubApiBaseUrl(this.repository.host)}/`,
     );
-    const response = await this.fetchFn(url, {
+    const response = await this.httpClient.requestJson<T | GitHubErrorBody | null>({
       method: options.method,
+      url,
       headers: {
         Accept: "application/vnd.github+json",
         "User-Agent": "dev-nexus",
@@ -846,23 +858,18 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     });
-    const text = await response.text();
-    const payload = text ? (JSON.parse(text) as unknown) : null;
     if (!response.ok) {
-      const message =
-        payload && typeof payload === "object"
-          ? (payload as GitHubErrorBody).message
-          : undefined;
+      const message = githubRestErrorDetail(response);
       throw new NexusForgePublicationError(
         "provider_request_failed",
         `${options.method} ${url.pathname} failed: ${response.status} ${
           message ?? response.statusText
-        }`,
+        }${githubRateLimitHint(response.rateLimit)}`,
         { backend: this.backend, capability: options.capability },
       );
     }
 
-    return payload as T;
+    return response.body as T;
   }
 
   private runGh(
@@ -1191,6 +1198,34 @@ function githubCliHost(host?: string | null): string {
   }
   const normalized = stripTrailingSlashes(stripHttpScheme(value));
   return normalized.startsWith("api.") ? normalized.slice("api.".length) : normalized;
+}
+
+function githubRestErrorDetail(
+  response: NexusProviderHttpJsonResponse<unknown>,
+): string | undefined {
+  const body = response.body;
+  return body && typeof body === "object"
+    ? (body as GitHubErrorBody).message
+    : response.bodyText || undefined;
+}
+
+function githubRateLimitHint(rateLimit: NexusProviderRateLimit | undefined): string {
+  if (!rateLimit?.limited) {
+    return "";
+  }
+  const details = [
+    rateLimit.retryAfterSeconds !== undefined
+      ? `retry after ${rateLimit.retryAfterSeconds}s`
+      : null,
+    rateLimit.resetAt ? `resets at ${rateLimit.resetAt}` : null,
+    rateLimit.remaining !== undefined
+      ? `remaining ${rateLimit.remaining}`
+      : null,
+    rateLimit.resource ? `resource ${rateLimit.resource}` : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  return details.length > 0
+    ? `. GitHub rate limit: ${details.join("; ")}`
+    : ". GitHub rate limit reached.";
 }
 
 function normalizeProvider(provider: string): string {

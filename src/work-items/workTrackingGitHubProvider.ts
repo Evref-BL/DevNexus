@@ -1,4 +1,11 @@
 import { spawnSync } from "node:child_process";
+import {
+  createNexusProviderHttpClient,
+  type NexusProviderHttpClient,
+  type NexusProviderHttpJsonResponse,
+  type NexusProviderHttpMethod,
+  type NexusProviderRateLimit,
+} from "../providers/nexusProviderHttpClient.js";
 import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
 import { stripTrailingSlashes } from "../runtime/nexusTextNormalization.js";
 import type {
@@ -37,6 +44,8 @@ export interface GitHubWorkTrackerProviderOptions {
   token?: string | null;
   authorizationHeader?: string | null;
   fetch?: typeof fetch;
+  httpClient?: NexusProviderHttpClient;
+  requestConcurrency?: number;
   apiBaseUrl?: string | null;
   graphqlApiUrl?: string | null;
   apiVersion?: string | null;
@@ -150,6 +159,7 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
 
   private readonly config: GitHubWorkTrackingConfig;
   private readonly fetchFn: typeof fetch;
+  private readonly httpClient: NexusProviderHttpClient;
   private readonly apiBaseUrl: string;
   private readonly graphqlApiUrl: string;
   private readonly apiVersion: string;
@@ -161,6 +171,11 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
   constructor(options: GitHubWorkTrackerProviderOptions) {
     this.config = options.config;
     this.fetchFn = options.fetch ?? fetch;
+    this.httpClient = options.httpClient ??
+      createNexusProviderHttpClient({
+        fetch: this.fetchFn,
+        concurrency: options.requestConcurrency ?? 1,
+      });
     this.apiBaseUrl = normalizeGitHubApiBaseUrl(
       options.apiBaseUrl ?? options.config.host,
     );
@@ -414,7 +429,7 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
   }
 
   private async requestJson<T>(
-    method: string,
+    method: NexusProviderHttpMethod,
     pathAndQuery: string,
     body?: Record<string, unknown>,
   ): Promise<T> {
@@ -432,25 +447,26 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
       headers.Authorization = authorizationHeader;
     }
 
-    const response = await this.fetchFn(url, {
+    const response = await this.httpClient.requestJson<T>({
       method,
+      url,
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
 
     if (!response.ok) {
-      const message = await githubErrorMessage(response, method, url);
+      const message = githubErrorMessage(response, method, url);
       throw new GitHubWorkTrackerProviderError(
         gitHubErrorMessageWithCredentialHint(
           message,
-          response,
+          response.status,
           authorizationHeader,
           this.config,
         ),
       );
     }
 
-    return (await response.json()) as T;
+    return response.body;
   }
 
   private async graphql<T>(
@@ -468,14 +484,18 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
       headers.Authorization = authorizationHeader;
     }
 
-    const response = await this.fetchFn(this.graphqlApiUrl, {
+    const response = await this.httpClient.requestJson<{
+      data?: T;
+      errors?: Array<{ message?: string }>;
+    }>({
       method: "POST",
+      url: this.graphqlApiUrl,
       headers,
       body: JSON.stringify({ query, variables }),
     });
 
     if (!response.ok) {
-      const message = await githubErrorMessage(
+      const message = githubErrorMessage(
         response,
         "POST",
         new URL(this.graphqlApiUrl),
@@ -483,17 +503,14 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
       throw new GitHubWorkTrackerProviderError(
         gitHubErrorMessageWithCredentialHint(
           message,
-          response,
+          response.status,
           authorizationHeader,
           this.config,
         ),
       );
     }
 
-    const payload = (await response.json()) as {
-      data?: T;
-      errors?: Array<{ message?: string }>;
-    };
+    const payload = response.body;
     if (payload.errors?.length) {
       throw new GitHubWorkTrackerProviderError(
         `GitHub GraphQL request failed: ${payload.errors
@@ -1044,34 +1061,32 @@ function encodePathSegment(value: string): string {
   return encodeURIComponent(requiredNonEmptyString(value, "path segment"));
 }
 
-async function githubErrorMessage(
-  response: Response,
+function githubErrorMessage(
+  response: NexusProviderHttpJsonResponse<unknown>,
   method: string,
   url: URL,
-): Promise<string> {
-  let detail: string | undefined;
-  try {
-    const body = (await response.json()) as GitHubErrorBody;
-    detail = body.message;
-  } catch {
-    detail = await response.text().catch(() => undefined);
-  }
+): string {
+  const body = response.body;
+  const detail = body && typeof body === "object"
+    ? (body as GitHubErrorBody).message
+    : response.bodyText || undefined;
 
   return [
     `GitHub request failed: ${method} ${url.pathname} returned ${response.status}`,
     detail ? `: ${detail}` : "",
+    githubRateLimitHint(response.rateLimit),
   ].join("");
 }
 
 function gitHubErrorMessageWithCredentialHint(
   message: string,
-  response: Response,
+  status: number,
   authorizationHeader: string | undefined,
   config: Pick<GitHubWorkTrackingConfig, "host" | "repository">,
 ): string {
   if (
     authorizationHeader ||
-    (response.status !== 401 && response.status !== 403)
+    (status !== 401 && status !== 403)
   ) {
     return message;
   }
@@ -1081,4 +1096,23 @@ function gitHubErrorMessageWithCredentialHint(
     `${normalizeGitHubCredentialHost(config.host)}. Configure GITHUB_TOKEN, ` +
     "GH_TOKEN, or a git credential helper."
   );
+}
+
+function githubRateLimitHint(rateLimit: NexusProviderRateLimit | undefined): string {
+  if (!rateLimit?.limited) {
+    return "";
+  }
+  const details = [
+    rateLimit.retryAfterSeconds !== undefined
+      ? `retry after ${rateLimit.retryAfterSeconds}s`
+      : null,
+    rateLimit.resetAt ? `resets at ${rateLimit.resetAt}` : null,
+    rateLimit.remaining !== undefined
+      ? `remaining ${rateLimit.remaining}`
+      : null,
+    rateLimit.resource ? `resource ${rateLimit.resource}` : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  return details.length > 0
+    ? `. GitHub rate limit: ${details.join("; ")}`
+    : ". GitHub rate limit reached.";
 }

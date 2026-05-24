@@ -377,6 +377,52 @@ describe("nexus forge publication facade", () => {
     });
   });
 
+  it("uses conditional GitHub REST reads for pull request check inspection", async () => {
+    const calls: CapturedFetchCall[] = [];
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential(),
+      fetch: queuedFetch(calls, [
+        {
+          headers: { etag: "\"pr-12\"" },
+          body: {
+            number: 12,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/12",
+            title: "Feature",
+            head: {
+              ref: "codex/dev-nexus/github-148",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          },
+        },
+        {
+          headers: { etag: "\"checks-abc123\"" },
+          body: {
+            check_runs: [],
+          },
+        },
+        {
+          headers: { etag: "\"reviews-12\"" },
+          body: [],
+        },
+        { status: 304 },
+        { status: 304 },
+        { status: 304 },
+      ]),
+    });
+
+    const first = await adapter.inspectPullRequestChecks({ number: 12 });
+    const second = await adapter.inspectPullRequestChecks({ number: 12 });
+
+    expect(second.evidence).toEqual(first.evidence);
+    expect(calls[3]?.headers["if-none-match"]).toBe("\"pr-12\"");
+    expect(calls[4]?.headers["if-none-match"]).toBe("\"checks-abc123\"");
+    expect(calls[5]?.headers["if-none-match"]).toBe("\"reviews-12\"");
+  });
+
   it("routes GitHub operations through the CLI backend when configured", async () => {
     const calls: Array<{
       command: string;
@@ -547,7 +593,8 @@ describe("nexus forge publication facade", () => {
 
 interface QueuedResponse {
   status?: number;
-  body: unknown;
+  body?: unknown;
+  headers?: Record<string, string>;
 }
 
 interface CapturedFetchCall {
@@ -617,12 +664,16 @@ function queuedFetch(
       headers,
       ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}),
     });
-    return new Response(JSON.stringify(response.body), {
-      status: response.status ?? 200,
-      headers: {
-        "Content-Type": "application/json",
+    return new Response(
+      response.body === undefined ? null : JSON.stringify(response.body),
+      {
+        status: response.status ?? 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...(response.headers ?? {}),
+        },
       },
-    });
+    );
   }) as typeof fetch;
 }
 
