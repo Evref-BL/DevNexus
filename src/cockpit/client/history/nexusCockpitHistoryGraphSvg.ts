@@ -265,11 +265,13 @@ function nexusCockpitHistoryGraphRouteD(
     } else if (from.y === to.y) {
       d += ` H ${to.x}`;
     } else {
+      const dy = to.y - from.y;
       const curve = Math.min(
         rowHeight * 0.7,
-        Math.max(8, Math.abs(to.y - from.y) * 0.58),
+        Math.abs(dy) * 0.45,
       );
-      d += ` C ${from.x} ${from.y + curve}, ${to.x} ${to.y - curve}, ${to.x} ${to.y}`;
+      const direction = Math.sign(dy) || 1;
+      d += ` C ${from.x} ${from.y + direction * curve}, ${to.x} ${to.y - direction * curve}, ${to.x} ${to.y}`;
     }
   }
   return d;

@@ -97,4 +97,30 @@ describe("nexus cockpit history graph SVG", () => {
       height: 60,
     });
   });
+
+  it("keeps shallow lane-change curves from looping backward", () => {
+    const model = buildNexusCockpitHistoryGraphSvgModel({
+      maxLane: 12,
+      rows: [
+        { lane: 8, index: 23, selectId: "history:primary:from" },
+        { lane: 5, index: 24, selectId: "history:primary:to" },
+      ],
+      paths: [
+        {
+          colorLane: 5,
+          points: [
+            { lane: 8, index: 23 },
+            { lane: 8, index: 23.45 },
+            { lane: 12, index: 23.85 },
+            { lane: 5, index: 23.95 },
+            { lane: 5, index: 24 },
+          ],
+        },
+      ],
+    });
+
+    expect(model.routes[0]?.d).toBe(
+      "M 204 705 V 718.5 C 204 723.9, 292 725.1, 292 730.5 C 292 731.85, 138 732.15, 138 733.5 V 735",
+    );
+  });
 });
