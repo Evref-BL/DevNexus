@@ -3250,7 +3250,7 @@ function coordinationActivityGroups(options: {
     return created;
   };
 
-  for (const lease of options.leases.records) {
+  for (const lease of options.leases.records.filter(leaseContributesToActivity)) {
     ensureGroup({
       componentId: lease.scope.componentId,
       workItemId: lease.workItemId,
@@ -3279,6 +3279,10 @@ function coordinationActivityGroups(options: {
       handoffs: group.handoffs,
     }))
     .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function leaseContributesToActivity(lease: NexusWorktreeLeaseSummary): boolean {
+  return !["merged", "abandoned"].includes(lease.status);
 }
 
 function coordinationActivityGroup(options: {

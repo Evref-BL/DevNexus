@@ -1288,6 +1288,99 @@ describe("nexus coordination", () => {
     );
   });
 
+  it("does not report terminal leases as active coordination groups", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initCoordinationProjectFixture("terminal-lease-activity");
+    const activeWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "active");
+    const mergedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "merged");
+    const abandonedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "abandoned");
+    fs.mkdirSync(activeWorktreePath, { recursive: true });
+    fs.mkdirSync(mergedWorktreePath, { recursive: true });
+    fs.mkdirSync(abandonedWorktreePath, { recursive: true });
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Active work",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      branchName: "codex/dev-nexus/active",
+      worktreePath: activeWorktreePath,
+      status: "working",
+      gitFacts: {
+        headCommit: "active123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/active",
+      },
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-merged",
+      branchName: "codex/dev-nexus/merged",
+      worktreePath: mergedWorktreePath,
+      status: "merged",
+      gitFacts: {
+        headCommit: "merged123",
+        dirty: false,
+        pushed: true,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-abandoned",
+      branchName: "codex/dev-nexus/abandoned",
+      worktreePath: abandonedWorktreePath,
+      status: "abandoned",
+      gitFacts: {
+        headCommit: "abandoned123",
+        dirty: false,
+        pushed: true,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:10:00.000Z",
+    });
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      currentPath: sourceRoot,
+      gitRunner: fakeGitRunner(sourceRoot, []),
+      now: () => "2026-05-16T10:30:00.000Z",
+      maxLeaseAgeMs: 60 * 60 * 1000,
+    });
+
+    expect(status.leases.records.map((lease) => lease.status).sort()).toEqual([
+      "abandoned",
+      "merged",
+      "working",
+    ]);
+    expect(status.activity).toMatchObject({
+      activeGroupCount: 1,
+      staleGroupCount: 0,
+      overlapCount: 0,
+    });
+    expect(status.activity.groups).toHaveLength(1);
+    expect(status.activity.groups[0]).toMatchObject({
+      branch: "codex/dev-nexus/active",
+      statuses: ["working"],
+      active: true,
+    });
+    expect(status.activity.groups.map((group) => group.branch)).not.toContain(
+      "codex/dev-nexus/merged",
+    );
+    expect(status.activity.groups.map((group) => group.branch)).not.toContain(
+      "codex/dev-nexus/abandoned",
+    );
+  });
+
   it("dry-runs and prepares a fresh interactive worktree start", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const sourceRoot = path.join(projectRoot, "source");
