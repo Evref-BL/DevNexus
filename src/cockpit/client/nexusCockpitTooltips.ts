@@ -147,6 +147,7 @@ export function findCockpitTooltipTarget(
     "[data-dn-tooltip], [data-dn-native-title], [title]",
   );
   if (!target || !root.contains(target)) return null;
+  if (target.matches(".dn-git-node")) return null;
   if (!cockpitTooltipText(target).trim()) return null;
   return shouldShowCockpitTooltipTarget(target) ? target : null;
 }

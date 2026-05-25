@@ -40,10 +40,56 @@ import {
   RecordingCodexChatStarter,
   worktreeLease,
 } from "./nexusDashboardTestHelpers.js";
+import {
+  gitHistoryNodePopoverContent,
+  renderGitHistoryNodePopoverContent,
+} from "../../src/cockpit/client/history/nexusCockpitHistoryInteractions.js";
 
 afterEach(cleanupDashboardTestTempDirs);
 
 describe("nexus dashboard client", () => {
+  it("renders graph node popovers as structured escaped commit cards", () => {
+    const node = {
+      getAttribute(name: string): string | null {
+        if (name === "data-dn-tooltip") {
+          return [
+            "Classify Git workflow branch freshness",
+            "DevNexus · 8c61c96",
+            "Refs: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
+            "devnexus-automation[bot] · 25 mai, 14:52",
+            "Details: Needs review, Active, 1 thread, 28 issues",
+          ].join("\n");
+        }
+        return null;
+      },
+    } as Element;
+
+    const content = gitHistoryNodePopoverContent(node);
+    const html = renderGitHistoryNodePopoverContent({
+      ...content,
+      title: `${content.title} <script>`,
+    });
+
+    expect(content).toEqual({
+      title: "Classify Git workflow branch freshness",
+      component: "DevNexus",
+      commit: "8c61c96",
+      refs: [
+        "codex/dev-nexus/358-git-workflow-freshness",
+        "app/codex/dev-nexus/358-git-workflow-freshness",
+      ],
+      meta: "devnexus-automation[bot] · 25 mai, 14:52",
+      details: ["Needs review", "Active", "1 thread", "28 issues"],
+    });
+    expect(html).toContain("Commit 8c61c96");
+    expect(html).toContain("Branches");
+    expect(html).toContain("Details");
+    expect(html).toContain("codex/dev-nexus/358-git-workflow-freshness");
+    expect(html).toContain("Needs review");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("<script>");
+  });
+
   it("renders a client module with explicit light and dark mode controls", () => {
     const module = renderNexusDashboardClientModule();
 
@@ -59,6 +105,8 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("data-select-id");
     expect(module).toContain("data-git-history-search");
     expect(module).toContain("applyGitHistorySearch");
+    expect(module).toContain("dn-history-popover");
+    expect(module).toContain("showGitHistoryNodePopover");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");

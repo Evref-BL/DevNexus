@@ -5,6 +5,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
   let hoveredId: string | null = null;
   let searchQuery = "";
   let activeSearchIndex = 0;
+  const popover = createGitHistoryNodePopover();
 
   function setHoveredId(nextId: string | null): void {
     if (hoveredId === nextId) return;
@@ -14,11 +15,15 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
   }
 
   function onPointerOver(event: MouseEvent | PointerEvent): void {
-    setHoveredId(gitHistorySelectIdFromEventTarget(container, event.target));
+    const target = gitHistoryInteractionElement(event.target);
+    setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
+    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
   }
 
   function onPointerMove(event: MouseEvent | PointerEvent): void {
-    setHoveredId(gitHistorySelectIdFromEventTarget(container, event.target));
+    const target = gitHistoryInteractionElement(event.target);
+    setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
+    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
   }
 
   function onPointerOut(event: MouseEvent | PointerEvent): void {
@@ -26,10 +31,13 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
     const nextId = gitHistorySelectIdFromEventTarget(container, event.relatedTarget);
     if (nextId === hoveredId) return;
     setHoveredId(null);
+    hideGitHistoryNodePopover(popover);
   }
 
   function onFocusIn(event: FocusEvent): void {
-    setHoveredId(gitHistorySelectIdFromEventTarget(container, event.target));
+    const target = gitHistoryInteractionElement(event.target);
+    setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
+    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
   }
 
   function onFocusOut(event: FocusEvent): void {
@@ -37,6 +45,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
     const nextId = gitHistorySelectIdFromEventTarget(container, event.relatedTarget);
     if (nextId === hoveredId) return;
     setHoveredId(null);
+    hideGitHistoryNodePopover(popover);
   }
 
   function onSearchInput(event: Event): void {
@@ -93,6 +102,8 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
 
   function dispose(): void {
     setHoveredId(null);
+    hideGitHistoryNodePopover(popover);
+    popover.remove();
     container.removeEventListener("pointerover", onPointerOver);
     container.removeEventListener("pointermove", onPointerMove);
     container.removeEventListener("pointerout", onPointerOut);
@@ -143,6 +154,119 @@ export function updateGitHistoryHover(
       element.classList.toggle("dn-history-hovered", hovered);
     }
   });
+}
+
+export function createGitHistoryNodePopover(): HTMLElement {
+  const popover = document.createElement("div");
+  popover.className = "dn-history-popover";
+  popover.setAttribute("role", "tooltip");
+  popover.setAttribute("aria-hidden", "true");
+  document.body.appendChild(popover);
+  return popover;
+}
+
+export function showGitHistoryNodePopover(
+  popover: HTMLElement,
+  node: Element | null,
+): void {
+  if (!node) {
+    hideGitHistoryNodePopover(popover);
+    return;
+  }
+  const content = gitHistoryNodePopoverContent(node);
+  if (!content.title && !content.commit) {
+    hideGitHistoryNodePopover(popover);
+    return;
+  }
+  popover.innerHTML = renderGitHistoryNodePopoverContent(content);
+  popover.classList.add("visible");
+  popover.setAttribute("aria-hidden", "false");
+  positionGitHistoryNodePopover(popover, node);
+}
+
+export function hideGitHistoryNodePopover(popover: HTMLElement): void {
+  popover.classList.remove("visible");
+  popover.setAttribute("aria-hidden", "true");
+}
+
+export function gitHistoryNodeFromEventTarget(
+  container: Element,
+  source: EventTarget | null,
+): Element | null {
+  const sourceElement = gitHistoryInteractionElement(source);
+  const node = sourceElement?.closest?.(".dn-git-node[data-select-id]");
+  return node && container.contains(node) ? node : null;
+}
+
+export function gitHistoryNodePopoverContent(node: Element): {
+  readonly commit: string;
+  readonly component: string;
+  readonly details: readonly string[];
+  readonly meta: string;
+  readonly refs: readonly string[];
+  readonly title: string;
+} {
+  const lines = String(node.getAttribute("data-dn-tooltip") ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const title = lines[0] ?? String(node.getAttribute("aria-label") ?? "").trim();
+  const identity = lines[1] ?? "";
+  const identityParts = identity.split("·").map((part) => part.trim()).filter(Boolean);
+  const refsLine = lines.find((line) => line.startsWith("Refs:")) ?? "";
+  const detailsLine = lines.find((line) => line.startsWith("Details:")) ?? "";
+  const meta = lines.find((line) => !line.startsWith("Refs:") && !line.startsWith("Details:") && line !== title && line !== identity) ?? "";
+  return {
+    title,
+    component: identityParts[0] ?? "",
+    commit: identityParts[1] ?? "",
+    refs: refsLine.replace(/^Refs:\s*/u, "").split(",").map((ref) => ref.trim()).filter(Boolean),
+    meta,
+    details: detailsLine.replace(/^Details:\s*/u, "").split(",").map((detail) => detail.trim()).filter(Boolean),
+  };
+}
+
+export function renderGitHistoryNodePopoverContent(content: {
+  readonly commit: string;
+  readonly component: string;
+  readonly details: readonly string[];
+  readonly meta: string;
+  readonly refs: readonly string[];
+  readonly title: string;
+}): string {
+  const heading = content.commit ? `Commit ${content.commit}` : "Commit";
+  const component = content.component ? `<span>${escapeHistoryPopoverHtml(content.component)}</span>` : "";
+  const meta = content.meta ? `<span>${escapeHistoryPopoverHtml(content.meta)}</span>` : "";
+  const refs = content.refs.length
+    ? content.refs.map((ref) => `<span class="dn-history-popover-chip">${escapeHistoryPopoverHtml(ref)}</span>`).join("")
+    : `<span class="dn-history-popover-muted">No branch refs loaded</span>`;
+  const details = content.details.length
+    ? content.details.map((detail) => `<span class="dn-history-popover-chip soft">${escapeHistoryPopoverHtml(detail)}</span>`).join("")
+    : `<span class="dn-history-popover-muted">No attached details</span>`;
+  return `<div class="dn-history-popover-heading">${escapeHistoryPopoverHtml(heading)}</div><div class="dn-history-popover-title">${escapeHistoryPopoverHtml(content.title)}</div><div class="dn-history-popover-meta">${component}${meta}</div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Branches</span><div class="dn-history-popover-chips">${refs}</div></div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Details</span><div class="dn-history-popover-chips">${details}</div></div>`;
+}
+
+export function positionGitHistoryNodePopover(
+  popover: HTMLElement,
+  node: Element,
+): void {
+  const margin = 12;
+  const anchor = node.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 320;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 320;
+  const bounds = popover.getBoundingClientRect();
+  const preferredLeft = anchor.right + 16;
+  const fallbackLeft = anchor.left - bounds.width - 16;
+  const left = preferredLeft + bounds.width + margin <= viewportWidth
+    ? preferredLeft
+    : Math.max(margin, fallbackLeft);
+  const anchorCenterY = anchor.top + anchor.height / 2;
+  const top = Math.min(
+    Math.max(margin, anchorCenterY - bounds.height / 2),
+    Math.max(margin, viewportHeight - bounds.height - margin),
+  );
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
 }
 
 export function applyGitHistorySearch(
@@ -235,11 +359,19 @@ export function renderNexusCockpitHistoryInteractionsClientSource(): string {
     bindGitHistoryInteractions,
     gitHistorySelectIdFromEventTarget,
     updateGitHistoryHover,
+    createGitHistoryNodePopover,
+    showGitHistoryNodePopover,
+    hideGitHistoryNodePopover,
+    gitHistoryNodeFromEventTarget,
+    gitHistoryNodePopoverContent,
+    renderGitHistoryNodePopoverContent,
+    positionGitHistoryNodePopover,
     applyGitHistorySearch,
     normalizeGitHistorySearchText,
     clearGitHistorySearchClasses,
     markGitHistorySearchElement,
     wrapGitHistorySearchIndex,
+    escapeHistoryPopoverHtml,
     gitHistoryInteractionElement,
   ]
     .map((fn) => fn.toString())
@@ -250,4 +382,12 @@ function gitHistoryInteractionElement(source: EventTarget | null): Element | nul
   if (source instanceof Element) return source;
   if (source instanceof Node) return source.parentElement;
   return null;
+}
+
+function escapeHistoryPopoverHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
