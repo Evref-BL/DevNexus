@@ -58,6 +58,39 @@ describe("nexus cleanup plan", () => {
     });
   });
 
+  it("does not let a fresh working lease block cleanup when the branch is merged", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "codex/primary/merged-working",
+      worktreePath: path.join(fixture.worktreesRoot, "merged-working"),
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "mergedWorking123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        branches: ["codex/primary/merged-working"],
+        mergedRefs: ["codex/primary/merged-working"],
+        upstreams: {
+          "codex/primary/merged-working": "origin/codex/primary/merged-working",
+        },
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "codex/primary/merged-working")).toMatchObject({
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["merged", "safe"]),
+      blockers: [],
+    });
+    expect(candidateFor(plan, "codex/primary/merged-working").classifications)
+      .not.toContain("active_lease");
+  });
+
   it("blocks dirty and untracked worktrees and marks them for rescue", () => {
     const fixture = initCleanupFixture();
     const dirtyWorktree = path.join(fixture.worktreesRoot, "dirty");
