@@ -399,6 +399,7 @@ export function positionGitHistoryNodePopover(
   const fallbackLeft = anchor.left - bounds.width - 16;
   const usesPreferredSide = preferredLeft + bounds.width + margin <= viewportWidth;
   const left = usesPreferredSide ? preferredLeft : Math.max(margin, fallbackLeft);
+  const anchorCenterX = anchor.left + anchor.width / 2;
   const anchorCenterY = anchor.top + anchor.height / 2;
   const top = Math.min(
     Math.max(margin, anchorCenterY - bounds.height / 2),
@@ -406,8 +407,8 @@ export function positionGitHistoryNodePopover(
   );
   const edgeSide = usesPreferredSide ? "left" : "right";
   const connectorWidth = edgeSide === "left"
-    ? Math.max(8, left - anchor.right)
-    : Math.max(8, anchor.left - (left + bounds.width));
+    ? Math.max(8, left - anchorCenterX)
+    : Math.max(8, anchorCenterX - (left + bounds.width));
   const connectorY = gitHistoryPopoverConnectorY(anchorCenterY, top, bounds.height);
   popover.style.left = `${left}px`;
   popover.style.top = `${top}px`;

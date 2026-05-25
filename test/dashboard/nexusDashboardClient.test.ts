@@ -123,7 +123,7 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("transform-box: fill-box");
     expect(module).toContain("vector-effect: non-scaling-stroke");
     expect(module).toContain("dn-history-node-hovered");
-    expect(module).toContain("transform: scale(1.38)");
+    expect(module).toContain("transform: scale(1.24)");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");
