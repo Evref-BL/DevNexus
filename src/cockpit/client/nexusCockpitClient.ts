@@ -117,7 +117,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   let selectedWorkspaceId = normalizeWorkspaceId(options.workspaceId ?? readWorkspaceIdFromLocation());
   let selectedId = null;
   let hostFocus = 'components';
-  let gitHistoryFilter = 'all';
+  let gitHistoryFilter = '';
   let latestSnapshot = null;
   let latestHost = null;
   let latestError = null;
@@ -178,7 +178,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     if (normalized === selectedWorkspaceId && !nextSelectedId) return;
     selectedWorkspaceId = normalized;
     selectedId = nextSelectedId ? String(nextSelectedId) : null;
-    gitHistoryFilter = 'all';
+    gitHistoryFilter = '';
     latestSnapshot = null;
     latestError = null;
     lastHostRefreshAt = 0;
@@ -339,7 +339,7 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = 'all') {
+function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = '') {
   const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);
   const loading = snapshot.partial === true;
   const componentsLoaded = sectionLoaded(snapshot, 'components');
@@ -642,14 +642,14 @@ function bindThemeControls(container, onSelect) {
 }
 
 function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
+  container.addEventListener('change', (event) => {
+    const target = eventElementTarget(event.target);
+    const historySelect = target?.closest?.('[data-git-history-project-select], [data-git-history-branch-select]');
+    if (!historySelect || !container.contains(historySelect)) return;
+    onGitHistoryFilter?.(historySelect.value);
+  });
   container.addEventListener('click', (event) => {
     const target = eventElementTarget(event.target);
-    const filterButton = target?.closest?.('[data-git-history-filter]');
-    if (filterButton && container.contains(filterButton)) {
-      event.preventDefault();
-      onGitHistoryFilter?.(filterButton.getAttribute('data-git-history-filter'));
-      return;
-    }
     const button = target?.closest?.('[data-select-id]');
     if (!button || !container.contains(button)) return;
     onSelect(button.getAttribute('data-select-id'));

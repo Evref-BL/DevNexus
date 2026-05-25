@@ -208,7 +208,7 @@ describe("nexus dashboard history graph", () => {
     });
   });
 
-  it("renders event history from every loaded component repository", async () => {
+  it("keeps project histories separate by default while retaining an internal all-project graph", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -296,21 +296,29 @@ describe("nexus dashboard history graph", () => {
     };
 
     const rows = hooks.gitHistoryRows(snapshot);
+    const allRows = hooks.gitHistoryRows(snapshot, "all");
     const rendered = hooks.renderGitHistory(snapshot);
     const pluginRows = hooks.gitHistoryRows(snapshot, "component:plugin");
     const pluginRendered = hooks.renderGitHistory(snapshot, null, "component:plugin");
 
     expect(rows?.rows.map((row) => row.selectId)).toEqual([
       "history:primary:core100000000000000000000000000000000000000",
+    ]);
+    expect(allRows?.rows.map((row) => row.selectId)).toEqual([
+      "history:primary:core100000000000000000000000000000000000000",
       "history:plugin:plug100000000000000000000000000000000000000",
     ]);
     expect(pluginRows?.rows.map((row) => row.selectId)).toEqual([
       "history:plugin:plug100000000000000000000000000000000000000",
     ]);
-    expect(rendered).toContain("2 events");
-    expect(rendered).toContain("2 repos");
+    expect(rendered).toContain("1 event");
+    expect(rendered).toContain("1 repo");
+    expect(rendered).toContain('data-git-history-project-select');
+    expect(rendered).toContain('data-git-history-branch-select');
+    expect(rendered).toContain('data-git-history-fetch-remotes');
+    expect(rendered).not.toContain("All events");
     expect(rendered).toContain("Update core cockpit");
-    expect(rendered).toContain("Update TypeScript setup");
+    expect(rendered).not.toContain("Update TypeScript setup");
     expect(rendered).toContain("DevNexus-TypeScript");
     expect(pluginRendered).toContain("1 event");
     expect(pluginRendered).toContain("1 repo");
@@ -1183,15 +1191,15 @@ describe("nexus dashboard history graph", () => {
       },
     };
 
-    const rows = hooks.gitHistoryRows(snapshot, "branch:feat/cockpit-graph");
-    const rendered = hooks.renderGitHistory(snapshot, null, "branch:feat/cockpit-graph");
+    const rows = hooks.gitHistoryRows(snapshot, "component:primary|branch:feat/cockpit-graph");
+    const rendered = hooks.renderGitHistory(snapshot, null, "component:primary|branch:feat/cockpit-graph");
 
     expect(rows?.rows.map((row) => row.commit.hash)).toEqual([
       "feature000000000000000000000000000000000000",
       "base0000000000000000000000000000000000000",
     ]);
-    expect(rendered).toContain("data-git-history-filter=\"branch:feat/cockpit-graph\"");
-    expect(rendered).toContain("aria-pressed=\"true\"");
+    expect(rendered).toContain('data-git-history-branch-select');
+    expect(rendered).toContain('value="component:primary|branch:feat/cockpit-graph" selected');
     expect(rendered).toContain("Add graph data");
     expect(rendered).toContain("Prepare base");
     expect(rendered).not.toContain("Merge feature graph");

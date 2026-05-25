@@ -1,8 +1,13 @@
 // @ts-nocheck
 import { buildNexusDashboardHistoryLayout } from "../../../dashboard/nexusDashboardHistoryLayout.js";
-import { renderActionStrip, uniqueActions } from "../nexusCockpitActions.js";
 import {
-  compactBranchName,
+  cloudFetchIcon,
+  gearIcon,
+  renderActionStrip,
+  searchIcon,
+  uniqueActions,
+} from "../nexusCockpitActions.js";
+import {
   countLabel,
   escapeAttribute,
   escapeHtml,
@@ -25,16 +30,16 @@ function isGitHistorySelection(selectedId) {
   return String(selectedId ?? '').startsWith('history:');
 }
 
-function renderGitHistory(snapshot, selectedId, filter = 'all') {
-  const activeFilter = normalizeGitHistoryFilter(filter);
+function renderGitHistory(snapshot, selectedId, filter = '') {
   const repositories = gitHistoryRepositories(snapshot);
+  const activeFilter = activeGitHistoryFilter(snapshot, filter);
   const graph = gitHistoryRows(snapshot, activeFilter);
   if (!graph) return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Event history</span><h2>Project Events</h2></div><span class="dn-count">0 events</span></div><p>No events loaded.</p></div>`;
   const branchCount = gitHistoryBranchNames(graph.repositories).length;
   const count = `${countLabel(graph.rows.length, 'event')} · ${countLabel(graph.repositories.length, 'repo')} · ${countLabel(branchCount, 'branch', 'branches')}`;
   const cappedRepositories = graph.repositories.filter((repository) => repository.moreAvailable);
   const note = cappedRepositories.length ? `<p class="dn-git-note">Showing the newest loaded events for ${countLabel(cappedRepositories.length, 'repo')}. Branch filters use each loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Event history</span><h2>Project Events</h2><p class="dn-history-note">Git commits are events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repositories, activeFilter)}${renderGitHistorySearchControls()}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Event history</span><h2>Project Events</h2><p class="dn-history-note">Git commits are events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryTopBar(snapshot, repositories, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
 }
 
 function renderGitHistoryBoard(snapshot, graph, selectedId) {
@@ -46,48 +51,90 @@ function renderGitHistoryBoard(snapshot, graph, selectedId) {
 
 function normalizeGitHistoryFilter(value) {
   const text = String(value ?? '').trim();
-  if (!text || text === 'all') return 'all';
+  if (!text) return '';
+  if (text === 'all') return 'all';
+  const scopedBranch = /^component:([^|]+)\|branch:(.+)$/u.exec(text);
+  if (scopedBranch?.[1]?.trim() && scopedBranch?.[2]?.trim()) {
+    return `component:${scopedBranch[1].trim()}|branch:${scopedBranch[2].trim()}`;
+  }
   if (text.startsWith('component:') && text.slice('component:'.length).trim()) return `component:${text.slice('component:'.length).trim()}`;
   if (text.startsWith('branch:') && text.slice('branch:'.length).trim()) return `branch:${text.slice('branch:'.length).trim()}`;
   if (text.startsWith('feature:') && text.slice('feature:'.length).trim()) return `feature:${text.slice('feature:'.length).trim()}`;
-  return 'all';
+  return '';
 }
 
-function renderGitHistoryFilters(snapshot, repositories, activeFilter) {
-  const filters = gitHistoryFilters(snapshot, repositories);
-  if (filters.length <= 1) return '';
-  return `<div class="dn-git-filters" aria-label="Event history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
+function activeGitHistoryFilter(snapshot, filter = '') {
+  const normalized = normalizeGitHistoryFilter(filter);
+  if (normalized === 'all' || normalized.startsWith('branch:') || normalized.startsWith('feature:')) return normalized;
+  const repositories = gitHistoryRepositories(snapshot);
+  const fallback = repositories[0]?.componentId ? `component:${repositories[0].componentId}` : '';
+  if (!normalized) return fallback;
+  const componentId = gitHistoryFilterProjectId(normalized);
+  if (!componentId) return fallback;
+  return repositories.some((repository) => repository.componentId === componentId) ? normalized : fallback;
+}
+
+function gitHistoryFilterProjectId(filter) {
+  const text = normalizeGitHistoryFilter(filter);
+  if (!text.startsWith('component:')) return '';
+  const branchIndex = text.indexOf('|branch:');
+  return branchIndex >= 0 ? text.slice('component:'.length, branchIndex) : text.slice('component:'.length);
+}
+
+function gitHistoryFilterBranchName(filter) {
+  const text = normalizeGitHistoryFilter(filter);
+  if (text.startsWith('branch:')) return text.slice('branch:'.length);
+  const branchIndex = text.indexOf('|branch:');
+  return branchIndex >= 0 ? text.slice(branchIndex + '|branch:'.length) : '';
+}
+
+function gitHistoryScopedFilter(projectId, branchName = '') {
+  const component = String(projectId ?? '').trim();
+  const branch = String(branchName ?? '').trim();
+  if (!component) return branch ? `branch:${branch}` : '';
+  return branch ? `component:${component}|branch:${branch}` : `component:${component}`;
+}
+
+function renderGitHistoryTopBar(snapshot, repositories, activeFilter) {
+  const activeProjectId = gitHistoryFilterProjectId(activeFilter) || repositories[0]?.componentId || '';
+  const activeRepository = repositories.find((repository) => repository.componentId === activeProjectId) ?? repositories[0] ?? null;
+  return `<div class="dn-git-topbar" aria-label="Event history controls">${renderGitHistoryProjectControl(repositories, activeProjectId)}${renderGitHistoryBranchControl(activeRepository, activeFilter)}${renderGitHistorySearchControls()}${renderGitHistoryToolbarActions(snapshot, activeRepository)}</div>`;
+}
+
+function renderGitHistoryProjectControl(repositories, activeProjectId) {
+  if (!repositories.length) return '';
+  const options = repositories.map((repository) => {
+    const value = `component:${repository.componentId}`;
+    const selected = repository.componentId === activeProjectId ? ' selected' : '';
+    const title = [repository.componentName, repository.repositoryPath].filter(Boolean).join(' · ');
+    return `<option value="${escapeHtml(value)}"${selected} title="${escapeHtml(title)}">${escapeHtml(repository.componentName ?? repository.componentId)}</option>`;
+  }).join('');
+  return `<label class="dn-git-context-control"><span>Project</span><select class="dn-git-context-select" data-git-history-project-select aria-label="Project">${options}</select></label>`;
+}
+
+function renderGitHistoryBranchControl(repository, activeFilter) {
+  if (!repository) return '';
+  const activeBranch = gitHistoryFilterBranchName(activeFilter);
+  const projectId = repository.componentId ?? '';
+  const branches = gitHistoryBranchNames(repository);
+  const allValue = gitHistoryScopedFilter(projectId);
+  const options = [`<option value="${escapeHtml(allValue)}"${activeBranch ? '' : ' selected'}>Show all branches</option>`]
+    .concat(branches.map((branch) => {
+      const value = gitHistoryScopedFilter(projectId, branch);
+      const selected = branch === activeBranch ? ' selected' : '';
+      return `<option value="${escapeHtml(value)}"${selected} title="${escapeHtml(branch)}">${escapeHtml(branch)}</option>`;
+    }))
+    .join('');
+  return `<label class="dn-git-context-control dn-git-branch-control"><span>Branches</span><select class="dn-git-context-select" data-git-history-branch-select aria-label="Branches">${options}</select></label>`;
 }
 
 function renderGitHistorySearchControls() {
-  return `<div class="dn-git-toolbar"><div class="dn-git-search" data-git-history-search role="search" aria-label="Search event history"><input class="dn-git-search-input" type="search" data-git-history-search-input placeholder="Search events" autocomplete="off" spellcheck="false" /><span class="dn-git-search-status" data-git-history-search-status aria-live="polite"></span><button class="dn-git-search-button" type="button" data-git-history-search-action="previous" aria-label="Previous event match" title="Previous match">Prev</button><button class="dn-git-search-button" type="button" data-git-history-search-action="next" aria-label="Next event match" title="Next match">Next</button><button class="dn-git-search-button" type="button" data-git-history-search-action="clear" aria-label="Clear event search" title="Clear search">Clear</button></div>${renderGitHistoryColumnVisibilityMenu()}</div>`;
+  return `<div class="dn-git-search" data-git-history-search role="search" aria-label="Search event history"><span class="dn-git-search-icon">${searchIcon()}</span><input class="dn-git-search-input" type="search" data-git-history-search-input placeholder="Search events" autocomplete="off" spellcheck="false" /><span class="dn-git-search-status" data-git-history-search-status aria-live="polite"></span><button class="dn-git-search-button" type="button" data-git-history-search-action="previous" aria-label="Previous event match" title="Previous match">Prev</button><button class="dn-git-search-button" type="button" data-git-history-search-action="next" aria-label="Next match">Next</button><button class="dn-git-search-button" type="button" data-git-history-search-action="clear" aria-label="Clear event search" title="Clear search">Clear</button></div>`;
 }
 
-function gitHistoryFilters(snapshot, repositories) {
-  const filters = [{ id: 'all', label: 'All events', title: 'Show all loaded project events' }];
-  const seen = new Set(filters.map((filter) => filter.id));
-  const push = (id, label, title = label) => {
-    const normalized = normalizeGitHistoryFilter(id);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    filters.push({ id: normalized, label, title });
-  };
-  const loadedRepositories = repositories ?? [];
-  if (loadedRepositories.length > 1) {
-    for (const repository of loadedRepositories) {
-      push(`component:${repository.componentId}`, repository.componentName ?? repository.componentId, `Show ${repository.componentName ?? repository.componentId} events`);
-    }
-  }
-  const defaultBranches = [...new Set(loadedRepositories.map((repository) => repository.defaultBranch).filter(Boolean))];
-  for (const branch of defaultBranches) push(`branch:${branch}`, branch, `Show ${branch} and its loaded ancestors`);
-  for (const feature of snapshot.features?.records ?? []) {
-    const branches = featureGitBranches(feature);
-    if (!branches.length) continue;
-    push(`feature:${feature.id}`, feature.title, `Show events reachable from ${feature.title}`);
-  }
-  const branchNames = gitHistoryBranchNames(loadedRepositories);
-  for (const branch of branchNames) push(`branch:${branch}`, compactBranchName(branch), `Show ${branch} and its loaded ancestors`);
-  return filters.slice(0, 18);
+function renderGitHistoryToolbarActions(snapshot, repository) {
+  const repoLabel = repository?.componentName ?? repository?.componentId ?? 'project';
+  return `<div class="dn-git-toolbar-actions"><button class="dn-git-icon-button" type="button" disabled data-git-history-fetch-remotes title="${escapeHtml(`Fetch remotes for ${repoLabel} needs a local Git action policy`)}" aria-label="${escapeHtml(`Fetch remotes for ${repoLabel}`)}">${cloudFetchIcon()}</button>${renderGitHistoryColumnVisibilityMenu(undefined, gearIcon())}</div>`;
 }
 
 function gitHistoryBranchNames(repositoryOrRepositories) {
@@ -123,7 +170,10 @@ function normalizeGitBranchName(value) {
 
 function filteredGitHistoryCommits(snapshot, repository, filter) {
   const commits = repository.commits ?? [];
-  if (filter.startsWith('component:')) return repository.componentId === filter.slice('component:'.length) ? commits : [];
+  const projectId = gitHistoryFilterProjectId(filter);
+  const branchName = gitHistoryFilterBranchName(filter);
+  if (projectId && repository.componentId !== projectId) return [];
+  if (projectId && !branchName) return commits;
   if (filter === 'all') return commits;
   const headHashes = gitHistoryFilterHeadHashes(snapshot, repository, filter);
   if (!headHashes.size) return [];
@@ -133,8 +183,9 @@ function filteredGitHistoryCommits(snapshot, repository, filter) {
 
 function gitHistoryFilterHeadHashes(snapshot, repository, filter) {
   const headHashes = new Set();
-  if (filter.startsWith('branch:')) {
-    for (const hash of branchHeadHashes(repository, filter.slice('branch:'.length))) headHashes.add(hash);
+  const branchName = gitHistoryFilterBranchName(filter);
+  if (branchName) {
+    for (const hash of branchHeadHashes(repository, branchName)) headHashes.add(hash);
   } else if (filter.startsWith('feature:')) {
     const id = filter.slice('feature:'.length);
     const feature = (snapshot.features?.records ?? []).find((candidate) => candidate.id === id);
@@ -175,10 +226,10 @@ function collectGitAncestorHashes(commits, headHashes) {
   return reachable;
 }
 
-function gitHistoryRows(snapshot, filter = 'all') {
+function gitHistoryRows(snapshot, filter = '') {
   const repositories = gitHistoryRepositories(snapshot);
   if (!repositories.length) return null;
-  const normalizedFilter = normalizeGitHistoryFilter(filter);
+  const normalizedFilter = activeGitHistoryFilter(snapshot, filter);
   const commitRows = repositories.flatMap((repository, repositoryIndex) =>
     filteredGitHistoryCommits(snapshot, repository, normalizedFilter).map((commit, commitIndex) => ({
       repository,
@@ -494,9 +545,15 @@ export function renderNexusCockpitEventHistoryClientSource() {
     renderGitHistory,
     renderGitHistoryBoard,
     normalizeGitHistoryFilter,
-    renderGitHistoryFilters,
+    activeGitHistoryFilter,
+    gitHistoryFilterProjectId,
+    gitHistoryFilterBranchName,
+    gitHistoryScopedFilter,
+    renderGitHistoryTopBar,
+    renderGitHistoryProjectControl,
+    renderGitHistoryBranchControl,
     renderGitHistorySearchControls,
-    gitHistoryFilters,
+    renderGitHistoryToolbarActions,
     gitHistoryBranchNames,
     featureGitBranches,
     normalizeGitBranchName,

@@ -206,7 +206,7 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("/api/local/app-icon?app=");
     expect(module).toContain("dn-app-icon-img");
     expect(module).toContain(".dn-header-path-menu { flex: 0 1 auto; width: fit-content; min-width: min(100%, 320px); max-width: min(100%, 520px); }");
-    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } }");
+    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }");
     expect(module).toContain("@media (max-width: 560px) { .dn-header-actions { justify-content: stretch; } .dn-header-strip { justify-content: stretch; } .dn-header-path-menu { width: 100%; max-width: 100%; } }");
     expect(module).not.toContain(".dn-header-strip, .dn-header-path-menu { width: 100%; }");
     expect(module).toContain("Finder");
@@ -271,8 +271,14 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("signal-components");
     expect(module).toContain("Not Git history");
     expect(module).toContain("Each rail is a workspace category");
-    expect(module).toContain(".dn-git-filters { display: flex; gap: 7px; margin: 0 0 10px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }");
-    expect(module).toContain(".dn-git-filters::-webkit-scrollbar { display: none; }");
+    expect(module).toContain("data-git-history-project-select");
+    expect(module).toContain("data-git-history-branch-select");
+    expect(module).toContain("data-git-history-fetch-remotes");
+    expect(module).toContain("cloudFetchIcon");
+    expect(module).toContain("gearIcon");
+    expect(module).toContain(".dn-git-topbar { display: grid; grid-template-columns: minmax(160px, 0.32fr) minmax(220px, 0.48fr) minmax(260px, 1fr) auto;");
+    expect(module).not.toContain(".dn-git-filters { display: flex;");
+    expect(module).not.toContain("All events");
     expect(module).toContain("--dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 30px);");
     expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px;");
     expect(module).toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto;");

@@ -96,6 +96,7 @@ export function gitHistoryColumnVisibilityAttributes(
 
 export function renderGitHistoryColumnVisibilityMenu(
   visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
+  triggerHtml = "Columns",
 ): string {
   const options = gitHistoryColumnOrder
     .map((column) => {
@@ -103,7 +104,7 @@ export function renderGitHistoryColumnVisibilityMenu(
       return `<label class="dn-git-column-option"><input type="checkbox" data-git-column-toggle="${escapeNexusCockpitHistoryColumnAttribute(column)}"${checked} /> <span>${escapeNexusCockpitHistoryColumnAttribute(gitHistoryColumnLabels[column])}</span></label>`;
     })
     .join("");
-  return `<details class="dn-git-column-menu" data-git-column-menu><summary class="dn-git-column-trigger">Columns</summary><div class="dn-git-column-options" role="group" aria-label="Visible event history columns">${options}</div></details>`;
+  return `<details class="dn-git-column-menu" data-git-column-menu><summary class="dn-git-column-trigger" title="History options" aria-label="History options">${triggerHtml}</summary><div class="dn-git-column-options" role="group" aria-label="Visible event history columns">${options}</div></details>`;
 }
 
 export function readStoredGitHistoryColumnWidths(): Record<GitHistoryColumn, number> {
