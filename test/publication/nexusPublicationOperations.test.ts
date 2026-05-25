@@ -1118,6 +1118,195 @@ describe("publication CLI operations", () => {
     expect(calls).toEqual([{ token: "installation-token" }]);
   });
 
+  it("creates review handoff pull requests through the configured App credential after pushing", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const gitCalls: Array<{ token: string | undefined }> = [];
+    const requests: Array<{
+      url: string;
+      method: string;
+      authorization: string | null;
+      body: unknown;
+    }> = [];
+    const gitRunner: NexusPublicationGitPushRunner = (args, options) => {
+      gitCalls.push({ token: options.env.DEV_NEXUS_GIT_TOKEN });
+      return {
+        args: [...args],
+        stdout: "",
+        stderr: "Everything up-to-date",
+        exitCode: 0,
+      };
+    };
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      requests.push({
+        url,
+        method,
+        authorization: new Headers(init?.headers).get("authorization"),
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      if (method === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({
+          number: 275,
+          html_url: "https://github.com/Evref-BL/DevNexus/pull/275",
+          state: "open",
+          title: "Fix App review handoff",
+        }),
+        { status: 201 },
+      );
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "codex/dev-nexus/app-review-handoff",
+        "--title",
+        "Fix App review handoff",
+        "--body",
+        "Create the pull request with the same App-backed publication path.",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: gitRunner,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      branchPush: {
+        credential: {
+          profileId: "dev-nexus-app-github",
+          actorId: "dev-nexus-automation-app",
+          account: "devnexus-automation",
+          kind: "github_app",
+        },
+      },
+      pullRequest: {
+        credential: {
+          profileId: "dev-nexus-app-github",
+          actorId: "dev-nexus-automation-app",
+          account: "devnexus-automation",
+          kind: "github_app",
+        },
+        pullRequest: {
+          number: 275,
+          url: "https://github.com/Evref-BL/DevNexus/pull/275",
+        },
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+    expect(gitCalls).toEqual([{ token: "installation-token" }]);
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fapp-review-handoff&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        method: "POST",
+        authorization: "Bearer installation-token",
+        body: {
+          head: "codex/dev-nexus/app-review-handoff",
+          base: "main",
+          title: "Fix App review handoff",
+          body: "Create the pull request with the same App-backed publication path.",
+        },
+      },
+    ]);
+  });
+
+  it("reports provider PR handoff failures with App credential context", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async (_input, init) =>
+      (init?.method ?? "GET") === "GET"
+        ? new Response(JSON.stringify([]), { status: 200 })
+        : new Response(JSON.stringify({ message: "Bad credentials" }), {
+            status: 401,
+            statusText: "Unauthorized",
+          });
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "codex/dev-nexus/app-review-handoff",
+        "--title",
+        "Fix App review handoff",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        }),
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      branchPush: {
+        ok: true,
+        credential: {
+          profileId: "dev-nexus-app-github",
+          kind: "github_app",
+        },
+      },
+      pullRequest: {
+        ok: false,
+        error: {
+          code: "pull_request_upsert_failed",
+          providerErrorCode: "provider_request_failed",
+          message: expect.stringContaining(
+            "POST /repos/Evref-BL/DevNexus/pulls failed: 401 Bad credentials",
+          ),
+          profileId: "dev-nexus-app-github",
+          actorId: "dev-nexus-automation-app",
+          account: "devnexus-automation",
+          credentialKind: "github_app",
+          provider: "github",
+          backend: "github_rest",
+          capability: "pull_request.upsert",
+        },
+        setupActions: [
+          expect.stringContaining(
+            "Fix the pull request provider error for Evref-BL/DevNexus",
+          ),
+        ],
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
   it("prints selected feature branch-push fallback plans as JSON", async () => {
     const { projectRoot, homePath, sourceRoot } = createPublicationProject();
     saveProjectConfig(
