@@ -3,6 +3,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
   refresh(): void;
 } {
   let hoveredId: string | null = null;
+  let directNode: Element | null = null;
   let searchQuery = "";
   let activeSearchIndex = 0;
   const popover = createGitHistoryNodePopover();
@@ -14,19 +15,32 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
     updateGitHistoryHover(container, hoveredId, true);
   }
 
+  function setDirectNode(nextNode: Element | null): void {
+    if (directNode === nextNode) return;
+    directNode?.classList.remove("dn-history-node-hovered");
+    directNode = nextNode;
+    directNode?.classList.add("dn-history-node-hovered");
+  }
+
   function onPointerOver(event: MouseEvent | PointerEvent): void {
     const target = gitHistoryInteractionElement(event.target);
+    const node = gitHistoryNodeFromEventTarget(container, target);
     setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
-    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
+    setDirectNode(node);
+    showGitHistoryNodePopover(popover, node);
   }
 
   function onPointerMove(event: MouseEvent | PointerEvent): void {
     const target = gitHistoryInteractionElement(event.target);
+    const node = gitHistoryNodeFromEventTarget(container, target);
     setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
-    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
+    setDirectNode(node);
+    showGitHistoryNodePopover(popover, node);
   }
 
   function onPointerOut(event: MouseEvent | PointerEvent): void {
+    const nextNode = gitHistoryNodeFromEventTarget(container, event.relatedTarget);
+    setDirectNode(nextNode);
     if (!hoveredId) return;
     const nextId = gitHistorySelectIdFromEventTarget(container, event.relatedTarget);
     if (nextId === hoveredId) return;
@@ -36,11 +50,15 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
 
   function onFocusIn(event: FocusEvent): void {
     const target = gitHistoryInteractionElement(event.target);
+    const node = gitHistoryNodeFromEventTarget(container, target);
     setHoveredId(gitHistorySelectIdFromEventTarget(container, target));
-    showGitHistoryNodePopover(popover, gitHistoryNodeFromEventTarget(container, target));
+    setDirectNode(node);
+    showGitHistoryNodePopover(popover, node);
   }
 
   function onFocusOut(event: FocusEvent): void {
+    const nextNode = gitHistoryNodeFromEventTarget(container, event.relatedTarget);
+    setDirectNode(nextNode);
     if (!hoveredId) return;
     const nextId = gitHistorySelectIdFromEventTarget(container, event.relatedTarget);
     if (nextId === hoveredId) return;
@@ -132,6 +150,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
 
   function dispose(): void {
     setHoveredId(null);
+    setDirectNode(null);
     hideGitHistoryNodePopover(popover);
     popover.remove();
     container.removeEventListener("pointerover", onPointerOver);
@@ -389,12 +408,23 @@ export function positionGitHistoryNodePopover(
   const connectorWidth = edgeSide === "left"
     ? Math.max(8, left - anchor.right)
     : Math.max(8, anchor.left - (left + bounds.width));
-  const connectorY = bounds.height / 2;
+  const connectorY = gitHistoryPopoverConnectorY(anchorCenterY, top, bounds.height);
   popover.style.left = `${left}px`;
   popover.style.top = `${top}px`;
   popover.style.setProperty("--dn-history-popover-connector-width", `${connectorWidth}px`);
   popover.style.setProperty("--dn-history-popover-connector-y", `${connectorY}px`);
   popover.dataset.edgeSide = edgeSide;
+}
+
+export function gitHistoryPopoverConnectorY(
+  anchorCenterY: number,
+  popoverTop: number,
+  popoverHeight: number,
+): number {
+  const inset = 12;
+  const rawY = anchorCenterY - popoverTop;
+  const maxY = Math.max(inset, popoverHeight - inset);
+  return Math.min(Math.max(rawY, inset), maxY);
 }
 
 export function applyGitHistorySearch(
@@ -502,6 +532,7 @@ export function renderNexusCockpitHistoryInteractionsClientSource(): string {
     gitHistoryNodePopoverContent,
     renderGitHistoryNodePopoverContent,
     positionGitHistoryNodePopover,
+    gitHistoryPopoverConnectorY,
     applyGitHistorySearch,
     normalizeGitHistorySearchText,
     clearGitHistorySearchClasses,

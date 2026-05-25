@@ -182,10 +182,10 @@ button, input, select { font: inherit; }
 .dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 6; opacity: 0.42; }
 .dn-git-line { stroke-width: 3; opacity: 0.82; }
 .dn-git-line-shadow, .dn-git-line { pointer-events: none; }
-.dn-git-node { cursor: pointer; outline: none; transform-box: fill-box; transform-origin: center; transition: filter 120ms ease, stroke-width 120ms ease, transform 120ms ease; }
-.dn-git-node.selected { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); stroke-width: 2.7; transform: scale(1.12); }
-.dn-git-node.dn-history-hovered { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); stroke-width: 2.7; transform: scale(1.24); }
-.dn-git-node:focus-visible { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--dn-active) 55%, transparent)); stroke-width: 3; transform: scale(1.24); }
+.dn-git-node { cursor: pointer; outline: none; transform-box: fill-box; transform-origin: center; vector-effect: non-scaling-stroke; transition: filter 120ms ease, transform 120ms ease; }
+.dn-git-node.selected { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); stroke-width: 1.8; transform: scale(1.08); }
+.dn-git-node.dn-history-hovered { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); }
+.dn-git-node.dn-history-node-hovered, .dn-git-node:focus-visible { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--dn-active) 55%, transparent)); stroke-width: 1.6; transform: scale(1.38); }
 .dn-git-row-hit:focus-visible { fill: color-mix(in srgb, var(--dn-active) 18%, transparent); }
 .dn-git-row-hit.dn-history-search-match { fill: color-mix(in srgb, var(--dn-warn) 14%, transparent); }
 .dn-git-row-hit.dn-history-search-current { fill: color-mix(in srgb, var(--dn-active) 22%, transparent); }

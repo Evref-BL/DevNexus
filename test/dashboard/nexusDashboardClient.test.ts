@@ -41,6 +41,7 @@ import {
   worktreeLease,
 } from "./nexusDashboardTestHelpers.js";
 import {
+  gitHistoryPopoverConnectorY,
   gitHistoryNodePopoverContent,
   isGitHistoryPopoverColor,
   renderGitHistoryNodePopoverContent,
@@ -92,6 +93,9 @@ describe("nexus dashboard client", () => {
     expect(isGitHistoryPopoverColor("var(--dn-branch-4)")).toBe(true);
     expect(isGitHistoryPopoverColor("rgb(53, 221, 84)")).toBe(true);
     expect(isGitHistoryPopoverColor("url(javascript:alert(1))")).toBe(false);
+    expect(gitHistoryPopoverConnectorY(500, 400, 180)).toBe(100);
+    expect(gitHistoryPopoverConnectorY(500, 492, 180)).toBe(12);
+    expect(gitHistoryPopoverConnectorY(500, 300, 180)).toBe(168);
   });
 
   it("renders a client module with explicit light and dark mode controls", () => {
@@ -117,7 +121,9 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("gitHistoryNodeAccentColor");
     expect(module).toContain("showGitHistoryNodePopover");
     expect(module).toContain("transform-box: fill-box");
-    expect(module).toContain("transform: scale(1.24)");
+    expect(module).toContain("vector-effect: non-scaling-stroke");
+    expect(module).toContain("dn-history-node-hovered");
+    expect(module).toContain("transform: scale(1.38)");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");
