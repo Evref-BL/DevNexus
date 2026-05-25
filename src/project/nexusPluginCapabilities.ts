@@ -91,6 +91,7 @@ function shellQuote(value: string): string {
 export type NexusPluginCapabilityKind =
   | "projected_skill"
   | "mcp_server"
+  | "agent_package"
   | "setup_obligation"
   | "environment_hint"
   | "cleanup_hook"
@@ -111,6 +112,25 @@ export type NexusPluginCleanupHookTrigger =
 export type NexusPluginDependencyProjectionSourceControl =
   | "support"
   | "source";
+
+export type NexusPluginAgentPackageKind =
+  | "native"
+  | "shim"
+  | "bundled_fallback"
+  | "manual_guidance";
+
+export type NexusPluginAgentPackageSurface =
+  | "skills"
+  | "commands"
+  | "hooks"
+  | "mcp"
+  | "scripts"
+  | "adapters"
+  | "schemas"
+  | "templates"
+  | "examples"
+  | "tests"
+  | "references";
 
 export const nexusPluginWorkerFragmentTitleMaxLength = 160;
 export const nexusPluginWorkerFragmentBodyMaxLength = 4000;
@@ -147,6 +167,23 @@ export interface NexusPluginMcpServerCapability
   targetAgents?: string[];
   exposure?: NexusMcpExposureMode;
   tools?: NexusPluginMcpToolCapability[];
+}
+
+export interface NexusPluginAgentPackageCapability
+  extends NexusPluginCapabilityBase {
+  kind: "agent_package";
+  packageKind: NexusPluginAgentPackageKind;
+  packageName: string;
+  repositoryUrl?: string;
+  installCommand?: string;
+  checkCommand?: string;
+  versionPolicy?: string;
+  license?: string;
+  provenance?: string;
+  required?: boolean;
+  targetAgents?: string[];
+  surfaces?: NexusPluginAgentPackageSurface[];
+  setupInstructions?: string[];
 }
 
 export interface NexusPluginSetupObligationCapability
@@ -204,6 +241,7 @@ export interface NexusPluginWorkerFragmentCapability
 export type NexusPluginCapabilityRecord =
   | NexusPluginProjectedSkillCapability
   | NexusPluginMcpServerCapability
+  | NexusPluginAgentPackageCapability
   | NexusPluginSetupObligationCapability
   | NexusPluginEnvironmentHintCapability
   | NexusPluginCleanupHookCapability
@@ -243,6 +281,23 @@ export type NexusPluginCapabilityProjectionRecord =
         name: string;
         description: string | null;
       }>;
+    }
+  | {
+      kind: "agent_package";
+      id: string;
+      description: string | null;
+      packageKind: NexusPluginAgentPackageKind;
+      packageName: string;
+      repositoryUrl: string | null;
+      installCommand: string | null;
+      checkCommand: string | null;
+      versionPolicy: string | null;
+      license: string | null;
+      provenance: string | null;
+      required: boolean;
+      targetAgents: string[];
+      surfaces: NexusPluginAgentPackageSurface[];
+      setupInstructions: string[];
     }
   | {
       kind: "setup_obligation";
@@ -361,6 +416,37 @@ export interface ProjectPluginDependencyProjectionsOptions {
   activeAgents?: string[];
 }
 
+export interface NexusPluginAgentPackageProjectionSource {
+  pluginId: string;
+  pluginName: string | null;
+  version: string | null;
+  capabilityId: string;
+}
+
+export interface NexusPluginAgentPackageProjection {
+  kind: "agent_package";
+  id: string;
+  description: string | null;
+  packageKind: NexusPluginAgentPackageKind;
+  packageName: string;
+  repositoryUrl: string | null;
+  installCommand: string | null;
+  checkCommand: string | null;
+  versionPolicy: string | null;
+  license: string | null;
+  provenance: string | null;
+  required: boolean;
+  targetAgents: string[];
+  surfaces: NexusPluginAgentPackageSurface[];
+  setupInstructions: string[];
+  pluginSource: NexusPluginAgentPackageProjectionSource;
+}
+
+export interface ProjectPluginAgentPackagesOptions {
+  agent?: string | null;
+  activeAgents?: string[];
+}
+
 export function projectPluginCapabilityProjections(config: {
   plugins?: NexusProjectPluginsConfig;
 }): NexusPluginCapabilityProjection[] {
@@ -419,6 +505,23 @@ export function projectPluginDependencyProjections(
     .sort(compareProjectedDependencyProjections);
 }
 
+export function projectPluginAgentPackages(
+  config: { plugins?: NexusProjectPluginsConfig },
+  options: ProjectPluginAgentPackagesOptions = {},
+): NexusPluginAgentPackageProjection[] {
+  return (config.plugins ?? [])
+    .filter((plugin) => plugin.enabled !== false)
+    .flatMap((plugin) =>
+      plugin.capabilities
+        .filter(isAgentPackageCapability)
+        .filter((capability) =>
+          targetAgentMatches(capability.targetAgents, options),
+        )
+        .map((capability) => projectAgentPackage(plugin, capability)),
+    )
+    .sort(compareProjectedAgentPackages);
+}
+
 function projectCapabilityRecord(
   capability: NexusPluginCapabilityRecord,
 ): NexusPluginCapabilityProjectionRecord {
@@ -446,6 +549,26 @@ function projectCapabilityRecord(
         name: tool.name,
         description: tool.description ?? null,
       })),
+    };
+  }
+
+  if (isAgentPackageCapability(capability)) {
+    return {
+      kind: capability.kind,
+      id: capability.id,
+      description: capability.description ?? null,
+      packageKind: capability.packageKind,
+      packageName: capability.packageName,
+      repositoryUrl: capability.repositoryUrl ?? null,
+      installCommand: capability.installCommand ?? null,
+      checkCommand: capability.checkCommand ?? null,
+      versionPolicy: capability.versionPolicy ?? null,
+      license: capability.license ?? null,
+      provenance: capability.provenance ?? null,
+      required: capability.required ?? false,
+      targetAgents: capability.targetAgents ?? [],
+      surfaces: capability.surfaces ?? [],
+      setupInstructions: capability.setupInstructions ?? [],
     };
   }
 
@@ -545,6 +668,35 @@ function projectDependencyProjection(
   };
 }
 
+function projectAgentPackage(
+  plugin: NexusProjectPluginConfig,
+  capability: NexusPluginAgentPackageCapability,
+): NexusPluginAgentPackageProjection {
+  return {
+    kind: capability.kind,
+    id: capability.id,
+    description: capability.description ?? null,
+    packageKind: capability.packageKind,
+    packageName: capability.packageName,
+    repositoryUrl: capability.repositoryUrl ?? null,
+    installCommand: capability.installCommand ?? null,
+    checkCommand: capability.checkCommand ?? null,
+    versionPolicy: capability.versionPolicy ?? null,
+    license: capability.license ?? null,
+    provenance: capability.provenance ?? null,
+    required: capability.required ?? false,
+    targetAgents: capability.targetAgents ?? [],
+    surfaces: capability.surfaces ?? [],
+    setupInstructions: capability.setupInstructions ?? [],
+    pluginSource: {
+      pluginId: plugin.id,
+      pluginName: plugin.name ?? null,
+      version: plugin.version ?? null,
+      capabilityId: capability.id,
+    },
+  };
+}
+
 function projectWorkerFragment(
   plugin: NexusProjectPluginConfig,
   capability: NexusPluginWorkerFragmentCapability,
@@ -571,6 +723,12 @@ function isDependencyProjectionCapability(
   capability: NexusPluginCapabilityRecord,
 ): capability is NexusPluginDependencyProjectionCapability {
   return capability.kind === "dependency_projection";
+}
+
+function isAgentPackageCapability(
+  capability: NexusPluginCapabilityRecord,
+): capability is NexusPluginAgentPackageCapability {
+  return capability.kind === "agent_package";
 }
 
 function isWorkerFragmentCapability(
@@ -649,6 +807,17 @@ function compareProjectedWorkerFragments(
     compareStrings(left.id, right.id) ||
     compareStrings(left.kind, right.kind) ||
     compareStrings(left.provenance, right.provenance)
+  );
+}
+
+function compareProjectedAgentPackages(
+  left: NexusPluginAgentPackageProjection,
+  right: NexusPluginAgentPackageProjection,
+): number {
+  return (
+    compareStrings(left.pluginSource.pluginId, right.pluginSource.pluginId) ||
+    compareStrings(left.id, right.id) ||
+    compareStrings(left.packageName, right.packageName)
   );
 }
 

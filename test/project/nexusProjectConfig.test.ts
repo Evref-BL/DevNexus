@@ -3193,6 +3193,62 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts provider-neutral agent package plugin capability records", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "agent-package-project",
+        name: "Agent Package Project",
+        plugins: [
+          {
+            id: "agent-tools",
+            capabilities: [
+              {
+                kind: "agent_package",
+                id: "claude-native",
+                description: "Use the upstream Claude agent package.",
+                packageKind: "native",
+                packageName: "@example/claude-agent-pack",
+                repositoryUrl: "https://example.invalid/claude-agent-pack",
+                installCommand: "claude plugin install @example/claude-agent-pack",
+                checkCommand: "claude plugin list",
+                versionPolicy: "Track approved releases.",
+                license: "MIT",
+                provenance: "Synthetic plugin fixture",
+                required: true,
+                targetAgents: ["claude"],
+                surfaces: ["skills", "commands", "hooks", "references"],
+                setupInstructions: [
+                  "Confirm project policy before installing.",
+                ],
+              },
+            ],
+          },
+        ],
+      }).plugins?.[0]?.capabilities,
+    ).toEqual([
+      {
+        kind: "agent_package",
+        id: "claude-native",
+        description: "Use the upstream Claude agent package.",
+        packageKind: "native",
+        packageName: "@example/claude-agent-pack",
+        repositoryUrl: "https://example.invalid/claude-agent-pack",
+        installCommand: "claude plugin install @example/claude-agent-pack",
+        checkCommand: "claude plugin list",
+        versionPolicy: "Track approved releases.",
+        license: "MIT",
+        provenance: "Synthetic plugin fixture",
+        required: true,
+        targetAgents: ["claude"],
+        surfaces: ["skills", "commands", "hooks", "references"],
+        setupInstructions: [
+          "Confirm project policy before installing.",
+        ],
+      },
+    ]);
+  });
+
   it("rejects invalid URL-backed plugin MCP server combinations", () => {
     const config = {
       version: 1,

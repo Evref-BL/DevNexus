@@ -25,6 +25,7 @@ import {
   validateNexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
 import {
+  activeNexusProjectAgentProviders,
   activeNexusProjectMcpAgentTargets,
   activeNexusProjectSkillAgentTargets,
   loadProjectConfig,
@@ -58,9 +59,13 @@ import {
   type NexusComponentSourceRootTopology,
 } from "./nexusSourceRootTopology.js";
 import type {
+  NexusPluginAgentPackageProjection,
   NexusPluginMcpServerCapability,
   NexusPluginProjectedSkillCapability,
   NexusProjectPluginConfig,
+} from "./nexusPluginCapabilities.js";
+import {
+  projectPluginAgentPackages,
 } from "./nexusPluginCapabilities.js";
 import {
   nexusSkillMarkdownFileName,
@@ -1119,6 +1124,7 @@ function joinExistingProjectSteps(options: {
         "Run from the workspace root after installing DevNexus and configuring local paths.",
         `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
         "Plugin-projected skills and plugin MCP servers may require plugin-specific setup commands; setup check reports those gaps explicitly.",
+        ...pluginAgentPackageManualInstructions(options.projectConfig),
         "A raw stdio MCP tools/list smoke test confirms the server command works, but the agent workspace session is not ready until the active provider exposes the tools in its own session.",
       ],
       checks: [
@@ -1132,6 +1138,7 @@ function joinExistingProjectSteps(options: {
           options.projectRoot,
           options.platform,
         ),
+        ...pluginAgentPackageCheckCommands(options.projectConfig),
         `${devNexusCommand} automation eligible-work . --json`,
       ],
     },
@@ -1410,6 +1417,31 @@ function pluginProjectionCheckCommands(
   return commands;
 }
 
+function pluginAgentPackageCheckCommands(
+  projectConfig: NexusProjectConfig,
+): string[] {
+  return [
+    ...new Set(
+      activePluginAgentPackageTargets(projectConfig)
+        .map(({ agentPackage }) => agentPackage.checkCommand)
+        .filter((command): command is string => command !== null),
+    ),
+  ];
+}
+
+function pluginAgentPackageManualInstructions(
+  projectConfig: NexusProjectConfig,
+): string[] {
+  const packages = activePluginAgentPackageTargets(projectConfig);
+  if (packages.length === 0) {
+    return [];
+  }
+
+  return [
+    `Plugin agent packages: ${packages.map(formatAgentPackageGuidance).join("; ")}.`,
+  ];
+}
+
 function pluginProjectionChecks(
   projectRoot: string,
   projectConfig: NexusProjectConfig,
@@ -1417,7 +1449,16 @@ function pluginProjectionChecks(
   return [
     ...pluginProjectedSkillChecks(projectRoot, projectConfig),
     ...pluginMcpServerChecks(projectRoot, projectConfig),
+    ...pluginAgentPackageChecks(projectConfig),
   ];
+}
+
+function pluginAgentPackageChecks(
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  return activePluginAgentPackageTargets(projectConfig).map(
+    ({ agent, agentPackage }) => pluginAgentPackageCheck(agent, agentPackage),
+  );
 }
 
 function agentClientAdapterReadinessChecks(options: {
@@ -1728,6 +1769,110 @@ function agentProjectionPolicyCheck(
 
 function projectionMissing(projection: NexusAgentProjectionPathStatus): boolean {
   return projection.state === "expected-missing";
+}
+
+function activePluginAgentPackageTargets(
+  projectConfig: NexusProjectConfig,
+): Array<{ agent: string; agentPackage: NexusPluginAgentPackageProjection }> {
+  const activeAgents = activeNexusProjectAgentProviders(projectConfig);
+  return projectPluginAgentPackages(projectConfig, { activeAgents })
+    .flatMap((agentPackage) =>
+      activeAgentsForAgentPackage(agentPackage, activeAgents).map((agent) => ({
+        agent,
+        agentPackage,
+      })),
+    );
+}
+
+function activeAgentsForAgentPackage(
+  agentPackage: NexusPluginAgentPackageProjection,
+  activeAgents: readonly string[],
+): string[] {
+  if (activeAgents.length === 0) {
+    return agentPackage.targetAgents;
+  }
+  if (agentPackage.targetAgents.length === 0) {
+    return [...activeAgents];
+  }
+
+  const activeAgentSet = new Set(activeAgents);
+  return agentPackage.targetAgents.filter((agent) => activeAgentSet.has(agent));
+}
+
+function formatAgentPackageGuidance(options: {
+  agent: string;
+  agentPackage: NexusPluginAgentPackageProjection;
+}): string {
+  const pluginLabel =
+    options.agentPackage.pluginSource.pluginName ??
+    options.agentPackage.pluginSource.pluginId;
+  const parts = [
+    `${pluginLabel} ${options.agent}/${options.agentPackage.packageKind} ${options.agentPackage.packageName}`,
+  ];
+  if (options.agentPackage.repositoryUrl) {
+    parts.push(options.agentPackage.repositoryUrl);
+  }
+  if (options.agentPackage.installCommand) {
+    parts.push(`install: ${options.agentPackage.installCommand}`);
+  }
+  if (options.agentPackage.license) {
+    parts.push(`license: ${options.agentPackage.license}`);
+  }
+
+  return parts.join(" ");
+}
+
+function pluginAgentPackageCheck(
+  agent: string,
+  agentPackage: NexusPluginAgentPackageProjection,
+): NexusSetupCheckResult {
+  const pluginLabel =
+    agentPackage.pluginSource.pluginName ?? agentPackage.pluginSource.pluginId;
+
+  return {
+    id: `plugin-${setupCheckIdPart(agentPackage.pluginSource.pluginId)}-agent-package-${setupCheckIdPart(agentPackage.id)}-${setupCheckIdPart(agent)}`,
+    title: `${agent} agent package ${agentPackage.packageName}`,
+    status: agentPackage.required ? "warning" : "passed",
+    summary:
+      `Plugin ${pluginLabel} declares ${agentPackage.packageKind} agent package ${agentPackage.packageName} for ${agent}.`,
+    nextAction: agentPackageNextAction(agentPackage),
+    details: {
+      packageKind: agentPackage.packageKind,
+      packageName: agentPackage.packageName,
+      repositoryUrl: agentPackage.repositoryUrl,
+      installCommand: agentPackage.installCommand,
+      checkCommand: agentPackage.checkCommand,
+      versionPolicy: agentPackage.versionPolicy,
+      license: agentPackage.license,
+      provenance: agentPackage.provenance,
+      required: agentPackage.required,
+      surfaces: agentPackage.surfaces,
+      setupInstructions: agentPackage.setupInstructions,
+      pluginSource: agentPackage.pluginSource,
+    },
+  };
+}
+
+function agentPackageNextAction(
+  agentPackage: NexusPluginAgentPackageProjection,
+): string | null {
+  const actions = [
+    ...(agentPackage.installCommand
+      ? [`Run ${agentPackage.installCommand}.`]
+      : []),
+    ...agentPackage.setupInstructions,
+    ...(agentPackage.checkCommand
+      ? [`Verify with ${agentPackage.checkCommand}.`]
+      : []),
+  ];
+  if (actions.length > 0) {
+    return actions.join(" ");
+  }
+  if (agentPackage.required) {
+    return `Review ${agentPackage.packageName} setup guidance before assigning agent work.`;
+  }
+
+  return null;
 }
 
 function pluginProjectedSkillChecks(
