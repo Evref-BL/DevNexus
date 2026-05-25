@@ -7423,6 +7423,13 @@ function printCoordinationStatusResult(
   );
   writeLine(stdout, `  Active leases: ${status.leases.activeCount}`);
   writeLine(stdout, `  Handoffs: ${status.handoffs.records.length}`);
+  writeLine(
+    stdout,
+    `  Activity: ${status.activity.activeGroupCount} active; ${status.activity.staleGroupCount} stale; ${status.activity.overlapCount} overlap`,
+  );
+  if (status.activity.nextAction !== status.nextAction) {
+    writeLine(stdout, `  Activity next action: ${status.activity.nextAction}`);
+  }
   if (!status.handoffs.available) {
     writeLine(stdout, "  Handoff storage: incomplete");
     if (status.handoffs.capability.reason) {

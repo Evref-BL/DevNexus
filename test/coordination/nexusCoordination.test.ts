@@ -7,6 +7,7 @@ import {
   createDefaultNexusHomeConfigBase,
   createLocalWorkTrackerProvider,
   createNexusCoordinationHandoff,
+  createOrRefreshNexusWorktreeLease,
   defaultNexusAutomationConfig,
   getNexusCoordinationStatus,
   getNexusCoordinationIntegrationPlan,
@@ -299,6 +300,7 @@ function fakeGitRunner(
     upstreamExitCode?: number;
     branch?: string;
     head?: string;
+    changedFiles?: string[];
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
@@ -330,6 +332,12 @@ function fakeGitRunner(
     }
     if (joined === "rev-list --left-right --count HEAD...@{u}") {
       return ok(argsArray, overrides.aheadBehind ?? "0\t0\n");
+    }
+    if (
+      joined === "diff --name-only HEAD" ||
+      joined === "ls-files --others --exclude-standard"
+    ) {
+      return ok(argsArray, `${overrides.changedFiles?.join("\n") ?? ""}\n`);
     }
 
     return ok(argsArray, "");
@@ -1097,6 +1105,158 @@ describe("nexus coordination", () => {
       unstagedCount: 2,
       untrackedCount: 1,
     });
+  });
+
+  it("groups active coordination activity and reports overlap, stale leases, and branch blockers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const currentWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "current");
+    const ownedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "owned");
+    const otherWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "other");
+    const staleWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "stale");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(currentWorktreePath, { recursive: true });
+    fs.mkdirSync(ownedWorktreePath, { recursive: true });
+    fs.mkdirSync(otherWorktreePath, { recursive: true });
+    fs.mkdirSync(staleWorktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+    );
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Parallel status",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: os.hostname(),
+      agentId: "codex-owned",
+      workItemId,
+      branchName: "codex/dev-nexus/owned",
+      worktreePath: ownedWorktreePath,
+      writeScope: ["src/coordination"],
+      status: "working",
+      gitFacts: {
+        headCommit: "owned123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/owned",
+      },
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "other-host",
+      agentId: "codex-other",
+      workItemId: "local-99",
+      branchName: "codex/dev-nexus/other",
+      worktreePath: otherWorktreePath,
+      writeScope: ["src/coordination/nexusCoordination.ts"],
+      status: "working",
+      gitFacts: {
+        headCommit: "other123",
+        dirty: true,
+        stagedCount: 1,
+        pushed: false,
+        ahead: 2,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "old-host",
+      agentId: "codex-stale",
+      workItemId: "local-100",
+      branchName: "codex/dev-nexus/stale",
+      worktreePath: staleWorktreePath,
+      writeScope: ["docs"],
+      status: "working",
+      gitFacts: {
+        headCommit: "stale123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/stale",
+      },
+      now: () => "2026-05-15T09:00:00.000Z",
+    });
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      currentPath: currentWorktreePath,
+      gitRunner: fakeGitRunner(currentWorktreePath, [], {
+        status: " M src/coordination/nexusCoordination.ts\n",
+        aheadBehind: "1\t0\n",
+        upstreamExitCode: 1,
+        changedFiles: ["src/coordination/nexusCoordination.ts"],
+      }),
+      now: () => "2026-05-16T10:30:00.000Z",
+      maxLeaseAgeMs: 60 * 60 * 1000,
+    });
+
+    expect(status.git).toMatchObject({
+      dirty: true,
+      upstream: null,
+      ahead: null,
+      pushed: null,
+      changedFiles: ["src/coordination/nexusCoordination.ts"],
+    });
+    expect(status.activity).toMatchObject({
+      activeGroupCount: 2,
+      staleGroupCount: 1,
+      overlapCount: 2,
+      dirtyGeneratedWorktree: true,
+      dirtySharedCheckout: false,
+      currentBranch: {
+        missingUpstream: true,
+        unpushed: false,
+      },
+      authority: {
+        missingSummary: true,
+      },
+    });
+    expect(status.activity.groups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          branch: "codex/dev-nexus/owned",
+          ownership: "current_host",
+          active: true,
+          overlap: expect.objectContaining({
+            likely: true,
+            granularity: "package",
+          }),
+          nextAction: "Continue or hand off the owned active worktree.",
+        }),
+        expect.objectContaining({
+          branch: "codex/dev-nexus/other",
+          ownership: "other_host",
+          active: true,
+          dirty: true,
+          unpushed: true,
+          missingUpstream: true,
+          overlap: expect.objectContaining({
+            likely: true,
+            granularity: "file",
+          }),
+          nextAction: "Coordinate before editing overlapping active work.",
+        }),
+        expect.objectContaining({
+          branch: "codex/dev-nexus/stale",
+          stale: true,
+          nextAction: "Run cleanup dry-run or refresh the stale lease.",
+        }),
+      ]),
+    );
+    expect(status.activity.nextAction).toBe(
+      "Review, commit, or hand off current worktree changes before starting parallel work.",
+    );
   });
 
   it("uses host-local auth profiles in coordination authority status", async () => {
