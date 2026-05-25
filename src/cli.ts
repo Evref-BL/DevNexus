@@ -159,6 +159,7 @@ import {
 } from "./automation/nexusAutomationTargetReport.js";
 import {
   createNexusCoordinationHandoff,
+  formatNexusCoordinationQualityDeltaSummary,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
   nexusCoordinationErrorPayload,
@@ -854,6 +855,8 @@ interface ParsedCoordinationHandoffCommand {
   decisions: string[];
   verificationSummary?: string | null;
   integrationPreference?: string | null;
+  qualityDelta?: unknown;
+  qualityDeltaSourcePath?: string | null;
   note?: string | null;
   currentPath?: string;
   json?: boolean;
@@ -1759,6 +1762,8 @@ async function handleCoordinationCommand(
       decisions: parsed.decisions,
       verificationSummary: parsed.verificationSummary,
       integrationPreference: parsed.integrationPreference,
+      qualityDelta: parsed.qualityDelta,
+      qualityDeltaSourcePath: parsed.qualityDeltaSourcePath,
       note: parsed.note,
       currentPath: parsed.currentPath,
       gitRunner: dependencies.gitRunner,
@@ -4271,6 +4276,14 @@ function parseCoordinationHandoffCommand(
       case "--integration-preference":
         parsed.integrationPreference = next();
         break;
+      case "--quality-delta": {
+        const qualityDeltaSourcePath = path.resolve(next());
+        parsed.qualityDelta = JSON.parse(
+          fs.readFileSync(qualityDeltaSourcePath, "utf8"),
+        );
+        parsed.qualityDeltaSourcePath = qualityDeltaSourcePath;
+        break;
+      }
       case "--note":
         parsed.note = next();
         break;
@@ -7396,6 +7409,12 @@ function printCoordinationHandoffResult(
   }
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
+  if (result.record.qualityDelta) {
+    writeLine(
+      stdout,
+      `  ${formatNexusCoordinationQualityDeltaSummary(result.record.qualityDelta)}`,
+    );
+  }
   if (result.blockedMutation) {
     writeLine(stdout, `  Blocked: ${result.blockedMutation.action}`);
     if (result.blockedMutation.fallbackSuggestion) {
