@@ -37,7 +37,8 @@ function readNexusCockpitBuiltClientModuleSource(): string | null {
 
 function readNexusCockpitBuiltClientModulePath(): string | null {
   const candidates = [
-    new URL("../cockpit-client/dev-nexus-cockpit.js", import.meta.url),
+    new URL("../../cockpit-client/dev-nexus-cockpit.js", import.meta.url),
+    new URL("../../../dist/cockpit-client/dev-nexus-cockpit.js", import.meta.url),
   ];
   for (const candidate of candidates) {
     const candidatePath = fileURLToPath(candidate);

@@ -81,6 +81,7 @@ import {
   gitHistoryBranchReferences,
   summarizeGitHistory,
 } from "./nexusDashboardGitHistory.js";
+import { summarizeGitWorkflows } from "./nexusDashboardGitWorkflows.js";
 import { summarizeFeatures } from "./nexusDashboardFeatures.js";
 import type {
   NexusDashboardGitHistoryCommit,
@@ -307,6 +308,7 @@ export async function buildNexusDashboardSnapshot(
     },
   );
   const trackedWork = summarizeTrackedWork(eligibleWork.value, providerUrls);
+  const gitWorkflows = summarizeGitWorkflows(projectRoot, projectConfig);
   const features = summarizeFeatures({
     projectRoot,
     projectConfig,
@@ -369,6 +371,7 @@ export async function buildNexusDashboardSnapshot(
     worktrees,
     threads,
     features,
+    gitWorkflows,
     plugins,
     trackedWork,
     publication,
@@ -397,6 +400,7 @@ export async function buildNexusDashboardWorkspaceShell(
     worktrees: emptyWorktreeSummary(),
     threads: emptyThreadSummary(),
   });
+  const gitWorkflows = summarizeGitWorkflows(projectRoot, projectConfig);
 
   return {
     version: 1,
@@ -421,6 +425,7 @@ export async function buildNexusDashboardWorkspaceShell(
     worktrees: emptyWorktreeSummary(),
     threads: emptyThreadSummary(),
     features,
+    gitWorkflows,
     plugins,
     trackedWork: emptyTrackedWorkSummary(),
     publication: [],

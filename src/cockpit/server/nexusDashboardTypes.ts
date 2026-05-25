@@ -4,6 +4,7 @@ import type { ResolvedNexusProjectComponent } from "../../project/nexusProjectLi
 import type { NexusEligibleWorkMode, NexusEligibleWorkSummary } from "../../work-items/nexusEligibleWorkSummary.js";
 import type { GitRunner } from "../../worktrees/gitWorktreeService.js";
 import type { NexusDashboardGitHistorySummary } from "./nexusDashboardGitHistory.js";
+import type { NexusDashboardGitWorkflowSummary } from "./nexusDashboardGitWorkflows.js";
 import type { NexusDashboardProviderAction } from "./nexusDashboardProviderActions.js";
 
 export type NexusDashboardSignalTone =
@@ -455,6 +456,7 @@ export interface NexusDashboardSnapshot {
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
   features: NexusDashboardFeatureSummary;
+  gitWorkflows: NexusDashboardGitWorkflowSummary;
   plugins: NexusDashboardPluginSummary;
   trackedWork: NexusDashboardTrackedWorkSummary;
   publication: NexusDashboardPublicationSummary[];

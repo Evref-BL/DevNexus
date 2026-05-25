@@ -753,6 +753,137 @@ describe("nexus dashboard client", () => {
     });
   });
 
+  it("renders Git workflow state as compact read-only cockpit context", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      features: {
+        activeCount: 0,
+        needsAttentionCount: 0,
+        records: [],
+      },
+      gitWorkflows: {
+        activeProfileId: "protected-main",
+        profileCount: 1,
+        runCount: 2,
+        activeRunCount: 1,
+        waitingRunCount: 1,
+        blockedRunCount: 0,
+        terminalRunCount: 1,
+        profiles: [
+          {
+            id: "protected-main",
+            name: "Protected main",
+            source: "configured",
+            branchStrategy: "hybrid",
+            targetBranch: "main",
+            activeFeatureId: "codex-goals",
+            reviewMode: "review_branch_pr",
+            finalPullRequest: true,
+            gateCount: 6,
+          },
+        ],
+        runs: [
+          {
+            id: "run-review",
+            componentId: "primary",
+            profileId: "protected-main",
+            branchStrategy: "hybrid",
+            status: "ready_for_review",
+            statusLabel: "Ready for review",
+            terminalOutcome: null,
+            branchName: "codex/dev-nexus/123-cockpit",
+            currentRef: "codex/dev-nexus/123-cockpit",
+            targetBranch: "main",
+            workItemId: "github-123",
+            nextOwnerLabel: "Human: Gabriel",
+            evidenceCount: 1,
+            allowedTransitionCount: 1,
+            updatedAt: "2026-05-23T09:04:00.000Z",
+          },
+          {
+            id: "run-merged",
+            componentId: "primary",
+            profileId: "protected-main",
+            branchStrategy: "hybrid",
+            status: "merged",
+            statusLabel: "Merged",
+            terminalOutcome: "merged",
+            branchName: "codex/dev-nexus/122-done",
+            currentRef: "main",
+            targetBranch: "main",
+            workItemId: null,
+            nextOwnerLabel: "No owner",
+            evidenceCount: 0,
+            allowedTransitionCount: 0,
+            updatedAt: "2026-05-23T08:30:00.000Z",
+          },
+        ],
+      },
+      events: [],
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderFeatureOverview(snapshot, null);
+
+    expect(rendered).toContain("Git workflows");
+    expect(rendered).toContain("Protected main");
+    expect(rendered).toContain("hybrid");
+    expect(rendered).toContain("main");
+    expect(rendered).toContain("1 active");
+    expect(rendered).toContain("1 waiting");
+    expect(rendered).toContain("Ready for review");
+    expect(rendered).toContain("codex/dev-nexus/123-cockpit");
+    expect(rendered).not.toContain("activeProfileId");
+    expect(rendered).not.toContain("{");
+  });
+
+  it("renders a compact Git workflow empty state without raw configuration", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const rendered = hooks.renderFeatureOverview(
+      {
+        features: {
+          activeCount: 0,
+          needsAttentionCount: 0,
+          records: [],
+        },
+        gitWorkflows: {
+          activeProfileId: null,
+          profileCount: 0,
+          runCount: 0,
+          activeRunCount: 0,
+          waitingRunCount: 0,
+          blockedRunCount: 0,
+          terminalRunCount: 0,
+          profiles: [],
+          runs: [],
+        },
+        events: [],
+        project: {
+          name: "Dashboard Demo",
+        },
+        signals: [],
+        weave: {
+          nodes: [],
+          lanes: [],
+        },
+      },
+      null,
+    );
+
+    expect(rendered).toContain("Git workflows");
+    expect(rendered).toContain("No profile configured");
+    expect(rendered).toContain("No workflow runs recorded yet.");
+    expect(rendered).not.toContain("gitWorkflows");
+    expect(rendered).not.toContain("automation.gitWorkflows");
+  });
+
   it("renders compact provider chips with provider and external-link affordances", async () => {
     const hooks = await loadDashboardClientTestHooks();
 

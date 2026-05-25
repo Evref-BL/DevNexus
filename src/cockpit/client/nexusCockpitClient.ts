@@ -833,7 +833,51 @@ function renderFeatureOverview(snapshot, selectedId) {
   const visible = records.slice(0, 6);
   const more = records.length > visible.length ? `<div class="dn-feature-more">${escapeHtml(countLabel(records.length - visible.length, 'more feature'))}</div>` : '';
   const body = records.length ? `${visible.map((feature) => renderFeatureCard(feature, selectedId)).join('')}${more}` : '<p>No active feature branch delivery configured.</p>';
-  return `<div class="dn-panel dn-feature-panel" id="active-features"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Project workflow</span><h2>Active Features</h2></div><span class="dn-count">${escapeHtml(count)}</span></div>${note}<div class="dn-feature-list">${body}</div></div>`;
+  return `<div class="dn-panel dn-feature-panel" id="active-features"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Project workflow</span><h2>Active Features</h2></div><span class="dn-count">${escapeHtml(count)}</span></div>${note}${renderGitWorkflowOverview(snapshot.gitWorkflows)}<div class="dn-feature-list">${body}</div></div>`;
+}
+
+function renderGitWorkflowOverview(gitWorkflows) {
+  if (!gitWorkflows) return '';
+  const profiles = gitWorkflows?.profiles ?? [];
+  const runs = gitWorkflows?.runs ?? [];
+  const activeProfile = profiles.find((profile) => profile.id === gitWorkflows.activeProfileId) ?? profiles[0] ?? null;
+  const profileTitle = activeProfile?.name ?? gitWorkflows.activeProfileId ?? 'No profile configured';
+  const profileMeta = [
+    activeProfile?.branchStrategy,
+    activeProfile?.targetBranch ? `target ${activeProfile.targetBranch}` : null,
+    activeProfile?.finalPullRequest ? 'pull request' : null,
+    activeProfile?.gateCount ? countLabel(activeProfile.gateCount, 'gate') : null,
+  ].filter(Boolean);
+  const counters = [
+    workflowCount(gitWorkflows.activeRunCount ?? 0, 'active'),
+    workflowCount(gitWorkflows.waitingRunCount ?? 0, 'waiting'),
+    workflowCount(gitWorkflows.blockedRunCount ?? 0, 'blocked'),
+  ].filter(Boolean);
+  const recentRuns = runs.slice(0, 3).map(renderGitWorkflowRun).join('');
+  const runBody = recentRuns || '<p>No workflow runs recorded yet.</p>';
+  return `<section class="dn-git-workflows" aria-label="Git workflows"><div class="dn-git-workflows-head"><div><span class="dn-label">Git workflows</span><strong title="${escapeHtml(profileTitle)}">${escapeHtml(profileTitle)}</strong>${profileMeta.length ? `<span class="dn-git-workflow-meta">${profileMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</span>` : ''}</div><span class="dn-git-workflow-counts">${counters.join('')}</span></div><div class="dn-git-workflow-runs">${runBody}</div></section>`;
+}
+
+function renderGitWorkflowRun(run) {
+  const title = run.branchName ?? run.currentRef ?? run.workItemId ?? run.id;
+  const meta = [
+    run.statusLabel ?? run.status,
+    run.nextOwnerLabel,
+    run.targetBranch ? `target ${run.targetBranch}` : null,
+    run.evidenceCount ? countLabel(run.evidenceCount, 'evidence item') : null,
+  ].filter(Boolean);
+  return `<article class="dn-git-workflow-run tone-${escapeAttribute(gitWorkflowRunTone(run))}"><strong title="${escapeHtml(title)}">${escapeHtml(truncate(title, 72))}</strong><span class="dn-git-workflow-run-meta">${meta.map((item) => `<span title="${escapeHtml(item)}">${escapeHtml(item)}</span>`).join('')}</span></article>`;
+}
+
+function workflowCount(value, label) {
+  return value > 0 ? `<span>${escapeHtml(`${value} ${label}`)}</span>` : '';
+}
+
+function gitWorkflowRunTone(run) {
+  if (run.status === 'blocked') return 'danger';
+  if (run.status === 'ready_for_review' || run.status === 'waiting') return 'warn';
+  if (run.terminalOutcome || ['completed', 'merged'].includes(run.status)) return 'good';
+  return 'active';
 }
 
 function renderFeatureCard(feature, selectedId) {

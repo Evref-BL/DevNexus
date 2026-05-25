@@ -21,8 +21,9 @@ root and carries the workspace list, selected workspace id, and action queue.
 
 `/api/cockpit?workspace=<id>` and `/api/snapshot?workspace=<id>` return the
 selected workspace payload. The default workspace payload is meant for UI: it
-keeps summaries, threads, plugins, provider actions, events, and the parallel
-work map, but leaves raw automation objects out.
+keeps summaries, Git history, Git workflow state, threads, plugins, provider
+actions, events, and the parallel work map, but leaves raw automation objects
+out.
 
 `/api/diagnostics?workspace=<id>` returns the raw automation, eligible-work, and
 target-report objects for an explicit diagnostics view.
@@ -41,6 +42,7 @@ surfaces:
 | Plugins | `workspaces[].pluginCount` | `plugins` |
 | Thread actions | `workspaces[].needsDecisionCount` | `threads.records` |
 | Tracked work | `workspaces[].eligibleWorkCount` | `trackedWork` |
+| Git workflows | not default | `gitWorkflows` |
 
 ## Host Payload
 
@@ -81,6 +83,12 @@ Workspace `plugins.records[]` includes configured plugins and curated catalogue
 entries. A catalogue entry has `state: "available"`, `source: "catalogue"`,
 `sourcePath: null`, `packageName`, `repositoryUrl`, `configExportName`,
 `installCommand`, and a `refreshCommand` suitable for copying into a shell.
+
+Workspace `gitWorkflows` is a compact, read-only summary. It contains profile
+counts, the active profile id, run counts by broad state, configured profile
+records, and recent run records. It must not expose raw
+`automation.gitWorkflows` JSON; editable configuration belongs in a future
+Settings surface with validation and an explicit apply step.
 
 ## Workspace Drill-Down
 

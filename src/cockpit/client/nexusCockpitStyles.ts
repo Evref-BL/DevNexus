@@ -135,6 +135,18 @@ button, input, select { font: inherit; }
 .dn-feature-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .dn-feature-meta span { max-width: 100%; overflow: hidden; padding: 4px 7px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface-raised); font-size: 0.72rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .dn-feature-more { padding: 8px 10px; border: 1px dashed var(--dn-border-muted); border-radius: 8px; color: var(--dn-muted); background: var(--dn-surface-muted); font-size: 0.78rem; font-weight: 800; }
+.dn-git-workflows { display: grid; gap: 8px; margin: 0 0 12px; padding: 10px; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: var(--dn-surface-muted); }
+.dn-git-workflows-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.dn-git-workflows-head > div { display: grid; gap: 5px; min-width: 0; }
+.dn-git-workflows-head strong { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-workflow-meta, .dn-git-workflow-counts, .dn-git-workflow-run-meta { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.dn-git-workflow-meta span, .dn-git-workflow-counts span, .dn-git-workflow-run-meta span { max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface-raised); font-size: 0.68rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-workflow-counts { justify-content: flex-end; }
+.dn-git-workflow-counts span strong { color: var(--dn-strong); font-size: inherit; }
+.dn-git-workflow-runs { display: grid; gap: 6px; }
+.dn-git-workflow-run { --dn-workflow-accent: var(--dn-active); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; padding: 7px 8px; border-left: 3px solid var(--dn-workflow-accent); border-radius: 6px; background: var(--dn-surface); }
+.dn-git-workflow-run.tone-good { --dn-workflow-accent: var(--dn-good); } .dn-git-workflow-run.tone-active { --dn-workflow-accent: var(--dn-active); } .dn-git-workflow-run.tone-warn { --dn-workflow-accent: var(--dn-warn); } .dn-git-workflow-run.tone-danger { --dn-workflow-accent: var(--dn-danger); }
+.dn-git-workflow-run strong { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-panel { background: var(--dn-surface); }
 .dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px; --dn-git-row-height: 26px; --dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 12px); display: grid; grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: var(--dn-weave-bg); }
 .dn-git-topbar { display: grid; grid-template-columns: minmax(160px, 0.32fr) minmax(220px, 0.48fr) minmax(260px, 1fr) auto; align-items: end; gap: 8px; margin: 0 0 10px; }

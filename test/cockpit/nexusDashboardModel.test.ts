@@ -10,14 +10,18 @@ import {
   buildNexusDashboardSnapshot,
   CodexAppServerJsonRpcClient,
   createLocalWorkTrackerProvider,
+  createNexusGitWorkflowRun,
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
+  defaultNexusGitWorkflowGateConfig,
+  defaultNexusGitWorkflowUpdatePolicyConfig,
   renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
   stopVerifiedNexusDashboardServerRecord,
+  updateNexusGitWorkflowRun,
   validateNexusHomeConfigBase,
   writeNexusWorktreeLeaseStore,
   type GitRunner,
@@ -604,6 +608,169 @@ describe("nexus dashboard model", () => {
           branches: ["feat/codex-goals", "feat/codex-goals/header-card"],
         }),
       ]),
+    });
+  });
+
+  it("summarizes configured Git workflow profiles and recorded runs", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-git-workflows-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        gitWorkflows: {
+          activeProfileId: "protected-main",
+          profiles: [
+            {
+              id: "protected-main",
+              name: "Protected main",
+              source: "configured",
+              branchStrategy: "hybrid",
+              targetBranch: "main",
+              activeFeatureId: "codex-goals",
+              allowedBranchStrategies: [
+                ...defaultNexusFeatureBranchDeliveryConfig.allowedBranchStrategies,
+              ],
+              branchNaming: {
+                ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
+                allowedIntentPrefixes: [
+                  ...defaultNexusFeatureBranchDeliveryConfig.branchNaming
+                    .allowedIntentPrefixes,
+                ],
+              },
+              review: {
+                ...defaultNexusFeatureBranchDeliveryConfig.review,
+              },
+              provider: {
+                ...defaultNexusFeatureBranchDeliveryConfig.provider,
+              },
+              branchPublication: {
+                ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
+              },
+              update: {
+                ...defaultNexusGitWorkflowUpdatePolicyConfig,
+                behind: "restack",
+              },
+              gates: {
+                ...defaultNexusGitWorkflowGateConfig,
+                review: ["provider_review"],
+                publication: [
+                  "human_approval",
+                  "provider_review",
+                  "publication_authority",
+                ],
+              },
+              release: null,
+              environment: null,
+            },
+          ],
+        },
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    createNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-review",
+      projectId: config.id,
+      componentId: "primary",
+      profileId: "protected-main",
+      branchStrategy: "hybrid",
+      workItemId: "github-123",
+      branchName: "codex/dev-nexus/123-cockpit",
+      currentRef: "codex/dev-nexus/123-cockpit",
+      targetBranch: "main",
+      owner: {
+        kind: "human",
+        id: "Gabriel",
+      },
+      evidence: [
+        {
+          id: "checks",
+          kind: "verification",
+          summary: "Focused checks passed.",
+        },
+      ],
+      allowedTransitions: [
+        {
+          id: "approve",
+          to: "completed",
+          summary: "Approve publication.",
+          requiresApproval: true,
+        },
+      ],
+      now: "2026-05-23T09:03:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-review",
+      status: "ready_for_review",
+      owner: {
+        kind: "human",
+        id: "Gabriel",
+      },
+      now: "2026-05-23T09:04:00.000Z",
+    });
+    createNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-merged",
+      projectId: config.id,
+      componentId: "primary",
+      profileId: "protected-main",
+      branchStrategy: "hybrid",
+      branchName: "codex/dev-nexus/122-done",
+      currentRef: "main",
+      targetBranch: "main",
+      now: "2026-05-23T08:00:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-merged",
+      status: "merged",
+      terminalOutcome: "merged",
+      now: "2026-05-23T08:30:00.000Z",
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-23T09:05:00.000Z"),
+    });
+
+    expect(snapshot.gitWorkflows).toMatchObject({
+      activeProfileId: "protected-main",
+      profileCount: 1,
+      runCount: 2,
+      activeRunCount: 1,
+      waitingRunCount: 1,
+      blockedRunCount: 0,
+      terminalRunCount: 1,
+      profiles: [
+        expect.objectContaining({
+          id: "protected-main",
+          name: "Protected main",
+          branchStrategy: "hybrid",
+          targetBranch: "main",
+          activeFeatureId: "codex-goals",
+          reviewMode: "review_branch_pr",
+          finalPullRequest: true,
+          gateCount: 5,
+        }),
+      ],
+      runs: [
+        expect.objectContaining({
+          id: "run-review",
+          status: "ready_for_review",
+          statusLabel: "Ready for review",
+          branchName: "codex/dev-nexus/123-cockpit",
+          nextOwnerLabel: "Human: Gabriel",
+          evidenceCount: 1,
+          allowedTransitionCount: 1,
+        }),
+        expect.objectContaining({
+          id: "run-merged",
+          status: "merged",
+          statusLabel: "Merged",
+        }),
+      ],
     });
   });
 

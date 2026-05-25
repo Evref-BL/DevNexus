@@ -53,6 +53,34 @@ describe("nexus dashboard server", () => {
     );
   });
 
+  it("serves the Vite-built cockpit browser module when the bundle exists", async () => {
+    const builtAssetPath = path.join(
+      process.cwd(),
+      "dist",
+      "cockpit-client",
+      "dev-nexus-cockpit.js",
+    );
+    if (!fs.existsSync(builtAssetPath)) {
+      return;
+    }
+    const projectRoot = makeTempDir("dev-nexus-dashboard-built-asset-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const server = await startNexusDashboardServer({ projectRoot });
+
+    try {
+      const module = await fetch(`${server.url}assets/dev-nexus-cockpit.js`)
+        .then((response) => response.text());
+
+      expect(module).toContain("mountDevNexusCockpit");
+      expect(module).toContain("dn-git-workflows");
+      expect(module).not.toContain('from "./nexusCockpitStyles.js"');
+      expect(module).not.toContain('from "./history/nexusCockpitWorkMap.js"');
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves a Codex thread action endpoint for dashboard prompts", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-server-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
