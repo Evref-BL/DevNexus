@@ -241,7 +241,10 @@ describe("project registry helpers", () => {
               actorId: null,
               status: "unknown",
             }),
-            keyAllowedActions: ["coordination.handoff"],
+            keyAllowedActions: expect.arrayContaining([
+              "project.read",
+              "coordination.handoff",
+            ]),
           }),
         ],
       }),

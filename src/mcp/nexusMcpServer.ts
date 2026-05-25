@@ -139,6 +139,7 @@ import {
   getNexusCoordinationStatus,
   nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
+  startOrAdoptNexusCoordinationWork,
   type NexusCoordinationStatus,
 } from "../coordination/nexusCoordination.js";
 import {
@@ -149,6 +150,7 @@ import {
 import {
   executeNexusCleanup,
   selectNexusCleanupCandidate,
+  type NexusCleanupExecutionRescueOptions,
 } from "../operations/nexusCleanupExecution.js";
 import {
   createNexusRemoteExecutionRequest,
@@ -819,6 +821,36 @@ const tools: McpTool[] = [
     },
   },
   {
+    name: "coordination_start",
+    description: "Start or adopt an interactive DevNexus worktree flow after checking coordination status, active leases, and authority.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        detail: { type: "string", enum: ["summary", "full"], default: "summary" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        projectMeta: { type: "boolean" },
+        workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
+        currentPath: { type: "string" },
+        topic: { type: ["string", "null"] },
+        branchName: { type: "string" },
+        worktreeName: { type: "string" },
+        baseRef: { type: ["string", "null"] },
+        dryRun: { type: "boolean" },
+        hostId: { type: ["string", "null"] },
+        agentId: { type: ["string", "null"] },
+        workerAgentProvider: { type: ["string", "null"] },
+        writeScope: { type: "array", items: { type: "string" } },
+        leaseNotes: { type: "array", items: { type: "string" } },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "coordination_handoff",
     description: "Record an advisory structured coordination handoff as a tracker-backed work-item comment.",
     inputSchema: {
@@ -890,6 +922,10 @@ const tools: McpTool[] = [
         keepBranch: { type: "boolean" },
         force: { type: "boolean" },
         forceReason: { type: ["string", "null"], maxLength: 500 },
+        rescueBranch: { type: "string" },
+        rescueReason: { type: ["string", "null"], maxLength: 500 },
+        archiveSummary: { type: "string", maxLength: 1000 },
+        archiveUrl: { type: ["string", "null"], maxLength: 1000 },
       },
       required: ["candidateId"],
       additionalProperties: false,
@@ -2082,6 +2118,47 @@ async function callCoordinationMcpTool(
         status: detail === "full" ? status : summarizeCoordinationStatus(status),
       });
     }
+    case "coordination_start": {
+      const detail = mcpDetailFromArgs(args);
+      if (optionalBoolean(args, "dryRun", "arguments") !== true) {
+        assertMcpMutationAllowed(args, context, {
+          command: "coordination_start",
+          mutationClass: "worktree_bootstrap",
+          targetPath: optionalString(args, "currentPath", "arguments"),
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+      }
+      const result = await startOrAdoptNexusCoordinationWork({
+        projectRoot: projectRootFromArgs(args),
+        componentId: optionalString(args, "componentId", "arguments"),
+        projectMeta: optionalBoolean(args, "projectMeta", "arguments"),
+        workItemId: optionalString(args, "workItemId", "arguments"),
+        trackerId: optionalString(args, "trackerId", "arguments"),
+        trackerRole: optionalString(args, "trackerRole", "arguments"),
+        currentPath: optionalString(args, "currentPath", "arguments"),
+        topic: optionalNullableString(args, "topic", "arguments"),
+        branchName: optionalString(args, "branchName", "arguments"),
+        worktreeName: optionalString(args, "worktreeName", "arguments"),
+        baseRef: optionalNullableString(args, "baseRef", "arguments"),
+        dryRun: optionalBoolean(args, "dryRun", "arguments"),
+        hostId: optionalNullableString(args, "hostId", "arguments"),
+        agentId: optionalNullableString(args, "agentId", "arguments"),
+        workerAgentProvider: optionalNullableString(
+          args,
+          "workerAgentProvider",
+          "arguments",
+        ),
+        writeScope: optionalStringArray(args, "writeScope", "arguments") ?? [],
+        leaseNotes: optionalStringArray(args, "leaseNotes", "arguments") ?? [],
+        gitRunner: context.gitRunner,
+        now: context.now,
+      });
+      return toolResult({
+        ok: result.action !== "blocked",
+        detail,
+        result,
+      });
+    }
     case "coordination_handoff":
       assertMcpMutationAllowed(args, context, {
         command: "coordination_handoff",
@@ -2181,6 +2258,7 @@ async function callCoordinationMcpTool(
             : undefined,
           force: optionalBoolean(args, "force", "arguments"),
           forceReason: optionalNullableString(args, "forceReason", "arguments"),
+          rescue: coordinationCleanupRescueOptionsFromArgs(args),
           gitRunner: context.gitRunner,
           now: context.now,
         }),
@@ -2811,6 +2889,34 @@ function assertMcpMutationAllowed(
     gitRunner: context.gitRunner,
     override: context.sharedCheckoutGuardOverride,
   });
+}
+
+function coordinationCleanupRescueOptionsFromArgs(
+  args: Record<string, unknown>,
+): NexusCleanupExecutionRescueOptions | undefined {
+  const rescueBranch = optionalString(args, "rescueBranch", "arguments");
+  const archiveSummary = optionalString(args, "archiveSummary", "arguments");
+  if (rescueBranch && archiveSummary) {
+    throw new Error(
+      "arguments accepts either rescueBranch or archiveSummary, not both",
+    );
+  }
+  if (rescueBranch) {
+    return {
+      mode: "branch",
+      branchName: rescueBranch,
+      reason: optionalNullableString(args, "rescueReason", "arguments") ?? null,
+    };
+  }
+  if (archiveSummary) {
+    return {
+      mode: "archive_record",
+      summary: archiveSummary,
+      url: optionalNullableString(args, "archiveUrl", "arguments") ?? null,
+    };
+  }
+
+  return undefined;
 }
 
 export async function handleDevNexusMcpJsonRpcMessage(
@@ -4813,6 +4919,7 @@ export function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
       ahead: status.git.ahead,
       behind: status.git.behind,
       pushed: status.git.pushed,
+      changedFiles: summaryItems(status.git.changedFiles),
       warningCount: status.git.warnings.length,
     },
     authority: summarizeAuthorityComponent(status.authority),
@@ -4885,6 +4992,43 @@ export function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
       diagnostics: summaryItems(status.handoffs.diagnostics),
       warningCount: status.handoffs.warnings.length,
       warnings: summaryItems(status.handoffs.warnings),
+    },
+    activity: {
+      activeGroupCount: status.activity.activeGroupCount,
+      staleGroupCount: status.activity.staleGroupCount,
+      overlapCount: status.activity.overlapCount,
+      dirtySharedCheckout: status.activity.dirtySharedCheckout,
+      dirtyGeneratedWorktree: status.activity.dirtyGeneratedWorktree,
+      currentBranch: status.activity.currentBranch,
+      authority: {
+        missingSummary: status.activity.authority.missingSummary,
+        readAllowed: status.activity.authority.read?.allowed ?? null,
+        handoffAllowed: status.activity.authority.handoff?.allowed ?? null,
+        pushBranchAllowed: status.activity.authority.pushBranch?.allowed ?? null,
+        integrateAllowed: status.activity.authority.integrate?.allowed ?? null,
+        cleanupWorktreeAllowed:
+          status.activity.authority.cleanupWorktree?.allowed ?? null,
+        cleanupBranchAllowed:
+          status.activity.authority.cleanupBranch?.allowed ?? null,
+      },
+      groups: summaryItems(status.activity.groups).map((group) => ({
+        id: group.id,
+        componentId: group.componentId,
+        workItemId: group.workItemId,
+        branch: group.branch,
+        leaseCount: group.leaseIds.length,
+        handoffCount: group.handoffCount,
+        ownership: group.ownership,
+        active: group.active,
+        stale: group.stale,
+        dirty: group.dirty,
+        unpushed: group.unpushed,
+        missingUpstream: group.missingUpstream,
+        overlap: group.overlap,
+        nextAction: group.nextAction,
+      })),
+      omittedGroupCount: omittedCount(status.activity.groups),
+      nextAction: status.activity.nextAction,
     },
     nextAction: status.nextAction,
     blocking: status.blocking,

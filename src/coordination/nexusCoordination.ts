@@ -7,6 +7,7 @@ import {
 } from "../worktrees/gitWorktreeService.js";
 import {
   loadProjectConfig,
+  projectWorktreesRootPath,
   type NexusProjectWorkTrackerRole,
   type NexusProjectConfig,
 } from "../project/nexusProjectConfig.js";
@@ -18,6 +19,7 @@ import {
   summarizeNexusAuthorityForComponent,
   unconfiguredNexusAuthorityAllowedResolution,
   type NexusAuthorityAction,
+  type NexusAuthorityActionDecisionSummary,
   type NexusAuthorityMutationBlock,
   type NexusAuthorityComponentSummary,
   type NexusEffectiveAuthorityResolution,
@@ -27,7 +29,13 @@ import {
   listNexusWorktreeLeases,
   type NexusWorktreeLeaseCollection,
   type NexusWorktreeLeaseRecord,
+  type NexusWorktreeLeaseSummary,
 } from "../worktrees/nexusWorktreeLease.js";
+import {
+  prepareNexusManualWorktree,
+  summarizeNexusManualWorktreeResult,
+  type NexusPreparedWorktreeSummary,
+} from "../worktrees/nexusManualWorktree.js";
 import {
   type ResolvedNexusProjectWorkTracker,
   type ResolvedNexusProjectComponent,
@@ -86,6 +94,7 @@ export interface NexusCoordinationGitStatus {
   ahead: number | null;
   behind: number | null;
   pushed: boolean | null;
+  changedFiles: string[];
   warnings: string[];
 }
 
@@ -376,6 +385,75 @@ export interface NexusCoordinationIntegrationPlan {
   mutatesSource: false;
 }
 
+export type NexusCoordinationActivityOwnership =
+  | "current_host"
+  | "other_host"
+  | "unknown";
+
+export type NexusCoordinationActivityOverlapGranularity =
+  | "none"
+  | "component"
+  | "package"
+  | "file";
+
+export interface NexusCoordinationActivityOverlap {
+  likely: boolean;
+  granularity: NexusCoordinationActivityOverlapGranularity;
+  currentFiles: string[];
+  matchedAreas: string[];
+}
+
+export interface NexusCoordinationActivityGroup {
+  id: string;
+  componentId: string | null;
+  workItemId: string | null;
+  branch: string | null;
+  leaseIds: string[];
+  handoffCount: number;
+  hosts: string[];
+  agents: string[];
+  statuses: string[];
+  changedAreas: string[];
+  writeScopes: string[];
+  ownership: NexusCoordinationActivityOwnership;
+  active: boolean;
+  stale: boolean;
+  dirty: boolean;
+  unpushed: boolean;
+  missingUpstream: boolean;
+  ahead: number | null;
+  behind: number | null;
+  overlap: NexusCoordinationActivityOverlap;
+  nextAction: string;
+}
+
+export interface NexusCoordinationActivityAuthoritySummary {
+  missingSummary: boolean;
+  read: NexusAuthorityActionDecisionSummary | null;
+  handoff: NexusAuthorityActionDecisionSummary | null;
+  pushBranch: NexusAuthorityActionDecisionSummary | null;
+  integrate: NexusAuthorityActionDecisionSummary | null;
+  cleanupWorktree: NexusAuthorityActionDecisionSummary | null;
+  cleanupBranch: NexusAuthorityActionDecisionSummary | null;
+}
+
+export interface NexusCoordinationActivityStatus {
+  groups: NexusCoordinationActivityGroup[];
+  activeGroupCount: number;
+  staleGroupCount: number;
+  overlapCount: number;
+  dirtySharedCheckout: boolean;
+  dirtyGeneratedWorktree: boolean;
+  currentBranch: {
+    missingUpstream: boolean;
+    unpushed: boolean;
+    ahead: number | null;
+    behind: number | null;
+  };
+  authority: NexusCoordinationActivityAuthoritySummary;
+  nextAction: string;
+}
+
 export interface NexusCoordinationStatus {
   project: {
     id: string;
@@ -396,6 +474,7 @@ export interface NexusCoordinationStatus {
   authority: NexusAuthorityComponentSummary;
   leases: NexusWorktreeLeaseCollection;
   handoffs: NexusCoordinationHandoffCollection;
+  activity: NexusCoordinationActivityStatus;
   nextAction: string;
   blocking: boolean;
   warnings: string[];
@@ -412,6 +491,43 @@ export interface NexusCoordinationStatusOptions {
   now?: () => Date | string;
   maxHandoffAgeMs?: number;
   maxLeaseAgeMs?: number;
+}
+
+export interface NexusCoordinationStartOptions
+  extends NexusCoordinationStatusOptions {
+  projectMeta?: boolean;
+  topic?: string | null;
+  branchName?: string;
+  worktreeName?: string;
+  baseRef?: string | null;
+  dryRun?: boolean;
+  hostId?: string | null;
+  agentId?: string | null;
+  workerAgentProvider?: string | null;
+  writeScope?: string[];
+  leaseNotes?: string[];
+}
+
+export interface NexusCoordinationAdoptedWorktree {
+  lease: NexusWorktreeLeaseSummary;
+  refreshedLease: NexusWorktreeLeaseRecord | null;
+  worktreePath: string;
+  branchName: string | null;
+  git: NexusCoordinationGitStatus;
+}
+
+export interface NexusCoordinationStartResult {
+  project: NexusCoordinationStatus["project"];
+  component: NexusCoordinationStatus["component"] | null;
+  status: NexusCoordinationStatus;
+  action: "prepare" | "adopt" | "blocked";
+  dryRun: boolean;
+  mutatesSource: boolean;
+  preparedWorktree: NexusPreparedWorktreeSummary | null;
+  adoptedWorktree: NexusCoordinationAdoptedWorktree | null;
+  blockedReasons: string[];
+  alternatives: string[];
+  nextAction: string;
 }
 
 export interface NexusCoordinationHandoffOptions
@@ -513,6 +629,22 @@ export async function getNexusCoordinationStatus(
     now,
     staleAfterMs: options.maxLeaseAgeMs,
   });
+  const activityLeases = workItemId
+    ? listNexusWorktreeLeases({
+        projectRoot: context.projectRoot,
+        componentId: context.component.id,
+        now,
+        staleAfterMs: options.maxLeaseAgeMs,
+      })
+    : leases;
+  const authority = coordinationAuthoritySummary(context);
+  const activity = coordinationActivityStatus({
+    context,
+    git,
+    leases: activityLeases,
+    handoffs,
+    authority,
+  });
   const warnings = [...git.warnings, ...handoffs.warnings, ...leases.warnings];
 
   return {
@@ -521,13 +653,126 @@ export async function getNexusCoordinationStatus(
     workItem,
     coordinationTracker: coordinationTracker.summary,
     git,
-    authority: coordinationAuthoritySummary(context),
+    authority,
     leases,
     handoffs,
+    activity,
     nextAction: coordinationNextAction(git, handoffs),
     blocking: false,
     warnings,
   };
+}
+
+export async function startOrAdoptNexusCoordinationWork(
+  options: NexusCoordinationStartOptions,
+): Promise<NexusCoordinationStartResult> {
+  const status = await getNexusCoordinationStatus(options);
+  const dryRun = options.dryRun === true;
+  const context = resolveCoordinationContext(options);
+  const hostId = optionalNullableTrimmedString(options.hostId) ?? os.hostname();
+  const workItemId = context.workItemId ?? null;
+  const adoption = coordinationAdoptionCandidate({
+    context,
+    status,
+    hostId,
+    workItemId,
+    gitRunner: options.gitRunner,
+  });
+  if (adoption.blockedReasons.length > 0) {
+    return blockedCoordinationStartResult({
+      status,
+      projectMeta: options.projectMeta === true,
+      reasons: adoption.blockedReasons,
+    });
+  }
+  if (adoption.worktree) {
+    if (dryRun) {
+      return coordinationStartResult({
+        status,
+        action: "adopt",
+        dryRun,
+        adoptedWorktree: {
+          ...adoption.worktree,
+          refreshedLease: null,
+        },
+        nextAction: "Adopt the existing owned worktree.",
+      });
+    }
+    const refreshedLease = createOrRefreshNexusWorktreeLease({
+      projectRoot: context.projectRoot,
+      componentId: adoption.worktree.lease.scope.componentId,
+      projectMeta: adoption.worktree.lease.scope.kind === "project_meta",
+      hostId,
+      agentId: options.agentId,
+      workItemId: adoption.worktree.lease.workItemId,
+      branchName: adoption.worktree.lease.branchName,
+      baseRef: adoption.worktree.lease.baseRef,
+      requestedBaseRef: adoption.worktree.lease.requestedBaseRef,
+      resolvedBaseCommit: adoption.worktree.lease.resolvedBaseCommit,
+      baseRefKind: adoption.worktree.lease.baseRefKind,
+      worktreePath: adoption.worktree.worktreePath,
+      writeScope: options.writeScope ?? adoption.worktree.lease.writeScope,
+      status: "working",
+      notes: options.leaseNotes ?? adoption.worktree.lease.notes,
+      gitRunner: options.gitRunner,
+      now: options.now,
+    });
+    return coordinationStartResult({
+      status,
+      action: "adopt",
+      dryRun,
+      adoptedWorktree: {
+        ...adoption.worktree,
+        refreshedLease,
+      },
+      nextAction: `Use existing worktree ${adoption.worktree.worktreePath}.`,
+    });
+  }
+
+  const blockers = coordinationStartPrepareBlockers(status);
+  if (blockers.length > 0) {
+    return blockedCoordinationStartResult({
+      status,
+      projectMeta: options.projectMeta === true,
+      reasons: blockers,
+    });
+  }
+  if (dryRun) {
+    return coordinationStartResult({
+      status,
+      action: "prepare",
+      dryRun,
+      nextAction: "Prepare a new isolated worktree.",
+    });
+  }
+
+  const prepared = prepareNexusManualWorktree({
+    projectRoot: options.projectRoot,
+    componentId: options.projectMeta ? undefined : context.component.id,
+    projectMeta: options.projectMeta,
+    branchName: options.branchName,
+    worktreeName: options.worktreeName,
+    baseRef: options.baseRef,
+    topic: options.topic,
+    workItemId,
+    workItemTitle: status.workItem?.title ?? null,
+    workItemDescription: status.workItem?.description ?? null,
+    hostId,
+    agentId: options.agentId,
+    workerAgentProvider: options.workerAgentProvider,
+    writeScope: options.writeScope,
+    leaseNotes: options.leaseNotes,
+    gitRunner: options.gitRunner,
+    now: options.now,
+  });
+
+  return coordinationStartResult({
+    status,
+    action: "prepare",
+    dryRun,
+    preparedWorktree: summarizeNexusManualWorktreeResult(prepared),
+    nextAction: `Use prepared worktree ${prepared.worktree.worktreePath}.`,
+  });
 }
 
 export async function createNexusCoordinationHandoff(
@@ -1364,6 +1609,7 @@ function getCoordinationGitStatus(
       ahead: null,
       behind: null,
       pushed: null,
+      changedFiles: [],
       warnings: coordinationGitResolutionWarnings(context),
     };
   }
@@ -1396,6 +1642,18 @@ function getCoordinationGitStatus(
         ),
       )
     : { ahead: null, behind: null };
+  const changedFiles = uniqueSortedStrings([
+    ...linesFromGitResult(
+      runOptionalGit(runner, ["diff", "--name-only", "HEAD"], repositoryPath),
+    ),
+    ...linesFromGitResult(
+      runOptionalGit(
+        runner,
+        ["ls-files", "--others", "--exclude-standard"],
+        repositoryPath,
+      ),
+    ),
+  ]);
   const warnings: string[] = [];
   if (!upstream) {
     warnings.push("Current branch has no upstream configured.");
@@ -1414,6 +1672,7 @@ function getCoordinationGitStatus(
     ahead: aheadBehind.ahead,
     behind: aheadBehind.behind,
     pushed: upstream && aheadBehind.ahead !== null ? aheadBehind.ahead === 0 : null,
+    changedFiles,
     warnings,
   };
 }
@@ -2908,6 +3167,558 @@ function coordinationNextAction(
   }
 
   return "Ready for review or integration.";
+}
+
+function coordinationActivityStatus(options: {
+  context: ResolvedCoordinationContext;
+  git: NexusCoordinationGitStatus;
+  leases: NexusWorktreeLeaseCollection;
+  handoffs: NexusCoordinationHandoffCollection;
+  authority: NexusAuthorityComponentSummary;
+}): NexusCoordinationActivityStatus {
+  const groups = coordinationActivityGroups(options);
+  const activeGroups = groups.filter((group) => group.active);
+  const staleGroups = groups.filter((group) => group.stale);
+  const overlappingGroups = groups.filter((group) => group.overlap.likely);
+  const currentPathKind = coordinationCurrentPathKind(
+    options.context,
+    options.git.repositoryPath,
+  );
+  const currentBranch = {
+    missingUpstream: Boolean(options.git.branch && !options.git.upstream),
+    unpushed: options.git.ahead !== null && options.git.ahead > 0,
+    ahead: options.git.ahead,
+    behind: options.git.behind,
+  };
+
+  return {
+    groups,
+    activeGroupCount: activeGroups.length,
+    staleGroupCount: staleGroups.length,
+    overlapCount: overlappingGroups.length,
+    dirtySharedCheckout: options.git.dirty === true && currentPathKind === "shared",
+    dirtyGeneratedWorktree:
+      options.git.dirty === true && currentPathKind === "generated_worktree",
+    currentBranch,
+    authority: coordinationActivityAuthority(options.authority),
+    nextAction: coordinationActivityNextAction({
+      git: options.git,
+      groups,
+      currentPathKind,
+    }),
+  };
+}
+
+function coordinationActivityGroups(options: {
+  context: ResolvedCoordinationContext;
+  git: NexusCoordinationGitStatus;
+  leases: NexusWorktreeLeaseCollection;
+  handoffs: NexusCoordinationHandoffCollection;
+  authority: NexusAuthorityComponentSummary;
+}): NexusCoordinationActivityGroup[] {
+  const groups = new Map<string, {
+    componentId: string | null;
+    workItemId: string | null;
+    branch: string | null;
+    leases: NexusWorktreeLeaseSummary[];
+    handoffs: NexusCoordinationHandoffSummary[];
+  }>();
+
+  const ensureGroup = (input: {
+    componentId: string | null;
+    workItemId: string | null;
+    branch: string | null;
+    fallbackId: string;
+  }) => {
+    const id = [
+      input.componentId ?? options.context.component.id,
+      input.workItemId ?? "no-work-item",
+      input.branch ?? input.fallbackId,
+    ].join(":");
+    const existing = groups.get(id);
+    if (existing) {
+      return existing;
+    }
+    const created = {
+      componentId: input.componentId,
+      workItemId: input.workItemId,
+      branch: input.branch,
+      leases: [],
+      handoffs: [],
+    };
+    groups.set(id, created);
+    return created;
+  };
+
+  for (const lease of options.leases.records) {
+    ensureGroup({
+      componentId: lease.scope.componentId,
+      workItemId: lease.workItemId,
+      branch: lease.branchName,
+      fallbackId: lease.id,
+    }).leases.push(lease);
+  }
+  for (const handoff of options.handoffs.records) {
+    ensureGroup({
+      componentId: handoff.componentId,
+      workItemId: handoff.workItemId,
+      branch: handoff.branch,
+      fallbackId: handoff.commentId ?? handoff.createdAt,
+    }).handoffs.push(handoff);
+  }
+
+  return [...groups.entries()]
+    .map(([id, group]) => coordinationActivityGroup({
+      id,
+      context: options.context,
+      git: options.git,
+      componentId: group.componentId,
+      workItemId: group.workItemId,
+      branch: group.branch,
+      leases: group.leases,
+      handoffs: group.handoffs,
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function coordinationActivityGroup(options: {
+  id: string;
+  context: ResolvedCoordinationContext;
+  git: NexusCoordinationGitStatus;
+  componentId: string | null;
+  workItemId: string | null;
+  branch: string | null;
+  leases: NexusWorktreeLeaseSummary[];
+  handoffs: NexusCoordinationHandoffSummary[];
+}): NexusCoordinationActivityGroup {
+  const hosts = uniqueSortedStrings(options.leases.map((lease) => lease.hostId));
+  const agents = uniqueSortedStrings(
+    options.leases
+      .map((lease) => lease.agentId)
+      .filter((agentId): agentId is string => Boolean(agentId)),
+  );
+  const statuses = uniqueSortedStrings([
+    ...options.leases.map((lease) => lease.effectiveStatus),
+    ...options.handoffs.map((handoff) => handoff.status),
+  ]);
+  const changedAreas = uniqueSortedStrings(
+    options.handoffs.flatMap((handoff) => handoff.changedAreas),
+  );
+  const writeScopes = uniqueSortedStrings(
+    options.leases.flatMap((lease) => lease.writeScope),
+  );
+  const stale =
+    options.leases.some((lease) => lease.stale) ||
+    options.handoffs.some((handoff) => handoff.stale);
+  const active =
+    !stale &&
+    (
+      options.leases.some((lease) =>
+        !["merged", "abandoned"].includes(lease.status)
+      ) ||
+      options.handoffs.some((handoff) => handoff.status !== "merged")
+    );
+  const dirty =
+    options.leases.some((lease) => lease.dirty === true) ||
+    options.handoffs.some((handoff) => handoff.dirty === true);
+  const aheadValues = [
+    ...options.leases.map((lease) => lease.git.ahead),
+    ...options.handoffs.map((handoff) => handoff.ahead),
+  ].filter((value): value is number => value !== null);
+  const behindValues = [
+    ...options.leases.map((lease) => lease.git.behind),
+    ...options.handoffs.map((handoff) => handoff.behind),
+  ].filter((value): value is number => value !== null);
+  const missingUpstream =
+    Boolean(options.branch) &&
+    (
+      options.leases.some((lease) => !lease.git.upstream) ||
+      options.handoffs.some((handoff) => !handoff.upstream)
+    );
+  const unpushed =
+    options.leases.some((lease) => lease.pushed === false) ||
+    options.handoffs.some((handoff) => handoff.pushed === false) ||
+    aheadValues.some((ahead) => ahead > 0);
+  const ownership = coordinationActivityOwnership(hosts);
+  const overlap = coordinationActivityOverlap({
+    currentFiles: options.git.changedFiles,
+    changedAreas,
+    writeScopes,
+  });
+
+  const group: Omit<NexusCoordinationActivityGroup, "nextAction"> = {
+    id: options.id,
+    componentId: options.componentId,
+    workItemId: options.workItemId,
+    branch: options.branch,
+    leaseIds: options.leases.map((lease) => lease.id),
+    handoffCount: options.handoffs.length,
+    hosts,
+    agents,
+    statuses,
+    changedAreas,
+    writeScopes,
+    ownership,
+    active,
+    stale,
+    dirty,
+    unpushed,
+    missingUpstream,
+    ahead: aheadValues.length > 0 ? Math.max(...aheadValues) : null,
+    behind: behindValues.length > 0 ? Math.max(...behindValues) : null,
+    overlap,
+  };
+
+  return {
+    ...group,
+    nextAction: coordinationActivityGroupNextAction(group),
+  };
+}
+
+function coordinationActivityOwnership(
+  hosts: string[],
+): NexusCoordinationActivityOwnership {
+  if (hosts.length === 0) {
+    return "unknown";
+  }
+  return hosts.every((host) => host === os.hostname())
+    ? "current_host"
+    : "other_host";
+}
+
+function coordinationActivityOverlap(options: {
+  currentFiles: string[];
+  changedAreas: string[];
+  writeScopes: string[];
+}): NexusCoordinationActivityOverlap {
+  const areas = uniqueSortedStrings([...options.changedAreas, ...options.writeScopes]);
+  let granularity: NexusCoordinationActivityOverlapGranularity = "none";
+  const matchedAreas: string[] = [];
+  for (const file of options.currentFiles) {
+    for (const area of areas) {
+      const match = changedAreaMatchesFile(area, file);
+      if (match === "none") {
+        continue;
+      }
+      matchedAreas.push(area);
+      granularity = moreSpecificOverlapGranularity(granularity, match);
+    }
+  }
+
+  return {
+    likely: matchedAreas.length > 0,
+    granularity,
+    currentFiles: [...options.currentFiles],
+    matchedAreas: uniqueSortedStrings(matchedAreas),
+  };
+}
+
+function changedAreaMatchesFile(
+  area: string,
+  file: string,
+): NexusCoordinationActivityOverlapGranularity {
+  const normalizedArea = normalizeCoordinationPath(area);
+  const normalizedFile = normalizeCoordinationPath(file);
+  if (!normalizedArea || !normalizedFile) {
+    return "none";
+  }
+  if (normalizedArea === normalizedFile) {
+    return "file";
+  }
+  if (
+    normalizedFile.startsWith(`${normalizedArea}/`) ||
+    normalizedArea.startsWith(`${normalizedFile}/`)
+  ) {
+    return "package";
+  }
+  if (normalizedArea.split("/")[0] === normalizedFile.split("/")[0]) {
+    return "component";
+  }
+
+  return "none";
+}
+
+function moreSpecificOverlapGranularity(
+  left: NexusCoordinationActivityOverlapGranularity,
+  right: NexusCoordinationActivityOverlapGranularity,
+): NexusCoordinationActivityOverlapGranularity {
+  const rank = { none: 0, component: 1, package: 2, file: 3 };
+  return rank[right] > rank[left] ? right : left;
+}
+
+function normalizeCoordinationPath(value: string): string {
+  return value.trim().replace(/\\/gu, "/").replace(/^\.\/+/u, "");
+}
+
+function coordinationActivityGroupNextAction(
+  group: Omit<NexusCoordinationActivityGroup, "nextAction">,
+): string {
+  if (group.stale) {
+    return "Run cleanup dry-run or refresh the stale lease.";
+  }
+  if (group.active && group.overlap.likely && group.ownership !== "current_host") {
+    return "Coordinate before editing overlapping active work.";
+  }
+  if (group.active && group.ownership === "current_host") {
+    return "Continue or hand off the owned active worktree.";
+  }
+  if (group.missingUpstream || group.unpushed) {
+    return "Push the branch or record a handoff with fetch instructions.";
+  }
+  if (group.statuses.includes("ready")) {
+    return "Consider integration planning for the ready handoff.";
+  }
+
+  return "Monitor or inspect this coordination group.";
+}
+
+function coordinationActivityAuthority(
+  authority: NexusAuthorityComponentSummary,
+): NexusCoordinationActivityAuthoritySummary {
+  const decision = (key: string) =>
+    authority.decisions.find((entry) => entry.key === key) ?? null;
+  return {
+    missingSummary:
+      authority.actor.status !== "matched" ||
+      authority.warnings.length > 0,
+    read: decision("read_project"),
+    handoff: decision("handoff"),
+    pushBranch: decision("push_branch"),
+    integrate: decision("direct_integration"),
+    cleanupWorktree: decision("delete_worktree"),
+    cleanupBranch: decision("delete_branch"),
+  };
+}
+
+function coordinationActivityNextAction(options: {
+  git: NexusCoordinationGitStatus;
+  groups: NexusCoordinationActivityGroup[];
+  currentPathKind: "shared" | "generated_worktree" | "other";
+}): string {
+  if (options.git.dirty) {
+    const location = options.currentPathKind === "shared"
+      ? "shared checkout"
+      : "worktree";
+    return `Review, commit, or hand off current ${location} changes before starting parallel work.`;
+  }
+  if (options.groups.some((group) =>
+    group.active && group.overlap.likely && group.ownership !== "current_host"
+  )) {
+    return "Coordinate overlapping active work before editing.";
+  }
+  if (options.groups.some((group) => group.ownership === "current_host" && group.active)) {
+    return "Continue the owned active worktree or record a handoff.";
+  }
+  if (options.groups.some((group) => group.stale)) {
+    return "Run coordination cleanup-plan before deleting stale worktrees or branches.";
+  }
+  if (options.git.branch && !options.git.upstream) {
+    return "Push the branch and set upstream, or record fetch instructions.";
+  }
+  if (options.git.ahead !== null && options.git.ahead > 0) {
+    return "Push the branch before requesting integration.";
+  }
+
+  return "No parallel activity needs action before continuing.";
+}
+
+function coordinationCurrentPathKind(
+  context: ResolvedCoordinationContext,
+  repositoryPath: string | null,
+): "shared" | "generated_worktree" | "other" {
+  if (!repositoryPath) {
+    return "other";
+  }
+  if (samePath(repositoryPath, context.component.sourceRoot)) {
+    return "shared";
+  }
+  if (pathIsInside(context.component.worktreesRoot, repositoryPath)) {
+    return "generated_worktree";
+  }
+
+  return "other";
+}
+
+function samePath(left: string, right: string): boolean {
+  return path.resolve(left) === path.resolve(right);
+}
+
+function pathIsInside(root: string, target: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function coordinationStartResult(options: {
+  status: NexusCoordinationStatus;
+  action: "prepare" | "adopt";
+  dryRun: boolean;
+  preparedWorktree?: NexusPreparedWorktreeSummary | null;
+  adoptedWorktree?: NexusCoordinationAdoptedWorktree | null;
+  nextAction: string;
+}): NexusCoordinationStartResult {
+  return {
+    project: options.status.project,
+    component: options.action === "prepare" &&
+        options.preparedWorktree?.scope === "project"
+      ? null
+      : options.status.component,
+    status: options.status,
+    action: options.action,
+    dryRun: options.dryRun,
+    mutatesSource: options.action === "prepare" && !options.dryRun,
+    preparedWorktree: options.preparedWorktree ?? null,
+    adoptedWorktree: options.adoptedWorktree ?? null,
+    blockedReasons: [],
+    alternatives: [],
+    nextAction: options.nextAction,
+  };
+}
+
+function blockedCoordinationStartResult(options: {
+  status: NexusCoordinationStatus;
+  projectMeta: boolean;
+  reasons: string[];
+}): NexusCoordinationStartResult {
+  return {
+    project: options.status.project,
+    component: options.projectMeta ? null : options.status.component,
+    status: options.status,
+    action: "blocked",
+    dryRun: true,
+    mutatesSource: false,
+    preparedWorktree: null,
+    adoptedWorktree: null,
+    blockedReasons: uniqueSortedStrings(options.reasons),
+    alternatives: [
+      "Choose another work item or topic.",
+      "Continue the existing owned worktree if it is still valid.",
+      "Wait for a handoff or ask the active owner to hand off.",
+      "Run coordination integrate or cleanup-plan when stale or ready work needs resolution.",
+    ],
+    nextAction: "Resolve the blocked start/adopt conditions before mutating source.",
+  };
+}
+
+function coordinationAdoptionCandidate(options: {
+  context: ResolvedCoordinationContext;
+  status: NexusCoordinationStatus;
+  hostId: string;
+  workItemId: string | null;
+  gitRunner?: GitRunner;
+}): {
+  worktree: Omit<NexusCoordinationAdoptedWorktree, "refreshedLease"> | null;
+  blockedReasons: string[];
+} {
+  const ownedLeases = options.status.leases.records.filter((lease) =>
+    lease.hostId === options.hostId &&
+    !lease.stale &&
+    !["merged", "abandoned"].includes(lease.status) &&
+    (options.workItemId ? lease.workItemId === options.workItemId : true)
+  );
+  const lease = ownedLeases[0] ?? null;
+  if (!lease) {
+    return { worktree: null, blockedReasons: [] };
+  }
+
+  const worktreePath = coordinationLeaseWorktreePath(options.context, lease);
+  if (!worktreePath) {
+    return {
+      worktree: null,
+      blockedReasons: [
+        `Owned lease ${lease.id} does not include an adoptable worktree path.`,
+      ],
+    };
+  }
+  const git = getCoordinationGitStatus(options.context, options.gitRunner, {
+    repositoryCandidates: [worktreePath],
+  });
+  const blockers: string[] = [];
+  if (!git.repositoryPath) {
+    blockers.push(`Owned lease ${lease.id} worktree is not a Git checkout.`);
+  }
+  if (lease.branchName && git.branch && lease.branchName !== git.branch) {
+    blockers.push(
+      `Owned lease ${lease.id} branch ${lease.branchName} does not match worktree branch ${git.branch}.`,
+    );
+  }
+  if (options.workItemId && lease.workItemId !== options.workItemId) {
+    blockers.push(
+      `Owned lease ${lease.id} is for ${lease.workItemId ?? "no work item"}, not ${options.workItemId}.`,
+    );
+  }
+  if (blockers.length > 0) {
+    return { worktree: null, blockedReasons: blockers };
+  }
+
+  return {
+    worktree: {
+      lease,
+      worktreePath,
+      branchName: lease.branchName,
+      git,
+    },
+    blockedReasons: [],
+  };
+}
+
+function coordinationStartPrepareBlockers(
+  status: NexusCoordinationStatus,
+): string[] {
+  const blockers: string[] = [];
+  const createWorktree = status.authority.decisions.find((decision) =>
+    decision.key === "create_worktree"
+  );
+  if (createWorktree && !createWorktree.allowed && status.authority.actor.knownActor) {
+    blockers.push(createWorktree.explanation);
+  }
+  for (const group of status.activity.groups) {
+    if (
+      group.active &&
+      group.ownership !== "current_host" &&
+      (
+        group.overlap.likely ||
+        (status.workItem && group.workItemId === status.workItem.id)
+      )
+    ) {
+      blockers.push(
+        `Active work ${group.branch ?? group.id} is owned by another host and may overlap this start request.`,
+      );
+    }
+  }
+  if (status.activity.dirtySharedCheckout) {
+    blockers.push(
+      "Current path is a dirty shared checkout; commit, clean, or hand off before starting a new chat flow.",
+    );
+  }
+
+  return blockers;
+}
+
+function coordinationLeaseWorktreePath(
+  context: ResolvedCoordinationContext,
+  lease: NexusWorktreeLeaseSummary,
+): string | null {
+  const relativePath = lease.worktree.relativePath;
+  if (!relativePath) {
+    return null;
+  }
+  if (lease.worktree.base === "projectRoot") {
+    return path.join(context.projectRoot, relativePath);
+  }
+  if (lease.worktree.base === "projectWorktreesRoot") {
+    return path.join(
+      projectWorktreesRootPath(context.projectRoot, context.projectConfig),
+      relativePath,
+    );
+  }
+  if (lease.worktree.base === "componentSourceRoot") {
+    return path.join(context.component.sourceRoot, relativePath);
+  }
+  if (lease.worktree.base === "componentWorktreesRoot") {
+    return path.join(context.component.worktreesRoot, relativePath);
+  }
+
+  return null;
 }
 
 function coordinationLeaseNotes(
