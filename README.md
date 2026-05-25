@@ -195,6 +195,9 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 - [Publication workflows](docs/user/publication-workflows.md) explains the
   simple review-handoff default and the optional green-main, CI tier, and
   release train paths.
+- [Git workflow integration](docs/user/git-workflows.md) explains how DevNexus
+  models branch strategies, freshness decisions, human gates, pause/resume, and
+  cleanup around existing Git workflows.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
   files.

@@ -284,6 +284,59 @@ describe("git worktree service", () => {
     )).toBe(false);
   });
 
+  it("blocks a mutable branch base when refreshing its upstream ref fails", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const currentCommit = "1111111111111111111111111111111111111111";
+
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      const joined = argsArray.join(" ");
+      if (argsArray[0] === "for-each-ref") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/heads/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name main@{upstream}") {
+        return { args: argsArray, stdout: "origin/main\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "fetch --prune origin refs/heads/main:refs/remotes/origin/main") {
+        return {
+          args: argsArray,
+          stdout: "",
+          stderr: "! [rejected] main -> origin/main (non-fast-forward)",
+          exitCode: 1,
+        };
+      }
+      if (joined === "rev-parse --verify --quiet main^{commit}") {
+        return { args: argsArray, stdout: `${currentCommit}\n`, stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --verify --quiet origin/main^{commit}") {
+        return { args: argsArray, stdout: `${currentCommit}\n`, stderr: "", exitCode: 0 };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+
+    expect(() =>
+      prepareGitWorktree({
+        componentId: "core",
+        sourceRoot,
+        worktreesRoot,
+        branchName: "codex/demo/failed-base-fetch",
+        baseRef: "main",
+        gitRunner,
+      }),
+    ).toThrow(/Fetch for base ref main from origin\/main failed/u);
+    expect(calls.some((call) =>
+      call.args[0] === "worktree" && call.args[1] === "add"
+    )).toBe(false);
+  });
+
   it("adopts an existing local branch when it is not checked out", () => {
     const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
     const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");

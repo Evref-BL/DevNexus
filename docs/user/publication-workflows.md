@@ -4,6 +4,9 @@ DevNexus starts with a simple publication posture. A normal workspace can use
 work items, isolated worktrees, focused verification, and review handoff without
 configuring versions, release trains, or CI budgets.
 
+For the higher-level branch strategy and pause/resume model around Git
+workflows, see [Git workflow integration](git-workflows.md).
+
 Use the advanced publication tools only when the workspace needs them. A team
 can opt into green-main checks, CI tiers, candidate branches, merge queues,
 remote runners, or version-scoped release trains later.
@@ -209,8 +212,50 @@ The default long-running feature shape is `hybrid`:
 - one final pull request from the feature branch to the target branch;
 - human approval for the branch strategy choice and final publication.
 
-Configure feature branch delivery under `releaseTrain`. It extends release
-trains instead of replacing them.
+Prefer configuring long-running branch policy under
+`automation.gitWorkflows.profiles`. Older
+`automation.publication.releaseTrain.featureBranchDelivery` config remains
+readable and is projected as the `legacy-feature-branch-delivery` Git workflow
+profile when `automation.gitWorkflows` is omitted. Keep release trains focused on
+batching, candidate branches, CI tiers, and final publication.
+
+A modern feature workflow profile looks like this:
+
+```json
+{
+  "automation": {
+    "gitWorkflows": {
+      "activeProfileId": "codex-goals",
+      "profiles": [
+        {
+          "id": "codex-goals",
+          "branchStrategy": "hybrid",
+          "targetBranch": "main",
+          "activeFeatureId": "codex-goals",
+          "allowedBranchStrategies": ["direct", "stacked", "feature_branch", "hybrid"],
+          "branchNaming": {
+            "defaultIntentPrefix": "feat",
+            "allowedIntentPrefixes": ["feat", "fix", "chore", "docs"],
+            "featureBranchPattern": "{intent}/{feature}",
+            "reviewBranchPattern": "{intent}/{feature}/{change}"
+          },
+          "review": {
+            "mode": "review_branch_pr",
+            "finalPullRequest": true,
+            "finalPullRequestCreation": "at_review_gate"
+          },
+          "branchPublication": {
+            "strategy": "push_remote_then_fallback",
+            "fallbackRemote": "fork"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+The legacy release-train form is still accepted during migration:
 
 ```json
 {

@@ -391,6 +391,104 @@ describe("nexus manual worktree worker target preparation", () => {
     ).toBe(true);
   });
 
+  it("defaults component worktree base to the configured publication target remote branch", () => {
+    const { projectRoot, sourceRoot, calls } = prepareProject({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          remote: "app",
+          targetBranch: "main",
+          push: false,
+        },
+      },
+    });
+    const baseCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push({ args: argsArray, cwd });
+      const joined = argsArray.join(" ");
+      if (argsArray[0] === "for-each-ref") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/heads/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/heads/app/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 1 };
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name main@{upstream}") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 1 };
+      }
+      if (joined === "rev-parse --verify --quiet main^{commit}") {
+        return { args: argsArray, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/remotes/app/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "show-ref --verify --quiet refs/tags/app/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 1 };
+      }
+      if (joined === "fetch --prune app refs/heads/main:refs/remotes/app/main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --verify --quiet app/main^{commit}") {
+        return { args: argsArray, stdout: `${baseCommit}\n`, stderr: "", exitCode: 0 };
+      }
+      if (argsArray[0] === "worktree" && argsArray[1] === "add") {
+        fs.mkdirSync(argsArray[4]!, { recursive: true });
+      }
+      if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+        return {
+          args: argsArray,
+          stdout: path.join(cwd ?? "", ".git", "info", "exclude"),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "publication target base",
+      branchName: "codex/primary/publication-target-base",
+      worktreeName: "publication-target-base",
+      gitRunner,
+    });
+
+    expect(result.worktree).toMatchObject({
+      baseRef: "app/main",
+      requestedBaseRef: "app/main",
+      resolvedBaseCommit: baseCommit,
+      baseRefKind: "remote_branch",
+      baseRefFreshness: {
+        status: "fresh",
+      },
+    });
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: ["fetch", "--prune", "app", "refs/heads/main:refs/remotes/app/main"],
+    });
+    expect(calls).toContainEqual({
+      cwd: sourceRoot,
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/primary/publication-target-base",
+        result.worktree.worktreePath,
+        "app/main",
+      ],
+    });
+  });
+
   it("prepares distinct worker contexts for different active providers", () => {
     const { projectRoot, calls } = prepareProject({
       agentTargets: {

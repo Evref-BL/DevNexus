@@ -739,6 +739,7 @@ function componentWorktreeTarget(
   if (!component) {
     throw new Error(`Workspace component is not configured: ${componentId}`);
   }
+  const publication = resolveNexusPublicationPolicy(projectConfig, component);
 
   return {
     scope: "component",
@@ -746,9 +747,33 @@ function componentWorktreeTarget(
     component,
     sourceRoot: component.sourceRoot,
     worktreesRoot: component.worktreesRoot,
-    defaultBaseRef:
-      component.defaultBranch ?? projectConfig.repo.defaultBranch ?? null,
+    defaultBaseRef: componentWorktreeDefaultBaseRef({
+      projectConfig,
+      component,
+      publication,
+    }),
   };
+}
+
+function componentWorktreeDefaultBaseRef(options: {
+  projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
+  publication: ReturnType<typeof resolveNexusPublicationPolicy>;
+}): string | null {
+  if (
+    options.publication.strategy !== "local_only" &&
+    options.publication.remote &&
+    options.publication.targetBranch
+  ) {
+    return `${options.publication.remote}/${options.publication.targetBranch}`;
+  }
+
+  return (
+    options.publication.targetBranch ??
+      options.component.defaultBranch ??
+      options.projectConfig.repo.defaultBranch ??
+      null
+  );
 }
 
 function manualWorkItemProjectContext(

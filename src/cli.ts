@@ -39,6 +39,7 @@ import {
   printQuickFixPlan,
   printQuickFixStart,
 } from "./cli/cliQuickFixCommand.js";
+import { handleGitWorkflowCommand } from "./cli/cliGitWorkflowCommand.js";
 import {
   handleRemoteExecutionCommand,
   type ParsedRemoteExecutionRequestCreateCommand,
@@ -1029,7 +1030,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, git-workflow, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1051,6 +1052,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
       coordinationAttachmentRefs: remoteExecutionCoordinationAttachmentRefs,
     }),
   worktree: handleWorktreeCommand,
+  "git-workflow": handleGitWorkflowCommand,
   publication: handlePublicationCommand,
   review: handleReviewCommand,
   "quick-fix": handleQuickFixCommand,
@@ -7524,6 +7526,12 @@ function printCoordinationCleanupPlan(
         candidate.safeToDelete ? "safe" : "blocked"
       }`,
     );
+    if (candidate.workflowRun) {
+      writeLine(
+        stdout,
+        `      Workflow run: ${candidate.workflowRun.id} ${candidate.workflowRun.status}`,
+      );
+    }
   }
 }
 
