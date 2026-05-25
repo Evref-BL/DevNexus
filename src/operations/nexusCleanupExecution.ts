@@ -247,7 +247,17 @@ export function executeNexusCleanup(
     removedWorktree = removed.worktreePath;
   }
 
-  if (options.deleteBranch !== false && candidate.branch) {
+  if (
+    options.deleteBranch !== false &&
+    candidate.branch &&
+    candidate.git.headCommit === null
+  ) {
+    skipped.push({
+      candidateId: candidate.id,
+      action: "branch_delete",
+      reason: "Branch is already absent from the local repository.",
+    });
+  } else if (options.deleteBranch !== false && candidate.branch) {
     const deleted = deleteGitBranch({
       sourceRoot,
       branchName: candidate.branch,
