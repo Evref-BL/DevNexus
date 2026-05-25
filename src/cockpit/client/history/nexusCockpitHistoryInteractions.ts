@@ -279,12 +279,11 @@ export function positionGitHistoryNodePopover(
     Math.max(margin, anchorCenterY - bounds.height / 2),
     Math.max(margin, viewportHeight - bounds.height - margin),
   );
-  const anchorCenterX = anchor.left + anchor.width / 2;
   const edgeSide = usesPreferredSide ? "left" : "right";
   const connectorWidth = edgeSide === "left"
-    ? Math.max(10, left - anchorCenterX)
-    : Math.max(10, anchorCenterX - (left + bounds.width));
-  const connectorY = Math.min(Math.max(14, anchorCenterY - top), Math.max(14, bounds.height - 14));
+    ? Math.max(8, left - anchor.right)
+    : Math.max(8, anchor.left - (left + bounds.width));
+  const connectorY = bounds.height / 2;
   popover.style.left = `${left}px`;
   popover.style.top = `${top}px`;
   popover.style.setProperty("--dn-history-popover-connector-width", `${connectorWidth}px`);

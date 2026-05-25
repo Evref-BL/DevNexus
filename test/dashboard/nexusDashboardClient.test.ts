@@ -111,9 +111,13 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("applyGitHistorySearch");
     expect(module).toContain("dn-history-popover");
     expect(module).toContain("--dn-history-popover-accent");
+    expect(module).toContain("--dn-history-popover-border-width");
     expect(module).toContain("data-edge-side='left'");
+    expect(module).toContain("height: var(--dn-history-popover-border-width)");
     expect(module).toContain("gitHistoryNodeAccentColor");
     expect(module).toContain("showGitHistoryNodePopover");
+    expect(module).toContain("transform-box: fill-box");
+    expect(module).toContain("transform: scale(1.24)");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");
