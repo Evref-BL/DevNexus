@@ -510,6 +510,7 @@ describe("DevNexus MCP server", () => {
       "current_agent_record",
       "worktree_prepare",
       "coordination_status",
+      "coordination_start",
       "coordination_handoff",
       "coordination_integrate",
       "coordination_cleanup_execute",

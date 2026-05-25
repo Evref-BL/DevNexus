@@ -166,9 +166,11 @@ import {
   nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
   parseNexusCoordinationTrackerRole,
+  startOrAdoptNexusCoordinationWork,
   type NexusCoordinationHandoffResult,
   type NexusCoordinationHandoffStatus,
   type NexusCoordinationIntegrationPlan,
+  type NexusCoordinationStartResult,
   type NexusCoordinationStatus,
 } from "./coordination/nexusCoordination.js";
 import {
@@ -842,6 +844,20 @@ interface ParsedCoordinationStatusCommand {
   currentPath?: string;
   json?: boolean;
   detail?: CliOutputDetail;
+}
+
+interface ParsedCoordinationStartCommand extends ParsedCoordinationStatusCommand {
+  projectMeta?: boolean;
+  topic?: string | null;
+  branchName?: string;
+  worktreeName?: string;
+  baseRef?: string | null;
+  dryRun?: boolean;
+  hostId?: string | null;
+  agentId?: string | null;
+  workerAgentProvider?: string | null;
+  writeScope?: string[];
+  leaseNotes?: string[];
 }
 
 interface ParsedCoordinationHandoffCommand {
@@ -1747,6 +1763,46 @@ async function handleCoordinationCommand(
     return 0;
   }
 
+  if (command === "start") {
+    const parsed = parseCoordinationStartCommand(argv);
+    if (!parsed.dryRun) {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "coordination start",
+        mutationClass: "worktree_bootstrap",
+        targetPath: parsed.currentPath,
+        componentId: parsed.componentId,
+      });
+    }
+    const result = await startOrAdoptNexusCoordinationWork({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      trackerId: parsed.trackerId,
+      trackerRole: parsed.trackerRole,
+      currentPath: parsed.currentPath,
+      projectMeta: parsed.projectMeta,
+      topic: parsed.topic,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      baseRef: parsed.baseRef,
+      dryRun: parsed.dryRun,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      workerAgentProvider: parsed.workerAgentProvider,
+      writeScope: parsed.writeScope,
+      leaseNotes: parsed.leaseNotes,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationStartResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.action === "blocked" ? 2 : 0;
+  }
+
   if (command === "handoff") {
     const parsed = parseCoordinationHandoffCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -1922,7 +1978,7 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status, handoff, integrate, cleanup-plan, cleanup-execute, or request");
+  throw new Error("coordination requires status, start, handoff, integrate, cleanup-plan, cleanup-execute, or request");
 }
 
 async function handleWorktreeCommand(
@@ -4219,6 +4275,93 @@ function parseCoordinationStatusCommand(
         break;
       default:
         throw new Error(`Unknown coordination status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseCoordinationStartCommand(
+  argv: string[],
+): ParsedCoordinationStartCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination start requires a workspace root");
+  }
+
+  const parsed: ParsedCoordinationStartCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--workspace-meta":
+      case "--project-meta":
+        parsed.projectMeta = true;
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--topic":
+        parsed.topic = next();
+        break;
+      case "--branch":
+        parsed.branchName = next();
+        break;
+      case "--worktree-name":
+        parsed.worktreeName = next();
+        break;
+      case "--base-ref":
+        parsed.baseRef = next();
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--worker-agent":
+        parsed.workerAgentProvider = next();
+        break;
+      case "--write-scope":
+        parsed.writeScope = [...(parsed.writeScope ?? []), next()];
+        break;
+      case "--lease-note":
+        parsed.leaseNotes = [...(parsed.leaseNotes ?? []), next()];
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
+        break;
+      default:
+        throw new Error(`Unknown coordination start option: ${arg}`);
     }
   }
 
@@ -7437,6 +7580,52 @@ function printCoordinationStatusResult(
     }
   }
   writeLine(stdout, `  Next action: ${status.nextAction}`);
+}
+
+function printCoordinationStartResult(
+  result: NexusCoordinationStartResult,
+  parsed: ParsedCoordinationStartCommand,
+  stdout: TextWriter,
+): void {
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: result.action !== "blocked",
+    detail,
+    result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination start.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Action: ${result.action}`);
+  writeLine(stdout, `  Dry run: ${String(result.dryRun)}`);
+  if (result.preparedWorktree) {
+    writeLine(
+      stdout,
+      `  Worktree: ${result.preparedWorktree.worktree.worktreePath}`,
+    );
+    writeLine(
+      stdout,
+      `  Branch: ${result.preparedWorktree.worktree.branchName}`,
+    );
+  }
+  if (result.adoptedWorktree) {
+    writeLine(stdout, `  Adopted: ${result.adoptedWorktree.worktreePath}`);
+    writeLine(
+      stdout,
+      `  Branch: ${result.adoptedWorktree.branchName ?? "unknown"}`,
+    );
+  }
+  for (const reason of result.blockedReasons) {
+    writeLine(stdout, `  Blocked: ${reason}`);
+  }
+  for (const alternative of result.alternatives) {
+    writeLine(stdout, `  Alternative: ${alternative}`);
+  }
+  writeLine(stdout, `  Next action: ${result.nextAction}`);
 }
 
 function printCoordinationHandoffResult(

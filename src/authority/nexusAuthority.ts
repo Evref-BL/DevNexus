@@ -548,6 +548,7 @@ const nexusAuthorityScopePrecedence = [
 
 const nexusAuthoritySummaryActionSpecs = [
   { key: "read_project", action: "project.read" },
+  { key: "create_worktree", action: "worktree.create" },
   { key: "commit", action: "git.commit" },
   { key: "push_branch", action: "git.push_branch" },
   { key: "direct_integration", action: "git.push_target_branch" },

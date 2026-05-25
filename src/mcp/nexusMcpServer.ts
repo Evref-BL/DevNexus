@@ -139,6 +139,7 @@ import {
   getNexusCoordinationStatus,
   nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
+  startOrAdoptNexusCoordinationWork,
   type NexusCoordinationStatus,
 } from "../coordination/nexusCoordination.js";
 import {
@@ -815,6 +816,36 @@ const tools: McpTool[] = [
         trackerId: { type: "string" },
         trackerRole: { type: "string" },
         currentPath: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_start",
+    description: "Start or adopt an interactive DevNexus worktree flow after checking coordination status, active leases, and authority.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        detail: { type: "string", enum: ["summary", "full"], default: "summary" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        projectMeta: { type: "boolean" },
+        workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
+        currentPath: { type: "string" },
+        topic: { type: ["string", "null"] },
+        branchName: { type: "string" },
+        worktreeName: { type: "string" },
+        baseRef: { type: ["string", "null"] },
+        dryRun: { type: "boolean" },
+        hostId: { type: ["string", "null"] },
+        agentId: { type: ["string", "null"] },
+        workerAgentProvider: { type: ["string", "null"] },
+        writeScope: { type: "array", items: { type: "string" } },
+        leaseNotes: { type: "array", items: { type: "string" } },
       },
       additionalProperties: false,
     },
@@ -2085,6 +2116,47 @@ async function callCoordinationMcpTool(
         ok: true,
         detail,
         status: detail === "full" ? status : summarizeCoordinationStatus(status),
+      });
+    }
+    case "coordination_start": {
+      const detail = mcpDetailFromArgs(args);
+      if (optionalBoolean(args, "dryRun", "arguments") !== true) {
+        assertMcpMutationAllowed(args, context, {
+          command: "coordination_start",
+          mutationClass: "worktree_bootstrap",
+          targetPath: optionalString(args, "currentPath", "arguments"),
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+      }
+      const result = await startOrAdoptNexusCoordinationWork({
+        projectRoot: projectRootFromArgs(args),
+        componentId: optionalString(args, "componentId", "arguments"),
+        projectMeta: optionalBoolean(args, "projectMeta", "arguments"),
+        workItemId: optionalString(args, "workItemId", "arguments"),
+        trackerId: optionalString(args, "trackerId", "arguments"),
+        trackerRole: optionalString(args, "trackerRole", "arguments"),
+        currentPath: optionalString(args, "currentPath", "arguments"),
+        topic: optionalNullableString(args, "topic", "arguments"),
+        branchName: optionalString(args, "branchName", "arguments"),
+        worktreeName: optionalString(args, "worktreeName", "arguments"),
+        baseRef: optionalNullableString(args, "baseRef", "arguments"),
+        dryRun: optionalBoolean(args, "dryRun", "arguments"),
+        hostId: optionalNullableString(args, "hostId", "arguments"),
+        agentId: optionalNullableString(args, "agentId", "arguments"),
+        workerAgentProvider: optionalNullableString(
+          args,
+          "workerAgentProvider",
+          "arguments",
+        ),
+        writeScope: optionalStringArray(args, "writeScope", "arguments") ?? [],
+        leaseNotes: optionalStringArray(args, "leaseNotes", "arguments") ?? [],
+        gitRunner: context.gitRunner,
+        now: context.now,
+      });
+      return toolResult({
+        ok: result.action !== "blocked",
+        detail,
+        result,
       });
     }
     case "coordination_handoff":
