@@ -4,18 +4,31 @@ import {
   buildNexusGitWorkflowStatus,
   type NexusGitWorkflowPlanStatusResult,
 } from "../git-workflows/nexusGitWorkflowPlanStatus.js";
+import {
+  startNexusGitWorkflow,
+  type StartNexusGitWorkflowResult,
+} from "../git-workflows/nexusGitWorkflowStart.js";
 import type { DevNexusCliDependencies } from "./cliCommandContext.js";
 import { writeJson, writeLine, type TextWriter } from "./cliSupport.js";
 
 export interface ParsedGitWorkflowCommand {
-  command: "plan" | "status";
+  command: "plan" | "status" | "start";
   projectRoot: string;
   componentId?: string | null;
   profileId?: string | null;
   workItemId?: string | null;
+  workItemTitle?: string | null;
+  workItemDescription?: string | null;
   branchName?: string | null;
+  worktreeName?: string | null;
+  baseRef?: string | null;
   runId?: string | null;
   repositoryPath?: string | null;
+  hostId?: string | null;
+  agentId?: string | null;
+  workerAgentProvider?: string | null;
+  writeScope: string[];
+  leaseNotes: string[];
   json?: boolean;
 }
 
@@ -24,6 +37,29 @@ export async function handleGitWorkflowCommand(
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
   const parsed = parseGitWorkflowCommand(argv);
+  if (parsed.command === "start") {
+    const result = startNexusGitWorkflow({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      profileId: parsed.profileId,
+      runId: parsed.runId,
+      workItemId: parsed.workItemId,
+      workItemTitle: parsed.workItemTitle,
+      workItemDescription: parsed.workItemDescription,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      baseRef: parsed.baseRef,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      workerAgentProvider: parsed.workerAgentProvider,
+      writeScope: parsed.writeScope,
+      leaseNotes: parsed.leaseNotes,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printGitWorkflowStartResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
   const result = parsed.command === "plan"
     ? buildNexusGitWorkflowPlan({
         projectRoot: parsed.projectRoot,
@@ -51,8 +87,8 @@ export async function handleGitWorkflowCommand(
 
 export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "plan" && command !== "status") {
-    throw new Error("git-workflow requires plan or status");
+  if (command !== "plan" && command !== "status" && command !== "start") {
+    throw new Error("git-workflow requires plan, status, or start");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
     throw new Error(`git-workflow ${command} requires a workspace root`);
@@ -61,6 +97,8 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
   const parsed: ParsedGitWorkflowCommand = {
     command,
     projectRoot,
+    writeScope: [],
+    leaseNotes: [],
   };
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index]!;
@@ -82,14 +120,41 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
       case "--work-item":
         parsed.workItemId = next();
         break;
+      case "--work-item-title":
+        parsed.workItemTitle = next();
+        break;
+      case "--work-item-description":
+        parsed.workItemDescription = next();
+        break;
       case "--branch":
         parsed.branchName = next();
+        break;
+      case "--worktree-name":
+        parsed.worktreeName = next();
+        break;
+      case "--base-ref":
+        parsed.baseRef = next();
         break;
       case "--run":
         parsed.runId = next();
         break;
       case "--repository-path":
         parsed.repositoryPath = next();
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--worker-agent":
+        parsed.workerAgentProvider = next();
+        break;
+      case "--write-scope":
+        parsed.writeScope.push(next());
+        break;
+      case "--lease-note":
+        parsed.leaseNotes.push(next());
         break;
       case "--json":
         parsed.json = true;
@@ -99,6 +164,42 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
     }
   }
   return parsed;
+}
+
+export function printGitWorkflowStartResult(
+  result: StartNexusGitWorkflowResult,
+  parsed: ParsedGitWorkflowCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    profile: result.profile,
+    preparedWorktree: result.preparedSummary,
+    run: result.run,
+    nextActions: result.nextActions,
+  };
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      result: payload,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus Git workflow started.");
+  writeLine(stdout, `  Component: ${result.prepared.worktree.componentId}`);
+  writeLine(
+    stdout,
+    `  Profile: ${result.profile.id ?? "none"} (${result.profile.branchStrategy ?? "none"})`,
+  );
+  writeLine(stdout, `  Worktree: ${result.prepared.worktree.worktreePath}`);
+  writeLine(stdout, `  Branch: ${result.prepared.worktree.branchName}`);
+  writeLine(stdout, `  Base ref: ${result.prepared.worktree.baseRef ?? "none"}`);
+  writeLine(stdout, `  Run: ${result.run.id} status=${result.run.status}`);
+  writeLine(stdout, `  Lease: ${result.prepared.lease.id}`);
+  writeLine(stdout, "  Next:");
+  for (const action of result.nextActions) {
+    writeLine(stdout, `    ${action}`);
+  }
 }
 
 export function printGitWorkflowResult(
