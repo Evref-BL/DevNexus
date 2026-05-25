@@ -1169,12 +1169,17 @@ describe("publication CLI operations", () => {
       };
     };
     const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
       requests.push({
-        url: String(input),
-        method: init?.method ?? "GET",
+        url,
+        method,
         authorization: new Headers(init?.headers).get("authorization"),
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      if (method === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       return new Response(
         JSON.stringify({
           number: 275,
@@ -1239,6 +1244,12 @@ describe("publication CLI operations", () => {
     expect(gitCalls).toEqual([{ token: "installation-token" }]);
     expect(requests).toEqual([
       {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fapp-review-handoff&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
         url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
         method: "POST",
         authorization: "Bearer installation-token",
@@ -1255,11 +1266,13 @@ describe("publication CLI operations", () => {
   it("reports provider PR handoff failures with App credential context", async () => {
     const { projectRoot, sourceRoot } = createPublicationProject();
     const stdout = textWriter();
-    const fetchImpl: typeof fetch = async () =>
-      new Response(JSON.stringify({ message: "Bad credentials" }), {
-        status: 401,
-        statusText: "Unauthorized",
-      });
+    const fetchImpl: typeof fetch = async (_input, init) =>
+      (init?.method ?? "GET") === "GET"
+        ? new Response(JSON.stringify([]), { status: 200 })
+        : new Response(JSON.stringify({ message: "Bad credentials" }), {
+            status: 401,
+            statusText: "Unauthorized",
+          });
 
     const exitCode = await main(
       [
