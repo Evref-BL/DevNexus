@@ -7,6 +7,7 @@ import {
   createNexusGitWorkflowRun,
   defaultNexusAutomationConfig,
   saveProjectConfig,
+  updateNexusGitWorkflowRun,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
@@ -205,6 +206,99 @@ describe("git-workflow CLI", () => {
       },
     });
   });
+
+  it("advances a recorded workflow run from provider evidence", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-advance-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      branchStrategy: "feature_branch",
+      workItemId: "github-360",
+      branchName: "feat/git-workflows/advance",
+      currentRef: "feat/git-workflows/advance",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "provider",
+        id: "github",
+      },
+      now: "2026-05-25T10:00:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      status: "waiting",
+      owner: {
+        kind: "provider",
+        id: "github",
+      },
+      now: "2026-05-25T10:05:00.000Z",
+    });
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "advance",
+        projectRoot,
+        "--component",
+        "primary",
+        "--run",
+        "run-1",
+        "--repository-path",
+        sourceRoot,
+        "--provider-review",
+        "approved",
+        "--required-checks",
+        "passed",
+        "--base-status",
+        "up_to_date",
+        "--mergeable",
+        "mergeable",
+        "--validation-mode",
+        "strict_checks",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: readOnlyGitRunner("feat/git-workflows/advance"),
+        now: fixedClock("2026-05-25T10:10:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      result: {
+        decision: {
+          action: "handoff",
+          status: "waiting",
+          nextOwner: {
+            kind: "human",
+            id: null,
+          },
+        },
+        runAfter: {
+          status: "waiting",
+          nextOwner: {
+            kind: "human",
+            id: null,
+          },
+        },
+      },
+    });
+  });
 });
 
 function projectConfig(
@@ -334,4 +428,8 @@ function success(args: string[], stdout: string): GitCommandResult {
     stderr: "",
     exitCode: 0,
   };
+}
+
+function fixedClock(value: string): () => string {
+  return () => value;
 }

@@ -1,5 +1,20 @@
 import process from "node:process";
 import {
+  advanceNexusGitWorkflowRun,
+  type NexusGitWorkflowAdvanceAuthority,
+  type NexusGitWorkflowAdvanceProviderEvidence,
+  type NexusGitWorkflowAdvanceResult,
+  type NexusGitWorkflowProviderReviewStatus,
+  type NexusGitWorkflowPublicationEvidenceStatus,
+} from "../git-workflows/nexusGitWorkflowAdvance.js";
+import type {
+  NexusGitWorkflowMergeQueueStatus,
+  NexusGitWorkflowProviderBaseStatus,
+  NexusGitWorkflowProviderMergeability,
+  NexusGitWorkflowRequiredChecksStatus,
+  NexusGitWorkflowValidationMode,
+} from "../git-workflows/nexusGitWorkflowBranchFreshness.js";
+import {
   buildNexusGitWorkflowPlan,
   buildNexusGitWorkflowStatus,
   type NexusGitWorkflowPlanStatusResult,
@@ -12,7 +27,7 @@ import type { DevNexusCliDependencies } from "./cliCommandContext.js";
 import { writeJson, writeLine, type TextWriter } from "./cliSupport.js";
 
 export interface ParsedGitWorkflowCommand {
-  command: "plan" | "status" | "start";
+  command: "plan" | "status" | "start" | "advance" | "resume";
   projectRoot: string;
   componentId?: string | null;
   profileId?: string | null;
@@ -29,6 +44,8 @@ export interface ParsedGitWorkflowCommand {
   workerAgentProvider?: string | null;
   writeScope: string[];
   leaseNotes: string[];
+  provider: NexusGitWorkflowAdvanceProviderEvidence;
+  authority: NexusGitWorkflowAdvanceAuthority;
   json?: boolean;
 }
 
@@ -60,6 +77,26 @@ export async function handleGitWorkflowCommand(
     printGitWorkflowStartResult(result, parsed, dependencies.stdout ?? process.stdout);
     return 0;
   }
+  if (parsed.command === "advance" || parsed.command === "resume") {
+    const result = advanceNexusGitWorkflowRun({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      profileId: parsed.profileId,
+      workItemId: parsed.workItemId,
+      branchName: parsed.branchName,
+      runId: parsed.runId,
+      repositoryPath: parsed.repositoryPath,
+      provider: parsed.provider,
+      authority: parsed.authority,
+      now: dependencies.now,
+    });
+    printGitWorkflowAdvanceResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
   const result = parsed.command === "plan"
     ? buildNexusGitWorkflowPlan({
         projectRoot: parsed.projectRoot,
@@ -87,8 +124,14 @@ export async function handleGitWorkflowCommand(
 
 export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "plan" && command !== "status" && command !== "start") {
-    throw new Error("git-workflow requires plan, status, or start");
+  if (
+    command !== "plan" &&
+    command !== "status" &&
+    command !== "start" &&
+    command !== "advance" &&
+    command !== "resume"
+  ) {
+    throw new Error("git-workflow requires plan, status, start, advance, or resume");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
     throw new Error(`git-workflow ${command} requires a workspace root`);
@@ -99,6 +142,8 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
     projectRoot,
     writeScope: [],
     leaseNotes: [],
+    provider: {},
+    authority: {},
   };
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index]!;
@@ -155,6 +200,39 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
         break;
       case "--lease-note":
         parsed.leaseNotes.push(next());
+        break;
+      case "--provider-review":
+        parsed.provider.review = parseProviderReviewStatus(next(), arg);
+        break;
+      case "--required-checks":
+        parsed.provider.requiredChecks = parseRequiredChecksStatus(next(), arg);
+        break;
+      case "--base-status":
+        parsed.provider.baseStatus = parseProviderBaseStatus(next(), arg);
+        break;
+      case "--mergeable":
+        parsed.provider.mergeable = parseProviderMergeability(next(), arg);
+        break;
+      case "--validation-mode":
+        parsed.provider.validationMode = parseValidationMode(next(), arg);
+        break;
+      case "--merge-queue":
+        parsed.provider.mergeQueue = parseMergeQueueStatus(next(), arg);
+        break;
+      case "--publication":
+        parsed.provider.publication = parsePublicationStatus(next(), arg);
+        break;
+      case "--allow-git-mutation":
+        parsed.authority.gitMutation = true;
+        break;
+      case "--allow-provider-write":
+        parsed.authority.providerWrite = true;
+        break;
+      case "--allow-final-publication":
+        parsed.authority.finalPublication = true;
+        break;
+      case "--allow-force-with-lease":
+        parsed.authority.forceWithLease = true;
         break;
       case "--json":
         parsed.json = true;
@@ -261,6 +339,147 @@ export function printGitWorkflowResult(
   }
 }
 
+export function printGitWorkflowAdvanceResult(
+  result: NexusGitWorkflowAdvanceResult,
+  parsed: ParsedGitWorkflowCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      result,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus Git workflow advanced.");
+  writeLine(stdout, `  Component: ${result.component.id}`);
+  writeLine(stdout, `  Profile: ${result.profile.id} (${result.profile.branchStrategy})`);
+  writeLine(stdout, `  Run: ${result.runAfter.id} status=${result.runAfter.status}`);
+  writeLine(stdout, `  Action: ${result.decision.action}`);
+  writeLine(stdout, `  Next owner: ${formatOwner(result.decision.nextOwner)}`);
+  writeLine(stdout, "  Reasons:");
+  for (const reason of result.decision.reasons) {
+    writeLine(stdout, `    ${reason}`);
+  }
+  writeLine(stdout, "  Blockers:");
+  if (result.decision.blockers.length === 0) {
+    writeLine(stdout, "    none");
+  } else {
+    for (const blocker of result.decision.blockers) {
+      writeLine(stdout, `    ${blocker}`);
+    }
+  }
+  if (result.decision.commands.length > 0) {
+    writeLine(stdout, "  Commands:");
+    for (const command of result.decision.commands) {
+      writeLine(stdout, `    ${command}`);
+    }
+  }
+}
+
 function formatOwner(owner: NexusGitWorkflowPlanStatusResult["nextOwner"]): string {
   return owner.id ? `${owner.kind}/${owner.id}` : owner.kind;
+}
+
+function parseProviderReviewStatus(
+  value: string,
+  option: string,
+): NexusGitWorkflowProviderReviewStatus {
+  if (
+    value === "approved" ||
+    value === "changes_requested" ||
+    value === "pending" ||
+    value === "missing" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be approved, changes_requested, pending, missing, or unknown`);
+}
+
+function parseRequiredChecksStatus(
+  value: string,
+  option: string,
+): NexusGitWorkflowRequiredChecksStatus {
+  if (
+    value === "passed" ||
+    value === "pending" ||
+    value === "failed" ||
+    value === "stale" ||
+    value === "missing" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be passed, pending, failed, stale, missing, or unknown`);
+}
+
+function parseProviderBaseStatus(
+  value: string,
+  option: string,
+): NexusGitWorkflowProviderBaseStatus {
+  if (
+    value === "up_to_date" ||
+    value === "behind" ||
+    value === "diverged" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be up_to_date, behind, diverged, or unknown`);
+}
+
+function parseProviderMergeability(
+  value: string,
+  option: string,
+): NexusGitWorkflowProviderMergeability {
+  if (value === "mergeable" || value === "conflicting" || value === "unknown") {
+    return value;
+  }
+  throw new Error(`${option} must be mergeable, conflicting, or unknown`);
+}
+
+function parseValidationMode(
+  value: string,
+  option: string,
+): NexusGitWorkflowValidationMode {
+  if (
+    value === "strict_checks" ||
+    value === "loose_checks" ||
+    value === "merge_queue"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be strict_checks, loose_checks, or merge_queue`);
+}
+
+function parseMergeQueueStatus(
+  value: string,
+  option: string,
+): NexusGitWorkflowMergeQueueStatus {
+  if (
+    value === "available" ||
+    value === "queued" ||
+    value === "unavailable" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be available, queued, unavailable, or unknown`);
+}
+
+function parsePublicationStatus(
+  value: string,
+  option: string,
+): NexusGitWorkflowPublicationEvidenceStatus {
+  if (
+    value === "completed" ||
+    value === "pending" ||
+    value === "missing" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new Error(`${option} must be completed, pending, missing, or unknown`);
 }

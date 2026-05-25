@@ -516,6 +516,16 @@ function allowedNextCommands(options: {
       requiresApproval: false,
     });
   }
+  if (options.mode === "status" && options.run) {
+    commands.push({
+      id: "advance-workflow",
+      command: gitWorkflowAdvanceCommand(options),
+      summary:
+        "Advance the recorded workflow run after attaching fresh provider and branch evidence.",
+      mutates: true,
+      requiresApproval: false,
+    });
+  }
   return commands;
 }
 
@@ -559,6 +569,28 @@ function worktreePrepareCommand(options: {
       : []),
     ...(options.branchName ? ["--branch", shellQuoteArgument(options.branchName)] : []),
     ...(options.baseRef ? ["--base-ref", shellQuoteArgument(options.baseRef)] : []),
+  ].join(" ");
+}
+
+function gitWorkflowAdvanceCommand(options: {
+  context: NexusGitWorkflowContext;
+  run: NexusGitWorkflowRunRecord | null;
+  workItemId: string | null;
+  branchName: string | null;
+}): string {
+  return [
+    "dev-nexus",
+    "git-workflow",
+    "advance",
+    shellQuoteArgument(options.context.projectRoot),
+    "--component",
+    shellQuoteArgument(options.context.component.id),
+    ...(options.run ? ["--run", shellQuoteArgument(options.run.id)] : []),
+    ...(options.workItemId
+      ? ["--work-item", shellQuoteArgument(options.workItemId)]
+      : []),
+    ...(options.branchName ? ["--branch", shellQuoteArgument(options.branchName)] : []),
+    "--json",
   ].join(" ");
 }
 
