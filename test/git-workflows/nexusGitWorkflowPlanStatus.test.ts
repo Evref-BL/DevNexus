@@ -1,0 +1,283 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  buildNexusGitWorkflowPlan,
+  buildNexusGitWorkflowStatus,
+  createNexusGitWorkflowRun,
+  defaultNexusAutomationConfig,
+  saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
+  type NexusProjectConfig,
+} from "../../src/index.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+describe("nexus Git workflow plan and status", () => {
+  it("plans a direct workflow without mutating Git or runtime state", () => {
+    const projectRoot = makeTempDir("dev-nexus-git-workflow-plan-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("direct-protected", "direct"));
+    const git = readOnlyGitRunner({
+      currentBranch: "main",
+      currentCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      baseCommits: {
+        "origin/main": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+      status: "## main...origin/main\n",
+    });
+
+    const plan = buildNexusGitWorkflowPlan({
+      projectRoot,
+      componentId: "primary",
+      profileId: "direct-protected",
+      workItemId: "github-356",
+      repositoryPath: sourceRoot,
+      gitRunner: git.runner,
+    });
+
+    expect(plan).toMatchObject({
+      mode: "plan",
+      mutates: false,
+      profile: {
+        id: "direct-protected",
+        branchStrategy: "direct",
+      },
+      refs: {
+        baseRef: "origin/main",
+        baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        targetBranch: "main",
+        currentBranch: "main",
+      },
+      nextOwner: {
+        kind: "agent",
+        id: null,
+      },
+      blockers: [],
+    });
+    expect(plan.evidence).toContainEqual(
+      expect.objectContaining({
+        id: "base-ref",
+        status: "present",
+      }),
+    );
+    expect(plan.allowedNextCommands).toContainEqual(
+      expect.objectContaining({
+        id: "prepare-worktree",
+        mutates: true,
+        command: expect.stringContaining("--base-ref origin/main"),
+      }),
+    );
+    expect(fs.existsSync(path.join(sourceRoot, ".git", "dev-nexus"))).toBe(false);
+    expect(git.commands.map((command) => command.args[0])).toEqual([
+      "rev-parse",
+      "rev-parse",
+      "rev-parse",
+      "status",
+    ]);
+  });
+
+  it("reports a feature-branch workflow status from a recorded run and fresh Git facts", () => {
+    const projectRoot = makeTempDir("dev-nexus-git-workflow-status-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      workItemId: "github-356",
+      branchName: "feat/git-workflows/plan-status",
+      currentRef: "feat/git-workflows/plan-status",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+      now: "2026-05-25T10:00:00.000Z",
+    });
+    const updatedRun = buildNexusGitWorkflowStatus({
+      projectRoot,
+      componentId: "primary",
+      workItemId: "github-356",
+      branchName: "feat/git-workflows/plan-status",
+      repositoryPath: sourceRoot,
+      gitRunner: readOnlyGitRunner({
+        currentBranch: "feat/git-workflows/plan-status",
+        currentCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        baseCommits: {
+          "origin/main": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        status: "## feat/git-workflows/plan-status...origin/feat/git-workflows/plan-status\n",
+      }).runner,
+    });
+
+    expect(updatedRun).toMatchObject({
+      mode: "status",
+      mutates: false,
+      profile: {
+        id: "feature-delivery",
+        branchStrategy: "feature_branch",
+        activeFeatureId: "git-workflows",
+      },
+      run: {
+        id: "run-1",
+        status: "working",
+        workItemId: "github-356",
+        branchName: "feat/git-workflows/plan-status",
+      },
+      refs: {
+        baseRef: "origin/main",
+        baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        currentBranch: "feat/git-workflows/plan-status",
+      },
+      nextOwner: {
+        kind: "agent",
+        id: "codex",
+      },
+      blockers: [],
+    });
+    expect(updatedRun.allowedNextCommands).toContainEqual(
+      expect.objectContaining({
+        id: "refresh-status",
+        mutates: false,
+        command: expect.stringContaining("git-workflow status"),
+      }),
+    );
+  });
+});
+
+function projectConfig(
+  profileId: string,
+  branchStrategy: "direct" | "feature_branch",
+  profileOverrides: Record<string, unknown> = {},
+): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "demo-project",
+    name: "Demo Project",
+    home: null,
+    repo: {
+      kind: "git",
+      remoteUrl: "git@example.invalid:demo/project.git",
+      defaultBranch: "main",
+      sourceRoot: "source",
+    },
+    worktreesRoot: "worktrees",
+    components: [
+      {
+        id: "primary",
+        name: "Primary",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/project.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+        relationships: [],
+      },
+    ],
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        remote: "origin",
+        targetBranch: "main",
+      },
+      gitWorkflows: {
+        activeProfileId: profileId,
+        profiles: [
+          {
+            id: profileId,
+            branchStrategy,
+            targetBranch: "main",
+            ...profileOverrides,
+          },
+        ],
+      },
+    },
+  };
+}
+
+function readOnlyGitRunner(options: {
+  currentBranch: string;
+  currentCommit: string;
+  baseCommits: Record<string, string>;
+  status: string;
+}): { runner: GitRunner; commands: GitCommandResult[] } {
+  const commands: GitCommandResult[] = [];
+  const runner: GitRunner = (args) => {
+    const command = [...args];
+    const result = gitResult(command, options);
+    commands.push(result);
+    return result;
+  };
+  return { runner, commands };
+}
+
+function gitResult(
+  args: string[],
+  options: {
+    currentBranch: string;
+    currentCommit: string;
+    baseCommits: Record<string, string>;
+    status: string;
+  },
+): GitCommandResult {
+  if (args.join(" ") === "rev-parse --abbrev-ref HEAD") {
+    return success(args, `${options.currentBranch}\n`);
+  }
+  if (args.join(" ") === "rev-parse HEAD") {
+    return success(args, `${options.currentCommit}\n`);
+  }
+  if (args[0] === "rev-parse" && args[1] === "--verify" && args[2] === "--quiet") {
+    const ref = args[3]?.replace(/\^\{commit\}$/u, "") ?? "";
+    const commit = options.baseCommits[ref];
+    return commit ? success(args, `${commit}\n`) : failure(args);
+  }
+  if (args.join(" ") === "status --short --branch") {
+    return success(args, options.status);
+  }
+  return failure(args);
+}
+
+function success(args: string[], stdout: string): GitCommandResult {
+  return {
+    args,
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}
+
+function failure(args: string[]): GitCommandResult {
+  return {
+    args,
+    stdout: "",
+    stderr: "not found",
+    exitCode: 1,
+  };
+}
