@@ -72,6 +72,7 @@ export interface NexusForgePullRequestResult {
   url: string | null;
   state: string | null;
   title: string | null;
+  operation?: "create" | "update";
   metadata: NexusForgePublicationOperationMetadata;
 }
 
@@ -518,24 +519,22 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     body?: string | null;
     draft?: boolean;
   }): Promise<NexusForgePullRequestResult> {
-    const body = {
-      head: options.head,
-      base: options.base,
-      title: options.title,
-      ...(options.body !== undefined ? { body: options.body ?? "" } : {}),
-      ...(!options.number && options.draft === true ? { draft: true } : {}),
-    };
+    const resolvedNumber = options.number ??
+      (await this.openPullRequestForHeadBaseWithRest(options))?.number ??
+      null;
+    const operation = resolvedNumber ? "update" : "create";
+    const body = pullRequestUpsertBody(options, operation);
     const response = await this.githubRestRequest<GitHubPullRequestResponse>(
-      options.number
-        ? `${this.repositoryApiPath()}/pulls/${String(options.number)}`
+      resolvedNumber
+        ? `${this.repositoryApiPath()}/pulls/${String(resolvedNumber)}`
         : `${this.repositoryApiPath()}/pulls`,
       {
-        method: options.number ? "PATCH" : "POST",
+        method: resolvedNumber ? "PATCH" : "POST",
         capability: "pull_request.upsert",
         body,
       },
     );
-    return pullRequestResult(response, this.metadata("pull_request.upsert"));
+    return pullRequestResult(response, this.metadata("pull_request.upsert"), operation);
   }
 
   private upsertPullRequestWithCli(options: {
@@ -546,11 +545,16 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     body?: string | null;
     draft?: boolean;
   }): NexusForgePullRequestResult {
-    const args = options.number
+    const existingPullRequest = options.number
+      ? null
+      : this.openPullRequestForHeadBaseWithCli(options);
+    const resolvedNumber = options.number ?? existingPullRequest?.number ?? null;
+    const operation = resolvedNumber ? "update" : "create";
+    const args = resolvedNumber
       ? [
           "pr",
           "edit",
-          String(options.number),
+          String(resolvedNumber),
           "--repo",
           this.repositorySlug(),
           "--title",
@@ -572,8 +576,8 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
           ...(options.body !== undefined ? ["--body", options.body ?? ""] : []),
         ];
     const result = this.runGh(args, "pull_request.upsert");
-    const url = clean(result.stdout);
-    const number = options.number ?? pullRequestNumberFromUrl(url);
+    const url = clean(result.stdout) ?? existingPullRequest?.url ?? null;
+    const number = resolvedNumber ?? pullRequestNumberFromUrl(url);
     if (!number) {
       throw new NexusForgePublicationError(
         "invalid_provider_response",
@@ -587,8 +591,84 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       url,
       state: null,
       title: options.title,
+      operation,
       metadata: this.metadata("pull_request.upsert"),
     };
+  }
+
+  private async openPullRequestForHeadBaseWithRest(options: {
+    head: string;
+    base: string;
+  }): Promise<NexusForgePullRequestResult | null> {
+    const query = new URLSearchParams({
+      head: githubPullRequestHeadFilter(this.repository.owner, options.head),
+      base: options.base,
+      state: "open",
+      per_page: "2",
+    });
+    const matches = await this.githubRestRequest<GitHubPullRequestResponse[]>(
+      `${this.repositoryApiPath()}/pulls?${query.toString()}`,
+      {
+        method: "GET",
+        capability: "pull_request.upsert",
+      },
+    );
+    if (!Array.isArray(matches)) {
+      throw new NexusForgePublicationError(
+        "invalid_provider_response",
+        "GitHub pull request lookup response was not a JSON array.",
+        { backend: this.backend },
+      );
+    }
+    if (matches.length > 1) {
+      throw multiplePullRequestMatchesError({
+        backend: this.backend,
+        head: options.head,
+        base: options.base,
+      });
+    }
+    const match = matches[0];
+    return match
+      ? pullRequestResult(match, this.metadata("pull_request.upsert"), "update")
+      : null;
+  }
+
+  private openPullRequestForHeadBaseWithCli(options: {
+    head: string;
+    base: string;
+  }): NexusForgePullRequestResult | null {
+    const result = this.runGh(
+      [
+        "pr",
+        "list",
+        "--repo",
+        this.repositorySlug(),
+        "--head",
+        options.head,
+        "--base",
+        options.base,
+        "--state",
+        "open",
+        "--limit",
+        "2",
+        "--json",
+        "number,url,state,title",
+      ],
+      "pull_request.upsert",
+    );
+    const matches = parseJsonArray<Record<string, unknown>>(
+      result.stdout,
+      "GitHub CLI pull request lookup",
+    );
+    if (matches.length > 1) {
+      throw multiplePullRequestMatchesError({
+        backend: this.backend,
+        head: options.head,
+        base: options.base,
+      });
+    }
+    const match = matches[0];
+    return match ? pullRequestResultFromRecord(match, this.metadata("pull_request.upsert")) : null;
   }
 
   private async inspectPullRequestChecksWithRest(options: {
@@ -986,6 +1066,7 @@ function defaultForgePublicationCommandRunner(
 function pullRequestResult(
   response: GitHubPullRequestResponse,
   metadata: NexusForgePublicationOperationMetadata,
+  operation?: "create" | "update",
 ): NexusForgePullRequestResult {
   if (!response.number) {
     throw new NexusForgePublicationError(
@@ -999,8 +1080,70 @@ function pullRequestResult(
     url: clean(response.html_url),
     state: clean(response.state),
     title: clean(response.title),
+    ...(operation ? { operation } : {}),
     metadata,
   };
+}
+
+function pullRequestResultFromRecord(
+  record: Record<string, unknown>,
+  metadata: NexusForgePublicationOperationMetadata,
+): NexusForgePullRequestResult {
+  const number = numberField(record, "number");
+  if (!number) {
+    throw new NexusForgePublicationError(
+      "invalid_provider_response",
+      "GitHub CLI pull request lookup response did not include a number.",
+      { backend: metadata.backend },
+    );
+  }
+  return {
+    number,
+    url: stringField(record, "url"),
+    state: stringField(record, "state"),
+    title: stringField(record, "title"),
+    operation: "update",
+    metadata,
+  };
+}
+
+function pullRequestUpsertBody(
+  options: {
+    head: string;
+    base: string;
+    title: string;
+    body?: string | null;
+    draft?: boolean;
+  },
+  operation: "create" | "update",
+): Record<string, unknown> {
+  return {
+    ...(operation === "create" ? { head: options.head } : {}),
+    base: options.base,
+    title: options.title,
+    ...(options.body !== undefined ? { body: options.body ?? "" } : {}),
+    ...(operation === "create" && options.draft === true ? { draft: true } : {}),
+  };
+}
+
+function githubPullRequestHeadFilter(owner: string, head: string): string {
+  return head.includes(":") ? head : `${owner}:${head}`;
+}
+
+function multiplePullRequestMatchesError(options: {
+  backend: NexusForgePublicationBackend;
+  head: string;
+  base: string;
+}): NexusForgePublicationError {
+  return new NexusForgePublicationError(
+    "invalid_provider_response",
+    `Multiple open pull requests match head ${options.head} and base ${options.base}.`,
+    {
+      backend: options.backend,
+      head: options.head,
+      base: options.base,
+    },
+  );
 }
 
 function unsupportedCapability(
@@ -1059,6 +1202,11 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
 function booleanField(record: Record<string, unknown>, key: string): boolean | null {
   const value = record[key];
   return typeof value === "boolean" ? value : null;
+}
+
+function numberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" && Number.isInteger(value) ? value : null;
 }
 
 function reviewStateFromGitHubReviews(

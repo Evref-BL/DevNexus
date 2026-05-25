@@ -526,6 +526,9 @@ describe("publication operations", () => {
         authorization: new Headers(init?.headers).get("authorization"),
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      if ((init?.method ?? "GET") === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       return new Response(
         JSON.stringify({
           number: 191,
@@ -555,6 +558,13 @@ describe("publication operations", () => {
     });
     expect(requests).toEqual([
       {
+        url:
+          "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fapp-publication-cli&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
         url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
         method: "POST",
         authorization: "Bearer installation-token",
@@ -570,7 +580,7 @@ describe("publication operations", () => {
 
   it("creates pull requests through GitHub App user-to-server API credentials", async () => {
     const { projectRoot } = createHumanUserTokenPublicationProject();
-    const requests: Array<{ authorization: string | null; body: unknown }> = [];
+    const requests: Array<{ method: string; authorization: string | null; body: unknown }> = [];
     const result = await upsertNexusPublicationPullRequestForComponent({
       projectRoot,
       head: "codex/dev-nexus/human-attributed-auth",
@@ -581,10 +591,15 @@ describe("publication operations", () => {
         DEV_NEXUS_TEST_USER_TOKEN: "user-access-token",
       } as NodeJS.ProcessEnv,
       fetch: (async (_input, init) => {
+        const method = init?.method ?? "GET";
         requests.push({
+          method,
           authorization: new Headers(init?.headers).get("authorization"),
           body: init?.body ? JSON.parse(String(init.body)) : null,
         });
+        if (method === "GET") {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
         return new Response(
           JSON.stringify({
             number: 214,
@@ -609,6 +624,12 @@ describe("publication operations", () => {
     });
     expect(requests).toEqual([
       {
+        method: "GET",
+        authorization: "Bearer user-access-token",
+        body: null,
+      },
+      {
+        method: "POST",
         authorization: "Bearer user-access-token",
         body: {
           head: "codex/dev-nexus/human-attributed-auth",
@@ -631,6 +652,9 @@ describe("publication operations", () => {
         authorization: new Headers(init?.headers).get("authorization"),
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      if ((init?.method ?? "GET") === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       return new Response(
         JSON.stringify({
           number: 31,
@@ -662,6 +686,13 @@ describe("publication operations", () => {
       title: "Update dogfood publication context",
     });
     expect(requests).toEqual([
+      {
+        url:
+          "https://api.github.com/repos/Gabot-Darbot/dev-nexus-dogfood/pulls?head=Gabot-Darbot%3Acodex%2Fdogfood%2Fcode-quality-audit-records&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
       {
         url: "https://api.github.com/repos/Gabot-Darbot/dev-nexus-dogfood/pulls",
         method: "POST",
@@ -1631,12 +1662,17 @@ describe("publication CLI operations", () => {
   it("upserts pull requests through the configured App API credential path", async () => {
     const { projectRoot } = createPublicationProject();
     const stdout = textWriter();
-    const requests: Array<{ authorization: string | null; body: unknown }> = [];
-    const fetchImpl: typeof fetch = async (_input, init) => {
+    const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
       requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
         authorization: new Headers(init?.headers).get("authorization"),
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      if ((init?.method ?? "GET") === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       return new Response(
         JSON.stringify({
           number: 191,
@@ -1687,6 +1723,15 @@ describe("publication CLI operations", () => {
     expect(stdout.output()).not.toContain("installation-token");
     expect(requests).toEqual([
       {
+        url:
+          "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fapp-publication-cli&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        method: "POST",
         authorization: "Bearer installation-token",
         body: {
           head: "codex/dev-nexus/app-publication-cli",
@@ -1697,6 +1742,74 @@ describe("publication CLI operations", () => {
         },
       },
     ]);
+  });
+
+  it("updates an existing same-head pull request through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const requests: Array<{ url: string; method: string; body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      if ((init?.method ?? "GET") === "GET") {
+        return new Response(
+          JSON.stringify([
+            {
+              number: 191,
+              html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+              state: "open",
+              title: "Existing title",
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          number: 191,
+          html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+          state: "open",
+          title: "Updated title",
+        }),
+        { status: 200 },
+      );
+    };
+
+    const result = await upsertNexusPublicationPullRequestForComponent({
+      projectRoot,
+      head: "codex/dev-nexus/app-publication-cli",
+      title: "Updated title",
+      body: "Updated body.",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.plan).toMatchObject({
+      operation: "update",
+      number: 191,
+      head: "codex/dev-nexus/app-publication-cli",
+      base: "main",
+    });
+    expect(result.pullRequest).toMatchObject({
+      number: 191,
+      title: "Updated title",
+      operation: "update",
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls",
+        "PATCH /repos/Evref-BL/DevNexus/pulls/191",
+      ]);
+    expect(new URL(requests[0]!.url).searchParams.get("head"))
+      .toBe("Evref-BL:codex/dev-nexus/app-publication-cli");
+    expect(requests[1]!.body).toMatchObject({
+      title: "Updated title",
+      body: "Updated body.",
+    });
   });
 
   it("dry-runs pull request upserts through the configured App API credential path", async () => {
@@ -1736,7 +1849,7 @@ describe("publication CLI operations", () => {
       dryRun: true,
       pullRequest: null,
       plan: {
-        operation: "create",
+        operation: "upsert",
         head: "codex/dev-nexus/app-publication-cli",
         base: "main",
         title: "Add App publication commands",
@@ -1780,7 +1893,7 @@ describe("publication CLI operations", () => {
       kind: "github_app",
     });
     expect(result.plan).toMatchObject({
-      operation: "create",
+      operation: "upsert",
       head: "codex/dev-nexus/app-publication-cli",
       base: "main",
     });
@@ -1839,7 +1952,7 @@ describe("publication CLI operations", () => {
       pullRequest: {
         dryRun: true,
         plan: {
-          operation: "create",
+          operation: "upsert",
           head: "codex/dev-nexus/app-publication-cli",
           base: "main",
         },
@@ -1852,11 +1965,16 @@ describe("publication CLI operations", () => {
     const { projectRoot } = createPublicationProject();
     const stdout = textWriter();
     const escapedLineBreak = `${String.fromCharCode(92)}n`;
-    const requests: Array<{ body: unknown }> = [];
+    const requests: Array<{ method: string; body: unknown }> = [];
     const fetchImpl: typeof fetch = async (_input, init) => {
+      const method = init?.method ?? "GET";
       requests.push({
+        method,
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      if (method === "GET") {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       return new Response(
         JSON.stringify({
           number: 191,
@@ -1894,6 +2012,11 @@ describe("publication CLI operations", () => {
     expect(exitCode).toBe(0);
     expect(requests).toEqual([
       {
+        method: "GET",
+        body: null,
+      },
+      {
+        method: "POST",
         body: expect.objectContaining({
           body: ["Summary.", "", "Verification."].join(String.fromCharCode(10)),
         }),
