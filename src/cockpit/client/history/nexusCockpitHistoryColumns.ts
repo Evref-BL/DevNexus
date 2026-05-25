@@ -1,4 +1,5 @@
 const gitHistoryColumnStorageKey = "dev-nexus-cockpit-git-history-columns";
+const gitHistoryColumnVisibilityStorageKey = "dev-nexus-cockpit-git-history-column-visibility";
 const gitHistoryColumnSpecs = {
   graph: { property: "--dn-git-graph-width", defaultWidth: 230, minWidth: 96, maxWidth: 520 },
   description: {
@@ -22,6 +23,7 @@ const gitHistoryColumnLabels = {
 
 type GitHistoryColumn = keyof typeof gitHistoryColumnSpecs;
 type GitHistoryColumnWidths = Partial<Record<GitHistoryColumn, number>>;
+type GitHistoryColumnVisibility = Record<GitHistoryColumn, boolean>;
 
 export function bindGitHistoryColumnResizers(container: ParentNode): void {
   container.querySelectorAll<HTMLElement>("[data-git-resize-column]").forEach((handle) => {
@@ -31,27 +33,31 @@ export function bindGitHistoryColumnResizers(container: ParentNode): void {
       event.preventDefault();
       const board = handle.closest<HTMLElement>("[data-git-board]");
       const column = historyColumnFromAttribute(handle.getAttribute("data-git-resize-column"));
-      if (!board || !column) return;
+      const nextColumn = historyColumnFromAttribute(handle.getAttribute("data-git-resize-next-column"));
+      if (!board || !column || !nextColumn) return;
       const direction = event.key === "ArrowRight" ? 1 : -1;
       const step = event.shiftKey ? 32 : 12;
       updateGitHistoryColumnPairWidth(
         board,
         column,
+        nextColumn,
         gitHistoryColumnWidth(board, column) + direction * step,
         handle,
       );
     });
   });
+  bindGitHistoryColumnVisibilityControls(container);
 }
 
 export function renderGitHistoryColumnHeader(
   column: GitHistoryColumn,
   label: string,
   widths: GitHistoryColumnWidths,
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
 ): string {
   const spec = gitHistoryColumnSpecs[column];
   const width = widths[column] ?? spec.defaultWidth;
-  const nextColumn = nextGitHistoryColumn(column);
+  const nextColumn = visibility[column] ? nextVisibleGitHistoryColumn(column, visibility) : null;
   const nextSpec = nextColumn ? gitHistoryColumnSpecs[nextColumn] : null;
   const nextWidth = nextColumn ? widths[nextColumn] ?? nextSpec!.defaultWidth : null;
   const totalWidth = nextWidth === null ? width : width + nextWidth;
@@ -61,20 +67,43 @@ export function renderGitHistoryColumnHeader(
   const handle = nextColumn
     ? `<span class="dn-git-resize-handle" role="separator" tabindex="0" aria-label="Resize ${escapeNexusCockpitHistoryColumnAttribute(label)} and ${escapeNexusCockpitHistoryColumnAttribute(nextLabel)} columns" aria-orientation="vertical" aria-valuemin="${escapeNexusCockpitHistoryColumnAttribute(minWidth)}" aria-valuemax="${escapeNexusCockpitHistoryColumnAttribute(maxWidth)}" aria-valuenow="${escapeNexusCockpitHistoryColumnAttribute(width)}" data-git-resize-column="${escapeNexusCockpitHistoryColumnAttribute(column)}" data-git-resize-next-column="${escapeNexusCockpitHistoryColumnAttribute(nextColumn)}"></span>`
     : "";
-  return `<span class="dn-git-column-header" data-git-column="${escapeNexusCockpitHistoryColumnAttribute(column)}"><span class="dn-git-column-label">${escapeNexusCockpitHistoryColumnAttribute(label)}</span>${handle}</span>`;
+  return `<span class="dn-git-column-header" data-git-column="${escapeNexusCockpitHistoryColumnAttribute(column)}" data-git-cell="${escapeNexusCockpitHistoryColumnAttribute(column)}"><span class="dn-git-column-label">${escapeNexusCockpitHistoryColumnAttribute(label)}</span>${handle}</span>`;
 }
 
 export function gitHistoryColumnStyle(
   widths: GitHistoryColumnWidths = readStoredGitHistoryColumnWidths(),
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
 ): string {
   return Object.entries(gitHistoryColumnSpecs)
     .map(([column, spec]) =>
-      `${spec.property}:${normalizeGitHistoryColumnWidth(
+      `${spec.property}:${visibility[column as GitHistoryColumn] ? normalizeGitHistoryColumnWidth(
         column as GitHistoryColumn,
         widths[column as GitHistoryColumn],
-      )}px`
+      ) : 0}px`
     )
     .join(";");
+}
+
+export function gitHistoryColumnVisibilityAttributes(
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
+): string {
+  return gitHistoryColumnOrder
+    .map((column) =>
+      `data-git-column-${column}="${visibility[column] ? "visible" : "hidden"}"`
+    )
+    .join(" ");
+}
+
+export function renderGitHistoryColumnVisibilityMenu(
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
+): string {
+  const options = gitHistoryColumnOrder
+    .map((column) => {
+      const checked = visibility[column] ? " checked" : "";
+      return `<label class="dn-git-column-option"><input type="checkbox" data-git-column-toggle="${escapeNexusCockpitHistoryColumnAttribute(column)}"${checked} /> <span>${escapeNexusCockpitHistoryColumnAttribute(gitHistoryColumnLabels[column])}</span></label>`;
+    })
+    .join("");
+  return `<details class="dn-git-column-menu" data-git-column-menu><summary class="dn-git-column-trigger">Columns</summary><div class="dn-git-column-options" role="group" aria-label="Visible event history columns">${options}</div></details>`;
 }
 
 export function readStoredGitHistoryColumnWidths(): Record<GitHistoryColumn, number> {
@@ -102,20 +131,47 @@ export function readStoredGitHistoryColumnWidths(): Record<GitHistoryColumn, num
   }
 }
 
+export function readStoredGitHistoryColumnVisibility(): GitHistoryColumnVisibility {
+  const defaults = gitHistoryDefaultColumnVisibility();
+  if (typeof window === "undefined") return defaults;
+  try {
+    const storage = window.localStorage;
+    if (!storage) return defaults;
+    const raw = storage.getItem(gitHistoryColumnVisibilityStorageKey);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<Record<string, unknown>>;
+    return normalizeGitHistoryColumnVisibility(parsed);
+  } catch {
+    return defaults;
+  }
+}
+
 export function renderNexusCockpitHistoryColumnsClientSource(): string {
   return [
     `const gitHistoryColumnStorageKey = ${JSON.stringify(gitHistoryColumnStorageKey)};`,
+    `const gitHistoryColumnVisibilityStorageKey = ${JSON.stringify(gitHistoryColumnVisibilityStorageKey)};`,
     `const gitHistoryColumnSpecs = ${JSON.stringify(gitHistoryColumnSpecs)};`,
     `const gitHistoryColumnOrder = ${JSON.stringify(gitHistoryColumnOrder)};`,
     `const gitHistoryColumnLabels = ${JSON.stringify(gitHistoryColumnLabels)};`,
     bindGitHistoryColumnResizers,
     renderGitHistoryColumnHeader,
     gitHistoryColumnStyle,
+    gitHistoryColumnVisibilityAttributes,
+    renderGitHistoryColumnVisibilityMenu,
     readStoredGitHistoryColumnWidths,
+    readStoredGitHistoryColumnVisibility,
     writeStoredGitHistoryColumnWidths,
+    writeStoredGitHistoryColumnVisibility,
+    gitHistoryDefaultColumnVisibility,
+    normalizeGitHistoryColumnVisibility,
     normalizeGitHistoryColumnWidth,
     historyColumnFromAttribute,
     nextGitHistoryColumn,
+    nextVisibleGitHistoryColumn,
+    bindGitHistoryColumnVisibilityControls,
+    applyGitHistoryColumnVisibility,
+    readGitHistoryColumnVisibilityFromControls,
+    updateGitHistoryColumnMenuControls,
     startGitHistoryColumnResize,
     updateGitHistoryColumnPairWidth,
     gitHistoryColumnPairLeftWidth,
@@ -151,6 +207,37 @@ function writeStoredGitHistoryColumnWidths(widths: GitHistoryColumnWidths): void
   }
 }
 
+function writeStoredGitHistoryColumnVisibility(visibility: Partial<Record<GitHistoryColumn, boolean>>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const storage = window.localStorage;
+    if (!storage) return;
+    storage.setItem(
+      gitHistoryColumnVisibilityStorageKey,
+      JSON.stringify(normalizeGitHistoryColumnVisibility(visibility)),
+    );
+  } catch {
+    // Visibility controls remain usable for the current page without storage.
+  }
+}
+
+function gitHistoryDefaultColumnVisibility(): GitHistoryColumnVisibility {
+  return Object.fromEntries(gitHistoryColumnOrder.map((column) => [column, true])) as GitHistoryColumnVisibility;
+}
+
+function normalizeGitHistoryColumnVisibility(
+  visibility: Partial<Record<string, unknown>> | null | undefined,
+): GitHistoryColumnVisibility {
+  const normalized = Object.fromEntries(
+    gitHistoryColumnOrder.map((column) => [
+      column,
+      visibility?.[column] === undefined ? true : visibility[column] !== false,
+    ]),
+  ) as GitHistoryColumnVisibility;
+  if (!gitHistoryColumnOrder.some((column) => normalized[column])) normalized.description = true;
+  return normalized;
+}
+
 function normalizeGitHistoryColumnWidth(column: GitHistoryColumn, value: unknown): number {
   const spec = gitHistoryColumnSpecs[column];
   const width = Number(value);
@@ -167,22 +254,88 @@ function nextGitHistoryColumn(column: GitHistoryColumn): GitHistoryColumn | null
   return index >= 0 ? gitHistoryColumnOrder[index + 1] ?? null : null;
 }
 
+function nextVisibleGitHistoryColumn(
+  column: GitHistoryColumn,
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
+): GitHistoryColumn | null {
+  let nextColumn = nextGitHistoryColumn(column);
+  while (nextColumn) {
+    if (visibility[nextColumn]) return nextColumn;
+    nextColumn = nextGitHistoryColumn(nextColumn);
+  }
+  return null;
+}
+
+function bindGitHistoryColumnVisibilityControls(container: ParentNode): void {
+  container.querySelectorAll<HTMLInputElement>("[data-git-column-toggle]").forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const menu = toggle.closest<HTMLElement>("[data-git-column-menu]");
+      const panel = toggle.closest<HTMLElement>(".dn-git-panel");
+      const board = panel?.querySelector<HTMLElement>("[data-git-board]") ?? null;
+      const visibility = normalizeGitHistoryColumnVisibility(readGitHistoryColumnVisibilityFromControls(menu));
+      writeStoredGitHistoryColumnVisibility(visibility);
+      updateGitHistoryColumnMenuControls(menu, visibility);
+      if (board) applyGitHistoryColumnVisibility(board, visibility);
+      board?.dispatchEvent(new CustomEvent("dn-git-history-columns-change", { bubbles: true }));
+    });
+  });
+}
+
+function applyGitHistoryColumnVisibility(
+  board: HTMLElement,
+  visibility: GitHistoryColumnVisibility = readStoredGitHistoryColumnVisibility(),
+): void {
+  const widths = readStoredGitHistoryColumnWidths();
+  for (const column of gitHistoryColumnOrder) {
+    board.setAttribute(`data-git-column-${column}`, visibility[column] ? "visible" : "hidden");
+    const spec = gitHistoryColumnSpecs[column];
+    const width = visibility[column] ? normalizeGitHistoryColumnWidth(column, widths[column]) : 0;
+    board.style.setProperty(spec.property, `${width}px`);
+  }
+}
+
+function readGitHistoryColumnVisibilityFromControls(
+  menu: Element | null,
+): Partial<Record<GitHistoryColumn, boolean>> {
+  const visibility = gitHistoryDefaultColumnVisibility();
+  if (!menu) return visibility;
+  menu.querySelectorAll<HTMLInputElement>("[data-git-column-toggle]").forEach((toggle) => {
+    const column = historyColumnFromAttribute(toggle.getAttribute("data-git-column-toggle"));
+    if (column) visibility[column] = toggle.checked;
+  });
+  return visibility;
+}
+
+function updateGitHistoryColumnMenuControls(
+  menu: Element | null,
+  visibility: GitHistoryColumnVisibility,
+): void {
+  if (!menu) return;
+  const visibleCount = gitHistoryColumnOrder.filter((column) => visibility[column]).length;
+  menu.querySelectorAll<HTMLInputElement>("[data-git-column-toggle]").forEach((toggle) => {
+    const column = historyColumnFromAttribute(toggle.getAttribute("data-git-column-toggle"));
+    if (!column) return;
+    toggle.checked = visibility[column];
+    toggle.disabled = visibility[column] && visibleCount === 1;
+  });
+}
+
 function startGitHistoryColumnResize(event: PointerEvent, handle: HTMLElement): void {
   if (event.button !== undefined && event.button !== 0) return;
   const board = handle.closest<HTMLElement>("[data-git-board]");
   const column = historyColumnFromAttribute(handle.getAttribute("data-git-resize-column"));
-  if (!board || !column) return;
+  const nextColumn = historyColumnFromAttribute(handle.getAttribute("data-git-resize-next-column"));
+  if (!board || !column || !nextColumn) return;
   event.preventDefault();
   const startX = event.clientX ?? 0;
   const startWidth = gitHistoryColumnWidth(board, column);
-  const nextColumn = nextGitHistoryColumn(column);
-  if (!nextColumn) return;
   const pairWidth = startWidth + gitHistoryColumnWidth(board, nextColumn);
   board.classList.add("resizing");
   const move = (moveEvent: PointerEvent) => {
     updateGitHistoryColumnPairWidth(
       board,
       column,
+      nextColumn,
       startWidth + ((moveEvent.clientX ?? startX) - startX),
       handle,
       pairWidth,
@@ -202,12 +355,11 @@ function startGitHistoryColumnResize(event: PointerEvent, handle: HTMLElement): 
 function updateGitHistoryColumnPairWidth(
   board: HTMLElement,
   column: GitHistoryColumn,
+  nextColumn: GitHistoryColumn,
   nextLeftWidth: number,
   handle: HTMLElement | null = null,
   pairWidth: number | null = null,
 ): void {
-  const nextColumn = nextGitHistoryColumn(column);
-  if (!nextColumn) return;
   const widths = gitHistoryBoardColumnWidths(board);
   const leftSpec = gitHistoryColumnSpecs[column];
   const rightSpec = gitHistoryColumnSpecs[nextColumn];

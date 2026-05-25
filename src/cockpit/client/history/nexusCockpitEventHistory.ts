@@ -11,12 +11,15 @@ import {
 } from "../nexusCockpitFormat.js";
 import {
   gitHistoryColumnStyle,
+  gitHistoryColumnVisibilityAttributes,
   readStoredGitHistoryColumnWidths,
+  readStoredGitHistoryColumnVisibility,
   renderGitHistoryColumnHeader,
+  renderGitHistoryColumnVisibilityMenu,
 } from "./nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvg } from "./nexusCockpitHistoryGraphSvg.js";
 
-const gitHistoryInlineDetailRows = 7;
+const gitHistoryInlineDetailRows = 9;
 
 function isGitHistorySelection(selectedId) {
   return String(selectedId ?? '').startsWith('history:');
@@ -36,8 +39,9 @@ function renderGitHistory(snapshot, selectedId, filter = 'all') {
 
 function renderGitHistoryBoard(snapshot, graph, selectedId) {
   const widths = readStoredGitHistoryColumnWidths();
+  const visibility = readStoredGitHistoryColumnVisibility();
   const visualGraph = gitHistoryVisualGraph(graph, selectedId);
-  return `<div class="dn-git-board" data-git-board style="${escapeHtml(gitHistoryColumnStyle(widths))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths)}${renderGitHistoryColumnHeader('date', 'Date', widths)}${renderGitHistoryColumnHeader('author', 'Author', widths)}${renderGitHistoryColumnHeader('commit', 'Commit', widths)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
+  return `<div class="dn-git-board" data-git-board ${gitHistoryColumnVisibilityAttributes(visibility)} style="${escapeHtml(gitHistoryColumnStyle(widths, visibility))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths, visibility)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths, visibility)}${renderGitHistoryColumnHeader('date', 'Date', widths, visibility)}${renderGitHistoryColumnHeader('author', 'Author', widths, visibility)}${renderGitHistoryColumnHeader('commit', 'Commit', widths, visibility)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
 }
 
 function normalizeGitHistoryFilter(value) {
@@ -56,7 +60,7 @@ function renderGitHistoryFilters(snapshot, repositories, activeFilter) {
 }
 
 function renderGitHistorySearchControls() {
-  return `<div class="dn-git-search" data-git-history-search role="search" aria-label="Search event history"><input class="dn-git-search-input" type="search" data-git-history-search-input placeholder="Search events" autocomplete="off" spellcheck="false" /><span class="dn-git-search-status" data-git-history-search-status aria-live="polite"></span><button class="dn-git-search-button" type="button" data-git-history-search-action="previous" aria-label="Previous event match" title="Previous match">Prev</button><button class="dn-git-search-button" type="button" data-git-history-search-action="next" aria-label="Next event match" title="Next match">Next</button><button class="dn-git-search-button" type="button" data-git-history-search-action="clear" aria-label="Clear event search" title="Clear search">Clear</button></div>`;
+  return `<div class="dn-git-toolbar"><div class="dn-git-search" data-git-history-search role="search" aria-label="Search event history"><input class="dn-git-search-input" type="search" data-git-history-search-input placeholder="Search events" autocomplete="off" spellcheck="false" /><span class="dn-git-search-status" data-git-history-search-status aria-live="polite"></span><button class="dn-git-search-button" type="button" data-git-history-search-action="previous" aria-label="Previous event match" title="Previous match">Prev</button><button class="dn-git-search-button" type="button" data-git-history-search-action="next" aria-label="Next event match" title="Next match">Next</button><button class="dn-git-search-button" type="button" data-git-history-search-action="clear" aria-label="Clear event search" title="Clear search">Clear</button></div>${renderGitHistoryColumnVisibilityMenu()}</div>`;
 }
 
 function gitHistoryFilters(snapshot, repositories) {
@@ -282,6 +286,7 @@ function gitHistoryVisualGraph(graph, selectedId) {
 function renderGitHistoryRow(snapshot, row, selectedId) {
   const selected = row.selectId === selectedId ? ' selected' : '';
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
+  const branchName = refs.find((ref) => ref.kind === 'branch' || ref.kind === 'remote')?.name ?? refs[0]?.name ?? '';
   const componentLabel = row.repository.componentName ?? row.repository.componentId ?? 'Workspace';
   const componentChip = `<span class="dn-git-component" title="${escapeHtml([componentLabel, row.repository.repositoryPath].filter(Boolean).join(' · '))}">${escapeHtml(componentLabel)}</span>`;
   const refChips = refs.map((ref) => `<span class="dn-git-ref" style="--dn-branch-color:var(--dn-branch-${(row.colorLane ?? row.lane) % 7});" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join('');
@@ -301,7 +306,10 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
     row.commit.shortHash,
     row.commit.hash,
   ].filter(Boolean).join(' ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
+  const copyCommit = row.commit.hash ?? row.commit.shortHash ?? '';
+  const copyBranch = branchName ? `<button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(branchName)}">Copy branch</button>` : '';
+  const utilityMenu = `<details class="dn-git-row-menu"><summary class="dn-git-row-menu-trigger" aria-label="Event actions">...</summary><div class="dn-git-row-menu-options"><button class="dn-git-row-menu-item" type="button" data-select-id="${escapeHtml(row.selectId)}">Toggle details</button><button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(copyCommit)}">Copy commit</button>${copyBranch}</div></details>`;
+  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -313,17 +321,46 @@ function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
   const children = gitHistoryChildCommits(row.repository, commit);
   const annotations = gitHistoryAnnotations(snapshot, row.repository, commit);
   const actions = uniqueActions(annotations.flatMap((annotation) => annotation.actions ?? []));
+  const refs = gitCommitBranchNames(commit);
   const markers = annotations.length
     ? `<div class="dn-history-marker-list">${annotations.map((annotation) => `<span class="dn-history-marker tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('')}</div>`
     : '<p>No attached decision, review, or tracked-work markers.</p>';
   const actionStrip = actions.length ? renderActionStrip(actions, 'compact') : '<p>No direct action for this event.</p>';
   const facts = [
     ['Component', row.repository.componentName ?? row.repository.componentId ?? 'Workspace'],
-    ['Parents', parents.length ? parents.map(gitHistoryEventLabel).join(', ') : 'none'],
-    ['Children', children.length ? children.map(gitHistoryEventLabel).join(', ') : 'none'],
-    ['Source', commit.shortHash ?? commit.hash],
+    ['Commit', commit.shortHash ?? commit.hash],
+    ['Author', [commit.authorName, commit.authorEmail].filter(Boolean).join(' · ') || 'unknown'],
+    ['Time', formatTime(commit.committedAt) || commit.committedAt || 'unknown'],
+    ['Parents', parents.length ? countLabel(parents.length, 'parent') : 'none'],
+    ['Children', children.length ? countLabel(children.length, 'child', 'children') : 'none'],
   ];
-  return `<section class="dn-git-detail-panel dn-git-inline-detail" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Selected event</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ') || 'Git commit event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl></article><aside class="dn-git-detail-side"><span class="dn-label">Attached details</span>${markers}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
+  const refChips = refs.length
+    ? `<div class="dn-git-detail-chip-list">${refs.slice(0, 6).map((ref) => `<span class="dn-git-detail-chip" title="${escapeHtml(ref)}">${escapeHtml(ref)}</span>`).join('')}</div>`
+    : '<p class="dn-git-detail-muted">No branch refs loaded.</p>';
+  return `<section class="dn-git-detail-panel dn-git-inline-detail" data-history-detail-for="${escapeHtml(row.selectId)}"><article class="dn-git-detail-main"><span class="dn-label">Event details</span><strong title="${escapeHtml(commit.subject)}">${escapeHtml(commit.subject)}</strong><p>${escapeHtml([row.repository.repositoryPath, commit.hash].filter(Boolean).join(' · ') || 'Git commit event')}</p><dl class="dn-git-detail-grid">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join('')}</dl><div class="dn-git-detail-relations">${renderGitHistoryRelationChips('Parents', parents)}${renderGitHistoryRelationChips('Children', children)}</div></article><aside class="dn-git-detail-side"><span class="dn-label">Branches</span>${refChips}<span class="dn-label">Attached details</span>${markers}${renderGitHistoryAnnotationDetails(annotations)}<span class="dn-label">Actions</span>${actionStrip}</aside></section>`;
+}
+
+function renderGitHistoryRelationChips(label, commits) {
+  if (!commits.length) return `<div><span class="dn-label">${escapeHtml(label)}</span><p class="dn-git-detail-muted">none</p></div>`;
+  return `<div><span class="dn-label">${escapeHtml(label)}</span><div class="dn-git-detail-chip-list">${commits.slice(0, 4).map((commit) => `<span class="dn-git-detail-chip" title="${escapeHtml(gitHistoryEventLabel(commit))}">${escapeHtml(commit.shortHash ?? commit.hash)}</span>`).join('')}</div></div>`;
+}
+
+function renderGitHistoryAnnotationDetails(annotations) {
+  if (!annotations.length) return '';
+  return `<div class="dn-git-attached-list">${annotations.map((annotation) => {
+    const items = gitHistoryAnnotationItems(annotation).slice(0, 4);
+    const itemList = items.length
+      ? items.map((item) => `<li title="${escapeHtml(item)}">${escapeHtml(item)}</li>`).join('')
+      : `<li>${escapeHtml(annotation.title ?? annotation.label)}</li>`;
+    return `<section class="dn-git-attached-group"><span class="dn-history-marker tone-${escapeAttribute(annotation.tone)}">${escapeHtml(annotation.label)}</span><ul>${itemList}</ul></section>`;
+  }).join('')}</div>`;
+}
+
+function gitHistoryAnnotationItems(annotation) {
+  if (annotation.kind === 'feature') return [annotation.title].filter(Boolean);
+  if (annotation.kind === 'thread') return (annotation.threads ?? []).map((thread) => thread.title ?? thread.branchName ?? thread.id).filter(Boolean);
+  if (annotation.kind === 'tracked-work') return (annotation.trackedWork ?? []).map((item) => item.title ?? item.logicalItemId ?? item.id).filter(Boolean);
+  return [annotation.title ?? annotation.label].filter(Boolean);
 }
 
 function gitHistoryParentCommits(repository, commit) {
@@ -452,7 +489,7 @@ function gitHistoryDetail(snapshot, id) {
 
 export function renderNexusCockpitEventHistoryClientSource() {
   return [
-    `const gitHistoryInlineDetailRows = 7;`,
+    `const gitHistoryInlineDetailRows = 9;`,
     isGitHistorySelection,
     renderGitHistory,
     renderGitHistoryBoard,
@@ -477,6 +514,9 @@ export function renderNexusCockpitEventHistoryClientSource() {
     gitHistoryVisualGraph,
     renderGitHistoryRow,
     renderGitHistoryDetailPanel,
+    renderGitHistoryRelationChips,
+    renderGitHistoryAnnotationDetails,
+    gitHistoryAnnotationItems,
     gitHistoryParentCommits,
     gitHistoryChildCommits,
     gitHistoryEventLabel,

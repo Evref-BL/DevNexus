@@ -113,7 +113,7 @@ export function renderNexusCockpitHistoryGraphSvg(
     .map((target) => {
       const id = escapeNexusCockpitHistoryGraphAttribute(target.id);
       const selected = target.selected ? " selected" : "";
-      return `<rect class="dn-git-row-hit${selected}" data-select-id="${id}" data-history-event-id="${id}" aria-hidden="true" x="${target.x}" y="${target.y}" width="${target.width}" height="${target.height}" />`;
+      return `<rect class="dn-git-row-hit${selected}" data-select-id="${id}" data-history-event-id="${id}" role="button" tabindex="0" aria-label="Select history event ${id}" x="${target.x}" y="${target.y}" width="${target.width}" height="${target.height}" />`;
     })
     .join("");
   const nodes = model.nodes
@@ -123,7 +123,7 @@ export function renderNexusCockpitHistoryGraphSvg(
       const tooltip = escapeNexusCockpitHistoryGraphAttribute(node.tooltip);
       const color = `var(--dn-branch-${node.colorIndex})`;
       const selected = node.selected ? " selected" : "";
-      return `<circle class="dn-git-node${selected}" data-select-id="${id}" data-history-event-class="${node.eventClass}" data-history-event-id="${id}" data-dn-tooltip="${tooltip}" data-dn-tooltip-mode="always" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1.6" />`;
+      return `<circle class="dn-git-node${selected}" data-select-id="${id}" data-history-event-class="${node.eventClass}" data-history-event-id="${id}" data-dn-tooltip="${tooltip}" data-dn-tooltip-mode="always" role="button" tabindex="0" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1.6" />`;
     })
     .join("");
   return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${hitTargets}${paths}${nodes}</svg>`;

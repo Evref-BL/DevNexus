@@ -56,9 +56,14 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
     applyGitHistorySearch(container, searchQuery, activeSearchIndex, true);
   }
 
-  function onSearchKeyDown(event: KeyboardEvent): void {
+  function onKeyDown(event: KeyboardEvent): void {
+    if (onSearchKeyDown(event)) return;
+    onHistoryKeyDown(event);
+  }
+
+  function onSearchKeyDown(event: KeyboardEvent): boolean {
     const target = gitHistoryInteractionElement(event.target);
-    if (!target?.matches?.("[data-git-history-search-input]")) return;
+    if (!target?.matches?.("[data-git-history-search-input]")) return false;
     if (event.key === "Enter") {
       event.preventDefault();
       moveGitHistorySearch(event.shiftKey ? -1 : 1);
@@ -69,6 +74,31 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
       if (target instanceof HTMLInputElement) target.value = "";
       applyGitHistorySearch(container, searchQuery, activeSearchIndex, false);
     }
+    return true;
+  }
+
+  function onHistoryKeyDown(event: KeyboardEvent): void {
+    const target = gitHistoryKeyboardTarget(container, event.target);
+    if (!target) return;
+    const key = event.key;
+    if (key === "Enter" || key === " ") {
+      if (!target.classList.contains("dn-git-history-row")) {
+        event.preventDefault();
+        gitHistoryRowForSelectId(container, target.getAttribute("data-select-id"))?.click();
+      }
+      return;
+    }
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+    event.preventDefault();
+    const nextId = nextGitHistoryKeyboardSelectId(
+      container,
+      target.getAttribute("data-select-id"),
+      key,
+    );
+    if (!nextId) return;
+    const preferGraph = target.classList.contains("dn-git-node") || target.classList.contains("dn-git-row-hit");
+    focusGitHistoryEvent(container, nextId, preferGraph);
+    setHoveredId(nextId);
   }
 
   function onSearchClick(event: MouseEvent): void {
@@ -113,7 +143,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
     container.removeEventListener("focusin", onFocusIn);
     container.removeEventListener("focusout", onFocusOut);
     container.removeEventListener("input", onSearchInput);
-    container.removeEventListener("keydown", onSearchKeyDown);
+    container.removeEventListener("keydown", onKeyDown);
     container.removeEventListener("click", onSearchClick);
   }
 
@@ -126,7 +156,7 @@ export function bindGitHistoryInteractions(container: HTMLElement): {
   container.addEventListener("focusin", onFocusIn);
   container.addEventListener("focusout", onFocusOut);
   container.addEventListener("input", onSearchInput);
-  container.addEventListener("keydown", onSearchKeyDown);
+  container.addEventListener("keydown", onKeyDown);
   container.addEventListener("click", onSearchClick);
 
   return { dispose, refresh };
@@ -154,6 +184,82 @@ export function updateGitHistoryHover(
       element.classList.toggle("dn-history-hovered", hovered);
     }
   });
+}
+
+export function gitHistoryKeyboardTarget(
+  container: Element,
+  source: EventTarget | null,
+): HTMLElement | SVGElement | null {
+  const sourceElement = gitHistoryInteractionElement(source);
+  const target = sourceElement?.closest?.(
+    ".dn-git-history-row[data-select-id], .dn-git-node[data-select-id], .dn-git-row-hit[data-select-id]",
+  );
+  return target && container.contains(target) ? (target as HTMLElement | SVGElement) : null;
+}
+
+export function nextGitHistoryKeyboardSelectId(
+  container: Element,
+  currentId: string | null,
+  key: string,
+): string | null {
+  const ids = orderedGitHistorySelectIds(container);
+  if (!ids.length) return null;
+  const currentIndex = Math.max(0, ids.indexOf(String(currentId ?? "")));
+  if (key === "Home") return ids[0] ?? null;
+  if (key === "End") return ids[ids.length - 1] ?? null;
+  if (key === "ArrowUp") return ids[Math.max(0, currentIndex - 1)] ?? null;
+  if (key === "ArrowDown") return ids[Math.min(ids.length - 1, currentIndex + 1)] ?? null;
+  return null;
+}
+
+export function orderedGitHistorySelectIds(container: Element): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  container.querySelectorAll(".dn-git-history-row[data-select-id]").forEach((row) => {
+    const id = row.getAttribute("data-select-id") ?? "";
+    if (!id.startsWith("history:") || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  });
+  return ids;
+}
+
+export function focusGitHistoryEvent(
+  container: Element,
+  selectId: string,
+  preferGraph = false,
+): void {
+  const target = preferGraph
+    ? gitHistoryGraphNodeForSelectId(container, selectId) ?? gitHistoryRowForSelectId(container, selectId)
+    : gitHistoryRowForSelectId(container, selectId) ?? gitHistoryGraphNodeForSelectId(container, selectId);
+  if (!target) return;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+export function gitHistoryRowForSelectId(
+  container: Element,
+  selectId: string | null,
+): HTMLElement | null {
+  if (!selectId) return null;
+  for (const row of container.querySelectorAll<HTMLElement>(".dn-git-history-row[data-select-id]")) {
+    if (row.getAttribute("data-select-id") === selectId) return row;
+  }
+  return null;
+}
+
+export function gitHistoryGraphNodeForSelectId(
+  container: Element,
+  selectId: string | null,
+): SVGElement | null {
+  if (!selectId) return null;
+  for (const node of container.querySelectorAll<SVGElement>(".dn-git-node[data-select-id]")) {
+    if (node.getAttribute("data-select-id") === selectId) return node;
+  }
+  for (const hit of container.querySelectorAll<SVGElement>(".dn-git-row-hit[data-select-id]")) {
+    if (hit.getAttribute("data-select-id") === selectId) return hit;
+  }
+  return null;
 }
 
 export function createGitHistoryNodePopover(): HTMLElement {
@@ -381,6 +487,12 @@ export function renderNexusCockpitHistoryInteractionsClientSource(): string {
     bindGitHistoryInteractions,
     gitHistorySelectIdFromEventTarget,
     updateGitHistoryHover,
+    gitHistoryKeyboardTarget,
+    nextGitHistoryKeyboardSelectId,
+    orderedGitHistorySelectIds,
+    focusGitHistoryEvent,
+    gitHistoryRowForSelectId,
+    gitHistoryGraphNodeForSelectId,
     createGitHistoryNodePopover,
     showGitHistoryNodePopover,
     hideGitHistoryNodePopover,

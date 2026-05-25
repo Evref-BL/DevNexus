@@ -146,7 +146,7 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain('data-git-history-search-input');
     expect(rendered).toContain('data-history-search-text="');
     expect(rendered).toContain("feature000");
-    expect(rendered).toContain("Selected event");
+    expect(rendered).toContain("Event details");
     expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
     const selectedRowIndex = rendered.indexOf(
       "dn-git-history-row selected\" type=\"button\" data-select-id=\"history:primary:feature000000000000000000000000000000000000\"",
@@ -163,8 +163,11 @@ describe("nexus dashboard history graph", () => {
     expect(rendered.slice(selectedRowIndex, inlineDetailIndex)).not.toContain(
       'data-scroll-target="selected-item"',
     );
-    expect(rendered).toContain('data-history-row-count="10"');
+    expect(rendered).toContain('data-history-row-count="12"');
     expect(rendered).toContain("data-git-board");
+    expect(rendered).toContain("data-git-column-menu");
+    expect(rendered).toContain("data-git-column-toggle=\"graph\"");
+    expect(rendered).toContain("data-git-column-graph=\"visible\"");
     expect(rendered).toContain("data-git-column=\"graph\"");
     expect(rendered).toContain("data-git-column=\"description\"");
     expect(rendered).toContain("data-git-column=\"date\"");
@@ -186,6 +189,11 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain("<span class=\"dn-git-sha\"");
     expect(rendered).toContain(">feature</span>");
     expect(rendered).toContain("<svg");
+    expect(rendered).toContain("dn-git-row-hit");
+    expect(rendered).toContain("role=\"button\" tabindex=\"0\"");
+    expect(rendered).toContain("dn-git-row-menu");
+    expect(rendered).toContain("Copy commit");
+    expect(rendered).toContain("Copy branch");
     expect(rendered).toContain("feat/cockpit-graph");
     expect(rendered).toContain("Add graph data");
     expect(rendered).toContain("data-select-id=\"history:primary:feature000000000000000000000000000000000000\"");
