@@ -96,7 +96,7 @@ export function renderNexusCockpitHistoryGraphSvg(
       const id = escapeNexusCockpitHistoryGraphAttribute(node.id);
       const label = escapeNexusCockpitHistoryGraphAttribute(node.label);
       const color = `var(--dn-branch-${node.colorIndex})`;
-      return `<circle data-history-event-class="${node.eventClass}" data-history-event-id="${id}" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="var(--dn-surface)" stroke="${color}" stroke-width="3" />`;
+      return `<circle data-history-event-class="${node.eventClass}" data-history-event-id="${id}" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1.6" />`;
     })
     .join("");
   return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${paths}${nodes}</svg>`;
@@ -191,10 +191,12 @@ export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
     nexusCockpitHistoryGraphSvgMetrics,
     nexusCockpitHistoryGraphRoutePoints,
     nexusCockpitHistoryGraphRouteD,
+    nexusCockpitHistoryGraphLaneTransitionD,
     nexusCockpitHistoryGraphColorIndex,
     nexusCockpitHistoryGraphNodeId,
     nexusCockpitHistoryGraphNodeLabel,
     finiteNexusCockpitHistoryGraphNumber,
+    formatNexusCockpitHistoryGraphNumber,
     escapeNexusCockpitHistoryGraphAttribute,
   ]
     .map((fn) => fn.toString())
@@ -256,23 +258,51 @@ function nexusCockpitHistoryGraphRouteD(
   rowHeight: number,
 ): string {
   if (!points.length) return "";
-  let d = `M ${points[0]!.x} ${points[0]!.y}`;
+  let d = `M ${formatNexusCockpitHistoryGraphNumber(points[0]!.x)} ${formatNexusCockpitHistoryGraphNumber(points[0]!.y)}`;
   for (let index = 1; index < points.length; index++) {
     const from = points[index - 1]!;
     const to = points[index]!;
     if (from.x === to.x) {
-      d += ` V ${to.y}`;
+      d += ` V ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
     } else if (from.y === to.y) {
-      d += ` H ${to.x}`;
+      d += ` H ${formatNexusCockpitHistoryGraphNumber(to.x)}`;
     } else {
-      const dy = to.y - from.y;
-      const curve = Math.min(
-        rowHeight * 0.7,
-        Math.abs(dy) * 0.45,
-      );
-      const direction = Math.sign(dy) || 1;
-      d += ` C ${from.x} ${from.y + direction * curve}, ${to.x} ${to.y - direction * curve}, ${to.x} ${to.y}`;
+      d += nexusCockpitHistoryGraphLaneTransitionD(from, to, rowHeight);
     }
+  }
+  return d;
+}
+
+function nexusCockpitHistoryGraphLaneTransitionD(
+  from: NexusCockpitHistoryGraphSvgPoint,
+  to: NexusCockpitHistoryGraphSvgPoint,
+  rowHeight: number,
+): string {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const directionX = Math.sign(dx) || 1;
+  const directionY = Math.sign(dy) || 1;
+  const radius = Math.min(
+    Math.abs(dx) / 2,
+    Math.abs(dy) / 2,
+    rowHeight * 0.45,
+  );
+  const midY = from.y + dy / 2;
+  const firstY = midY - directionY * radius;
+  const secondY = midY + directionY * radius;
+  const firstX = from.x + directionX * radius;
+  const secondX = to.x - directionX * radius;
+  let d = "";
+  if (Math.abs(from.y - firstY) > 0.001) {
+    d += ` V ${formatNexusCockpitHistoryGraphNumber(firstY)}`;
+  }
+  d += ` Q ${formatNexusCockpitHistoryGraphNumber(from.x)} ${formatNexusCockpitHistoryGraphNumber(midY)} ${formatNexusCockpitHistoryGraphNumber(firstX)} ${formatNexusCockpitHistoryGraphNumber(midY)}`;
+  if (Math.abs(firstX - secondX) > 0.001) {
+    d += ` H ${formatNexusCockpitHistoryGraphNumber(secondX)}`;
+  }
+  d += ` Q ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(midY)} ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(secondY)}`;
+  if (Math.abs(secondY - to.y) > 0.001) {
+    d += ` V ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
   }
   return d;
 }
@@ -307,6 +337,10 @@ function finiteNexusCockpitHistoryGraphNumber(
   fallback: number,
 ): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function formatNexusCockpitHistoryGraphNumber(value: number): string {
+  return Number(value.toFixed(3)).toString();
 }
 
 function escapeNexusCockpitHistoryGraphAttribute(value: unknown): string {

@@ -63,10 +63,11 @@ describe("nexus cockpit history graph SVG", () => {
       0.85,
       1,
     ]);
-    expect(model.routes[0]?.d).toContain("C");
+    expect(model.routes[0]?.d).toContain("Q");
     expect(rendered).toContain('data-history-row-count="2"');
     expect(rendered).toContain('data-history-lane-count="2"');
     expect(rendered).toContain('data-history-event-class="source-change"');
+    expect(rendered).toContain('fill="var(--dn-branch-0)"');
     expect(rendered).toContain(
       'data-history-event-id="history:primary:merge"',
     );
@@ -120,7 +121,30 @@ describe("nexus cockpit history graph SVG", () => {
     });
 
     expect(model.routes[0]?.d).toBe(
-      "M 204 705 V 718.5 C 204 723.9, 292 725.1, 292 730.5 C 292 731.85, 138 732.15, 138 733.5 V 735",
+      "M 204 705 V 718.5 Q 204 724.5 210 724.5 H 286 Q 292 724.5 292 730.5 Q 292 732 290.5 732 H 139.5 Q 138 732 138 733.5 V 735",
+    );
+  });
+
+  it("rounds lane changes through a horizontal row corridor", () => {
+    const model = buildNexusCockpitHistoryGraphSvgModel({
+      maxLane: 4,
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:from" },
+        { lane: 4, index: 1, selectId: "history:primary:to" },
+      ],
+      paths: [
+        {
+          colorLane: 1,
+          points: [
+            { lane: 0, index: 0 },
+            { lane: 4, index: 0.4 },
+          ],
+        },
+      ],
+    });
+
+    expect(model.routes[0]?.d).toBe(
+      "M 28 15 Q 28 21 34 21 H 110 Q 116 21 116 27",
     );
   });
 });
