@@ -395,6 +395,11 @@ export function positionGitHistoryNodePopover(
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 320;
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 320;
   const bounds = popover.getBoundingClientRect();
+  const style = window.getComputedStyle(popover);
+  const borderTop = gitHistoryPopoverPixelValue(style.borderTopWidth);
+  const borderRight = gitHistoryPopoverPixelValue(style.borderRightWidth);
+  const borderBottom = gitHistoryPopoverPixelValue(style.borderBottomWidth);
+  const borderLeft = gitHistoryPopoverPixelValue(style.borderLeftWidth);
   const preferredLeft = anchor.right + 16;
   const fallbackLeft = anchor.left - bounds.width - 16;
   const usesPreferredSide = preferredLeft + bounds.width + margin <= viewportWidth;
@@ -407,9 +412,13 @@ export function positionGitHistoryNodePopover(
   );
   const edgeSide = usesPreferredSide ? "left" : "right";
   const connectorWidth = edgeSide === "left"
-    ? Math.max(8, left - anchorCenterX)
-    : Math.max(8, anchorCenterX - (left + bounds.width));
-  const connectorY = gitHistoryPopoverConnectorY(anchorCenterY, top, bounds.height);
+    ? Math.max(8, left + borderLeft - anchorCenterX)
+    : Math.max(8, anchorCenterX - (left + bounds.width - borderRight));
+  const connectorY = gitHistoryPopoverConnectorY(
+    anchorCenterY,
+    top + borderTop,
+    Math.max(1, bounds.height - borderTop - borderBottom),
+  );
   popover.style.left = `${left}px`;
   popover.style.top = `${top}px`;
   popover.style.setProperty("--dn-history-popover-connector-width", `${connectorWidth}px`);
@@ -426,6 +435,11 @@ export function gitHistoryPopoverConnectorY(
   const rawY = anchorCenterY - popoverTop;
   const maxY = Math.max(inset, popoverHeight - inset);
   return Math.min(Math.max(rawY, inset), maxY);
+}
+
+export function gitHistoryPopoverPixelValue(value: string): number {
+  const pixels = Number.parseFloat(value);
+  return Number.isFinite(pixels) ? pixels : 0;
 }
 
 export function applyGitHistorySearch(
@@ -534,6 +548,7 @@ export function renderNexusCockpitHistoryInteractionsClientSource(): string {
     renderGitHistoryNodePopoverContent,
     positionGitHistoryNodePopover,
     gitHistoryPopoverConnectorY,
+    gitHistoryPopoverPixelValue,
     applyGitHistorySearch,
     normalizeGitHistorySearchText,
     clearGitHistorySearchClasses,

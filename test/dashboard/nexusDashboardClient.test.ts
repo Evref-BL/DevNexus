@@ -42,6 +42,7 @@ import {
 } from "./nexusDashboardTestHelpers.js";
 import {
   gitHistoryPopoverConnectorY,
+  gitHistoryPopoverPixelValue,
   gitHistoryNodePopoverContent,
   isGitHistoryPopoverColor,
   renderGitHistoryNodePopoverContent,
@@ -96,6 +97,9 @@ describe("nexus dashboard client", () => {
     expect(gitHistoryPopoverConnectorY(500, 400, 180)).toBe(100);
     expect(gitHistoryPopoverConnectorY(500, 492, 180)).toBe(12);
     expect(gitHistoryPopoverConnectorY(500, 300, 180)).toBe(168);
+    expect(gitHistoryPopoverConnectorY(500, 402, 176)).toBe(98);
+    expect(gitHistoryPopoverPixelValue("2px")).toBe(2);
+    expect(gitHistoryPopoverPixelValue("")).toBe(0);
   });
 
   it("renders a client module with explicit light and dark mode controls", () => {
