@@ -10,7 +10,7 @@ import type { NexusMcpRuntimeProcess } from "../project/nexusSetupAssistant.js";
 import type {
   NexusDashboardServerHandle,
   startNexusDashboardServer,
-} from "../dashboard/nexusDashboardServer.js";
+} from "../cockpit/server/nexusDashboardServer.js";
 import type {
   NexusEligibleWorkClaimProviderFactory,
   NexusWorkItemClaimAuthority,

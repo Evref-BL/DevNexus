@@ -37,16 +37,17 @@ import {
 } from "./history/nexusCockpitWorkMap.js";
 import {
   featureGitBranches,
-  firstGitHistoryCommit,
   gitHistoryCommitBySelectId,
   gitHistoryDetail,
   gitHistoryRows,
-  gitHistorySelectId,
   isGitHistorySelection,
+  normalizeGitHistoryFilter,
   renderGitHistory,
   threadsForGitBranches,
   trackedWorkForGitBranches,
-} from "./history/nexusCockpitWriteHistory.js";
+} from "./history/nexusCockpitEventHistory.js";
+import { bindGitHistoryColumnResizers } from "./history/nexusCockpitHistoryColumns.js";
+import { bindGitHistoryInteractions } from "./history/nexusCockpitHistoryInteractions.js";
 import {
   cockpitTooltipText,
   installCockpitTooltips,
@@ -116,7 +117,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   let selectedWorkspaceId = normalizeWorkspaceId(options.workspaceId ?? readWorkspaceIdFromLocation());
   let selectedId = null;
   let hostFocus = 'components';
-  let gitHistoryFilter = 'all';
+  let gitHistoryFilter = '';
   let latestSnapshot = null;
   let latestHost = null;
   let latestError = null;
@@ -129,6 +130,11 @@ export function mountDevNexusDashboard(root, options = {}) {
   applyThemePreference(themeMode);
   injectStyles();
   const tooltipController = installCockpitTooltips(root);
+  const gitHistoryInteractions = bindGitHistoryInteractions(root);
+  const onGitHistoryColumnsChange = () => {
+    lastRenderSignature = null;
+    renderCurrent();
+  };
   const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const onSystemThemeChange = () => {
     if (themeMode !== 'system') return;
@@ -137,6 +143,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   };
   if (systemThemeQuery?.addEventListener) systemThemeQuery.addEventListener('change', onSystemThemeChange);
   else if (systemThemeQuery?.addListener) systemThemeQuery.addListener(onSystemThemeChange);
+  root.addEventListener('dn-git-history-columns-change', onGitHistoryColumnsChange);
   function setThemeMode(nextThemeMode) {
     if (disposed) return;
     themeMode = normalizeThemeMode(nextThemeMode);
@@ -146,7 +153,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   }
   function setSelectedId(nextSelectedId) {
     if (disposed) return;
-    selectedId = String(nextSelectedId ?? '');
+    selectedId = nextDashboardSelectedId(selectedId, nextSelectedId);
     renderCurrent();
   }
   function setHostFocus(nextHostFocus) {
@@ -158,9 +165,9 @@ export function mountDevNexusDashboard(root, options = {}) {
     if (disposed) return;
     gitHistoryFilter = normalizeGitHistoryFilter(nextFilter);
     const graph = latestSnapshot ? gitHistoryRows(latestSnapshot, gitHistoryFilter) : null;
-    if (graph?.rows?.length) {
+    if (graph && isGitHistorySelection(selectedId)) {
       const visible = new Set(graph.rows.map((row) => row.selectId));
-      if (!visible.has(selectedId)) selectedId = graph.rows[0].selectId;
+      if (!visible.has(selectedId)) selectedId = null;
     }
     renderCurrent();
   }
@@ -171,7 +178,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     if (normalized === selectedWorkspaceId && !nextSelectedId) return;
     selectedWorkspaceId = normalized;
     selectedId = nextSelectedId ? String(nextSelectedId) : null;
-    gitHistoryFilter = 'all';
+    gitHistoryFilter = '';
     latestSnapshot = null;
     latestError = null;
     lastHostRefreshAt = 0;
@@ -187,10 +194,10 @@ export function mountDevNexusDashboard(root, options = {}) {
     tooltipController.hide();
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
-    bindSelectionControls(root, setSelectedId);
+    bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
     bindHostSignalControls(root, setHostFocus);
-    bindGitHistoryFilterControls(root, setGitHistoryFilter);
     bindGitHistoryColumnResizers(root);
+    gitHistoryInteractions.refresh();
     bindWorkspaceControls(root, setWorkspaceId);
     bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));
   }
@@ -321,7 +328,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   renderCurrent();
   void refresh();
   const timer = setInterval(refresh, refreshMs);
-  return { dispose() { disposed = true; clearInterval(timer); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
+  return { dispose() { disposed = true; clearInterval(timer); root.removeEventListener('dn-git-history-columns-change', onGitHistoryColumnsChange); gitHistoryInteractions.dispose(); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
 }
 
 function injectStyles() {
@@ -332,14 +339,14 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = 'all') {
+function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = '') {
   const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);
   const loading = snapshot.partial === true;
   const componentsLoaded = sectionLoaded(snapshot, 'components');
   const threadsLoaded = sectionLoaded(snapshot, 'threads');
   const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');
   const pluginsLoaded = sectionLoaded(snapshot, 'plugins');
-  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Write history', 'Project Writes', 'Loading write events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
+  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Event history', 'Project Events', 'Loading events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
   const workHistory = loading && !threadsLoaded ? renderProgressivePanel('parallel-work-map', 'Workspace map', 'Activity Lanes', 'Loading source checkout, branches, automation, and decisions.') : renderWorkHistory(snapshot, activeSelection);
   const features = loading && !threadsLoaded ? renderProgressivePanel('active-features', 'Project workflow', 'Active Features', 'Loading feature branches and active threads.') : renderFeatureOverview(snapshot, activeSelection);
   const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('hitl-queue', 'HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot, activeSelection);
@@ -354,9 +361,8 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
     </header>
     ${renderHostOverview(host, snapshot, selectedWorkspaceId)}
     ${renderSignals(snapshot.signals, activeSelection)}
-    ${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}
     <section class="dn-main-grid">
-      <div class="dn-work-stack">${gitHistory}${features}${workHistory}${threadInbox}${trackedWork}</div>
+      <div class="dn-work-stack">${gitHistory}${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}${features}${workHistory}${threadInbox}${trackedWork}</div>
     </section>
     <section class="dn-plugin-row">${plugins}</section>
     <section class="dn-grid dn-secondary-grid">
@@ -635,14 +641,33 @@ function bindThemeControls(container, onSelect) {
   });
 }
 
-function bindSelectionControls(container, onSelect) {
-  container.querySelectorAll('[data-select-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      onSelect(button.getAttribute('data-select-id'));
-      const targetId = button.getAttribute('data-scroll-target');
-      if (targetId) scrollToDashboardSection(targetId);
-    });
+function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
+  container.addEventListener('change', (event) => {
+    const target = eventElementTarget(event.target);
+    const historySelect = target?.closest?.('[data-git-history-project-select], [data-git-history-branch-select]');
+    if (!historySelect || !container.contains(historySelect)) return;
+    onGitHistoryFilter?.(historySelect.value);
   });
+  container.addEventListener('click', (event) => {
+    const target = eventElementTarget(event.target);
+    const button = target?.closest?.('[data-select-id]');
+    if (!button || !container.contains(button)) return;
+    onSelect(button.getAttribute('data-select-id'));
+    const targetId = button.getAttribute('data-scroll-target');
+    if (targetId) scrollToDashboardSection(targetId);
+  });
+}
+
+function eventElementTarget(target) {
+  if (target instanceof Element) return target;
+  if (target instanceof Node) return target.parentElement;
+  return null;
+}
+
+function nextDashboardSelectedId(currentSelectedId, nextSelectedId) {
+  const next = String(nextSelectedId ?? '');
+  if (!next) return null;
+  return next === String(currentSelectedId ?? '') ? null : next;
 }
 
 function bindHostSignalControls(container, onSelect) {
@@ -652,12 +677,6 @@ function bindHostSignalControls(container, onSelect) {
       onSelect(focus);
       scrollToDashboardSection(hostSignalTarget(focus));
     });
-  });
-}
-
-function bindGitHistoryFilterControls(container, onSelect) {
-  container.querySelectorAll('[data-git-history-filter]').forEach((button) => {
-    button.addEventListener('click', () => onSelect(button.getAttribute('data-git-history-filter')));
   });
 }
 
@@ -814,7 +833,51 @@ function renderFeatureOverview(snapshot, selectedId) {
   const visible = records.slice(0, 6);
   const more = records.length > visible.length ? `<div class="dn-feature-more">${escapeHtml(countLabel(records.length - visible.length, 'more feature'))}</div>` : '';
   const body = records.length ? `${visible.map((feature) => renderFeatureCard(feature, selectedId)).join('')}${more}` : '<p>No active feature branch delivery configured.</p>';
-  return `<div class="dn-panel dn-feature-panel" id="active-features"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Project workflow</span><h2>Active Features</h2></div><span class="dn-count">${escapeHtml(count)}</span></div>${note}<div class="dn-feature-list">${body}</div></div>`;
+  return `<div class="dn-panel dn-feature-panel" id="active-features"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Project workflow</span><h2>Active Features</h2></div><span class="dn-count">${escapeHtml(count)}</span></div>${note}${renderGitWorkflowOverview(snapshot.gitWorkflows)}<div class="dn-feature-list">${body}</div></div>`;
+}
+
+function renderGitWorkflowOverview(gitWorkflows) {
+  if (!gitWorkflows) return '';
+  const profiles = gitWorkflows?.profiles ?? [];
+  const runs = gitWorkflows?.runs ?? [];
+  const activeProfile = profiles.find((profile) => profile.id === gitWorkflows.activeProfileId) ?? profiles[0] ?? null;
+  const profileTitle = activeProfile?.name ?? gitWorkflows.activeProfileId ?? 'No profile configured';
+  const profileMeta = [
+    activeProfile?.branchStrategy,
+    activeProfile?.targetBranch ? `target ${activeProfile.targetBranch}` : null,
+    activeProfile?.finalPullRequest ? 'pull request' : null,
+    activeProfile?.gateCount ? countLabel(activeProfile.gateCount, 'gate') : null,
+  ].filter(Boolean);
+  const counters = [
+    workflowCount(gitWorkflows.activeRunCount ?? 0, 'active'),
+    workflowCount(gitWorkflows.waitingRunCount ?? 0, 'waiting'),
+    workflowCount(gitWorkflows.blockedRunCount ?? 0, 'blocked'),
+  ].filter(Boolean);
+  const recentRuns = runs.slice(0, 3).map(renderGitWorkflowRun).join('');
+  const runBody = recentRuns || '<p>No workflow runs recorded yet.</p>';
+  return `<section class="dn-git-workflows" aria-label="Git workflows"><div class="dn-git-workflows-head"><div><span class="dn-label">Git workflows</span><strong title="${escapeHtml(profileTitle)}">${escapeHtml(profileTitle)}</strong>${profileMeta.length ? `<span class="dn-git-workflow-meta">${profileMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</span>` : ''}</div><span class="dn-git-workflow-counts">${counters.join('')}</span></div><div class="dn-git-workflow-runs">${runBody}</div></section>`;
+}
+
+function renderGitWorkflowRun(run) {
+  const title = run.branchName ?? run.currentRef ?? run.workItemId ?? run.id;
+  const meta = [
+    run.statusLabel ?? run.status,
+    run.nextOwnerLabel,
+    run.targetBranch ? `target ${run.targetBranch}` : null,
+    run.evidenceCount ? countLabel(run.evidenceCount, 'evidence item') : null,
+  ].filter(Boolean);
+  return `<article class="dn-git-workflow-run tone-${escapeAttribute(gitWorkflowRunTone(run))}"><strong title="${escapeHtml(title)}">${escapeHtml(truncate(title, 72))}</strong><span class="dn-git-workflow-run-meta">${meta.map((item) => `<span title="${escapeHtml(item)}">${escapeHtml(item)}</span>`).join('')}</span></article>`;
+}
+
+function workflowCount(value, label) {
+  return value > 0 ? `<span>${escapeHtml(`${value} ${label}`)}</span>` : '';
+}
+
+function gitWorkflowRunTone(run) {
+  if (run.status === 'blocked') return 'danger';
+  if (run.status === 'ready_for_review' || run.status === 'waiting') return 'warn';
+  if (run.terminalOutcome || ['completed', 'merged'].includes(run.status)) return 'good';
+  return 'active';
 }
 
 function renderFeatureCard(feature, selectedId) {
@@ -1024,8 +1087,6 @@ function renderBlockers(snapshot, selectedId) {
 function defaultSelectedId(snapshot) {
   const urgentFeature = (snapshot.features?.records ?? []).find((candidate) => candidate.status === 'blocked' || candidate.status === 'needs-review');
   if (urgentFeature) return urgentFeature.id;
-  const commit = firstGitHistoryCommit(snapshot);
-  if (commit) return gitHistorySelectId(commit.repository, commit.commit);
   const feature = (snapshot.features?.records ?? [])[0];
   if (feature) return feature.id;
   const node = snapshot.weave.nodes.find((candidate) => ['blocked', 'failed', 'dirty', 'missing'].includes(candidate.status)) ?? snapshot.weave.nodes.find((candidate) => candidate.kind === 'project') ?? snapshot.weave.nodes[0];

@@ -40,10 +40,68 @@ import {
   RecordingCodexChatStarter,
   worktreeLease,
 } from "./nexusDashboardTestHelpers.js";
+import {
+  gitHistoryPopoverConnectorY,
+  gitHistoryPopoverPixelValue,
+  gitHistoryNodePopoverContent,
+  isGitHistoryPopoverColor,
+  renderGitHistoryNodePopoverContent,
+} from "../../src/cockpit/client/history/nexusCockpitHistoryInteractions.js";
 
 afterEach(cleanupDashboardTestTempDirs);
 
 describe("nexus dashboard client", () => {
+  it("renders graph node popovers as structured escaped commit cards", () => {
+    const node = {
+      getAttribute(name: string): string | null {
+        if (name === "data-dn-tooltip") {
+          return [
+            "Classify Git workflow branch freshness",
+            "DevNexus · 8c61c96",
+            "Refs: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
+            "devnexus-automation[bot] · 25 mai, 14:52",
+            "Details: Needs review, Active, 1 thread, 28 issues",
+          ].join("\n");
+        }
+        return null;
+      },
+    } as Element;
+
+    const content = gitHistoryNodePopoverContent(node);
+    const html = renderGitHistoryNodePopoverContent({
+      ...content,
+      title: `${content.title} <script>`,
+    });
+
+    expect(content).toEqual({
+      title: "Classify Git workflow branch freshness",
+      component: "DevNexus",
+      commit: "8c61c96",
+      refs: [
+        "codex/dev-nexus/358-git-workflow-freshness",
+        "app/codex/dev-nexus/358-git-workflow-freshness",
+      ],
+      meta: "devnexus-automation[bot] · 25 mai, 14:52",
+      details: ["Needs review", "Active", "1 thread", "28 issues"],
+    });
+    expect(html).toContain("Commit 8c61c96");
+    expect(html).toContain("Branches");
+    expect(html).toContain("Details");
+    expect(html).toContain("codex/dev-nexus/358-git-workflow-freshness");
+    expect(html).toContain("Needs review");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("<script>");
+    expect(isGitHistoryPopoverColor("var(--dn-branch-4)")).toBe(true);
+    expect(isGitHistoryPopoverColor("rgb(53, 221, 84)")).toBe(true);
+    expect(isGitHistoryPopoverColor("url(javascript:alert(1))")).toBe(false);
+    expect(gitHistoryPopoverConnectorY(500, 400, 180)).toBe(100);
+    expect(gitHistoryPopoverConnectorY(500, 492, 180)).toBe(12);
+    expect(gitHistoryPopoverConnectorY(500, 300, 180)).toBe(168);
+    expect(gitHistoryPopoverConnectorY(500, 402, 176)).toBe(98);
+    expect(gitHistoryPopoverPixelValue("2px")).toBe(2);
+    expect(gitHistoryPopoverPixelValue("")).toBe(0);
+  });
+
   it("renders a client module with explicit light and dark mode controls", () => {
     const module = renderNexusDashboardClientModule();
 
@@ -57,6 +115,21 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("color-scheme");
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
+    expect(module).toContain("data-git-history-search");
+    expect(module).toContain("applyGitHistorySearch");
+    expect(module).toContain("dn-history-popover");
+    expect(module).toContain("--dn-history-popover-accent");
+    expect(module).toContain("--dn-history-popover-border-width");
+    expect(module).toContain("--dn-history-popover-radius");
+    expect(module).toContain("border-top-left-radius: calc(var(--dn-history-popover-radius) - var(--dn-history-popover-border-width))");
+    expect(module).toContain("data-edge-side='left'");
+    expect(module).toContain("height: var(--dn-history-popover-border-width)");
+    expect(module).toContain("gitHistoryNodeAccentColor");
+    expect(module).toContain("showGitHistoryNodePopover");
+    expect(module).toContain("transform-box: fill-box");
+    expect(module).toContain("vector-effect: non-scaling-stroke");
+    expect(module).toContain("dn-history-node-hovered");
+    expect(module).toContain("transform: scale(1.24)");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");
@@ -133,7 +206,7 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("/api/local/app-icon?app=");
     expect(module).toContain("dn-app-icon-img");
     expect(module).toContain(".dn-header-path-menu { flex: 0 1 auto; width: fit-content; min-width: min(100%, 320px); max-width: min(100%, 520px); }");
-    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } }");
+    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }");
     expect(module).toContain("@media (max-width: 560px) { .dn-header-actions { justify-content: stretch; } .dn-header-strip { justify-content: stretch; } .dn-header-path-menu { width: 100%; max-width: 100%; } }");
     expect(module).not.toContain(".dn-header-strip, .dn-header-path-menu { width: 100%; }");
     expect(module).toContain("Finder");
@@ -198,6 +271,38 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("signal-components");
     expect(module).toContain("Not Git history");
     expect(module).toContain("Each rail is a workspace category");
+    expect(module).toContain("data-git-history-project-select");
+    expect(module).toContain("data-git-history-branch-select");
+    expect(module).toContain("data-git-history-fetch-remotes");
+    expect(module).toContain("cloudFetchIcon");
+    expect(module).toContain("gearIcon");
+    expect(module).toContain(".dn-git-topbar { display: grid; grid-template-columns: minmax(160px, 0.32fr) minmax(220px, 0.48fr) minmax(260px, 1fr) auto;");
+    expect(module).not.toContain(".dn-git-filters { display: flex;");
+    expect(module).not.toContain("All events");
+    expect(module).toContain("--dn-git-row-height: 26px; --dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 12px);");
+    expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px;");
+    expect(module).toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto;");
+    expect(module).toContain(".dn-git-graph-column { position: relative; display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0;");
+    expect(module).toContain(".dn-git-graph-detail-edge { position: absolute; right: 0; z-index: 1; width: 1px; background: var(--dn-border-muted); pointer-events: none; }");
+    expect(module).not.toContain(".dn-git-board[data-git-detail-open='true'] .dn-git-graph-column { border-right:");
+    expect(module).toContain(".dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%;");
+    expect(module).toContain(".dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }");
+    expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");
+    expect(module).toContain("align-items: center; gap: 4px; width: 100%;");
+    expect(module).toContain("width: 100%; min-width: var(--dn-git-table-min-width);");
+    expect(module).toContain(".dn-git-column-header { position: relative; display: flex; align-items: center; justify-content: center;");
+    expect(module).toContain(".dn-git-description { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.82rem; font-weight: 460;");
+    expect(module).toContain(".dn-git-history-row.merge:not(.selected) .dn-git-description");
+    expect(module).toContain(".dn-git-detail-band { fill: color-mix(in srgb, var(--dn-surface-raised) 58%, var(--dn-control-active)); pointer-events: none; }");
+    expect(module).toContain(".dn-git-detail-band-divider { stroke: var(--dn-border-strong); stroke-width: 1;");
+    expect(module).toContain(".dn-git-history-row.selected { background: var(--dn-control-active); box-shadow: none; }");
+    expect(module).toContain(".dn-git-inline-detail { height: 234px; min-width: var(--dn-git-table-min-width); margin: 0; overflow: auto; border-width: 0 0 1px;");
+    expect(module).not.toContain(".dn-history-item.selected, .dn-git-history-row.selected { border-color: var(--dn-active);");
+    expect(module).toContain(".dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-align: left;");
+    expect(module).not.toContain(".dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }");
+    expect(module).not.toContain(".dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }");
+    expect(module).not.toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) max-content;");
+    expect(module).not.toContain("width: max-content; min-width: 100%;");
     expect(module).toContain("Source checkout");
     expect(module).toContain("Active branch");
     expect(module).toContain("More branches");
@@ -237,12 +342,116 @@ describe("nexus dashboard client", () => {
       scrollWidth: 180,
       getAttribute: (name: string) => (name === "title" ? "Short label" : null),
     };
+    const alwaysTarget = {
+      clientHeight: 20,
+      clientWidth: 180,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => {
+        if (name === "data-dn-tooltip") return "Event node context";
+        if (name === "data-dn-tooltip-mode") return "always";
+        return null;
+      },
+    };
 
     expect(hooks.cockpitTooltipText(truncatedTarget)).toBe(
       "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway",
     );
     expect(hooks.isCockpitTooltipTargetTruncated(truncatedTarget)).toBe(true);
     expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
+    expect(hooks.cockpitTooltipText(alwaysTarget)).toBe("Event node context");
+    expect(hooks.shouldShowCockpitTooltipTarget(alwaysTarget)).toBe(true);
+    expect(hooks.shouldShowCockpitTooltipTarget(fittingTarget)).toBe(false);
+  });
+
+  it("keeps the event history board before generic selected details", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-24T12:00:00.000Z",
+      summary: "Dashboard demo summary.",
+      project: {
+        name: "Dashboard Demo",
+        root: "/workspace",
+      },
+      signals: [],
+      components: [],
+      events: [],
+      blockers: [],
+      features: {
+        records: [],
+      },
+      threads: {
+        records: [],
+      },
+      trackedWork: {
+        records: [],
+      },
+      plugins: {
+        enabled: [],
+        available: [],
+        disabled: [],
+      },
+      worktrees: {
+        records: [],
+      },
+      weave: {
+        lanes: [
+          {
+            id: "project",
+            label: "Project",
+          },
+        ],
+        nodes: [
+          {
+            id: "project",
+            kind: "project",
+            laneId: "project",
+            label: "Dashboard Demo",
+            status: "active",
+          },
+        ],
+        edges: [],
+      },
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "core100000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "core100000000000000000000000000000000000000",
+                shortHash: "core100",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Update core cockpit",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered.indexOf('id="project-git-history"')).toBeLessThan(
+      rendered.indexOf('id="selected-item"'),
+    );
   });
 
   it("keeps visible dashboard content stable during background refresh", () => {
@@ -542,6 +751,137 @@ describe("nexus dashboard client", () => {
         ["Target branch", "main"],
       ]),
     });
+  });
+
+  it("renders Git workflow state as compact read-only cockpit context", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      features: {
+        activeCount: 0,
+        needsAttentionCount: 0,
+        records: [],
+      },
+      gitWorkflows: {
+        activeProfileId: "protected-main",
+        profileCount: 1,
+        runCount: 2,
+        activeRunCount: 1,
+        waitingRunCount: 1,
+        blockedRunCount: 0,
+        terminalRunCount: 1,
+        profiles: [
+          {
+            id: "protected-main",
+            name: "Protected main",
+            source: "configured",
+            branchStrategy: "hybrid",
+            targetBranch: "main",
+            activeFeatureId: "codex-goals",
+            reviewMode: "review_branch_pr",
+            finalPullRequest: true,
+            gateCount: 6,
+          },
+        ],
+        runs: [
+          {
+            id: "run-review",
+            componentId: "primary",
+            profileId: "protected-main",
+            branchStrategy: "hybrid",
+            status: "ready_for_review",
+            statusLabel: "Ready for review",
+            terminalOutcome: null,
+            branchName: "codex/dev-nexus/123-cockpit",
+            currentRef: "codex/dev-nexus/123-cockpit",
+            targetBranch: "main",
+            workItemId: "github-123",
+            nextOwnerLabel: "Human: Gabriel",
+            evidenceCount: 1,
+            allowedTransitionCount: 1,
+            updatedAt: "2026-05-23T09:04:00.000Z",
+          },
+          {
+            id: "run-merged",
+            componentId: "primary",
+            profileId: "protected-main",
+            branchStrategy: "hybrid",
+            status: "merged",
+            statusLabel: "Merged",
+            terminalOutcome: "merged",
+            branchName: "codex/dev-nexus/122-done",
+            currentRef: "main",
+            targetBranch: "main",
+            workItemId: null,
+            nextOwnerLabel: "No owner",
+            evidenceCount: 0,
+            allowedTransitionCount: 0,
+            updatedAt: "2026-05-23T08:30:00.000Z",
+          },
+        ],
+      },
+      events: [],
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderFeatureOverview(snapshot, null);
+
+    expect(rendered).toContain("Git workflows");
+    expect(rendered).toContain("Protected main");
+    expect(rendered).toContain("hybrid");
+    expect(rendered).toContain("main");
+    expect(rendered).toContain("1 active");
+    expect(rendered).toContain("1 waiting");
+    expect(rendered).toContain("Ready for review");
+    expect(rendered).toContain("codex/dev-nexus/123-cockpit");
+    expect(rendered).not.toContain("activeProfileId");
+    expect(rendered).not.toContain("{");
+  });
+
+  it("renders a compact Git workflow empty state without raw configuration", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const rendered = hooks.renderFeatureOverview(
+      {
+        features: {
+          activeCount: 0,
+          needsAttentionCount: 0,
+          records: [],
+        },
+        gitWorkflows: {
+          activeProfileId: null,
+          profileCount: 0,
+          runCount: 0,
+          activeRunCount: 0,
+          waitingRunCount: 0,
+          blockedRunCount: 0,
+          terminalRunCount: 0,
+          profiles: [],
+          runs: [],
+        },
+        events: [],
+        project: {
+          name: "Dashboard Demo",
+        },
+        signals: [],
+        weave: {
+          nodes: [],
+          lanes: [],
+        },
+      },
+      null,
+    );
+
+    expect(rendered).toContain("Git workflows");
+    expect(rendered).toContain("No profile configured");
+    expect(rendered).toContain("No workflow runs recorded yet.");
+    expect(rendered).not.toContain("gitWorkflows");
+    expect(rendered).not.toContain("automation.gitWorkflows");
   });
 
   it("renders compact provider chips with provider and external-link affordances", async () => {

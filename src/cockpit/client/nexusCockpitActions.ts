@@ -55,6 +55,18 @@ export function chatIcon(): string {
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 3.5h10A1.5 1.5 0 0114.5 5v4A1.5 1.5 0 0113 10.5H8l-3.5 3v-3H3A1.5 1.5 0 011.5 9V5A1.5 1.5 0 013 3.5z"/><path fill="none" stroke-width="1.8" stroke-linecap="round" d="M5 6.5h6M5 8.5h3"/></svg>';
 }
 
+export function searchIcon(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke-width="1.8"/><path d="M10.5 10.5 14 14" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>';
+}
+
+export function gearIcon(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M6.9 1.6h2.2l.4 1.8c.4.1.8.3 1.1.5l1.6-1 1.6 1.6-1 1.6c.2.4.4.7.5 1.1l1.8.4v2.2l-1.8.4c-.1.4-.3.8-.5 1.1l1 1.6-1.6 1.6-1.6-1c-.4.2-.7.4-1.1.5l-.4 1.8H6.9l-.4-1.8c-.4-.1-.8-.3-1.1-.5l-1.6 1-1.6-1.6 1-1.6c-.2-.4-.4-.7-.5-1.1L.9 9.8V7.6l1.8-.4c.1-.4.3-.8.5-1.1l-1-1.6 1.6-1.6 1.6 1c.4-.2.7-.4 1.1-.5l.4-1.8z"/><circle cx="8" cy="8.7" r="2.1" fill="none" stroke-width="1.6"/></svg>';
+}
+
+export function cloudFetchIcon(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5.1 12.8H4a2.8 2.8 0 01-.3-5.6 4.1 4.1 0 017.8-1.4 3.2 3.2 0 01.5 6.3h-1.1"/><path fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M8 8.2v6M5.8 12 8 14.2 10.2 12"/></svg>';
+}
+
 export function signalIcon(id: string): string {
   if (id === "components") return '<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg>';
   if (id === "automation") return '<svg viewBox="0 0 24 24"><path d="M6 8a3 3 0 116 0c0 2-3 2-3 5"/><path d="M18 16a3 3 0 11-6 0c0-2 3-2 3-5"/><path d="M9 21v-2"/><path d="M15 3v2"/></svg>';
@@ -94,6 +106,9 @@ export function renderNexusCockpitActionsClientSource(): string {
     finderIcon,
     terminalIcon,
     chatIcon,
+    searchIcon,
+    gearIcon,
+    cloudFetchIcon,
     signalIcon,
     uniqueActions,
   ]
