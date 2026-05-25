@@ -10,6 +10,7 @@ import type {
 } from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   createNexusForgePublicationAdapter,
+  NexusForgePublicationError,
   type NexusForgeActorVerificationResult,
   type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
@@ -739,14 +740,17 @@ export async function upsertNexusPublicationPullRequestForComponent(
     fetch: options.fetch,
     baseEnv: options.baseEnv,
   });
-  const pullRequest = await adapter.upsertPullRequest({
-    number: options.number,
-    head: options.head,
-    base,
-    title: options.title,
-    ...(options.body !== undefined ? { body: options.body } : {}),
-    ...(options.draft === true ? { draft: true } : {}),
-  });
+  const pullRequest = await withPublicationCredentialErrorContext(
+    credential,
+    () => adapter.upsertPullRequest({
+      number: options.number,
+      head: options.head,
+      base,
+      title: options.title,
+      ...(options.body !== undefined ? { body: options.body } : {}),
+      ...(options.draft === true ? { draft: true } : {}),
+    }),
+  );
 
   return {
     projectRoot: context.projectRoot,
@@ -901,6 +905,28 @@ export function summarizePublicationCredential(
         }
       : null,
   };
+}
+
+async function withPublicationCredentialErrorContext<T>(
+  credential: NexusResolvedProviderCredential,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof NexusForgePublicationError) {
+      const summary = summarizePublicationCredential(credential);
+      Object.assign(error.metadata, {
+        credential: summary,
+        profileId: summary.profileId,
+        actorId: summary.actorId,
+        account: summary.account,
+        credentialKind: summary.kind,
+        provider: summary.provider,
+      });
+    }
+    throw error;
+  }
 }
 
 async function resolvePublicationCredential(options: {
