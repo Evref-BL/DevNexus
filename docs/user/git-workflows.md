@@ -93,6 +93,7 @@ The current commands that participate in this lifecycle include:
 ```bash
 dev-nexus worktree prepare <workspace-root> --component api --work-item local-1
 dev-nexus git-workflow start <workspace-root> --component api --profile protected-main --work-item github-123
+dev-nexus git-workflow advance <workspace-root> --component api --run run-123 --provider-review approved --required-checks passed --base-status up_to_date
 dev-nexus coordination handoff <workspace-root> local-1 --component api --status ready --worktree worktrees/api/feat-example --decision "review requested"
 dev-nexus publication review-handoff <workspace-root> --component api --branch feat/example --title "Add example"
 dev-nexus publication green-main plan <workspace-root> --component api --pr 123 --checks-file checks.json
@@ -126,6 +127,12 @@ prepare the worktree and records the initial runtime workflow run in the new
 worktree. The plain `worktree prepare` command remains available for manual
 worktree setup and keeps its existing explicit `--base-ref` and feature-branch
 options.
+
+`git-workflow advance` and its `resume` alias read the recorded run plus fresh
+provider and branch evidence, then record the next safe workflow state. It does
+not hide Git or provider writes: stale branch updates, force-with-lease, provider
+writes, and final publication require explicit authority flags or become a
+human handoff with the exact command or provider action to perform.
 
 ## Branch Strategies
 
