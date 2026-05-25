@@ -26,7 +26,7 @@ Current production domains:
 - `cli`
 - `codex-app`
 - `coordination`
-- `dashboard`
+- `cockpit`
 - `extensions`
 - `git`
 - `hosts`
@@ -39,6 +39,21 @@ Current production domains:
 - `runtime`
 - `work-items`
 - `worktrees`
+
+The cockpit is still part of the core package while it owns DevNexus-local
+contracts, snapshots, routes, and the zero-build local browser client. Its
+implementation lives under `src/cockpit`:
+
+- `src/cockpit/client/`: browser UI, interactions, styles, and history widget
+  rendering.
+- `src/cockpit/server/`: snapshot/model builders, local HTTP routes, server
+  registry, cache policy, data contracts, server assets, and chat bridge.
+
+The legacy `src/dashboard/` folder is reserved for compatibility facades that
+re-export the cockpit server modules under old dashboard-named import paths.
+Do not add new implementation there. If the cockpit grows beyond DevNexus-local
+contracts and local-control routes, move the product UI into a separate app or
+workspace package and keep only the stable data/route contract in core.
 
 Avoid adding new source files directly under `src/` unless they are package
 entrypoints. New tests should go under the matching `test/<domain>/` folder.

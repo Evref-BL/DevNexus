@@ -88,6 +88,22 @@ The selected item panel should have four sections:
 Summary and Actions are open by default. Evidence and Diagnostics can be
 collapsed or lower on the page.
 
+## Configuration And Settings Direction
+
+The default cockpit should show configuration-derived state, not become the
+configuration editor. Main panels stay read-only and operational: they explain
+which policy is active, which runs are waiting, and what needs a human next.
+
+A future Settings surface should own edits to project configuration. Each
+setting needs a human-readable label, current value, source, validation state,
+permission boundary, pending diff, and explicit apply path. Settings changes
+should not be hidden behind status cards.
+
+Git workflows are the first good fit for this split. The workspace cockpit can
+show configured profiles and recorded runs now. Editing `automation.gitWorkflows`
+belongs in Settings later, with validation and review before writing the project
+config file.
+
 ## Implementation-Ready Decisions
 
 - `cockpit serve` without a workspace root opens the host cockpit.

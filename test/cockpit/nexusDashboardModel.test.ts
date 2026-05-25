@@ -10,14 +10,18 @@ import {
   buildNexusDashboardSnapshot,
   CodexAppServerJsonRpcClient,
   createLocalWorkTrackerProvider,
+  createNexusGitWorkflowRun,
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
+  defaultNexusGitWorkflowGateConfig,
+  defaultNexusGitWorkflowUpdatePolicyConfig,
   renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
   stopVerifiedNexusDashboardServerRecord,
+  updateNexusGitWorkflowRun,
   validateNexusHomeConfigBase,
   writeNexusWorktreeLeaseStore,
   type GitRunner,
@@ -339,6 +343,124 @@ describe("nexus dashboard model", () => {
     });
   });
 
+  it("includes workspace git history when the workspace repo is separate from component repos", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-workspace-git-history-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      repo: {
+        kind: "git",
+        remoteUrl: "git@github.com:Gabot-Darbot/dev-nexus-dogfood.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+      },
+      components: [
+        {
+          id: "primary",
+          name: "Dashboard Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "local",
+          workTrackers: [
+            {
+              id: "local",
+              name: "Local",
+              enabled: true,
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        },
+      ],
+    }));
+    const field = "\x1f";
+    const record = "\x1e";
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "rev-parse --show-toplevel") {
+        return ok(args as string[], `${cwd === sourceRoot ? sourceRoot : projectRoot}\n`);
+      }
+      if (command === "rev-parse HEAD") {
+        return ok(
+          args as string[],
+          cwd === sourceRoot
+            ? "component00000000000000000000000000000000000\n"
+            : "workspace000000000000000000000000000000000\n",
+        );
+      }
+      if (command === "show-ref -d --head" && cwd === sourceRoot) {
+        return ok(args as string[], [
+          "component00000000000000000000000000000000000 HEAD",
+          "component00000000000000000000000000000000000 refs/heads/main",
+          "",
+        ].join("\n"));
+      }
+      if (command === "show-ref -d --head" && cwd === projectRoot) {
+        return ok(args as string[], [
+          "workspace000000000000000000000000000000000 HEAD",
+          "workspace000000000000000000000000000000000 refs/heads/main",
+          "",
+        ].join("\n"));
+      }
+      if (command.startsWith("-c log.showSignature=false log") && cwd === sourceRoot) {
+        return ok(args as string[], [
+          [
+            "component00000000000000000000000000000000000",
+            "",
+            "Codex",
+            "codex@example.com",
+            "1779537600",
+            "Component write",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      if (command.startsWith("-c log.showSignature=false log") && cwd === projectRoot) {
+        return ok(args as string[], [
+          [
+            "workspace000000000000000000000000000000000",
+            "",
+            "Gabriel",
+            "gabriel@example.com",
+            "1779537300",
+            "Workspace metadata write",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      return baseGitRunner(args, cwd);
+    };
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner,
+      now: fixedClock("2026-05-23T10:00:00.000Z"),
+    });
+
+    expect(snapshot.history.totalCommitCount).toBe(2);
+    expect(snapshot.history.repositories.map((repository) => repository.componentId)).toEqual([
+      "primary",
+      "workspace",
+    ]);
+    expect(snapshot.history.repositories[1]).toMatchObject({
+      componentId: "workspace",
+      componentName: "Workspace",
+      repositoryPath: projectRoot,
+      commits: [
+        expect.objectContaining({
+          hash: "workspace000000000000000000000000000000000",
+          subject: "Workspace metadata write",
+        }),
+      ],
+    });
+  });
+
   it("can scope git history to selected branches", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-filtered-git-history-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -486,6 +608,169 @@ describe("nexus dashboard model", () => {
           branches: ["feat/codex-goals", "feat/codex-goals/header-card"],
         }),
       ]),
+    });
+  });
+
+  it("summarizes configured Git workflow profiles and recorded runs", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-git-workflows-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        gitWorkflows: {
+          activeProfileId: "protected-main",
+          profiles: [
+            {
+              id: "protected-main",
+              name: "Protected main",
+              source: "configured",
+              branchStrategy: "hybrid",
+              targetBranch: "main",
+              activeFeatureId: "codex-goals",
+              allowedBranchStrategies: [
+                ...defaultNexusFeatureBranchDeliveryConfig.allowedBranchStrategies,
+              ],
+              branchNaming: {
+                ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
+                allowedIntentPrefixes: [
+                  ...defaultNexusFeatureBranchDeliveryConfig.branchNaming
+                    .allowedIntentPrefixes,
+                ],
+              },
+              review: {
+                ...defaultNexusFeatureBranchDeliveryConfig.review,
+              },
+              provider: {
+                ...defaultNexusFeatureBranchDeliveryConfig.provider,
+              },
+              branchPublication: {
+                ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
+              },
+              update: {
+                ...defaultNexusGitWorkflowUpdatePolicyConfig,
+                behind: "restack",
+              },
+              gates: {
+                ...defaultNexusGitWorkflowGateConfig,
+                review: ["provider_review"],
+                publication: [
+                  "human_approval",
+                  "provider_review",
+                  "publication_authority",
+                ],
+              },
+              release: null,
+              environment: null,
+            },
+          ],
+        },
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    createNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-review",
+      projectId: config.id,
+      componentId: "primary",
+      profileId: "protected-main",
+      branchStrategy: "hybrid",
+      workItemId: "github-123",
+      branchName: "codex/dev-nexus/123-cockpit",
+      currentRef: "codex/dev-nexus/123-cockpit",
+      targetBranch: "main",
+      owner: {
+        kind: "human",
+        id: "Gabriel",
+      },
+      evidence: [
+        {
+          id: "checks",
+          kind: "verification",
+          summary: "Focused checks passed.",
+        },
+      ],
+      allowedTransitions: [
+        {
+          id: "approve",
+          to: "completed",
+          summary: "Approve publication.",
+          requiresApproval: true,
+        },
+      ],
+      now: "2026-05-23T09:03:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-review",
+      status: "ready_for_review",
+      owner: {
+        kind: "human",
+        id: "Gabriel",
+      },
+      now: "2026-05-23T09:04:00.000Z",
+    });
+    createNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-merged",
+      projectId: config.id,
+      componentId: "primary",
+      profileId: "protected-main",
+      branchStrategy: "hybrid",
+      branchName: "codex/dev-nexus/122-done",
+      currentRef: "main",
+      targetBranch: "main",
+      now: "2026-05-23T08:00:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot,
+      id: "run-merged",
+      status: "merged",
+      terminalOutcome: "merged",
+      now: "2026-05-23T08:30:00.000Z",
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-23T09:05:00.000Z"),
+    });
+
+    expect(snapshot.gitWorkflows).toMatchObject({
+      activeProfileId: "protected-main",
+      profileCount: 1,
+      runCount: 2,
+      activeRunCount: 1,
+      waitingRunCount: 1,
+      blockedRunCount: 0,
+      terminalRunCount: 1,
+      profiles: [
+        expect.objectContaining({
+          id: "protected-main",
+          name: "Protected main",
+          branchStrategy: "hybrid",
+          targetBranch: "main",
+          activeFeatureId: "codex-goals",
+          reviewMode: "review_branch_pr",
+          finalPullRequest: true,
+          gateCount: 5,
+        }),
+      ],
+      runs: [
+        expect.objectContaining({
+          id: "run-review",
+          status: "ready_for_review",
+          statusLabel: "Ready for review",
+          branchName: "codex/dev-nexus/123-cockpit",
+          nextOwnerLabel: "Human: Gabriel",
+          evidenceCount: 1,
+          allowedTransitionCount: 1,
+        }),
+        expect.objectContaining({
+          id: "run-merged",
+          status: "merged",
+          statusLabel: "Merged",
+        }),
+      ],
     });
   });
 
