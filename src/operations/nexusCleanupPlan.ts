@@ -475,8 +475,14 @@ function classifyCleanupCandidate(
         blockers.push("Lease is stale; refresh ownership or inspect manually before cleanup.");
       }
     } else if (!["merged"].includes(lease.record.status)) {
-      classifications.push("active_lease", "blocked");
-      blockers.push(`Lease status ${lease.record.status} indicates active or pending work.`);
+      if (mergedIntoTarget === true && cleanStatusFacts(statusFacts)) {
+        proof.push(
+          `Lease status ${lease.record.status} is advisory; Git proves the branch is contained in the target branch.`,
+        );
+      } else {
+        classifications.push("active_lease", "blocked");
+        blockers.push(`Lease status ${lease.record.status} indicates active or pending work.`);
+      }
     }
   } else if (
     branch &&
