@@ -361,6 +361,7 @@ export class NexusPostgresWorkItemClaimAuthority
   async releaseClaim(options: {
     key: NexusWorkItemClaimAuthorityKey;
     leaseToken: string;
+    fencingToken?: number | null;
     now: Date;
   }): Promise<NexusWorkItemClaimAuthorityReleaseResult> {
     const keyHash = serializedClaimAuthorityKey(options.key);
@@ -377,6 +378,17 @@ export class NexusPostgresWorkItemClaimAuthority
           status: "rejected",
           reason: verifyStatusToRejectedReason(result.status),
           ...(result.claim ? { claim: result.claim } : {}),
+        };
+      }
+      if (
+        options.fencingToken !== undefined &&
+        options.fencingToken !== null &&
+        options.fencingToken !== result.claim.fencingToken
+      ) {
+        return {
+          status: "rejected",
+          reason: "fencing_token_mismatch",
+          claim: result.claim,
         };
       }
 

@@ -10,6 +10,7 @@ import type {
 } from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   createNexusForgePublicationAdapter,
+  NexusForgePublicationError,
   type NexusForgeActorVerificationResult,
   type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
@@ -183,7 +184,7 @@ export interface NexusPublicationPullRequestUpsertResult {
 }
 
 export interface NexusPublicationPullRequestUpsertPlan {
-  operation: "create" | "update";
+  operation: "create" | "update" | "upsert";
   number: number | null;
   head: string;
   base: string;
@@ -710,7 +711,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
     publicationTargetDefaultBranch(context) ??
     "main";
   const plan: NexusPublicationPullRequestUpsertPlan = {
-    operation: options.number ? "update" : "create",
+    operation: options.number ? "update" : options.dryRun === true ? "upsert" : "create",
     number: options.number ?? null,
     head: options.head,
     base,
@@ -739,14 +740,17 @@ export async function upsertNexusPublicationPullRequestForComponent(
     fetch: options.fetch,
     baseEnv: options.baseEnv,
   });
-  const pullRequest = await adapter.upsertPullRequest({
-    number: options.number,
-    head: options.head,
-    base,
-    title: options.title,
-    ...(options.body !== undefined ? { body: options.body } : {}),
-    ...(options.draft === true ? { draft: true } : {}),
-  });
+  const pullRequest = await withPublicationCredentialErrorContext(
+    credential,
+    () => adapter.upsertPullRequest({
+      number: options.number,
+      head: options.head,
+      base,
+      title: options.title,
+      ...(options.body !== undefined ? { body: options.body } : {}),
+      ...(options.draft === true ? { draft: true } : {}),
+    }),
+  );
 
   return {
     projectRoot: context.projectRoot,
@@ -755,8 +759,20 @@ export async function upsertNexusPublicationPullRequestForComponent(
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
     dryRun: false,
-    plan,
+    plan: pullRequestUpsertResultPlan(plan, pullRequest),
     pullRequest,
+  };
+}
+
+function pullRequestUpsertResultPlan(
+  plan: NexusPublicationPullRequestUpsertPlan,
+  pullRequest: NexusForgePullRequestResult,
+): NexusPublicationPullRequestUpsertPlan {
+  const operation = pullRequest.operation ?? plan.operation;
+  return {
+    ...plan,
+    operation,
+    number: operation === "update" ? pullRequest.number : plan.number,
   };
 }
 
@@ -901,6 +917,28 @@ export function summarizePublicationCredential(
         }
       : null,
   };
+}
+
+async function withPublicationCredentialErrorContext<T>(
+  credential: NexusResolvedProviderCredential,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof NexusForgePublicationError) {
+      const summary = summarizePublicationCredential(credential);
+      Object.assign(error.metadata, {
+        credential: summary,
+        profileId: summary.profileId,
+        actorId: summary.actorId,
+        account: summary.account,
+        credentialKind: summary.kind,
+        provider: summary.provider,
+      });
+    }
+    throw error;
+  }
 }
 
 async function resolvePublicationCredential(options: {

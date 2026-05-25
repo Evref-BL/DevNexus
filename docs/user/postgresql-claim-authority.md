@@ -147,6 +147,26 @@ dev-nexus work-item claim-next <workspace-root> --home <home-path> --host <host-
 If PostgreSQL is configured but not ready, DevNexus blocks instead of silently
 falling back to `optimistic_tracker`.
 
+`claim-next --json` returns the claim lease token and, for authority-backed
+claims, an `authorityClaim.fencingToken`. Operators and external runners that
+claim work directly can release the authority row when they hand off or finish
+outside `automation current-agent record`:
+
+```bash
+dev-nexus work-item claim-release <workspace-root> <work-item-id> \
+  --home <home-path> \
+  --lease-token <lease-token> \
+  --fencing-token <fencing-token> \
+  --json
+```
+
+Use `--component` and `--tracker` when the work item is not on the primary
+component's default tracker. The lease token is required. The fencing token is
+optional for compatibility, but passing it protects against a stale owner
+releasing a newer claim for the same work item.
+
+The matching MCP tool is `work_item_claim_release`.
+
 ## Worker enforcement
 
 When an automation launch obtains an authority-backed claim, the launch context

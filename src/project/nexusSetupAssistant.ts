@@ -166,6 +166,18 @@ interface ConfiguredMcpServerCommandLine {
   args: string[];
 }
 
+interface SetupProjectConfigCheck {
+  projectConfig: NexusProjectConfig | null;
+  check: NexusSetupCheckResult;
+}
+
+interface ShellCommandTokenState {
+  tokens: string[];
+  current: string;
+  quote: "\"" | "'" | null;
+  escaped: boolean;
+}
+
 export interface NexusMcpRuntimeProcess {
   pid: number;
   commandLine: string;
@@ -282,30 +294,77 @@ export function buildNexusSetupCheck(options: {
   const platform = normalizeSetupPlatform(options.platform);
   const localPathPlatform = currentSetupPlatform();
   const projectRoot = path.resolve(options.projectRoot);
-  const checks: NexusSetupCheckResult[] = [];
   const setupState = readNexusSetupState(nexusSetupStatePath(projectRoot));
+  const { projectConfig, check: projectConfigCheck } = setupProjectConfigCheck(projectRoot);
+  const agentMcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
 
-  let projectConfig: NexusProjectConfig | null = null;
+  const checks: NexusSetupCheckResult[] = [
+    projectConfigCheck,
+    workspaceGitRepositoryCheck(projectRoot),
+    ...agentMcpTargetChecks(agentMcpTargets, projectConfig),
+    ...projectConfigSetupChecks({
+      projectRoot,
+      projectConfig,
+      agentMcpTargets,
+      platform: localPathPlatform,
+      diagnostics: options.agentClientAdapter,
+    }),
+    ...flowSetupChecks({
+      flow,
+      projectRoot,
+      projectConfig,
+      setupState,
+      agentMcpTargets,
+    }),
+    ...componentSetupChecks({
+      projectRoot,
+      projectConfig,
+      platform,
+      localPathPlatform,
+    }),
+  ];
+
+  const status = summarizeCheckStatus(checks);
+  return {
+    flow,
+    platform,
+    projectRoot,
+    status,
+    checks,
+    nextActions: checks
+      .filter((check) => check.status !== "passed" && check.nextAction)
+      .map((check) => check.nextAction!),
+  };
+}
+
+function setupProjectConfigCheck(projectRoot: string): SetupProjectConfigCheck {
   try {
-    projectConfig = loadProjectConfig(projectRoot);
-    checks.push({
-      id: "project-config",
-      title: "Workspace config",
-      status: "passed",
-      summary: "dev-nexus.project.json loaded successfully.",
-      nextAction: null,
-    });
+    return {
+      projectConfig: loadProjectConfig(projectRoot),
+      check: {
+        id: "project-config",
+        title: "Workspace config",
+        status: "passed",
+        summary: "dev-nexus.project.json loaded successfully.",
+        nextAction: null,
+      },
+    };
   } catch (error) {
-    checks.push({
-      id: "project-config",
-      title: "Workspace config",
-      status: "blocked",
-      summary: error instanceof Error ? error.message : String(error),
-      nextAction: "Clone the shared workspace repository or run this command from the workspace root.",
-    });
+    return {
+      projectConfig: null,
+      check: {
+        id: "project-config",
+        title: "Workspace config",
+        status: "blocked",
+        summary: error instanceof Error ? error.message : String(error),
+        nextAction: "Clone the shared workspace repository or run this command from the workspace root.",
+      },
+    };
   }
+}
 
-  checks.push(pathCheck({
+function workspaceGitRepositoryCheck(projectRoot: string): NexusSetupCheckResult {
+  return pathCheck({
     id: "workspace-git-repository",
     title: "Workspace Git repository",
     pathName: path.join(projectRoot, ".git"),
@@ -313,9 +372,14 @@ export function buildNexusSetupCheck(options: {
     blockedSummary: "The workspace repository is not a Git checkout at this path.",
     nextAction: "Clone or initialize the shared DevNexus workspace repository.",
     missingStatus: "blocked",
-  }));
+  });
+}
 
-  const agentMcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+function agentMcpTargetChecks(
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[],
+  projectConfig: NexusProjectConfig | null,
+): NexusSetupCheckResult[] {
+  const checks: NexusSetupCheckResult[] = [];
   const checkedAgentMcpConfigPaths = new Set<string>();
   for (const target of agentMcpTargets) {
     const exposure = projectConfig
@@ -343,35 +407,82 @@ export function buildNexusSetupCheck(options: {
     checks.push(agentMcpServerConfiguredCheck(target, exposure ?? undefined));
   }
 
-  if (projectConfig) {
-    checks.push(sharedHostRegistryHostLocalDetailsCheck(projectRoot));
-    checks.push(...agentProjectionStatusChecks(projectRoot, projectConfig));
-    const pluginChecks = pluginProjectionChecks(projectRoot, projectConfig);
-    checks.push(...pluginChecks);
-    checks.push(...agentClientAdapterReadinessChecks({
-      projectRoot,
-      projectConfig,
-      agentMcpTargets,
-      platform: localPathPlatform,
+  return checks;
+}
+
+function projectConfigSetupChecks(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig | null;
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[];
+  platform: NexusSetupPlatform;
+  diagnostics?: false | NexusSetupAgentClientAdapterDiagnosticsOptions;
+}): NexusSetupCheckResult[] {
+  if (!options.projectConfig) {
+    return [];
+  }
+
+  const pluginChecks = pluginProjectionChecks(options.projectRoot, options.projectConfig);
+  return [
+    sharedHostRegistryHostLocalDetailsCheck(options.projectRoot),
+    ...agentProjectionStatusChecks(options.projectRoot, options.projectConfig),
+    ...pluginChecks,
+    ...agentClientAdapterReadinessChecks({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      agentMcpTargets: options.agentMcpTargets,
+      platform: options.platform,
       pluginChecks,
-      diagnostics: options.agentClientAdapter,
-    }));
-  }
+      diagnostics: options.diagnostics,
+    }),
+  ];
+}
 
-  if (flow.id === "github-workspace-repository" && projectConfig) {
-    checks.push(...githubMetaProjectChecks(projectRoot, projectConfig, setupState));
-  }
+function flowSetupChecks(options: {
+  flow: NexusSetupFlowSummary;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig | null;
+  setupState: NexusSetupState;
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[];
+}): NexusSetupCheckResult[] {
+  return [
+    ...projectHostingFlowChecks(options),
+    ...agentProjectSessionChecks(options.flow, options.setupState, options.agentMcpTargets),
+  ];
+}
 
-  if (flow.id === "join-existing-project" && projectConfig) {
-    checks.push(...githubMetaProjectReadinessChecks(projectRoot, projectConfig, {
+function projectHostingFlowChecks(options: {
+  flow: NexusSetupFlowSummary;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig | null;
+  setupState: NexusSetupState;
+}): NexusSetupCheckResult[] {
+  if (!options.projectConfig) {
+    return [];
+  }
+  if (options.flow.id === "github-workspace-repository") {
+    return githubMetaProjectChecks(options.projectRoot, options.projectConfig, options.setupState);
+  }
+  if (options.flow.id === "join-existing-project") {
+    return githubMetaProjectReadinessChecks(options.projectRoot, options.projectConfig, {
       checkFallbackRemotes: false,
       warnWhenHostingMissing: false,
-    }));
+    });
+  }
+  return [];
+}
+
+function agentProjectSessionChecks(
+  flow: NexusSetupFlowSummary,
+  setupState: NexusSetupState,
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[],
+): NexusSetupCheckResult[] {
+  if (flow.id !== "join-existing-project" || agentMcpTargets.length === 0) {
+    return [];
   }
 
-  if (flow.id === "join-existing-project" && agentMcpTargets.length > 0) {
-    const flowState = setupState.flows[flow.id];
-    checks.push(recordedStepCheck({
+  const flowState = setupState.flows[flow.id];
+  return [
+    recordedStepCheck({
       id: "agent-project-session",
       title: "Agent workspace session",
       record:
@@ -385,38 +496,37 @@ export function buildNexusSetupCheck(options: {
         "Agent application workspace/session setup was recorded as blocked for this machine.",
       nextAction:
         `Open or restart the configured agent application on this workspace root, confirm DevNexus MCP tools are visible, then run dev-nexus setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible."`,
-    }));
+    }),
+  ];
+}
+
+function componentSetupChecks(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig | null;
+  platform: NexusSetupPlatform;
+  localPathPlatform: NexusSetupPlatform;
+}): NexusSetupCheckResult[] {
+  if (!options.projectConfig) {
+    return [];
   }
 
-  if (projectConfig) {
-    for (const component of projectConfig.components) {
-      const sourceRootPlan = componentCheckSourceRoot(
-        component,
-        projectRoot,
-        platform,
-        localPathPlatform,
-      );
-      checks.push(componentSourceRootTopologyCheck({
+  return options.projectConfig.components.flatMap((component) => {
+    const sourceRootPlan = componentCheckSourceRoot(
+      component,
+      options.projectRoot,
+      options.platform,
+      options.localPathPlatform,
+    );
+    return [
+      componentSourceRootTopologyCheck({
         component,
         topology: sourceRootPlan.topology,
-      }));
-      checks.push(...componentGitSafetyChecks(component, sourceRootPlan.path, {
+      }),
+      ...componentGitSafetyChecks(component, sourceRootPlan.path, {
         topology: sourceRootPlan.topology,
-      }));
-    }
-  }
-
-  const status = summarizeCheckStatus(checks);
-  return {
-    flow,
-    platform,
-    projectRoot,
-    status,
-    checks,
-    nextActions: checks
-      .filter((check) => check.status !== "passed" && check.nextAction)
-      .map((check) => check.nextAction!),
-  };
+      }),
+    ];
+  });
 }
 
 export function buildNexusMcpRuntimeFreshnessChecks(options: {
@@ -2649,51 +2759,71 @@ function parseMcpProcessCommandLine(
 }
 
 function shellCommandTokens(commandLine: string): string[] {
-  const tokens: string[] = [];
-  let current = "";
-  let quote: "\"" | "'" | null = null;
-  let escaped = false;
+  const state: ShellCommandTokenState = {
+    tokens: [],
+    current: "",
+    quote: null,
+    escaped: false,
+  };
 
   for (const char of commandLine.trim()) {
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if (char === "\"" || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/u.test(char)) {
-      if (current) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
+    consumeShellCommandTokenChar(state, char);
   }
+  finishShellCommandTokens(state);
 
-  if (escaped) {
-    current += "\\";
-  }
-  if (current) {
-    tokens.push(current);
-  }
+  return state.tokens;
+}
 
-  return tokens;
+function consumeShellCommandTokenChar(state: ShellCommandTokenState, char: string): void {
+  if (state.escaped) {
+    state.current += char;
+    state.escaped = false;
+    return;
+  }
+  if (char === "\\") {
+    state.escaped = true;
+    return;
+  }
+  if (state.quote) {
+    consumeQuotedShellCommandTokenChar(state, char);
+    return;
+  }
+  if (isShellCommandQuote(char)) {
+    state.quote = char;
+    return;
+  }
+  if (/\s/u.test(char)) {
+    pushCurrentShellCommandToken(state);
+    return;
+  }
+  state.current += char;
+}
+
+function consumeQuotedShellCommandTokenChar(state: ShellCommandTokenState, char: string): void {
+  if (char === state.quote) {
+    state.quote = null;
+    return;
+  }
+  state.current += char;
+}
+
+function finishShellCommandTokens(state: ShellCommandTokenState): void {
+  if (state.escaped) {
+    state.current += "\\";
+  }
+  pushCurrentShellCommandToken(state);
+}
+
+function pushCurrentShellCommandToken(state: ShellCommandTokenState): void {
+  if (!state.current) {
+    return;
+  }
+  state.tokens.push(state.current);
+  state.current = "";
+}
+
+function isShellCommandQuote(char: string): char is "\"" | "'" {
+  return char === "\"" || char === "'";
 }
 
 function isNodeCommand(command: string): boolean {
@@ -3506,53 +3636,67 @@ function hostingAuthProfileChecks(
     profile.id,
     profile,
   ]));
-  return requiredProfileIds.map((profileId) => {
-    const profile = profileById.get(profileId);
-    if (!profile) {
-      return {
-        id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
-        title: `GitHub auth profile ${profileId}`,
-        status: "blocked",
-        summary:
-          `Host-local DevNexus home config does not define auth profile ${profileId}.`,
-        nextAction:
-          `Add auth profile ${profileId} to the host-local DevNexus home config; keep credentials and private key material outside the shared workspace repository.`,
-      };
-    }
+  return requiredProfileIds.map((profileId) =>
+    hostingAuthProfileCheck(profileId, profileById.get(profileId))
+  );
+}
 
-    const details = [
-      profile.kind ? `kind=${profile.kind}` : null,
-      profile.credentialKind ? `credential=${profile.credentialKind}` : null,
-      profile.actorId ? `actor=${profile.actorId}` : null,
-      profile.account ? `account=${profile.account}` : null,
-      profile.sshHost ? `sshHost=${profile.sshHost}` : null,
-      profile.githubCliConfigDir ? "ghConfigDir=set" : null,
-      profile.command ? "command=set" : null,
-      profile.githubApp?.slug ? `app=${profile.githubApp.slug}` : null,
-      profile.githubApp?.installationAccount
-        ? `installation=${profile.githubApp.installationAccount}`
-        : null,
-      profile.githubApp ? "privateKeyPath=set" : null,
-      profile.githubApp?.repositories &&
-        profile.githubApp.repositories.length > 0
-        ? `repositories=${profile.githubApp.repositories.join(",")}`
-        : null,
-      profile.environmentKeys && profile.environmentKeys.length > 0
-        ? `envKeys=${profile.environmentKeys.join(",")}`
-        : null,
-    ].filter((detail): detail is string => Boolean(detail));
-    const userToServer = profile.credentialKind === "github_app_user_token";
-    return {
-      id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
-      title: `GitHub auth profile ${profileId}`,
-      status: userToServer ? "warning" : "passed",
-      summary:
-        `Host-local GitHub auth profile ${profileId} is configured${details.length > 0 ? ` (${details.join(", ")})` : ""}${userToServer ? "; user authorization was not checked." : "."}`,
-      nextAction: userToServer
-        ? "Run the host-local GitHub App user-token helper status/auth command and verify the authorizing user, App installation, selected repository, token refresh, and requested permissions."
-        : null,
-    };
-  });
+function hostingAuthProfileCheck(
+  profileId: string,
+  profile: NexusHostingAuthProfileConfig | undefined,
+): NexusSetupCheckResult {
+  if (!profile) {
+    return missingHostingAuthProfileCheck(profileId);
+  }
+
+  const details = hostingAuthProfileDetails(profile);
+  const userToServer = profile.credentialKind === "github_app_user_token";
+  return {
+    id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
+    title: `GitHub auth profile ${profileId}`,
+    status: userToServer ? "warning" : "passed",
+    summary:
+      `Host-local GitHub auth profile ${profileId} is configured${details.length > 0 ? ` (${details.join(", ")})` : ""}${userToServer ? "; user authorization was not checked." : "."}`,
+    nextAction: userToServer
+      ? "Run the host-local GitHub App user-token helper status/auth command and verify the authorizing user, App installation, selected repository, token refresh, and requested permissions."
+      : null,
+  };
+}
+
+function missingHostingAuthProfileCheck(profileId: string): NexusSetupCheckResult {
+  return {
+    id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
+    title: `GitHub auth profile ${profileId}`,
+    status: "blocked",
+    summary:
+      `Host-local DevNexus home config does not define auth profile ${profileId}.`,
+    nextAction:
+      `Add auth profile ${profileId} to the host-local DevNexus home config; keep credentials and private key material outside the shared workspace repository.`,
+  };
+}
+
+function hostingAuthProfileDetails(profile: NexusHostingAuthProfileConfig): string[] {
+  return [
+    profile.kind ? `kind=${profile.kind}` : null,
+    profile.credentialKind ? `credential=${profile.credentialKind}` : null,
+    profile.actorId ? `actor=${profile.actorId}` : null,
+    profile.account ? `account=${profile.account}` : null,
+    profile.sshHost ? `sshHost=${profile.sshHost}` : null,
+    profile.githubCliConfigDir ? "ghConfigDir=set" : null,
+    profile.command ? "command=set" : null,
+    profile.githubApp?.slug ? `app=${profile.githubApp.slug}` : null,
+    profile.githubApp?.installationAccount
+      ? `installation=${profile.githubApp.installationAccount}`
+      : null,
+    profile.githubApp ? "privateKeyPath=set" : null,
+    profile.githubApp?.repositories &&
+      profile.githubApp.repositories.length > 0
+      ? `repositories=${profile.githubApp.repositories.join(",")}`
+      : null,
+    profile.environmentKeys && profile.environmentKeys.length > 0
+      ? `envKeys=${profile.environmentKeys.join(",")}`
+      : null,
+  ].filter((detail): detail is string => Boolean(detail));
 }
 
 function loadSetupHomeAuthProfiles(
