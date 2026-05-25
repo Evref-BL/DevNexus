@@ -151,7 +151,7 @@ describe("nexus dashboard history graph", () => {
       "dn-git-detail-panel dn-git-inline-detail",
     );
     const nextRowIndex = rendered.indexOf(
-      "data-select-id=\"history:primary:main10000000000000000000000000000000000000\"",
+      "dn-git-history-row\" type=\"button\" data-select-id=\"history:primary:main10000000000000000000000000000000000000\"",
     );
     expect(selectedRowIndex).toBeGreaterThan(-1);
     expect(inlineDetailIndex).toBeGreaterThan(selectedRowIndex);
@@ -1052,6 +1052,11 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain('data-history-row-count="4"');
     expect(rendered).toContain('data-history-lane-count="1"');
     expect(rendered).toContain('data-history-event-class="source-change"');
+    expect(rendered).toContain('class="dn-git-row-hit"');
+    expect(rendered).toContain(
+      'data-select-id="history:primary:head000000000000000000000000000000000000"',
+    );
+    expect(rendered).toContain('data-dn-tooltip-mode="always"');
     expect(rendered).toContain(
       'data-history-event-id="history:primary:head000000000000000000000000000000000000"',
     );

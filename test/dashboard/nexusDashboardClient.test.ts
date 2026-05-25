@@ -253,12 +253,26 @@ describe("nexus dashboard client", () => {
       scrollWidth: 180,
       getAttribute: (name: string) => (name === "title" ? "Short label" : null),
     };
+    const alwaysTarget = {
+      clientHeight: 20,
+      clientWidth: 180,
+      scrollHeight: 20,
+      scrollWidth: 180,
+      getAttribute: (name: string) => {
+        if (name === "data-dn-tooltip") return "Event node context";
+        if (name === "data-dn-tooltip-mode") return "always";
+        return null;
+      },
+    };
 
     expect(hooks.cockpitTooltipText(truncatedTarget)).toBe(
       "Merge pull request #314 from Evref-BL/codex/dev-nexus/272-gateway",
     );
     expect(hooks.isCockpitTooltipTargetTruncated(truncatedTarget)).toBe(true);
     expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
+    expect(hooks.cockpitTooltipText(alwaysTarget)).toBe("Event node context");
+    expect(hooks.shouldShowCockpitTooltipTarget(alwaysTarget)).toBe(true);
+    expect(hooks.shouldShowCockpitTooltipTarget(fittingTarget)).toBe(false);
   });
 
   it("keeps the event history board before generic selected details", async () => {

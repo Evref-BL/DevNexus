@@ -47,6 +47,7 @@ import {
   trackedWorkForGitBranches,
 } from "./history/nexusCockpitEventHistory.js";
 import { bindGitHistoryColumnResizers } from "./history/nexusCockpitHistoryColumns.js";
+import { bindGitHistoryInteractions } from "./history/nexusCockpitHistoryInteractions.js";
 import {
   cockpitTooltipText,
   installCockpitTooltips,
@@ -129,6 +130,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   applyThemePreference(themeMode);
   injectStyles();
   const tooltipController = installCockpitTooltips(root);
+  const disposeGitHistoryInteractions = bindGitHistoryInteractions(root);
   const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const onSystemThemeChange = () => {
     if (themeMode !== 'system') return;
@@ -320,7 +322,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   renderCurrent();
   void refresh();
   const timer = setInterval(refresh, refreshMs);
-  return { dispose() { disposed = true; clearInterval(timer); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
+  return { dispose() { disposed = true; clearInterval(timer); disposeGitHistoryInteractions(); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
 }
 
 function injectStyles() {

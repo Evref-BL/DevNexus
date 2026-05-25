@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
 import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
+import { renderNexusCockpitHistoryInteractionsClientSource } from "../cockpit/client/history/nexusCockpitHistoryInteractions.js";
 import { renderNexusCockpitWorkMapClientSource } from "../cockpit/client/history/nexusCockpitWorkMap.js";
 import { renderNexusCockpitEventHistoryClientSource } from "../cockpit/client/history/nexusCockpitEventHistory.js";
 import { renderNexusCockpitActionsClientSource } from "../cockpit/client/nexusCockpitActions.js";
@@ -90,6 +91,10 @@ function standaloneNexusCockpitClientSource(source: string): string {
     .replace(
       /^import \{\s*bindGitHistoryColumnResizers,?\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
       "",
+    )
+    .replace(
+      /^import \{\s*bindGitHistoryInteractions,?\s*\} from ["'][^"']+nexusCockpitHistoryInteractions\.js["'];\s*/mu,
+      `${renderNexusCockpitHistoryInteractionsClientSource()}\n\n`,
     )
     .replace(
       /^import \{\s*cockpitTooltipText,\s*installCockpitTooltips,\s*isCockpitTooltipTargetTruncated,\s*\} from ["'][^"']+nexusCockpitTooltips\.js["'];\s*/mu,

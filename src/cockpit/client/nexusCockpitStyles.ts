@@ -62,7 +62,7 @@ button, input, select { font: inherit; }
 .dn-open-option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 0; border-radius: 6px; color: var(--dn-strong); background: transparent; text-align: left; cursor: pointer; }
 .dn-open-option:hover { background: var(--dn-control-hover); }
 .dn-open-option:disabled { opacity: 0.7; cursor: wait; }
-.dn-tooltip { position: fixed; z-index: 1000; max-width: min(420px, calc(100vw - 24px)); padding: 7px 9px; border: 1px solid var(--dn-border-strong); border-radius: 7px; color: var(--dn-strong); background: color-mix(in srgb, var(--dn-surface) 96%, var(--dn-bg) 4%); box-shadow: var(--dn-shadow); font-size: 0.78rem; font-weight: 760; line-height: 1.25; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translate(-50%, -4px); transition: opacity 90ms ease, transform 90ms ease; }
+.dn-tooltip { position: fixed; z-index: 1000; max-width: min(420px, calc(100vw - 24px)); padding: 7px 9px; border: 1px solid var(--dn-border-strong); border-radius: 7px; color: var(--dn-strong); background: color-mix(in srgb, var(--dn-surface) 96%, var(--dn-bg) 4%); box-shadow: var(--dn-shadow); font-size: 0.78rem; font-weight: 760; line-height: 1.25; overflow-wrap: anywhere; pointer-events: none; white-space: pre-line; opacity: 0; transform: translate(-50%, -4px); transition: opacity 90ms ease, transform 90ms ease; }
 .dn-tooltip.visible { opacity: 1; transform: translate(-50%, -8px); }
 .dn-open-option svg, .dn-open-trigger svg, .dn-header-path-control svg { flex: 0 0 auto; width: 16px; height: 16px; }
 .dn-open-option svg:not(.dn-app-icon), .dn-open-trigger svg, .dn-header-path-control svg:not(.dn-app-icon) { stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
@@ -140,11 +140,17 @@ button, input, select { font: inherit; }
 .dn-git-board.resizing { cursor: col-resize; user-select: none; }
 .dn-git-graph { display: block; flex: 0 0 auto; min-width: 118px; min-height: 34px; }
 .dn-git-graph path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.dn-git-row-hit { fill: transparent; cursor: pointer; pointer-events: all; }
+.dn-git-row-hit.dn-history-hovered { fill: var(--dn-control-hover); }
+.dn-git-row-hit.selected { fill: var(--dn-control-active); }
 .dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 6; opacity: 0.42; }
 .dn-git-line { stroke-width: 3; opacity: 0.82; }
+.dn-git-line-shadow, .dn-git-line { pointer-events: none; }
+.dn-git-node { cursor: pointer; transition: filter 120ms ease, stroke-width 120ms ease; }
+.dn-git-node.selected, .dn-git-node.dn-history-hovered { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); stroke-width: 2.7; }
 .dn-git-rows { display: grid; min-width: 0; }
 .dn-git-history-row { min-height: 30px; height: 30px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--dn-border-muted); color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.dn-git-history-row:hover { background: var(--dn-control-hover); }
+.dn-git-history-row:hover, .dn-git-history-row.dn-history-hovered { background: var(--dn-control-hover); }
 .dn-git-history-row.selected { background: var(--dn-control-active); }
 .dn-git-subject { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dn-git-subject strong { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.86rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }

@@ -15,6 +15,8 @@ describe("nexus cockpit history graph SVG", () => {
           index: 0,
           colorLane: 0,
           selectId: "history:primary:merge",
+          selected: true,
+          tooltip: "Merge change\nDevNexus · merge00",
           commit: {
             hash: "merge",
             shortHash: "merge00",
@@ -58,6 +60,14 @@ describe("nexus cockpit history graph SVG", () => {
       width: 148,
       height: 60,
     });
+    expect(model.hitTargets[0]).toMatchObject({
+      id: "history:primary:merge",
+      selected: true,
+      x: 0,
+      y: 0,
+      width: 148,
+      height: 30,
+    });
     expect(model.routes[0]?.points.map((point) => point.index)).toEqual([
       0,
       0.85,
@@ -67,6 +77,10 @@ describe("nexus cockpit history graph SVG", () => {
     expect(rendered).toContain('data-history-row-count="2"');
     expect(rendered).toContain('data-history-lane-count="2"');
     expect(rendered).toContain('data-history-event-class="source-change"');
+    expect(rendered).toContain('class="dn-git-row-hit selected"');
+    expect(rendered).toContain('class="dn-git-node selected"');
+    expect(rendered).toContain('data-select-id="history:primary:merge"');
+    expect(rendered).toContain('data-dn-tooltip-mode="always"');
     expect(rendered).toContain('fill="var(--dn-branch-0)"');
     expect(rendered).toContain(
       'data-history-event-id="history:primary:merge"',

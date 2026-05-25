@@ -198,6 +198,7 @@ function gitHistoryRows(snapshot, filter = 'all') {
       colorLane: node.colorIndex,
       index: node.row,
       selectId: row.eventId,
+      tooltip: gitHistoryNodeTooltip(snapshot, row.repository, row.commit),
     };
   }).filter(Boolean);
   const paths = layout.segments.map((segment) => ({
@@ -260,7 +261,11 @@ function gitHistoryVisualGraph(graph, selectedId) {
   };
   return {
     ...graph,
-    rows: graph.rows.map((row) => ({ ...row, index: shiftIndex(row.index) })),
+    rows: graph.rows.map((row) => ({
+      ...row,
+      index: shiftIndex(row.index),
+      selected: row.selectId === selectedId,
+    })),
     paths: (graph.paths ?? []).map((path) => ({
       ...path,
       fromIndex: path.fromIndex === undefined ? path.fromIndex : shiftIndex(path.fromIndex),
@@ -316,6 +321,21 @@ function gitHistoryChildCommits(repository, commit) {
 
 function gitHistoryEventLabel(commit) {
   return [commit.shortHash, commit.subject].filter(Boolean).join(' ');
+}
+
+function gitHistoryNodeTooltip(snapshot, repository, commit) {
+  const component = repository.componentName ?? repository.componentId ?? 'Workspace';
+  const refs = gitCommitBranchNames(commit).slice(0, 2).join(', ');
+  const markers = gitHistoryAnnotations(snapshot, repository, commit).map((annotation) => annotation.label).join(', ');
+  const authored = [commit.authorName, formatTime(commit.committedAt)].filter(Boolean).join(' · ');
+  const source = commit.shortHash ?? commit.hash ?? '';
+  return [
+    commit.subject,
+    [component, source].filter(Boolean).join(' · '),
+    refs ? `Refs: ${refs}` : '',
+    authored,
+    markers ? `Details: ${markers}` : '',
+  ].filter(Boolean).join('\n');
 }
 
 function gitHistoryAnnotations(snapshot, repository, commit) {
@@ -443,6 +463,7 @@ export function renderNexusCockpitEventHistoryClientSource() {
     gitHistoryParentCommits,
     gitHistoryChildCommits,
     gitHistoryEventLabel,
+    gitHistoryNodeTooltip,
     gitHistoryAnnotations,
     gitCommitBranchNames,
     featuresForGitBranches,

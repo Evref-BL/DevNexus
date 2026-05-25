@@ -11,16 +11,16 @@ export function installCockpitTooltips(root: HTMLElement): CockpitTooltipControl
   tooltip.setAttribute("role", "tooltip");
   tooltip.setAttribute("aria-hidden", "true");
   document.body.appendChild(tooltip);
-  let activeTarget: HTMLElement | null = null;
+  let activeTarget: Element | null = null;
 
   function show(
-    target: HTMLElement,
+    target: Element,
     clientX: number | null = null,
     clientY: number | null = null,
     mode: "pointer" | "focus" = "pointer",
   ): void {
     const text = cockpitTooltipText(target).trim();
-    if (!text || !isCockpitTooltipTargetTruncated(target)) {
+    if (!text || !shouldShowCockpitTooltipTarget(target)) {
       hide();
       return;
     }
@@ -70,16 +70,21 @@ export function installCockpitTooltips(root: HTMLElement): CockpitTooltipControl
     activeTarget = null;
   }
 
-  function onPointerOver(event: PointerEvent): void {
+  function onPointerOver(event: MouseEvent | PointerEvent): void {
     const target = findCockpitTooltipTarget(event.target, root);
     if (target) show(target, event.clientX, event.clientY, "pointer");
   }
-  function onPointerMove(event: PointerEvent): void {
-    if (activeTarget) {
+  function onPointerMove(event: MouseEvent | PointerEvent): void {
+    const target = findCockpitTooltipTarget(event.target, root);
+    if (target && target !== activeTarget) {
+      show(target, event.clientX, event.clientY, "pointer");
+    } else if (activeTarget) {
       positionCockpitTooltip(tooltip, activeTarget, event.clientX, event.clientY, "pointer");
+    } else if (!target) {
+      hide();
     }
   }
-  function onPointerOut(event: PointerEvent): void {
+  function onPointerOut(event: MouseEvent | PointerEvent): void {
     if (
       activeTarget &&
       event.relatedTarget instanceof Node &&
@@ -109,6 +114,9 @@ export function installCockpitTooltips(root: HTMLElement): CockpitTooltipControl
   root.addEventListener("pointerover", onPointerOver);
   root.addEventListener("pointermove", onPointerMove);
   root.addEventListener("pointerout", onPointerOut);
+  root.addEventListener("mouseover", onPointerOver);
+  root.addEventListener("mousemove", onPointerMove);
+  root.addEventListener("mouseout", onPointerOut);
   root.addEventListener("focusin", onFocusIn);
   root.addEventListener("focusout", onFocusOut);
   document.addEventListener("keydown", onKeyDown);
@@ -119,6 +127,9 @@ export function installCockpitTooltips(root: HTMLElement): CockpitTooltipControl
       root.removeEventListener("pointerover", onPointerOver);
       root.removeEventListener("pointermove", onPointerMove);
       root.removeEventListener("pointerout", onPointerOut);
+      root.removeEventListener("mouseover", onPointerOver);
+      root.removeEventListener("mousemove", onPointerMove);
+      root.removeEventListener("mouseout", onPointerOut);
       root.removeEventListener("focusin", onFocusIn);
       root.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("keydown", onKeyDown);
@@ -130,14 +141,14 @@ export function installCockpitTooltips(root: HTMLElement): CockpitTooltipControl
 export function findCockpitTooltipTarget(
   source: EventTarget | null,
   root: Element,
-): HTMLElement | null {
+): Element | null {
   if (!(source instanceof Element)) return null;
-  const target = source.closest<HTMLElement>(
+  const target = source.closest(
     "[data-dn-tooltip], [data-dn-native-title], [title]",
   );
   if (!target || !root.contains(target)) return null;
   if (!cockpitTooltipText(target).trim()) return null;
-  return isCockpitTooltipTargetTruncated(target) ? target : null;
+  return shouldShowCockpitTooltipTarget(target) ? target : null;
 }
 
 export function cockpitTooltipText(target: Element | null | undefined): string {
@@ -157,12 +168,25 @@ export function isCockpitTooltipTargetTruncated(target: {
     Number(target?.scrollHeight ?? 0) > Number(target?.clientHeight ?? 0) + 1;
 }
 
+export function shouldShowCockpitTooltipTarget(target: Element | ({
+  clientHeight?: number;
+  clientWidth?: number;
+  getAttribute?: (name: string) => string | null;
+  scrollHeight?: number;
+  scrollWidth?: number;
+}) | null | undefined): boolean {
+  const mode = target?.getAttribute?.("data-dn-tooltip-mode");
+  if (mode === "always") return true;
+  return isCockpitTooltipTargetTruncated(target);
+}
+
 export function renderNexusCockpitTooltipsClientSource(): string {
   return [
     installCockpitTooltips,
     findCockpitTooltipTarget,
     cockpitTooltipText,
     isCockpitTooltipTargetTruncated,
+    shouldShowCockpitTooltipTarget,
     positionCockpitTooltip,
   ]
     .map((fn) => fn.toString())
@@ -171,7 +195,7 @@ export function renderNexusCockpitTooltipsClientSource(): string {
 
 function positionCockpitTooltip(
   tooltip: HTMLElement,
-  target: HTMLElement,
+  target: Element,
   clientX: number | null = null,
   clientY: number | null = null,
   mode: "pointer" | "focus" = "pointer",
