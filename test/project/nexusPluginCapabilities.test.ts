@@ -4,6 +4,7 @@ import {
   findDevNexusPluginCatalogueEntry,
   listDevNexusPluginCatalogue,
   nexusPluginCatalogueRefreshCommand,
+  projectPluginAgentPackages,
   projectPluginCapabilityProjections,
   projectPluginDependencyProjections,
   projectPluginWorkerFragments,
@@ -57,6 +58,70 @@ describe("nexus plugin catalogue", () => {
 });
 
 describe("nexus plugin capability projections", () => {
+  it("includes provider-native agent package records in plugin capability summaries", () => {
+    expect(
+      projectPluginCapabilityProjections({
+        plugins: [
+          {
+            id: "agent-tools",
+            name: "Agent Tools",
+            version: "0.1.0",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "agent_package",
+                id: "codex-helper-pack",
+                description: "Use the Codex helper package.",
+                packageKind: "shim",
+                packageName: "@example/codex-helper-pack",
+                repositoryUrl: "https://example.invalid/codex-helper-pack",
+                installCommand: "codex skill install @example/codex-helper-pack",
+                checkCommand: "codex skill list",
+                versionPolicy: "Track approved releases.",
+                license: "MIT",
+                provenance: "Synthetic plugin fixture",
+                required: false,
+                targetAgents: ["codex"],
+                surfaces: ["skills", "commands", "references"],
+                setupInstructions: [
+                  "Install explicitly after confirming the project policy.",
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        pluginId: "agent-tools",
+        pluginName: "Agent Tools",
+        version: "0.1.0",
+        capabilityCount: 1,
+        capabilities: [
+          {
+            kind: "agent_package",
+            id: "codex-helper-pack",
+            description: "Use the Codex helper package.",
+            packageKind: "shim",
+            packageName: "@example/codex-helper-pack",
+            repositoryUrl: "https://example.invalid/codex-helper-pack",
+            installCommand: "codex skill install @example/codex-helper-pack",
+            checkCommand: "codex skill list",
+            versionPolicy: "Track approved releases.",
+            license: "MIT",
+            provenance: "Synthetic plugin fixture",
+            required: false,
+            targetAgents: ["codex"],
+            surfaces: ["skills", "commands", "references"],
+            setupInstructions: [
+              "Install explicitly after confirming the project policy.",
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
   it("includes dependency projection records in plugin capability summaries", () => {
     expect(
       projectPluginCapabilityProjections({
@@ -146,6 +211,107 @@ describe("nexus plugin capability projections", () => {
           },
         ],
       },
+    ]);
+  });
+});
+
+describe("nexus plugin agent packages", () => {
+  it("filters package guidance by active agent provider and keeps plugin source metadata", () => {
+    expect(
+      projectPluginAgentPackages(
+        {
+          plugins: [
+            {
+              id: "agent-tools",
+              name: "Agent Tools",
+              version: "0.1.0",
+              enabled: true,
+              capabilities: [
+                {
+                  kind: "agent_package",
+                  id: "claude-native",
+                  packageKind: "native",
+                  packageName: "@example/claude-agent-pack",
+                  repositoryUrl: "https://example.invalid/claude-agent-pack",
+                  required: true,
+                  targetAgents: ["claude"],
+                  surfaces: ["skills", "commands"],
+                },
+                {
+                  kind: "agent_package",
+                  id: "codex-shim",
+                  description: "Use the Codex agent package shim.",
+                  packageKind: "shim",
+                  packageName: "@example/codex-agent-shim",
+                  repositoryUrl: "https://example.invalid/codex-agent-shim",
+                  installCommand: "codex skill install @example/codex-agent-shim",
+                  checkCommand: "codex skill list",
+                  targetAgents: ["codex"],
+                  surfaces: ["skills", "commands", "references"],
+                },
+                {
+                  kind: "agent_package",
+                  id: "opencode-manual",
+                  packageKind: "manual_guidance",
+                  packageName: "@example/opencode-agent-plan",
+                  targetAgents: ["opencode"],
+                  setupInstructions: [
+                    "Use the project-local package plan until a native package exists.",
+                  ],
+                },
+                {
+                  kind: "agent_package",
+                  id: "fallback",
+                  packageKind: "bundled_fallback",
+                  packageName: "@example/bundled-agent-fallback",
+                  targetAgents: ["manual", "custom"],
+                },
+              ],
+            },
+            {
+              id: "disabled-tools",
+              enabled: false,
+              capabilities: [
+                {
+                  kind: "agent_package",
+                  id: "disabled",
+                  packageKind: "native",
+                  packageName: "disabled",
+                  targetAgents: ["codex"],
+                },
+              ],
+            },
+          ],
+        },
+        { activeAgents: ["codex", "opencode", "custom"] },
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        id: "codex-shim",
+        packageKind: "shim",
+        packageName: "@example/codex-agent-shim",
+        targetAgents: ["codex"],
+        pluginSource: {
+          pluginId: "agent-tools",
+          pluginName: "Agent Tools",
+          version: "0.1.0",
+          capabilityId: "codex-shim",
+        },
+      }),
+      expect.objectContaining({
+        id: "fallback",
+        packageKind: "bundled_fallback",
+        packageName: "@example/bundled-agent-fallback",
+        targetAgents: ["manual", "custom"],
+      }),
+      expect.objectContaining({
+        id: "opencode-manual",
+        packageKind: "manual_guidance",
+        packageName: "@example/opencode-agent-plan",
+        setupInstructions: [
+          "Use the project-local package plan until a native package exists.",
+        ],
+      }),
     ]);
   });
 });

@@ -33,12 +33,9 @@ import { handleHostCommand } from "./cli/cliHostCommand.js";
 import { handlePublicationCommand } from "./cli/cliPublicationCommand.js";
 import { handleReviewCommand } from "./cli/cliReviewCommand.js";
 import { isCliEntrypoint } from "./cli/cliRuntime.js";
-import {
-  parseQuickFixPlanCommand,
-  printQuickFixFinish,
-  printQuickFixPlan,
-  printQuickFixStart,
-} from "./cli/cliQuickFixCommand.js";
+import { handleQuickFixCommand } from "./cli/cliQuickFixCommand.js";
+import { handleWorktreeCommand } from "./cli/cliWorktreeCommand.js";
+import { handleGitWorkflowCommand } from "./cli/cliGitWorkflowCommand.js";
 import {
   handleRemoteExecutionCommand,
   type ParsedRemoteExecutionRequestCreateCommand,
@@ -159,14 +156,17 @@ import {
 } from "./automation/nexusAutomationTargetReport.js";
 import {
   createNexusCoordinationHandoff,
+  formatNexusCoordinationQualityDeltaSummary,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
   nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
   parseNexusCoordinationTrackerRole,
+  startOrAdoptNexusCoordinationWork,
   type NexusCoordinationHandoffResult,
   type NexusCoordinationHandoffStatus,
   type NexusCoordinationIntegrationPlan,
+  type NexusCoordinationStartResult,
   type NexusCoordinationStatus,
 } from "./coordination/nexusCoordination.js";
 import {
@@ -186,6 +186,7 @@ import {
   executeNexusCleanup,
   selectNexusCleanupCandidate,
   type NexusCleanupExecutionResult,
+  type NexusCleanupExecutionRescueOptions,
 } from "./operations/nexusCleanupExecution.js";
 import {
   buildNexusSetupCheck,
@@ -230,18 +231,10 @@ import {
   nexusMcpGatewayAgentTargets,
 } from "./mcp/nexusMcpGatewayProjection.js";
 import {
-  prepareNexusManualWorktree,
-  resolveNexusManualWorktreeWorkItem,
-  summarizeNexusManualWorktreeResult,
-  type PrepareNexusManualWorktreeResult,
-} from "./worktrees/nexusManualWorktree.js";
-import type { NexusCheckoutMutationClass } from "./worktrees/nexusSharedCheckoutGuard.js";
-import {
   heartbeatNexusAgentClaim,
   verifyNexusAgentClaimForMutation,
   type NexusAgentClaimGuardResult,
 } from "./agents/nexusAgentClaimGuard.js";
-import { buildNexusQuickFixPlan } from "./operations/nexusQuickFix.js";
 import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
@@ -327,6 +320,8 @@ import {
 } from "./work-items/nexusWorkItemDiscoveryStatus.js";
 import {
   claimNexusEligibleWorkItem,
+  releaseNexusWorkItemAuthorityClaim,
+  type NexusWorkItemAuthorityClaimReleaseResult,
   type NexusWorkItemClaimResult,
   type NexusWorkItemStaleClaimPolicy,
 } from "./work-items/nexusWorkItemClaim.js";
@@ -591,6 +586,17 @@ interface ParsedWorkItemClaimNextCommand {
   json?: boolean;
 }
 
+interface ParsedWorkItemClaimReleaseCommand {
+  projectRoot: string;
+  itemId: string;
+  homePath?: string;
+  componentId?: string;
+  trackerId?: string;
+  leaseToken: string;
+  fencingToken?: number | null;
+  json?: boolean;
+}
+
 interface ParsedWorkItemListCommand {
   projectRoot: string;
   componentId?: string;
@@ -828,6 +834,20 @@ interface ParsedCoordinationStatusCommand {
   detail?: CliOutputDetail;
 }
 
+interface ParsedCoordinationStartCommand extends ParsedCoordinationStatusCommand {
+  projectMeta?: boolean;
+  topic?: string | null;
+  branchName?: string;
+  worktreeName?: string;
+  baseRef?: string | null;
+  dryRun?: boolean;
+  hostId?: string | null;
+  agentId?: string | null;
+  workerAgentProvider?: string | null;
+  writeScope?: string[];
+  leaseNotes?: string[];
+}
+
 interface ParsedCoordinationHandoffCommand {
   projectRoot: string;
   componentId?: string;
@@ -841,6 +861,8 @@ interface ParsedCoordinationHandoffCommand {
   decisions: string[];
   verificationSummary?: string | null;
   integrationPreference?: string | null;
+  qualityDelta?: unknown;
+  qualityDeltaSourcePath?: string | null;
   note?: string | null;
   currentPath?: string;
   json?: boolean;
@@ -875,6 +897,10 @@ interface ParsedCoordinationCleanupExecuteCommand {
   keepBranch?: boolean;
   force?: boolean;
   forceReason?: string | null;
+  rescueBranch?: string;
+  rescueReason?: string | null;
+  archiveSummary?: string;
+  archiveUrl?: string | null;
   json?: boolean;
 }
 
@@ -895,29 +921,6 @@ interface ParsedCoordinationRequestCommand {
   responder?: string | null;
   requestedChanges: string[];
   currentPath?: string;
-  json?: boolean;
-}
-
-interface ParsedWorktreePrepareCommand {
-  projectRoot: string;
-  componentId?: string;
-  projectMeta?: boolean;
-  branchName?: string;
-  worktreeName?: string;
-  baseRef?: string | null;
-  featureId?: string | null;
-  featureChange?: string | null;
-  featureParentBranch?: string | null;
-  featureStackPosition?: number | null;
-  branchIntent?: string | null;
-  topic?: string | null;
-  workItemId?: string | null;
-  workItemTitle?: string | null;
-  hostId?: string | null;
-  agentId?: string | null;
-  workerAgentProvider?: string | null;
-  writeScope: string[];
-  leaseNotes: string[];
   json?: boolean;
 }
 
@@ -1013,7 +1016,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, git-workflow, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1035,6 +1038,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
       coordinationAttachmentRefs: remoteExecutionCoordinationAttachmentRefs,
     }),
   worktree: handleWorktreeCommand,
+  "git-workflow": handleGitWorkflowCommand,
   publication: handlePublicationCommand,
   review: handleReviewCommand,
   "quick-fix": handleQuickFixCommand,
@@ -1724,6 +1728,46 @@ async function handleCoordinationCommand(
     return 0;
   }
 
+  if (command === "start") {
+    const parsed = parseCoordinationStartCommand(argv);
+    if (!parsed.dryRun) {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "coordination start",
+        mutationClass: "worktree_bootstrap",
+        targetPath: parsed.currentPath,
+        componentId: parsed.componentId,
+      });
+    }
+    const result = await startOrAdoptNexusCoordinationWork({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      trackerId: parsed.trackerId,
+      trackerRole: parsed.trackerRole,
+      currentPath: parsed.currentPath,
+      projectMeta: parsed.projectMeta,
+      topic: parsed.topic,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      baseRef: parsed.baseRef,
+      dryRun: parsed.dryRun,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      workerAgentProvider: parsed.workerAgentProvider,
+      writeScope: parsed.writeScope,
+      leaseNotes: parsed.leaseNotes,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationStartResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.action === "blocked" ? 2 : 0;
+  }
+
   if (command === "handoff") {
     const parsed = parseCoordinationHandoffCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -1746,6 +1790,8 @@ async function handleCoordinationCommand(
       decisions: parsed.decisions,
       verificationSummary: parsed.verificationSummary,
       integrationPreference: parsed.integrationPreference,
+      qualityDelta: parsed.qualityDelta,
+      qualityDeltaSourcePath: parsed.qualityDeltaSourcePath,
       note: parsed.note,
       currentPath: parsed.currentPath,
       gitRunner: dependencies.gitRunner,
@@ -1848,6 +1894,7 @@ async function handleCoordinationCommand(
       deleteBranch: parsed.keepBranch ? false : undefined,
       force: parsed.force,
       forceReason: parsed.forceReason,
+      rescue: coordinationCleanupRescueOptions(parsed),
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -1896,142 +1943,7 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status, handoff, integrate, cleanup-plan, cleanup-execute, or request");
-}
-
-async function handleWorktreeCommand(
-  argv: string[],
-  dependencies: DevNexusCliDependencies,
-): Promise<number> {
-  const command = argv[1];
-  if (command === "prepare") {
-    const parsed = parseWorktreePrepareCommand(argv);
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: path.resolve(parsed.projectRoot),
-      command: "worktree prepare",
-      mutationClass: "worktree_bootstrap",
-      componentId: parsed.componentId,
-    });
-    const resolvedWorkItem = await resolveWorktreePrepareWorkItem(
-      parsed,
-      dependencies,
-    );
-    await verifyNexusAgentClaimForMutation({
-      projectRoot: path.resolve(parsed.projectRoot),
-      componentId: resolvedWorkItem.componentId ?? parsed.componentId ?? null,
-      workItemId: resolvedWorkItem.itemId ?? parsed.workItemId ?? null,
-      env: dependencies.env ?? process.env,
-      claimAuthority: dependencies.workItemClaimAuthority,
-      now: dependencies.now,
-    });
-    const result = prepareNexusManualWorktree({
-      projectRoot: parsed.projectRoot,
-      componentId: resolvedWorkItem.componentId ?? parsed.componentId,
-      projectMeta: parsed.projectMeta,
-      branchName: parsed.branchName,
-      worktreeName: parsed.worktreeName,
-      baseRef: parsed.baseRef,
-      featureId: parsed.featureId,
-      featureChange: parsed.featureChange,
-      featureParentBranch: parsed.featureParentBranch,
-      featureStackPosition: parsed.featureStackPosition,
-      branchIntent: parsed.branchIntent,
-      topic: parsed.topic,
-      workItemId: resolvedWorkItem.itemId ?? parsed.workItemId,
-      workItemTitle:
-        parsed.workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
-      workItemDescription: resolvedWorkItem.workItem?.description ?? null,
-      hostId: parsed.hostId,
-      agentId: parsed.agentId,
-      workerAgentProvider: parsed.workerAgentProvider,
-      writeScope: parsed.writeScope,
-      leaseNotes: parsed.leaseNotes,
-      gitRunner: dependencies.gitRunner,
-      now: dependencies.now,
-    });
-    printWorktreePrepareResult(
-      result,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
-  }
-
-  throw new Error("worktree requires prepare");
-}
-
-async function handleQuickFixCommand(
-  argv: string[],
-  dependencies: DevNexusCliDependencies,
-): Promise<number> {
-  if (argv[1] === "plan" || argv[1] === "start" || argv[1] === "finish") {
-    const parsed = parseQuickFixPlanCommand(argv);
-    const plan = buildNexusQuickFixPlan({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      workItemId: parsed.workItemId,
-      topic: parsed.topic,
-      branchName: parsed.branchName,
-      worktreeName: parsed.worktreeName,
-      writeScope: parsed.writeScope,
-      verificationCommands: parsed.verificationCommands,
-    });
-    if (parsed.command === "start") {
-      assertCliMutationAllowed(dependencies, {
-        projectRoot: path.resolve(parsed.projectRoot),
-        command: "quick-fix start",
-        mutationClass: "worktree_bootstrap",
-        componentId: parsed.componentId,
-      });
-      const prepared = prepareNexusManualWorktree({
-        projectRoot: parsed.projectRoot,
-        componentId: parsed.componentId,
-        workItemId: parsed.workItemId,
-        topic: plan.branch.topic,
-        branchName: plan.branch.name,
-        worktreeName: plan.branch.worktreeName,
-        writeScope: parsed.writeScope,
-        leaseNotes: [`Quick-fix work for ${plan.issue.repository}#${plan.issue.number}.`],
-        gitRunner: dependencies.gitRunner,
-        now: dependencies.now,
-      });
-      printQuickFixStart(
-        plan,
-        prepared,
-        parsed,
-        dependencies.stdout ?? process.stdout,
-      );
-      return 0;
-    }
-    if (parsed.command === "finish") {
-      printQuickFixFinish(plan, parsed, dependencies.stdout ?? process.stdout);
-      return 0;
-    }
-
-    printQuickFixPlan(plan, parsed, dependencies.stdout ?? process.stdout);
-    return 0;
-  }
-
-  throw new Error("quick-fix requires plan, start, or finish");
-}
-
-async function resolveWorktreePrepareWorkItem(
-  parsed: ParsedWorktreePrepareCommand,
-  dependencies: DevNexusCliDependencies,
-): Promise<{
-  componentId?: string;
-  itemId?: string;
-  workItem?: WorkItem | null;
-}> {
-  return resolveNexusManualWorktreeWorkItem({
-    projectRoot: parsed.projectRoot,
-    componentId: parsed.componentId,
-    projectMeta: parsed.projectMeta,
-    workItemId: parsed.workItemId,
-    workItemTitle: parsed.workItemTitle,
-    topic: parsed.topic,
-    now: dependencies.now,
-  });
+  throw new Error("coordination requires status, start, handoff, integrate, cleanup-plan, cleanup-execute, or request");
 }
 
 async function handleWorkItemCommand(
@@ -2138,6 +2050,23 @@ async function handleWorkItemCommand(
       dependencies.stdout ?? process.stdout,
     );
     return 0;
+  }
+
+  if (command === "claim-release") {
+    const parsed = parseWorkItemClaimReleaseCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item claim-release",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
+    const release = await releaseWorkItemClaim(parsed, dependencies);
+    printWorkItemClaimReleaseResult(
+      release,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return release.release.status === "released" ? 0 : 1;
   }
 
   if (command === "list") {
@@ -2491,7 +2420,7 @@ async function handleWorkItemCommand(
   }
 
   throw new Error(
-    "work-item requires create, discovery-status, claim-next, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
+    "work-item requires create, discovery-status, claim-next, claim-release, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
   );
 }
 
@@ -3018,8 +2947,35 @@ async function claimNextWorkItem(
     leaseDurationMs: parsed.leaseDurationMs,
     staleClaimPolicy: parsed.staleClaimPolicy,
     providerFactory: dependencies.workItemClaimProviderFactory,
+    claimAuthority: dependencies.workItemClaimAuthority,
     env: dependencies.env,
     leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
+    now: dependencies.now,
+  });
+}
+
+async function releaseWorkItemClaim(
+  parsed: ParsedWorkItemClaimReleaseCommand,
+  dependencies: DevNexusCliDependencies,
+): Promise<NexusWorkItemAuthorityClaimReleaseResult> {
+  const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  return releaseNexusWorkItemAuthorityClaim({
+    projectRoot,
+    projectConfig,
+    components: resolveProjectComponents(projectRoot, projectConfig),
+    automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    homePath: parsed.homePath
+      ? resolvedCommandHomePath(parsed.homePath)
+      : undefined,
+    componentId: parsed.componentId,
+    trackerId: parsed.trackerId,
+    workItemId: parsed.itemId,
+    leaseToken: parsed.leaseToken,
+    fencingToken: parsed.fencingToken,
+    providerFactory: dependencies.workItemClaimProviderFactory,
+    claimAuthority: dependencies.workItemClaimAuthority,
+    env: dependencies.env,
     now: dependencies.now,
   });
 }
@@ -4155,6 +4111,93 @@ function parseCoordinationStatusCommand(
   return parsed;
 }
 
+function parseCoordinationStartCommand(
+  argv: string[],
+): ParsedCoordinationStartCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination start requires a workspace root");
+  }
+
+  const parsed: ParsedCoordinationStartCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--workspace-meta":
+      case "--project-meta":
+        parsed.projectMeta = true;
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--topic":
+        parsed.topic = next();
+        break;
+      case "--branch":
+        parsed.branchName = next();
+        break;
+      case "--worktree-name":
+        parsed.worktreeName = next();
+        break;
+      case "--base-ref":
+        parsed.baseRef = next();
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--worker-agent":
+        parsed.workerAgentProvider = next();
+        break;
+      case "--write-scope":
+        parsed.writeScope = [...(parsed.writeScope ?? []), next()];
+        break;
+      case "--lease-note":
+        parsed.leaseNotes = [...(parsed.leaseNotes ?? []), next()];
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
+        break;
+      default:
+        throw new Error(`Unknown coordination start option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseCoordinationHandoffCommand(
   argv: string[],
 ): ParsedCoordinationHandoffCommand {
@@ -4214,6 +4257,14 @@ function parseCoordinationHandoffCommand(
       case "--integration-preference":
         parsed.integrationPreference = next();
         break;
+      case "--quality-delta": {
+        const qualityDeltaSourcePath = path.resolve(next());
+        parsed.qualityDelta = JSON.parse(
+          fs.readFileSync(qualityDeltaSourcePath, "utf8"),
+        );
+        parsed.qualityDeltaSourcePath = qualityDeltaSourcePath;
+        break;
+      }
       case "--note":
         parsed.note = next();
         break;
@@ -4375,6 +4426,18 @@ function parseCoordinationCleanupExecuteCommand(
       case "--force-reason":
         parsed.forceReason = next();
         break;
+      case "--rescue-branch":
+        parsed.rescueBranch = next();
+        break;
+      case "--rescue-reason":
+        parsed.rescueReason = next();
+        break;
+      case "--archive-record":
+        parsed.archiveSummary = next();
+        break;
+      case "--archive-url":
+        parsed.archiveUrl = next();
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -4388,6 +4451,32 @@ function parseCoordinationCleanupExecuteCommand(
   }
 
   return parsed as ParsedCoordinationCleanupExecuteCommand;
+}
+
+function coordinationCleanupRescueOptions(
+  parsed: ParsedCoordinationCleanupExecuteCommand,
+): NexusCleanupExecutionRescueOptions | undefined {
+  if (parsed.rescueBranch && parsed.archiveSummary) {
+    throw new Error(
+      "coordination cleanup-execute accepts either --rescue-branch or --archive-record, not both",
+    );
+  }
+  if (parsed.rescueBranch) {
+    return {
+      mode: "branch",
+      branchName: parsed.rescueBranch,
+      reason: parsed.rescueReason ?? null,
+    };
+  }
+  if (parsed.archiveSummary) {
+    return {
+      mode: "archive_record",
+      summary: parsed.archiveSummary,
+      url: parsed.archiveUrl ?? null,
+    };
+  }
+
+  return undefined;
 }
 
 function parseCoordinationRequestCommand(
@@ -4475,100 +4564,6 @@ function parseCoordinationRequestCommand(
   }
 
   return parsed as ParsedCoordinationRequestCommand;
-}
-
-function parseWorktreePrepareCommand(
-  argv: string[],
-): ParsedWorktreePrepareCommand {
-  const [, , projectRoot, ...rest] = argv;
-  if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("worktree prepare requires a workspace root");
-  }
-
-  const parsed: ParsedWorktreePrepareCommand = {
-    projectRoot,
-    writeScope: [],
-    leaseNotes: [],
-  };
-  for (let index = 0; index < rest.length; index += 1) {
-    const arg = rest[index]!;
-    const next = (): string => {
-      index += 1;
-      if (index >= rest.length) {
-        throw new Error(`${arg} requires a value`);
-      }
-
-      return rest[index]!;
-    };
-
-    switch (arg) {
-      case "--component":
-        parsed.componentId = next();
-        break;
-      case "--workspace-meta":
-      case "--project-meta":
-        parsed.projectMeta = true;
-        break;
-      case "--work-item":
-        parsed.workItemId = next();
-        break;
-      case "--work-item-title":
-        parsed.workItemTitle = next();
-        break;
-      case "--topic":
-        parsed.topic = next();
-        break;
-      case "--branch":
-        parsed.branchName = next();
-        break;
-      case "--worktree-name":
-        parsed.worktreeName = next();
-        break;
-      case "--base-ref":
-        parsed.baseRef = next();
-        break;
-      case "--no-base-ref":
-        parsed.baseRef = null;
-        break;
-      case "--feature":
-        parsed.featureId = next();
-        break;
-      case "--feature-change":
-        parsed.featureChange = next();
-        break;
-      case "--feature-parent":
-        parsed.featureParentBranch = next();
-        break;
-      case "--feature-stack-position":
-        parsed.featureStackPosition = parsePositiveInteger(next(), arg);
-        break;
-      case "--branch-intent":
-        parsed.branchIntent = next();
-        break;
-      case "--host":
-        parsed.hostId = next();
-        break;
-      case "--agent":
-        parsed.agentId = next();
-        break;
-      case "--worker-agent":
-        parsed.workerAgentProvider = next();
-        break;
-      case "--write-scope":
-        parsed.writeScope.push(next());
-        break;
-      case "--lease-note":
-        parsed.leaseNotes.push(next());
-        break;
-      case "--json":
-        parsed.json = true;
-        break;
-      default:
-        throw new Error(`Unknown worktree prepare option: ${arg}`);
-    }
-  }
-
-  return parsed;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -4722,6 +4717,62 @@ function parseWorkItemClaimNextCommand(
   }
 
   return parsed as ParsedWorkItemClaimNextCommand;
+}
+
+function parseWorkItemClaimReleaseCommand(
+  argv: string[],
+): ParsedWorkItemClaimReleaseCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item claim-release requires a workspace root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item claim-release requires a work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemClaimReleaseCommand> = {
+    projectRoot,
+    itemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--lease-token":
+        parsed.leaseToken = next();
+        break;
+      case "--fencing-token":
+        parsed.fencingToken = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item claim-release option: ${arg}`);
+    }
+  }
+  if (!parsed.leaseToken) {
+    throw new Error("work-item claim-release requires --lease-token");
+  }
+
+  return parsed as ParsedWorkItemClaimReleaseCommand;
 }
 
 function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
@@ -7251,6 +7302,13 @@ function printCoordinationStatusResult(
   );
   writeLine(stdout, `  Active leases: ${status.leases.activeCount}`);
   writeLine(stdout, `  Handoffs: ${status.handoffs.records.length}`);
+  writeLine(
+    stdout,
+    `  Activity: ${status.activity.activeGroupCount} active; ${status.activity.staleGroupCount} stale; ${status.activity.overlapCount} overlap`,
+  );
+  if (status.activity.nextAction !== status.nextAction) {
+    writeLine(stdout, `  Activity next action: ${status.activity.nextAction}`);
+  }
   if (!status.handoffs.available) {
     writeLine(stdout, "  Handoff storage: incomplete");
     if (status.handoffs.capability.reason) {
@@ -7258,6 +7316,52 @@ function printCoordinationStatusResult(
     }
   }
   writeLine(stdout, `  Next action: ${status.nextAction}`);
+}
+
+function printCoordinationStartResult(
+  result: NexusCoordinationStartResult,
+  parsed: ParsedCoordinationStartCommand,
+  stdout: TextWriter,
+): void {
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: result.action !== "blocked",
+    detail,
+    result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination start.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Action: ${result.action}`);
+  writeLine(stdout, `  Dry run: ${String(result.dryRun)}`);
+  if (result.preparedWorktree) {
+    writeLine(
+      stdout,
+      `  Worktree: ${result.preparedWorktree.worktree.worktreePath}`,
+    );
+    writeLine(
+      stdout,
+      `  Branch: ${result.preparedWorktree.worktree.branchName}`,
+    );
+  }
+  if (result.adoptedWorktree) {
+    writeLine(stdout, `  Adopted: ${result.adoptedWorktree.worktreePath}`);
+    writeLine(
+      stdout,
+      `  Branch: ${result.adoptedWorktree.branchName ?? "unknown"}`,
+    );
+  }
+  for (const reason of result.blockedReasons) {
+    writeLine(stdout, `  Blocked: ${reason}`);
+  }
+  for (const alternative of result.alternatives) {
+    writeLine(stdout, `  Alternative: ${alternative}`);
+  }
+  writeLine(stdout, `  Next action: ${result.nextAction}`);
 }
 
 function printCoordinationHandoffResult(
@@ -7283,6 +7387,12 @@ function printCoordinationHandoffResult(
   }
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
+  if (result.record.qualityDelta) {
+    writeLine(
+      stdout,
+      `  ${formatNexusCoordinationQualityDeltaSummary(result.record.qualityDelta)}`,
+    );
+  }
   if (result.blockedMutation) {
     writeLine(stdout, `  Blocked: ${result.blockedMutation.action}`);
     if (result.blockedMutation.fallbackSuggestion) {
@@ -7392,6 +7502,12 @@ function printCoordinationCleanupPlan(
         candidate.safeToDelete ? "safe" : "blocked"
       }`,
     );
+    if (candidate.workflowRun) {
+      writeLine(
+        stdout,
+        `      Workflow run: ${candidate.workflowRun.id} ${candidate.workflowRun.status}`,
+      );
+    }
   }
 }
 
@@ -7416,11 +7532,29 @@ function printCoordinationCleanupExecuteResult(
   if (result.actions.deletedBranch) {
     writeLine(stdout, `  Deleted branch: ${result.actions.deletedBranch}`);
   }
+  if (result.rescue.createdBranch) {
+    writeLine(
+      stdout,
+      `  Rescue branch: ${result.rescue.createdBranch} at ${result.rescue.startPoint ?? "unknown"}`,
+    );
+  }
+  if (result.rescue.archiveRecord) {
+    writeLine(
+      stdout,
+      `  Archive record: ${result.rescue.archiveRecord.summary}`,
+    );
+  }
+  for (const skipped of result.actions.skipped) {
+    writeLine(stdout, `  Skipped ${skipped.action}: ${skipped.reason}`);
+  }
   if (result.actions.updatedLeaseIds.length > 0) {
     writeLine(
       stdout,
       `  Updated leases: ${result.actions.updatedLeaseIds.join(", ")}`,
     );
+  }
+  for (const guidance of result.recoveryGuidance) {
+    writeLine(stdout, `  Recovery: ${guidance}`);
   }
   for (const command of result.git.commands) {
     writeLine(
@@ -7463,51 +7597,6 @@ function printCoordinationRequestResult(
   writeLine(stdout, `  Posted: ${String(result.record.provider.posted)}`);
   if (result.comment) {
     writeLine(stdout, `  Comment: ${result.comment.id}`);
-  }
-}
-
-function printWorktreePrepareResult(
-  result: PrepareNexusManualWorktreeResult,
-  parsed: ParsedWorktreePrepareCommand,
-  stdout: TextWriter,
-): void {
-  const payload = { ok: true, ...summarizeNexusManualWorktreeResult(result) };
-  if (parsed.json) {
-    writeJson(stdout, payload);
-    return;
-  }
-
-  writeLine(stdout, "DevNexus worktree prepared.");
-  writeLine(stdout, `  Scope: ${result.scope}`);
-  if (result.component) {
-    writeLine(stdout, `  Component: ${result.component.id}`);
-  }
-  writeLine(stdout, `  Worktree: ${result.worktree.worktreePath}`);
-  writeLine(stdout, `  Branch: ${result.worktree.branchName}`);
-  writeLine(stdout, `  Lease: ${result.lease.id}`);
-  if (result.worktree.baseRef) {
-    writeLine(
-      stdout,
-      `  Base ref: ${result.worktree.baseRef} (${result.worktree.baseRefKind})`,
-    );
-  }
-  if (result.worktree.resolvedBaseCommit) {
-    writeLine(
-      stdout,
-      `  Resolved base commit: ${result.worktree.resolvedBaseCommit}`,
-    );
-  }
-  for (const warning of result.worktree.baseRefFreshness.warnings) {
-    writeLine(stdout, `  Base warning: ${warning}`);
-  }
-  if (result.setup.context?.context.featureBranchDelivery) {
-    const feature = result.setup.context.context.featureBranchDelivery;
-    writeLine(stdout, `  Feature: ${feature.featureId}`);
-    writeLine(stdout, `  Review target: ${feature.branchTarget}`);
-    writeLine(stdout, `  Final target: ${feature.finalPublicationTarget}`);
-  }
-  for (const action of result.nextActions) {
-    writeLine(stdout, `  Next: ${action}`);
   }
 }
 
@@ -7741,6 +7830,39 @@ function printWorkItemClaimNextResult(
           `lease ${active.owner.leaseToken} expires ${active.owner.expiresAt}`,
       );
     }
+  }
+}
+
+function printWorkItemClaimReleaseResult(
+  release: NexusWorkItemAuthorityClaimReleaseResult,
+  parsed: ParsedWorkItemClaimReleaseCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: release.release.status === "released",
+    release,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  if (release.release.status === "released") {
+    writeLine(stdout, "DevNexus work item claim released.");
+    writeLine(stdout, `  Id: ${release.workItem.id}`);
+    writeLine(stdout, `  Authority: ${release.authorityKind}`);
+    writeLine(stdout, `  Fencing token: ${release.release.claim.fencingToken}`);
+    writeLine(stdout, `  Released: ${release.release.claim.releasedAt}`);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item claim release rejected.");
+  writeLine(stdout, `  Id: ${release.workItem.id}`);
+  writeLine(stdout, `  Authority: ${release.authorityKind}`);
+  writeLine(stdout, `  Reason: ${release.release.reason}`);
+  if (release.release.claim) {
+    writeLine(stdout, `  Fencing token: ${release.release.claim.fencingToken}`);
+    writeLine(stdout, `  State: ${release.release.claim.state}`);
   }
 }
 

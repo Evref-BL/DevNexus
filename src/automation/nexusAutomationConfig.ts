@@ -272,6 +272,94 @@ export interface NexusFeatureBranchDeliveryConfig {
   branchPublication: NexusFeatureBranchDeliveryBranchPublicationConfig;
 }
 
+export type NexusGitWorkflowProfileSource =
+  | "configured"
+  | "legacy_feature_branch_delivery";
+
+export type NexusGitWorkflowBranchStrategy =
+  | NexusFeatureBranchDeliveryBranchStrategy
+  | "release_maintenance"
+  | "environment_branch";
+
+export type NexusGitWorkflowUpdateAction =
+  | "none"
+  | "merge"
+  | "rebase"
+  | "restack"
+  | "recreate"
+  | "cherry_pick"
+  | "block"
+  | "wait";
+
+export type NexusGitWorkflowPublicRewritePolicy =
+  | "never"
+  | "before_review"
+  | "with_human_approval";
+
+export type NexusGitWorkflowGate =
+  | "human_approval"
+  | "provider_review"
+  | "required_checks"
+  | "merge_queue"
+  | "publication_authority"
+  | "manual_cleanup";
+
+export type NexusGitWorkflowReleaseMaintenanceFlow =
+  | "oldest_to_newest"
+  | "trunk_to_release";
+
+export type NexusGitWorkflowEnvironmentPromotion =
+  | "pull_request"
+  | "fast_forward"
+  | "manual";
+
+export interface NexusGitWorkflowUpdatePolicyConfig {
+  behind: NexusGitWorkflowUpdateAction;
+  diverged: NexusGitWorkflowUpdateAction;
+  wrongBase: NexusGitWorkflowUpdateAction;
+  publicRewrite: NexusGitWorkflowPublicRewritePolicy;
+}
+
+export interface NexusGitWorkflowGateConfig {
+  start: NexusGitWorkflowGate[];
+  review: NexusGitWorkflowGate[];
+  publication: NexusGitWorkflowGate[];
+  cleanup: NexusGitWorkflowGate[];
+}
+
+export interface NexusGitWorkflowReleaseMaintenanceConfig {
+  branches: string[];
+  flow: NexusGitWorkflowReleaseMaintenanceFlow;
+}
+
+export interface NexusGitWorkflowEnvironmentBranchConfig {
+  branch: string;
+  promotion: NexusGitWorkflowEnvironmentPromotion;
+}
+
+export interface NexusGitWorkflowProfileConfig {
+  id: string;
+  name: string | null;
+  source: NexusGitWorkflowProfileSource;
+  branchStrategy: NexusGitWorkflowBranchStrategy;
+  targetBranch: string | null;
+  activeFeatureId: string | null;
+  allowedBranchStrategies: NexusFeatureBranchDeliveryBranchStrategy[];
+  branchNaming: NexusFeatureBranchDeliveryBranchNamingConfig;
+  review: NexusFeatureBranchDeliveryReviewConfig;
+  provider: NexusFeatureBranchDeliveryProviderConfig;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationConfig;
+  update: NexusGitWorkflowUpdatePolicyConfig;
+  gates: NexusGitWorkflowGateConfig;
+  release: NexusGitWorkflowReleaseMaintenanceConfig | null;
+  environment: NexusGitWorkflowEnvironmentBranchConfig | null;
+}
+
+export interface NexusGitWorkflowConfig {
+  activeProfileId: string | null;
+  profiles: NexusGitWorkflowProfileConfig[];
+}
+
 export interface NexusAutomationReleaseTrainBranchNamingConfig {
   integrationPrefix: string;
   candidatePrefix: string;
@@ -346,6 +434,7 @@ export interface NexusAutomationConfig {
   target: NexusAutomationTargetConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
+  gitWorkflows: NexusGitWorkflowConfig;
 }
 
 export const defaultNexusAutomationConfig: NexusAutomationConfig = {
@@ -427,6 +516,10 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     allowDependencyInstall: false,
     allowLiveServices: false,
   },
+  gitWorkflows: {
+    activeProfileId: null,
+    profiles: [],
+  },
   publication: {
     strategy: "review_handoff",
     remote: "origin",
@@ -443,6 +536,21 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     manualActor: null,
     commandEnvironment: {},
   },
+};
+
+export const defaultNexusGitWorkflowUpdatePolicyConfig:
+  NexusGitWorkflowUpdatePolicyConfig = {
+    behind: "none",
+    diverged: "block",
+    wrongBase: "recreate",
+    publicRewrite: "with_human_approval",
+  };
+
+export const defaultNexusGitWorkflowGateConfig: NexusGitWorkflowGateConfig = {
+  start: [],
+  review: ["provider_review"],
+  publication: ["human_approval", "publication_authority"],
+  cleanup: ["manual_cleanup"],
 };
 
 export const defaultNexusAutomationGreenMainConfig:
@@ -556,6 +664,23 @@ export function validateNexusAutomationConfig(
     record.publication,
     "workspace config.automation.publication",
   );
+  const publicationPolicy = normalizeNexusAutomationPublicationConfig(
+    {
+      ...defaultNexusAutomationConfig.publication,
+      ...publication,
+      commandEnvironment: {
+        ...defaultNexusAutomationConfig.publication.commandEnvironment,
+        ...publication.commandEnvironment,
+      },
+    },
+    "workspace config.automation.publication",
+  );
+  const gitWorkflows = record.gitWorkflows === undefined
+    ? gitWorkflowsFromLegacyFeatureBranchDelivery(publicationPolicy)
+    : validateGitWorkflowConfig(
+        record.gitWorkflows,
+        "workspace config.automation.gitWorkflows",
+      );
 
   return {
     enabled: enabled ?? defaultNexusAutomationConfig.enabled,
@@ -611,17 +736,8 @@ export function validateNexusAutomationConfig(
       ...defaultNexusAutomationConfig.safety,
       ...safety,
     },
-    publication: normalizeNexusAutomationPublicationConfig(
-      {
-        ...defaultNexusAutomationConfig.publication,
-        ...publication,
-        commandEnvironment: {
-          ...defaultNexusAutomationConfig.publication.commandEnvironment,
-          ...publication.commandEnvironment,
-        },
-      },
-      "workspace config.automation.publication",
-    ),
+    gitWorkflows,
+    publication: publicationPolicy,
   };
 }
 
@@ -811,6 +927,530 @@ function normalizeFeatureBranchDeliveryConfig(
       ...value.provider,
     },
   };
+}
+
+function gitWorkflowsFromLegacyFeatureBranchDelivery(
+  publication: NexusAutomationPublicationConfig,
+): NexusGitWorkflowConfig {
+  const delivery = publication.releaseTrain?.featureBranchDelivery;
+  if (!delivery?.enabled) {
+    return {
+      activeProfileId: defaultNexusAutomationConfig.gitWorkflows.activeProfileId,
+      profiles: [...defaultNexusAutomationConfig.gitWorkflows.profiles],
+    };
+  }
+
+  const config = normalizeFeatureBranchDeliveryConfig(delivery);
+  const id = "legacy-feature-branch-delivery";
+  const branchStrategy = config.defaultBranchStrategy;
+  const review = branchStrategy === "throwaway_rehearsal"
+    ? {
+        ...config.review,
+        finalPullRequest: false,
+        finalPullRequestCreation: "manual_only" as const,
+      }
+    : config.review;
+
+  return {
+    activeProfileId: id,
+    profiles: [
+      {
+        id,
+        name: "Legacy feature branch delivery",
+        source: "legacy_feature_branch_delivery",
+        branchStrategy,
+        targetBranch: publication.targetBranch,
+        activeFeatureId: config.activeFeatureId,
+        allowedBranchStrategies: [...config.allowedBranchStrategies],
+        branchNaming: {
+          ...config.branchNaming,
+          allowedIntentPrefixes: [
+            ...config.branchNaming.allowedIntentPrefixes,
+          ],
+        },
+        review,
+        provider: { ...config.provider },
+        branchPublication: { ...config.branchPublication },
+        update: defaultGitWorkflowUpdatePolicyFor(branchStrategy),
+        gates: defaultGitWorkflowGatePolicyFor(review),
+        release: null,
+        environment: null,
+      },
+    ],
+  };
+}
+
+function validateGitWorkflowConfig(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowConfig {
+  const record = assertRecord(value, pathName);
+  const profiles = record.profiles === undefined
+    ? []
+    : optionalArray(
+        record.profiles,
+        `${pathName}.profiles`,
+        validateGitWorkflowProfile,
+      );
+  assertUniqueGitWorkflowProfileIds(profiles, `${pathName}.profiles`);
+  const activeProfileId = optionalNullableString(
+    record.activeProfileId,
+    `${pathName}.activeProfileId`,
+  ) ?? null;
+  if (
+    activeProfileId &&
+    !profiles.some((profile) => profile.id === activeProfileId)
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.activeProfileId must reference a configured profile`,
+    );
+  }
+
+  return {
+    activeProfileId,
+    profiles,
+  };
+}
+
+function assertUniqueGitWorkflowProfileIds(
+  profiles: NexusGitWorkflowProfileConfig[],
+  pathName: string,
+): void {
+  const seen = new Set<string>();
+  for (const profile of profiles) {
+    if (seen.has(profile.id)) {
+      throw new NexusAutomationConfigError(
+        `${pathName} must not contain duplicate profile id ${profile.id}`,
+      );
+    }
+    seen.add(profile.id);
+  }
+}
+
+function validateGitWorkflowProfile(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowProfileConfig {
+  const record = assertRecord(value, pathName);
+  const id = validateGitWorkflowProfileId(record.id, `${pathName}.id`);
+  const branchStrategy = validateGitWorkflowBranchStrategy(
+    record.branchStrategy,
+    `${pathName}.branchStrategy`,
+  );
+  const review = validateGitWorkflowReview(
+    record.review,
+    `${pathName}.review`,
+    branchStrategy,
+  );
+  const release = validateOptionalGitWorkflowReleaseMaintenance(
+    record.release,
+    `${pathName}.release`,
+  );
+  const environment = validateOptionalGitWorkflowEnvironmentBranch(
+    record.environment,
+    `${pathName}.environment`,
+  );
+  const update = validateGitWorkflowUpdatePolicy(
+    record.update,
+    `${pathName}.update`,
+    branchStrategy,
+  );
+  assertGitWorkflowSpecializedConfig(branchStrategy, release, environment, pathName);
+
+  return {
+    id,
+    name: optionalNullableString(record.name, `${pathName}.name`) ?? null,
+    source: record.source === undefined
+      ? "configured"
+      : validateGitWorkflowProfileSource(record.source, `${pathName}.source`),
+    branchStrategy,
+    targetBranch:
+      optionalNullableString(record.targetBranch, `${pathName}.targetBranch`) ??
+      null,
+    activeFeatureId:
+      optionalNullableString(
+        record.activeFeatureId,
+        `${pathName}.activeFeatureId`,
+      ) ?? null,
+    allowedBranchStrategies: validateAllowedFeatureBranchStrategies(
+      record.allowedBranchStrategies,
+      `${pathName}.allowedBranchStrategies`,
+    ),
+    branchNaming: validateFeatureBranchDeliveryBranchNaming(
+      record.branchNaming,
+      `${pathName}.branchNaming`,
+    ),
+    review,
+    provider: validateFeatureBranchDeliveryProvider(
+      record.provider,
+      `${pathName}.provider`,
+    ),
+    branchPublication: validateFeatureBranchDeliveryBranchPublication(
+      record.branchPublication,
+      `${pathName}.branchPublication`,
+    ),
+    update,
+    gates: validateGitWorkflowGatePolicy(record.gates, `${pathName}.gates`, review),
+    release,
+    environment,
+  };
+}
+
+function validateGitWorkflowProfileId(value: unknown, pathName: string): string {
+  const id = requiredNonEmptyString(value, pathName);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(id)) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must start with a letter or digit and contain only letters, digits, dots, underscores, or hyphens`,
+    );
+  }
+  return id;
+}
+
+function validateGitWorkflowProfileSource(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowProfileSource {
+  if (value === "configured" || value === "legacy_feature_branch_delivery") {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be configured or legacy_feature_branch_delivery`,
+  );
+}
+
+function validateGitWorkflowBranchStrategy(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowBranchStrategy {
+  if (
+    value === "direct" ||
+    value === "stacked" ||
+    value === "feature_branch" ||
+    value === "hybrid" ||
+    value === "throwaway_rehearsal" ||
+    value === "release_maintenance" ||
+    value === "environment_branch"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be direct, stacked, feature_branch, hybrid, release_maintenance, environment_branch, or throwaway_rehearsal`,
+  );
+}
+
+function validateGitWorkflowReview(
+  value: unknown,
+  pathName: string,
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+): NexusFeatureBranchDeliveryReviewConfig {
+  const review = value === undefined && branchStrategy === "throwaway_rehearsal"
+    ? {
+        ...defaultNexusFeatureBranchDeliveryConfig.review,
+        finalPullRequest: false,
+        finalPullRequestCreation: "manual_only" as const,
+      }
+    : validateFeatureBranchDeliveryReview(value, pathName);
+  if (branchStrategy === "throwaway_rehearsal" && review.finalPullRequest) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.finalPullRequest: throwaway_rehearsal profiles cannot create a final pull request`,
+    );
+  }
+  return review;
+}
+
+function validateGitWorkflowUpdatePolicy(
+  value: unknown,
+  pathName: string,
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+): NexusGitWorkflowUpdatePolicyConfig {
+  const defaults = defaultGitWorkflowUpdatePolicyFor(branchStrategy);
+  if (value === undefined) {
+    return defaults;
+  }
+  const record = assertRecord(value, pathName);
+  const update = {
+    behind: record.behind === undefined
+      ? defaults.behind
+      : validateGitWorkflowUpdateAction(record.behind, `${pathName}.behind`),
+    diverged: record.diverged === undefined
+      ? defaults.diverged
+      : validateGitWorkflowUpdateAction(record.diverged, `${pathName}.diverged`),
+    wrongBase: record.wrongBase === undefined
+      ? defaults.wrongBase
+      : validateGitWorkflowUpdateAction(record.wrongBase, `${pathName}.wrongBase`),
+    publicRewrite: record.publicRewrite === undefined
+      ? defaults.publicRewrite
+      : validateGitWorkflowPublicRewritePolicy(
+          record.publicRewrite,
+          `${pathName}.publicRewrite`,
+        ),
+  };
+  assertGitWorkflowUpdatePolicy(update, branchStrategy, pathName);
+  return update;
+}
+
+function defaultGitWorkflowUpdatePolicyFor(
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+): NexusGitWorkflowUpdatePolicyConfig {
+  if (branchStrategy === "stacked" || branchStrategy === "hybrid") {
+    return {
+      ...defaultNexusGitWorkflowUpdatePolicyConfig,
+      behind: "restack",
+    };
+  }
+  if (branchStrategy === "release_maintenance") {
+    return {
+      ...defaultNexusGitWorkflowUpdatePolicyConfig,
+      behind: "cherry_pick",
+      diverged: "cherry_pick",
+    };
+  }
+  if (branchStrategy === "throwaway_rehearsal") {
+    return {
+      behind: "recreate",
+      diverged: "recreate",
+      wrongBase: "recreate",
+      publicRewrite: "before_review",
+    };
+  }
+  return { ...defaultNexusGitWorkflowUpdatePolicyConfig };
+}
+
+function assertGitWorkflowUpdatePolicy(
+  update: NexusGitWorkflowUpdatePolicyConfig,
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+  pathName: string,
+): void {
+  const actions = [update.behind, update.diverged, update.wrongBase];
+  const usesRestack = actions.includes("restack");
+  if (
+    usesRestack &&
+    branchStrategy !== "stacked" &&
+    branchStrategy !== "hybrid"
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName}: restack update actions require stacked or hybrid branchStrategy`,
+    );
+  }
+  if (
+    update.publicRewrite === "never" &&
+    actions.some((action) => action === "rebase" || action === "restack")
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName}: publicRewrite never conflicts with rebase or restack update actions`,
+    );
+  }
+}
+
+function validateGitWorkflowUpdateAction(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowUpdateAction {
+  if (
+    value === "none" ||
+    value === "merge" ||
+    value === "rebase" ||
+    value === "restack" ||
+    value === "recreate" ||
+    value === "cherry_pick" ||
+    value === "block" ||
+    value === "wait"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be none, merge, rebase, restack, recreate, cherry_pick, block, or wait`,
+  );
+}
+
+function validateGitWorkflowPublicRewritePolicy(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowPublicRewritePolicy {
+  if (
+    value === "never" ||
+    value === "before_review" ||
+    value === "with_human_approval"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be never, before_review, or with_human_approval`,
+  );
+}
+
+function validateGitWorkflowGatePolicy(
+  value: unknown,
+  pathName: string,
+  review: NexusFeatureBranchDeliveryReviewConfig,
+): NexusGitWorkflowGateConfig {
+  if (value === undefined) {
+    return defaultGitWorkflowGatePolicyFor(review);
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    start: validateOptionalGitWorkflowGates(record.start, `${pathName}.start`) ??
+      [],
+    review: validateOptionalGitWorkflowGates(record.review, `${pathName}.review`) ??
+      [],
+    publication:
+      validateOptionalGitWorkflowGates(
+        record.publication,
+        `${pathName}.publication`,
+      ) ?? [],
+    cleanup:
+      validateOptionalGitWorkflowGates(record.cleanup, `${pathName}.cleanup`) ??
+      [],
+  };
+}
+
+function defaultGitWorkflowGatePolicyFor(
+  review: NexusFeatureBranchDeliveryReviewConfig,
+): NexusGitWorkflowGateConfig {
+  return {
+    ...defaultNexusGitWorkflowGateConfig,
+    review: review.mode === "review_branch_pr" ? ["provider_review"] : [],
+    publication: [
+      "human_approval",
+      ...(review.finalPullRequest ? ["provider_review" as const] : []),
+      "publication_authority",
+    ],
+  };
+}
+
+function validateOptionalGitWorkflowGates(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowGate[] | undefined {
+  return optionalStringArray(value, pathName)?.map((item) =>
+    validateGitWorkflowGate(item, pathName),
+  );
+}
+
+function validateGitWorkflowGate(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowGate {
+  if (
+    value === "human_approval" ||
+    value === "provider_review" ||
+    value === "required_checks" ||
+    value === "merge_queue" ||
+    value === "publication_authority" ||
+    value === "manual_cleanup"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must contain only known Git workflow gates`,
+  );
+}
+
+function validateOptionalGitWorkflowReleaseMaintenance(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowReleaseMaintenanceConfig | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const record = assertRecord(value, pathName);
+  const branches = optionalStringArray(record.branches, `${pathName}.branches`);
+  if (!branches || branches.length === 0) {
+    throw new NexusAutomationConfigError(`${pathName}.branches must not be empty`);
+  }
+  return {
+    branches: uniqueValues(branches.map((branch, index) =>
+      validateGitWorkflowBranchName(branch, `${pathName}.branches[${index}]`)
+    )),
+    flow: validateGitWorkflowReleaseMaintenanceFlow(
+      record.flow,
+      `${pathName}.flow`,
+    ),
+  };
+}
+
+function validateGitWorkflowReleaseMaintenanceFlow(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowReleaseMaintenanceFlow {
+  if (value === "oldest_to_newest" || value === "trunk_to_release") {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be oldest_to_newest or trunk_to_release`,
+  );
+}
+
+function validateOptionalGitWorkflowEnvironmentBranch(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowEnvironmentBranchConfig | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    branch: validateGitWorkflowBranchName(record.branch, `${pathName}.branch`),
+    promotion: validateGitWorkflowEnvironmentPromotion(
+      record.promotion,
+      `${pathName}.promotion`,
+    ),
+  };
+}
+
+function validateGitWorkflowEnvironmentPromotion(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowEnvironmentPromotion {
+  if (value === "pull_request" || value === "fast_forward" || value === "manual") {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be pull_request, fast_forward, or manual`,
+  );
+}
+
+function assertGitWorkflowSpecializedConfig(
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+  release: NexusGitWorkflowReleaseMaintenanceConfig | null,
+  environment: NexusGitWorkflowEnvironmentBranchConfig | null,
+  pathName: string,
+): void {
+  if (branchStrategy === "release_maintenance" && !release) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.release is required when branchStrategy is release_maintenance`,
+    );
+  }
+  if (branchStrategy !== "release_maintenance" && release) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.release requires branchStrategy release_maintenance`,
+    );
+  }
+  if (branchStrategy === "environment_branch" && !environment) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.environment is required when branchStrategy is environment_branch`,
+    );
+  }
+  if (branchStrategy !== "environment_branch" && environment) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.environment requires branchStrategy environment_branch`,
+    );
+  }
+}
+
+function validateGitWorkflowBranchName(value: unknown, pathName: string): string {
+  const branch = stripTrailingSlashes(requiredNonEmptyString(value, pathName));
+  if (
+    branch.length === 0 ||
+    branch.startsWith("/") ||
+    branch.includes("..") ||
+    /\s/u.test(branch)
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a relative Git branch name without whitespace or parent traversal`,
+    );
+  }
+  return branch;
 }
 
 export function summarizeNexusAutomationPublicationPolicy(

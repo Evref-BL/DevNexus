@@ -7,12 +7,14 @@ import {
   createDefaultNexusHomeConfigBase,
   createLocalWorkTrackerProvider,
   createNexusCoordinationHandoff,
+  createOrRefreshNexusWorktreeLease,
   defaultNexusAutomationConfig,
   getNexusCoordinationStatus,
   getNexusCoordinationIntegrationPlan,
   loadLocalWorkTrackingStore,
   saveNexusHomeConfigFile,
   saveProjectConfig,
+  startOrAdoptNexusCoordinationWork,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
@@ -299,12 +301,36 @@ function fakeGitRunner(
     upstreamExitCode?: number;
     branch?: string;
     head?: string;
+    changedFiles?: string[];
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
     const argsArray = [...args];
     calls.push({ args: argsArray, cwd });
     const joined = argsArray.join(" ");
+    if (argsArray[0] === "worktree" && argsArray[1] === "add") {
+      const worktreePath = argsArray.includes("-b") ? argsArray[4] : argsArray[2];
+      if (worktreePath) {
+        fs.mkdirSync(worktreePath, { recursive: true });
+      }
+      return ok(argsArray, "");
+    }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+      return ok(argsArray, path.join(cwd ?? repositoryPath, ".git", "info", "exclude"));
+    }
+    if (
+      argsArray[0] === "for-each-ref" ||
+      argsArray[0] === "show-ref"
+    ) {
+      return ok(argsArray, "");
+    }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet"
+    ) {
+      return ok(argsArray, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+    }
     if (joined === "rev-parse --show-toplevel") {
       return ok(argsArray, `${repositoryPath}\n`);
     }
@@ -330,6 +356,12 @@ function fakeGitRunner(
     }
     if (joined === "rev-list --left-right --count HEAD...@{u}") {
       return ok(argsArray, overrides.aheadBehind ?? "0\t0\n");
+    }
+    if (
+      joined === "diff --name-only HEAD" ||
+      joined === "ls-files --others --exclude-standard"
+    ) {
+      return ok(argsArray, `${overrides.changedFiles?.join("\n") ?? ""}\n`);
     }
 
     return ok(argsArray, "");
@@ -893,6 +925,36 @@ describe("nexus coordination", () => {
       title: "Shared coordination",
       status: "in_progress",
     });
+    const qualityDelta = {
+      producer: "static-analysis",
+      sourcePath: ".quality/static-analysis-delta.json",
+      readOnly: true,
+      status: "regressed",
+      touchedFiles: ["src/nexusCoordination.ts"],
+      summary: {
+        newFindingCount: 3,
+        resolvedFindingCount: 0,
+        touchedNewFindingCount: 2,
+        touchedResolvedFindingCount: 0,
+        newCriticalOrBlockerCount: 1,
+        newBugCount: 1,
+        newVulnerabilityCount: 1,
+        newSecurityHotspotCount: 1,
+        qualityGateRegressed: true,
+      },
+      attention: [
+        {
+          id: "sonar-issue:bug",
+          source: "sonar_issue",
+          category: "bug",
+          severity: "blocker",
+          filePath: "src/nexusCoordination.ts",
+          line: 42,
+          rule: "complexity:S3776",
+          message: "Reduce cognitive complexity.",
+        },
+      ],
+    };
     const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
 
     const handoff = await createNexusCoordinationHandoff({
@@ -906,6 +968,7 @@ describe("nexus coordination", () => {
       decisions: ["Use advisory handoffs instead of locks."],
       verificationSummary: "npm test passed",
       integrationPreference: "direct_integration",
+      qualityDelta,
       note: "Ready to merge.",
       currentPath: worktreePath,
       gitRunner: fakeGitRunner(worktreePath, gitCalls),
@@ -928,6 +991,30 @@ describe("nexus coordination", () => {
       dirty: false,
       pushed: true,
       changedAreas: ["src/nexusCoordination.ts"],
+      qualityDelta: {
+        producer: "static-analysis",
+        status: "regressed",
+        sourcePath: ".quality/static-analysis-delta.json",
+        touchedFiles: ["src/nexusCoordination.ts"],
+        summary: {
+          newFindingCount: 3,
+          touchedNewFindingCount: 2,
+          newCriticalOrBlockerCount: 1,
+          newBugCount: 1,
+          newVulnerabilityCount: 1,
+          newSecurityHotspotCount: 1,
+          qualityGateRegressed: true,
+        },
+        attention: [
+          {
+            category: "bug",
+            severity: "blocker",
+            rule: "complexity:S3776",
+            filePath: "src/nexusCoordination.ts",
+            line: 42,
+          },
+        ],
+      },
     });
     expect(handoff.lease).toMatchObject({
       projectId: "coordination-demo",
@@ -945,6 +1032,9 @@ describe("nexus coordination", () => {
       writeScope: ["src/nexusCoordination.ts"],
     });
     expect(handoff.comment.body).toContain(coordinationHandoffCommentMarker);
+    expect(handoff.comment.body).toContain(
+      "Quality delta: regressed; 3 new finding(s); 2 on touched file(s); 1 critical/blocker; 1 bug(s); 1 vulnerability issue(s); 1 security hotspot(s); quality gate regressed",
+    );
     const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
     expect(store.comments["local-1"]?.[0]?.body).toContain(
       coordinationHandoffCommentMarker,
@@ -1039,6 +1129,492 @@ describe("nexus coordination", () => {
       unstagedCount: 2,
       untrackedCount: 1,
     });
+  });
+
+  it("groups active coordination activity and reports overlap, stale leases, and branch blockers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const currentWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "current");
+    const ownedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "owned");
+    const otherWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "other");
+    const staleWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "stale");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(currentWorktreePath, { recursive: true });
+    fs.mkdirSync(ownedWorktreePath, { recursive: true });
+    fs.mkdirSync(otherWorktreePath, { recursive: true });
+    fs.mkdirSync(staleWorktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+    );
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Parallel status",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: os.hostname(),
+      agentId: "codex-owned",
+      workItemId,
+      branchName: "codex/dev-nexus/owned",
+      worktreePath: ownedWorktreePath,
+      writeScope: ["src/coordination"],
+      status: "working",
+      gitFacts: {
+        headCommit: "owned123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/owned",
+      },
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    const otherWorkItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Other active work",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "other-host",
+      agentId: "codex-other",
+      workItemId: otherWorkItemId,
+      branchName: "codex/dev-nexus/other",
+      worktreePath: otherWorktreePath,
+      writeScope: ["src/coordination/nexusCoordination.ts"],
+      status: "working",
+      gitFacts: {
+        headCommit: "other123",
+        dirty: true,
+        stagedCount: 1,
+        pushed: false,
+        ahead: 2,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "old-host",
+      agentId: "codex-stale",
+      workItemId: "local-100",
+      branchName: "codex/dev-nexus/stale",
+      worktreePath: staleWorktreePath,
+      writeScope: ["docs"],
+      status: "working",
+      gitFacts: {
+        headCommit: "stale123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/stale",
+      },
+      now: () => "2026-05-15T09:00:00.000Z",
+    });
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      currentPath: currentWorktreePath,
+      gitRunner: fakeGitRunner(currentWorktreePath, [], {
+        status: " M src/coordination/nexusCoordination.ts\n",
+        aheadBehind: "1\t0\n",
+        upstreamExitCode: 1,
+        changedFiles: ["src/coordination/nexusCoordination.ts"],
+      }),
+      now: () => "2026-05-16T10:30:00.000Z",
+      maxLeaseAgeMs: 60 * 60 * 1000,
+    });
+
+    expect(status.git).toMatchObject({
+      dirty: true,
+      upstream: null,
+      ahead: null,
+      pushed: null,
+      changedFiles: ["src/coordination/nexusCoordination.ts"],
+    });
+    expect(status.activity).toMatchObject({
+      activeGroupCount: 2,
+      staleGroupCount: 1,
+      overlapCount: 2,
+      dirtyGeneratedWorktree: true,
+      dirtySharedCheckout: false,
+      currentBranch: {
+        missingUpstream: true,
+        unpushed: false,
+      },
+      authority: {
+        missingSummary: true,
+      },
+    });
+    expect(status.activity.groups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          branch: "codex/dev-nexus/owned",
+          ownership: "current_host",
+          active: true,
+          overlap: expect.objectContaining({
+            likely: true,
+            granularity: "package",
+          }),
+          nextAction: "Continue or hand off the owned active worktree.",
+        }),
+        expect.objectContaining({
+          branch: "codex/dev-nexus/other",
+          ownership: "other_host",
+          active: true,
+          dirty: true,
+          unpushed: true,
+          missingUpstream: true,
+          overlap: expect.objectContaining({
+            likely: true,
+            granularity: "file",
+          }),
+          nextAction: "Coordinate before editing overlapping active work.",
+        }),
+        expect.objectContaining({
+          branch: "codex/dev-nexus/stale",
+          stale: true,
+          nextAction: "Run cleanup dry-run or refresh the stale lease.",
+        }),
+      ]),
+    );
+    expect(status.activity.nextAction).toBe(
+      "Review, commit, or hand off current worktree changes before starting parallel work.",
+    );
+  });
+
+  it("does not report terminal leases as active coordination groups", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initCoordinationProjectFixture("terminal-lease-activity");
+    const activeWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "active");
+    const mergedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "merged");
+    const abandonedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "abandoned");
+    fs.mkdirSync(activeWorktreePath, { recursive: true });
+    fs.mkdirSync(mergedWorktreePath, { recursive: true });
+    fs.mkdirSync(abandonedWorktreePath, { recursive: true });
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Active work",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      branchName: "codex/dev-nexus/active",
+      worktreePath: activeWorktreePath,
+      status: "working",
+      gitFacts: {
+        headCommit: "active123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/active",
+      },
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-merged",
+      branchName: "codex/dev-nexus/merged",
+      worktreePath: mergedWorktreePath,
+      status: "merged",
+      gitFacts: {
+        headCommit: "merged123",
+        dirty: false,
+        pushed: true,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-abandoned",
+      branchName: "codex/dev-nexus/abandoned",
+      worktreePath: abandonedWorktreePath,
+      status: "abandoned",
+      gitFacts: {
+        headCommit: "abandoned123",
+        dirty: false,
+        pushed: true,
+        upstream: null,
+      },
+      now: () => "2026-05-16T10:10:00.000Z",
+    });
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      currentPath: sourceRoot,
+      gitRunner: fakeGitRunner(sourceRoot, []),
+      now: () => "2026-05-16T10:30:00.000Z",
+      maxLeaseAgeMs: 60 * 60 * 1000,
+    });
+
+    expect(status.leases.records.map((lease) => lease.status).sort()).toEqual([
+      "abandoned",
+      "merged",
+      "working",
+    ]);
+    expect(status.activity).toMatchObject({
+      activeGroupCount: 1,
+      staleGroupCount: 0,
+      overlapCount: 0,
+    });
+    expect(status.activity.groups).toHaveLength(1);
+    expect(status.activity.groups[0]).toMatchObject({
+      branch: "codex/dev-nexus/active",
+      statuses: ["working"],
+      active: true,
+    });
+    expect(status.activity.groups.map((group) => group.branch)).not.toContain(
+      "codex/dev-nexus/merged",
+    );
+    expect(status.activity.groups.map((group) => group.branch)).not.toContain(
+      "codex/dev-nexus/abandoned",
+    );
+  });
+
+  it("dry-runs and prepares a fresh interactive worktree start", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const currentPath = path.join(projectRoot, "scratch");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(currentPath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+    );
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Interactive start",
+    );
+    const dryRun = await startOrAdoptNexusCoordinationWork({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      currentPath,
+      topic: "Interactive start",
+      writeScope: ["src/coordination"],
+      dryRun: true,
+      gitRunner: fakeGitRunner(sourceRoot, []),
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+
+    expect(dryRun).toMatchObject({
+      action: "prepare",
+      dryRun: true,
+      mutatesSource: false,
+      preparedWorktree: null,
+      nextAction: "Prepare a new isolated worktree.",
+    });
+
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const prepared = await startOrAdoptNexusCoordinationWork({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      currentPath,
+      topic: "Interactive start",
+      writeScope: ["src/coordination"],
+      gitRunner: fakeGitRunner(sourceRoot, calls),
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+
+    expect(prepared).toMatchObject({
+      action: "prepare",
+      dryRun: false,
+      mutatesSource: true,
+      preparedWorktree: {
+        scope: "component",
+        worktree: {
+          branchName: "codex/dev-nexus/local-1",
+          workItem: {
+            id: "local-1",
+          },
+        },
+        lease: {
+          workItemId: "local-1",
+          writeScope: ["src/coordination"],
+        },
+      },
+    });
+    expect(calls.some((call) =>
+      call.args[0] === "worktree" && call.args[1] === "add"
+    )).toBe(true);
+  });
+
+  it("adopts owned worktrees and blocks conflicting or unauthorized starts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const ownedWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "owned");
+    const otherWorktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "other");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(ownedWorktreePath, { recursive: true });
+    fs.mkdirSync(otherWorktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+    );
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Interactive adopt",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: os.hostname(),
+      agentId: "codex-owned",
+      workItemId,
+      branchName: "codex/dev-nexus/owned",
+      worktreePath: ownedWorktreePath,
+      writeScope: ["src/coordination"],
+      status: "working",
+      gitFacts: {
+        headCommit: "owned123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/owned",
+      },
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+
+    const adopted = await startOrAdoptNexusCoordinationWork({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      currentPath: sourceRoot,
+      agentId: "codex-new",
+      gitRunner: fakeGitRunner(ownedWorktreePath, [], {
+        branch: "codex/dev-nexus/owned",
+      }),
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(adopted).toMatchObject({
+      action: "adopt",
+      mutatesSource: false,
+      adoptedWorktree: {
+        worktreePath: ownedWorktreePath,
+        branchName: "codex/dev-nexus/owned",
+        refreshedLease: {
+          agentId: "codex-new",
+        },
+      },
+    });
+
+    const otherWorkItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Other active work",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "other-host",
+      agentId: "codex-other",
+      workItemId: otherWorkItemId,
+      branchName: "codex/dev-nexus/other",
+      worktreePath: otherWorktreePath,
+      writeScope: ["src/coordination/nexusCoordination.ts"],
+      status: "working",
+      gitFacts: {
+        headCommit: "other123",
+        dirty: false,
+        pushed: true,
+        upstream: "origin/codex/dev-nexus/other",
+      },
+      now: () => "2026-05-16T10:20:00.000Z",
+    });
+    const blockedConflict = await startOrAdoptNexusCoordinationWork({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: otherWorkItemId,
+      currentPath: sourceRoot,
+      gitRunner: fakeGitRunner(sourceRoot, [], {
+        changedFiles: ["src/coordination/nexusCoordination.ts"],
+      }),
+      now: () => "2026-05-16T10:25:00.000Z",
+    });
+    expect(blockedConflict).toMatchObject({
+      action: "blocked",
+      mutatesSource: false,
+      blockedReasons: expect.arrayContaining([
+        expect.stringContaining("owned by another host"),
+      ]),
+      alternatives: expect.arrayContaining([
+        "Wait for a handoff or ask the active owner to hand off.",
+      ]),
+    });
+
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+      authority: {
+        actors: [
+          {
+            id: "observer",
+            kind: "human",
+            provider: null,
+            providerIdentity: "observer",
+            displayName: "Observer",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "observer",
+            roles: ["observer"],
+            scope: {
+              component: "dev-nexus",
+            },
+          },
+        ],
+      },
+      automation: {
+        ...defaultNexusAutomationConfig,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          actor: {
+            id: "observer",
+            kind: "human",
+            provider: null,
+            handle: "observer",
+          },
+        },
+      },
+    });
+    const blockedAuthority = await startOrAdoptNexusCoordinationWork({
+      projectRoot,
+      componentId: "dev-nexus",
+      topic: "Unauthorized start",
+      currentPath: sourceRoot,
+      gitRunner: fakeGitRunner(sourceRoot, []),
+    });
+    expect(blockedAuthority).toMatchObject({
+      action: "blocked",
+      blockedReasons: expect.arrayContaining([
+        expect.stringContaining("lacks action worktree.create"),
+      ]),
+    });
+
+    await expect(
+      startOrAdoptNexusCoordinationWork({
+        projectRoot,
+        componentId: "missing",
+        topic: "Missing component",
+        currentPath: sourceRoot,
+        gitRunner: fakeGitRunner(sourceRoot, []),
+      }),
+    ).rejects.toThrow(/component.*missing/u);
   });
 
   it("uses host-local auth profiles in coordination authority status", async () => {

@@ -96,6 +96,7 @@ import {
   claimNexusEligibleWorkItem,
   type NexusWorkItemClaimAuthority,
   type NexusWorkItemClaimOwnerInput,
+  type NexusWorkItemClaimResult,
 } from "../work-items/nexusWorkItemClaim.js";
 import {
   automationComponentEligibleWorkItemsForClaim as componentEligibleWorkItemsForClaim,
@@ -357,17 +358,18 @@ export async function adoptNexusAutomationCurrentAgent(
   let metadataFile: string | null = null;
   let reused = false;
 
-  if (!automationConfig?.enabled) {
+  const inactiveAutomation = currentAgentInactiveAutomation(automationConfig);
+  if (inactiveAutomation) {
     return adoptionResult({
       runId,
       projectRoot,
       sourceRoot,
       projectConfig,
       automationConfig,
-      status: "skipped",
+      status: inactiveAutomation.status,
       shouldProceed: false,
       reused,
-      summary: "Automation is not enabled for this workspace",
+      summary: inactiveAutomation.summary,
       ledger,
       lock,
       preflight,
@@ -382,32 +384,7 @@ export async function adoptNexusAutomationCurrentAgent(
       result: null,
     });
   }
-
-  if (automationConfig.mode !== "agent_launch") {
-    return adoptionResult({
-      runId,
-      projectRoot,
-      sourceRoot,
-      projectConfig,
-      automationConfig,
-      status: "blocked",
-      shouldProceed: false,
-      reused,
-      summary: "Automation mode is not agent_launch",
-      ledger,
-      lock,
-      preflight,
-      selectorQuery,
-      eligibleWorkItems,
-      componentEligibleWorkItems,
-      components,
-      contextFile,
-      resultFile,
-      metadataFile,
-      environment: null,
-      result: null,
-    });
-  }
+  assertCurrentAgentActiveAutomationConfig(automationConfig);
 
   const startedAt = currentIso(options.now);
   ledger = readNexusAutomationRunLedger(projectRoot, automationConfig);
@@ -690,141 +667,31 @@ export async function adoptNexusAutomationCurrentAgent(
     eligibleWorkItems = componentEligibleWorkItems.flatMap(
       (component) => component.workItems,
     );
-    if (automationConfig.workItemClaims.enabled) {
-      try {
-        const claim = await claimNexusEligibleWorkItem({
-          projectRoot,
-          projectConfig,
-          components,
-          automationConfig,
-          homePath: options.homePath,
-          selectorQuery,
-          provider: options.provider,
-          providerFactory: currentAgentClaimProviderFactory({
-            options,
-            projectRoot,
-            projectConfig,
-          }),
-          providerOptions: options.providerOptions,
-          env: options.env,
-          claimAuthority: options.claimAuthority,
-          owner: currentAgentWorkItemClaimOwner({
-            options,
-            runId,
-          }),
-          leaseDurationMs: automationConfig.workItemClaims.leaseDurationMs,
-          staleClaimPolicy: automationConfig.workItemClaims.staleClaimPolicy,
-          leaseTokenFactory: options.workItemClaimLeaseTokenFactory,
-          now: options.now,
-        });
-        workItemClaim = currentAgentWorkItemClaim(claim);
-        if (claim.status === "claimed") {
-          eligibleWorkItems = [claim.workItem];
-          componentEligibleWorkItems = componentEligibleWorkItemsForClaim({
-            componentEligibleWorkItems,
-            claim,
-          });
-        } else {
-          const finishedAt = currentIso(options.now);
-          const summary = automationWorkItemClaimSkipSummary(
-            workItemClaim,
-            "current-agent adoption",
-          );
-          ledger = appendNexusAutomationRunRecord({
-            projectRoot,
-            config: automationConfig,
-            now: finishedAt,
-            record: {
-              id: runId,
-              projectId: projectConfig.id,
-              status: "skipped",
-              startedAt,
-              finishedAt,
-              sourceRoot,
-              summary,
-            },
-          });
-          releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
-          return adoptionResult({
-            runId,
-            projectRoot,
-            sourceRoot,
-            projectConfig,
-            automationConfig,
-            status: "skipped",
-            shouldProceed: false,
-            reused,
-            summary,
-            ledger,
-            lock,
-            preflight,
-            selectorQuery,
-            eligibleWorkItems,
-            workItemClaim,
-            componentEligibleWorkItems,
-            components,
-            contextFile,
-            resultFile,
-            metadataFile,
-            environment: null,
-            result: null,
-          });
-        }
-      } catch (error) {
-        const finishedAt = currentIso(options.now);
-        const summary =
-          `Work-item claim coordination blocked: ${errorMessage(error)}`;
-        workItemClaim = blockedWorkItemClaim(summary);
-        ledger = appendNexusAutomationRunRecord({
-          projectRoot,
-          config: automationConfig,
-          now: finishedAt,
-          record: {
-            id: runId,
-            projectId: projectConfig.id,
-            status: "blocked",
-            startedAt,
-            finishedAt,
-            sourceRoot,
-            summary,
-            error: summary,
-          },
-        });
-        releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
-        return adoptionResult({
-          runId,
-          projectRoot,
-          sourceRoot,
-          projectConfig,
-          automationConfig,
-          status: "blocked",
-          shouldProceed: false,
-          reused,
-          summary,
-          ledger,
-          lock,
-          preflight: [
-            ...preflight,
-            {
-              name: "workItemClaim",
-              status: "failed",
-              message: summary,
-            },
-          ],
-          selectorQuery,
-          eligibleWorkItems,
-          workItemClaim,
-          componentEligibleWorkItems,
-          components,
-          contextFile,
-          resultFile,
-          metadataFile,
-          environment: null,
-          result: null,
-        });
-      }
-    } else {
-      workItemClaim = disabledWorkItemClaim();
+    const claimOutcome = await currentAgentAdoptionClaimOutcome({
+      options,
+      runId,
+      projectRoot,
+      projectConfig,
+      automationConfig,
+      sourceRoot,
+      startedAt,
+      reused,
+      ledger,
+      lock,
+      preflight,
+      selectorQuery,
+      eligibleWorkItems,
+      componentEligibleWorkItems,
+      components,
+      contextFile,
+      resultFile,
+      metadataFile,
+    });
+    workItemClaim = claimOutcome.workItemClaim;
+    eligibleWorkItems = claimOutcome.eligibleWorkItems;
+    componentEligibleWorkItems = claimOutcome.componentEligibleWorkItems;
+    if (claimOutcome.result) {
+      return claimOutcome.result;
     }
     if (eligibleWorkItems.length === 0) {
       const summary = "No eligible work item matched the automation selector";
@@ -954,11 +821,240 @@ export async function adoptNexusAutomationCurrentAgent(
       result: resultContract,
     });
   } catch (error) {
-    if (automationConfig) {
-      releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
-    }
+    releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
     throw error;
   }
+}
+
+function currentAgentInactiveAutomation(
+  automationConfig: NexusAutomationConfig | null,
+): {
+  status: "skipped" | "blocked";
+  summary: string;
+} | null {
+  if (!automationConfig?.enabled) {
+    return {
+      status: "skipped",
+      summary: "Automation is not enabled for this workspace",
+    };
+  }
+  if (automationConfig.mode !== "agent_launch") {
+    return {
+      status: "blocked",
+      summary: "Automation mode is not agent_launch",
+    };
+  }
+  return null;
+}
+
+function assertCurrentAgentActiveAutomationConfig(
+  automationConfig: NexusAutomationConfig | null,
+): asserts automationConfig is NexusAutomationConfig {
+  if (!automationConfig) {
+    throw new NexusAutomationCurrentAgentAdoptionError(
+      "Automation config unexpectedly missing after active automation check",
+    );
+  }
+}
+
+interface CurrentAgentAdoptionClaimOutcome {
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim;
+  eligibleWorkItems: WorkItem[];
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  result: AdoptNexusAutomationCurrentAgentResult | null;
+}
+
+async function currentAgentAdoptionClaimOutcome(options: {
+  options: AdoptNexusAutomationCurrentAgentOptions;
+  runId: string;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  sourceRoot: string;
+  startedAt: string;
+  reused: boolean;
+  ledger: NexusAutomationRunLedger;
+  lock: AcquireNexusAutomationRunLockResult;
+  preflight: NexusAutomationPreflightCheck[];
+  selectorQuery: WorkItemQuery;
+  eligibleWorkItems: WorkItem[];
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  components: ResolvedNexusProjectComponent[];
+  contextFile: string | null;
+  resultFile: string | null;
+  metadataFile: string | null;
+}): Promise<CurrentAgentAdoptionClaimOutcome> {
+  if (!options.automationConfig.workItemClaims.enabled) {
+    return {
+      workItemClaim: disabledWorkItemClaim(),
+      eligibleWorkItems: options.eligibleWorkItems,
+      componentEligibleWorkItems: options.componentEligibleWorkItems,
+      result: null,
+    };
+  }
+
+  try {
+    const claim = await claimNexusEligibleWorkItem({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      components: options.components,
+      automationConfig: options.automationConfig,
+      homePath: options.options.homePath,
+      selectorQuery: options.selectorQuery,
+      provider: options.options.provider,
+      providerFactory: currentAgentClaimProviderFactory({
+        options: options.options,
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+      }),
+      providerOptions: options.options.providerOptions,
+      env: options.options.env,
+      claimAuthority: options.options.claimAuthority,
+      owner: currentAgentWorkItemClaimOwner({
+        options: options.options,
+        runId: options.runId,
+      }),
+      leaseDurationMs: options.automationConfig.workItemClaims.leaseDurationMs,
+      staleClaimPolicy: options.automationConfig.workItemClaims.staleClaimPolicy,
+      leaseTokenFactory: options.options.workItemClaimLeaseTokenFactory,
+      now: options.options.now,
+    });
+    return currentAgentClaimOutcomeFromClaim(options, claim);
+  } catch (error) {
+    return blockedCurrentAgentClaimOutcome(options, error);
+  }
+}
+
+function currentAgentClaimOutcomeFromClaim(
+  options: Parameters<typeof currentAgentAdoptionClaimOutcome>[0],
+  claim: NexusWorkItemClaimResult,
+): CurrentAgentAdoptionClaimOutcome {
+  const workItemClaim = currentAgentWorkItemClaim(claim);
+  if (claim.status === "claimed") {
+    return {
+      workItemClaim,
+      eligibleWorkItems: [claim.workItem],
+      componentEligibleWorkItems: componentEligibleWorkItemsForClaim({
+        componentEligibleWorkItems: options.componentEligibleWorkItems,
+        claim,
+      }),
+      result: null,
+    };
+  }
+
+  const finishedAt = currentIso(options.options.now);
+  const summary = automationWorkItemClaimSkipSummary(
+    workItemClaim,
+    "current-agent adoption",
+  );
+  const ledger = appendNexusAutomationRunRecord({
+    projectRoot: options.projectRoot,
+    config: options.automationConfig,
+    now: finishedAt,
+    record: {
+      id: options.runId,
+      projectId: options.projectConfig.id,
+      status: "skipped",
+      startedAt: options.startedAt,
+      finishedAt,
+      sourceRoot: options.sourceRoot,
+      summary,
+    },
+  });
+  releaseNexusAutomationRunLock({
+    projectRoot: options.projectRoot,
+    config: options.automationConfig,
+    runId: options.runId,
+  });
+  return {
+    workItemClaim,
+    eligibleWorkItems: options.eligibleWorkItems,
+    componentEligibleWorkItems: options.componentEligibleWorkItems,
+    result: adoptionResult({
+      ...currentAgentTerminalResultBase(options, ledger),
+      status: "skipped",
+      summary,
+      workItemClaim,
+      preflight: options.preflight,
+    }),
+  };
+}
+
+function blockedCurrentAgentClaimOutcome(
+  options: Parameters<typeof currentAgentAdoptionClaimOutcome>[0],
+  error: unknown,
+): CurrentAgentAdoptionClaimOutcome {
+  const finishedAt = currentIso(options.options.now);
+  const summary = `Work-item claim coordination blocked: ${errorMessage(error)}`;
+  const workItemClaim = blockedWorkItemClaim(summary);
+  const ledger = appendNexusAutomationRunRecord({
+    projectRoot: options.projectRoot,
+    config: options.automationConfig,
+    now: finishedAt,
+    record: {
+      id: options.runId,
+      projectId: options.projectConfig.id,
+      status: "blocked",
+      startedAt: options.startedAt,
+      finishedAt,
+      sourceRoot: options.sourceRoot,
+      summary,
+      error: summary,
+    },
+  });
+  releaseNexusAutomationRunLock({
+    projectRoot: options.projectRoot,
+    config: options.automationConfig,
+    runId: options.runId,
+  });
+  return {
+    workItemClaim,
+    eligibleWorkItems: options.eligibleWorkItems,
+    componentEligibleWorkItems: options.componentEligibleWorkItems,
+    result: adoptionResult({
+      ...currentAgentTerminalResultBase(options, ledger),
+      status: "blocked",
+      summary,
+      workItemClaim,
+      preflight: [
+        ...options.preflight,
+        {
+          name: "workItemClaim",
+          status: "failed",
+          message: summary,
+        },
+      ],
+    }),
+  };
+}
+
+function currentAgentTerminalResultBase(
+  options: Parameters<typeof currentAgentAdoptionClaimOutcome>[0],
+  ledger: NexusAutomationRunLedger,
+): Omit<
+  AdoptNexusAutomationCurrentAgentResult,
+  "status" | "summary" | "preflight" | "workItemClaim"
+> {
+  return {
+    runId: options.runId,
+    projectRoot: options.projectRoot,
+    sourceRoot: options.sourceRoot,
+    projectConfig: options.projectConfig,
+    automationConfig: options.automationConfig,
+    shouldProceed: false,
+    reused: options.reused,
+    ledger,
+    lock: options.lock,
+    selectorQuery: options.selectorQuery,
+    eligibleWorkItems: options.eligibleWorkItems,
+    componentEligibleWorkItems: options.componentEligibleWorkItems,
+    components: options.components,
+    contextFile: options.contextFile,
+    resultFile: options.resultFile,
+    metadataFile: options.metadataFile,
+    environment: null,
+    result: null,
+  };
 }
 
 export async function adoptNexusAutomationCurrentAgentFromCoordinatorLoop(

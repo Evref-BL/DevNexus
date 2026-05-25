@@ -204,14 +204,50 @@ describe("README onboarding guardrails", () => {
   it("keeps README local documentation links valid", () => {
     for (const file of [
       "README.md",
+      "docs/index.md",
       "docs/user/getting-started.md",
       "docs/user/concepts.md",
       "docs/user/agent-targets.md",
       "docs/user/first-workspace-existing-components.md",
+      "docs/user/git-workflows.md",
       "docs/user/providers-auth-hosting.md",
+      "docs/user/publication-workflows.md",
     ]) {
       assertLocalMarkdownLinksExist(file);
     }
+  });
+
+  it("documents Git workflow integration as configurable stateful policy", () => {
+    const guide = repoFile("docs/user/git-workflows.md");
+    const index = repoFile("docs/index.md");
+    const readme = repoFile("README.md");
+
+    expect(index).toContain("Git workflow integration");
+    expect(readme).toContain("docs/user/git-workflows.md");
+    expect(guide).toContain("Documentation-Driven Workflow Design");
+    expect(guide).toContain("Workflow Run Model");
+    expect(guide).toContain("Branch Freshness Decisions");
+    expect(guide).toContain("Pause, Abort, and Abandon");
+    expect(guide).toContain("states are typed nodes");
+    expect(guide).toContain("human approval");
+    expect(guide).toContain("merge queue");
+    expect(guide).toContain("force-with-lease");
+    expect(guide).toContain("Use profiles as named defaults");
+  });
+
+  it("documents review authorization ledger defaults and backend-only opt-in", () => {
+    const design = repoFile("docs/dev/review-policy.md");
+    const publication = repoFile("docs/user/publication-workflows.md");
+
+    expect(design).toContain("## Authorization Ledger Decision");
+    expect(design).toContain("The default storage mode is therefore `none`");
+    expect(design).toContain("append-only and scoped to the action");
+    expect(design).toContain("DevNexus should never prune audit records");
+    expect(design).toContain("another provider-backed surface");
+    expect(publication).toContain(
+      "DevNexus does not store local approval ledgers in the workspace repository.",
+    );
+    expect(publication).toContain("audit-grade local approvals");
   });
 
   it("documents opt-in agent targets and projection cleanup", () => {

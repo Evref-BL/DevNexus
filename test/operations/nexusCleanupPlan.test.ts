@@ -4,9 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildNexusCleanupPlan,
+  createNexusGitWorkflowRun,
   createOrRefreshNexusWorktreeLease,
   defaultNexusAutomationConfig,
   saveProjectConfig,
+  transitionNexusGitWorkflowRunLifecycle,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
@@ -54,6 +56,186 @@ describe("nexus cleanup plan", () => {
       safeToDelete: true,
       classifications: ["merged", "safe"],
     });
+  });
+
+  it("does not let a fresh working lease block cleanup when the branch is merged", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "codex/primary/merged-working",
+      worktreePath: path.join(fixture.worktreesRoot, "merged-working"),
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "mergedWorking123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        branches: ["codex/primary/merged-working"],
+        mergedRefs: ["codex/primary/merged-working"],
+        upstreams: {
+          "codex/primary/merged-working": "origin/codex/primary/merged-working",
+        },
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "codex/primary/merged-working")).toMatchObject({
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["merged", "safe"]),
+      blockers: [],
+    });
+    expect(candidateFor(plan, "codex/primary/merged-working").classifications)
+      .not.toContain("active_lease");
+  });
+
+  it("includes a safe lease-only candidate when cleanup already removed the branch and worktree", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/orphan-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "orphan-merged"),
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "orphanMerged123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["fix/primary/orphan-merged"],
+        mergedRefs: ["orphanMerged123"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "fix/primary/orphan-merged")).toMatchObject({
+      kind: "branch",
+      worktreePath: null,
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["superseded", "safe"]),
+      blockers: [],
+      proof: expect.arrayContaining([
+        "Recorded head orphanMerged123 is contained in main.",
+      ]),
+    });
+  });
+
+  it("allows stale lease-only cleanup when the recorded head is already merged", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/stale-orphan-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "stale-orphan-merged"),
+      status: "working",
+      now: () => "2026-05-16T09:55:00.000Z",
+      gitFacts: { headCommit: "staleOrphanMerged123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["fix/primary/stale-orphan-merged"],
+        mergedRefs: ["staleOrphanMerged123"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "fix/primary/stale-orphan-merged"))
+      .toMatchObject({
+        kind: "branch",
+        worktreePath: null,
+        safeToDelete: true,
+        classifications: expect.arrayContaining(["stale", "superseded", "safe"]),
+        blockers: [],
+        proof: expect.arrayContaining([
+          "Recorded head staleOrphanMerged123 is contained in main.",
+        ]),
+      });
+    expect(candidateFor(plan, "fix/primary/stale-orphan-merged").classifications)
+      .not.toContain("blocked");
+  });
+
+  it("allows stale duplicate lease cleanup when another scope already finalized the same head", () => {
+    const fixture = initCleanupFixture();
+    const metadataWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "metadata",
+      "duplicate",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      projectMeta: true,
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "merged",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123" },
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "ready",
+      now: () => "2026-05-16T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["codex/metadata/duplicate"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "codex/metadata/duplicate")).toMatchObject({
+      kind: "branch",
+      worktreePath: null,
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["stale", "superseded", "safe"]),
+      blockers: [],
+      proof: expect.arrayContaining([
+        expect.stringContaining("same branch and recorded head"),
+      ]),
+    });
+  });
+
+  it("does not materialize an existing lease worktree outside the cleanup scope", () => {
+    const fixture = initCleanupFixture();
+    const outOfScopeWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "other-scope",
+      "still-present",
+    );
+    fs.mkdirSync(outOfScopeWorktree, { recursive: true });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/out-of-scope",
+      worktreePath: outOfScopeWorktree,
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "outOfScope123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(plan.candidates.some((candidate) =>
+      candidate.worktreePath === outOfScopeWorktree ||
+      candidate.branch === "fix/primary/out-of-scope",
+    )).toBe(false);
   });
 
   it("blocks dirty and untracked worktrees and marks them for rescue", () => {
@@ -260,6 +442,191 @@ describe("nexus cleanup plan", () => {
       classifications: expect.arrayContaining(["superseded", "safe"]),
     });
   });
+
+  it("uses workflow run state to block paused and dirty abandoned cleanup", () => {
+    const fixture = initCleanupFixture();
+    const pausedWorktree = path.join(fixture.worktreesRoot, "paused");
+    const abandonedWorktree = path.join(fixture.worktreesRoot, "abandoned-run");
+    fs.mkdirSync(pausedWorktree, { recursive: true });
+    fs.mkdirSync(abandonedWorktree, { recursive: true });
+    createWorkflowRun(pausedWorktree, {
+      id: "run-paused",
+      branchName: "codex/primary/paused",
+      status: "paused",
+    });
+    createWorkflowRun(abandonedWorktree, {
+      id: "run-abandoned",
+      branchName: "codex/primary/abandoned-run",
+      status: "abandoned",
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        worktrees: [
+          {
+            path: pausedWorktree,
+            branch: "codex/primary/paused",
+            head: "paused123",
+          },
+          {
+            path: abandonedWorktree,
+            branch: "codex/primary/abandoned-run",
+            head: "abandonedRun123",
+          },
+        ],
+        statuses: {
+          [abandonedWorktree]: " M src/file.ts\n",
+        },
+        upstreams: {
+          "codex/primary/paused": "origin/codex/primary/paused",
+          "codex/primary/abandoned-run": "origin/codex/primary/abandoned-run",
+        },
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "codex/primary/paused")).toMatchObject({
+      safeToDelete: false,
+      workflowRun: {
+        id: "run-paused",
+        status: "paused",
+        nextOwner: {
+          kind: "human",
+          id: "maintainer",
+        },
+      },
+      classifications: expect.arrayContaining(["workflow_paused", "blocked"]),
+      blockers: expect.arrayContaining([
+        "Git workflow run run-paused is paused for human maintainer; resume it or choose abandon, archive, or rescue before cleanup.",
+      ]),
+    });
+    expect(candidateFor(plan, "codex/primary/abandoned-run")).toMatchObject({
+      safeToDelete: false,
+      rescue: { needed: true },
+      workflowRun: {
+        id: "run-abandoned",
+        status: "abandoned",
+      },
+      classifications: expect.arrayContaining([
+        "dirty",
+        "workflow_abandoned",
+        "needs_rescue",
+        "blocked",
+      ]),
+    });
+  });
+
+  it("uses terminal workflow preservation proof for cleanup safety", () => {
+    const fixture = initCleanupFixture();
+    const abortWorktree = path.join(fixture.worktreesRoot, "clean-abort");
+    const archivedWorktree = path.join(fixture.worktreesRoot, "archived");
+    const rescuedWorktree = path.join(fixture.worktreesRoot, "rescued");
+    const mergedWorktree = path.join(fixture.worktreesRoot, "workflow-merged");
+    fs.mkdirSync(abortWorktree, { recursive: true });
+    fs.mkdirSync(archivedWorktree, { recursive: true });
+    fs.mkdirSync(rescuedWorktree, { recursive: true });
+    fs.mkdirSync(mergedWorktree, { recursive: true });
+    createWorkflowRun(abortWorktree, {
+      id: "run-abort",
+      branchName: null,
+      status: "aborted",
+    });
+    createWorkflowRun(archivedWorktree, {
+      id: "run-archive",
+      branchName: "codex/primary/archived",
+      status: "archived",
+    });
+    createWorkflowRun(rescuedWorktree, {
+      id: "run-rescue",
+      branchName: "codex/primary/rescued",
+      status: "rescued",
+    });
+    createWorkflowRun(mergedWorktree, {
+      id: "run-merged",
+      branchName: "codex/primary/workflow-merged",
+      status: "merged",
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        worktrees: [
+          {
+            path: abortWorktree,
+            branch: null,
+            head: "abort123",
+          },
+          {
+            path: archivedWorktree,
+            branch: "codex/primary/archived",
+            head: "archived123",
+          },
+          {
+            path: rescuedWorktree,
+            branch: "codex/primary/rescued",
+            head: "rescued123",
+          },
+          {
+            path: mergedWorktree,
+            branch: "codex/primary/workflow-merged",
+            head: "merged123",
+          },
+        ],
+        upstreams: {
+          "codex/primary/archived": "origin/codex/primary/archived",
+          "codex/primary/rescued": "origin/codex/primary/rescued",
+          "codex/primary/workflow-merged": "origin/codex/primary/workflow-merged",
+        },
+        mergedRefs: ["codex/primary/workflow-merged"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(plan.candidates.find((candidate) =>
+      candidate.worktreePath === abortWorktree,
+    )).toMatchObject({
+      safeToDelete: true,
+      workflowRun: {
+        id: "run-abort",
+        status: "aborted",
+      },
+      classifications: expect.arrayContaining(["workflow_aborted", "safe"]),
+    });
+    expect(candidateFor(plan, "codex/primary/archived")).toMatchObject({
+      safeToDelete: true,
+      workflowRun: {
+        id: "run-archive",
+        status: "archived",
+        preservation: {
+          kind: "archive_record",
+        },
+      },
+      classifications: expect.arrayContaining(["workflow_archived", "safe"]),
+    });
+    expect(candidateFor(plan, "codex/primary/rescued")).toMatchObject({
+      safeToDelete: true,
+      workflowRun: {
+        id: "run-rescue",
+        status: "rescued",
+        preservation: {
+          kind: "rescue_branch",
+        },
+      },
+      classifications: expect.arrayContaining(["workflow_rescued", "safe"]),
+    });
+    expect(candidateFor(plan, "codex/primary/workflow-merged")).toMatchObject({
+      safeToDelete: true,
+      workflowRun: {
+        id: "run-merged",
+        status: "merged",
+      },
+      proof: expect.arrayContaining([
+        "Matched Git workflow run run-merged with status merged.",
+      ]),
+      classifications: expect.arrayContaining(["merged", "safe"]),
+    });
+  });
 });
 
 function candidateFor(
@@ -317,16 +684,116 @@ function initCleanupFixture() {
   return { projectRoot, sourceRoot, worktreesRoot };
 }
 
+function createWorkflowRun(
+  projectRoot: string,
+  options: {
+    id: string;
+    branchName: string | null;
+    status: "paused" | "abandoned" | "aborted" | "archived" | "rescued" | "merged";
+  },
+): void {
+  createNexusGitWorkflowRun({
+    projectRoot,
+    id: options.id,
+    projectId: "cleanup-demo",
+    componentId: "primary",
+    profileId: "protected-feature",
+    branchName: options.branchName,
+    currentRef: options.branchName,
+    baseRef: "main",
+    baseCommit: "target123",
+    targetBranch: "main",
+    owner: {
+      kind: "agent",
+      id: "codex",
+    },
+    now: "2026-05-18T09:00:00.000Z",
+  });
+  if (options.status === "paused") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "pause",
+      reason: "Waiting for maintainer.",
+      owner: {
+        kind: "human",
+        id: "maintainer",
+      },
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  } else if (options.status === "abandoned") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "abandon",
+      reason: "Work was abandoned without preservation.",
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  } else if (options.status === "aborted") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "abort",
+      reason: "No durable work was created.",
+      git: {
+        dirty: false,
+        unpushedCommits: false,
+      },
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  } else if (options.status === "archived") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "archive",
+      reason: "Archived before cleanup.",
+      preservation: {
+        kind: "archive_record",
+        url: "https://github.example.invalid/archive",
+        summary: "Archived work in a provider record.",
+      },
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  } else if (options.status === "rescued") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "rescue",
+      reason: "Copied to rescue branch.",
+      preservation: {
+        kind: "rescue_branch",
+        ref: "rescue/github-359",
+        summary: "Copied work to a rescue branch.",
+      },
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  } else if (options.status === "merged") {
+    transitionNexusGitWorkflowRunLifecycle({
+      projectRoot,
+      id: options.id,
+      action: "merge",
+      reason: "Merged into target branch.",
+      preservation: {
+        kind: "merged",
+        ref: "main",
+        summary: "Target branch contains this workflow.",
+      },
+      now: "2026-05-18T09:30:00.000Z",
+    });
+  }
+}
+
 function cleanupGitRunner(
   fixture: { sourceRoot: string },
   options: {
     branches?: string[];
-    worktrees?: Array<{ path: string; branch: string; head: string }>;
+    worktrees?: Array<{ path: string; branch: string | null; head: string }>;
     statuses?: Record<string, string>;
     targetExists?: boolean;
     mergedRefs?: string[];
     upstreams?: Record<string, string>;
     aheadBehind?: Record<string, { ahead: number; behind: number }>;
+    missingRefs?: string[];
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
@@ -337,7 +804,9 @@ function cleanupGitRunner(
       branchHeads.set(branch, `${safeHead(branch)}123`);
     }
     for (const worktree of options.worktrees ?? []) {
-      branchHeads.set(worktree.branch, worktree.head);
+      if (worktree.branch) {
+        branchHeads.set(worktree.branch, worktree.head);
+      }
     }
 
     if (joined === "worktree list --porcelain") {
@@ -349,7 +818,7 @@ function cleanupGitRunner(
         ...(options.worktrees ?? []).flatMap((worktree) => [
           `worktree ${worktree.path}`,
           `HEAD ${worktree.head}`,
-          `branch refs/heads/${worktree.branch}`,
+          ...(worktree.branch ? [`branch refs/heads/${worktree.branch}`] : []),
           "",
         ]),
       ].join("\n"));
@@ -367,7 +836,7 @@ function cleanupGitRunner(
     }
     if (argsArray[0] === "symbolic-ref" && argsArray[1] === "--short") {
       const worktree = (options.worktrees ?? []).find((entry) => entry.path === cwd);
-      return worktree
+      return worktree?.branch
         ? gitResult(argsArray, `${worktree.branch}\n`)
         : gitResult(argsArray, "", 1);
     }
@@ -382,6 +851,9 @@ function cleanupGitRunner(
     }
     if (argsArray[0] === "rev-parse") {
       const ref = argsArray[1]!;
+      if (options.missingRefs?.includes(ref)) {
+        return gitResult(argsArray, "", 1);
+      }
       return gitResult(argsArray, `${branchHeads.get(ref) ?? ref}\n`);
     }
     if (argsArray[0] === "status") {

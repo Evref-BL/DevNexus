@@ -598,37 +598,57 @@ function externalRefMatchesTracker(
   tracker: Pick<NexusProjectWorkTrackerContext, "workTracking">,
 ): boolean {
   const config = tracker.workTracking;
-  if (externalRef.provider !== config.provider) {
-    return false;
-  }
-  if (externalRef.host && config.host && externalRef.host !== config.host) {
-    return false;
-  }
+  return (
+    externalRef.provider === config.provider &&
+    externalRefHostMatchesTracker(externalRef, config) &&
+    externalRefRepositoryMatchesTracker(externalRef, config) &&
+    externalRefProjectMatchesTracker(externalRef, config) &&
+    externalRefBoardMatchesTracker(externalRef, config)
+  );
+}
 
+function externalRefHostMatchesTracker(
+  externalRef: ExternalRef,
+  config: NexusProjectWorkTrackerContext["workTracking"],
+): boolean {
+  return !externalRef.host || !config.host || externalRef.host === config.host;
+}
+
+function externalRefRepositoryMatchesTracker(
+  externalRef: ExternalRef,
+  config: NexusProjectWorkTrackerContext["workTracking"],
+): boolean {
   const repository = config.repository;
   if (externalRef.repositoryId && repository?.id) {
     return externalRef.repositoryId === repository.id;
   }
-  if (externalRef.repositoryOwner && repository?.owner) {
-    if (externalRef.repositoryOwner !== repository.owner) {
-      return false;
-    }
-  }
-  if (externalRef.repositoryName && repository?.name) {
-    if (externalRef.repositoryName !== repository.name) {
-      return false;
-    }
-  }
-  if (externalRef.projectId) {
-    if (config.provider === "jira") {
-      return externalRef.projectId === config.projectKey;
-    }
-  }
-  if (externalRef.boardId && config.board?.id) {
-    return externalRef.boardId === config.board.id;
-  }
 
-  return true;
+  return (
+    (!externalRef.repositoryOwner ||
+      !repository?.owner ||
+      externalRef.repositoryOwner === repository.owner) &&
+    (!externalRef.repositoryName ||
+      !repository?.name ||
+      externalRef.repositoryName === repository.name)
+  );
+}
+
+function externalRefProjectMatchesTracker(
+  externalRef: ExternalRef,
+  config: NexusProjectWorkTrackerContext["workTracking"],
+): boolean {
+  return (
+    !externalRef.projectId ||
+    config.provider !== "jira" ||
+    externalRef.projectId === config.projectKey
+  );
+}
+
+function externalRefBoardMatchesTracker(
+  externalRef: ExternalRef,
+  config: NexusProjectWorkTrackerContext["workTracking"],
+): boolean {
+  return !externalRef.boardId || !config.board?.id || externalRef.boardId === config.board.id;
 }
 
 function annotateWorkItem(

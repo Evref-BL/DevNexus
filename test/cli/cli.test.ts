@@ -13,6 +13,7 @@ import {
   loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
+  NexusMemoryWorkItemClaimAuthority,
   nexusWorktreeLeaseKind,
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
@@ -473,6 +474,9 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
+    expect(output.output()).toContain("dev-nexus git-workflow plan");
+    expect(output.output()).toContain("dev-nexus git-workflow status");
+    expect(output.output()).toContain("dev-nexus git-workflow start");
     expect(output.output()).toContain("dev-nexus publication green-main plan");
     expect(output.output()).toContain("dev-nexus review plan");
     expect(output.output()).toContain("dev-nexus quick-fix plan");
@@ -5013,6 +5017,39 @@ describe("dev-nexus cli", () => {
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");
     fs.mkdirSync(sourceRoot, { recursive: true });
     fs.mkdirSync(worktreePath, { recursive: true });
+    const qualityDeltaPath = path.join(projectRoot, "quality-delta.json");
+    fs.writeFileSync(
+      qualityDeltaPath,
+      JSON.stringify({
+        producer: "static-analysis",
+        readOnly: true,
+        status: "regressed",
+        touchedFiles: ["src/nexusCoordination.ts"],
+        summary: {
+          newFindingCount: 2,
+          resolvedFindingCount: 0,
+          touchedNewFindingCount: 2,
+          touchedResolvedFindingCount: 0,
+          newCriticalOrBlockerCount: 1,
+          newBugCount: 1,
+          newVulnerabilityCount: 0,
+          newSecurityHotspotCount: 0,
+          qualityGateRegressed: false,
+        },
+        attention: [
+          {
+            id: "sonar-issue:bug",
+            source: "sonar_issue",
+            category: "bug",
+            severity: "critical",
+            filePath: "src/nexusCoordination.ts",
+            line: 10,
+            rule: "complexity:S3776",
+            message: "Reduce cognitive complexity.",
+          },
+        ],
+      }),
+    );
     saveProjectConfig(projectRoot, projectConfig());
     await createLocalWorkTrackerProvider({
       projectRoot,
@@ -5104,6 +5141,8 @@ describe("dev-nexus cli", () => {
         "focused tests passed",
         "--integration-preference",
         "direct_integration",
+        "--quality-delta",
+        qualityDeltaPath,
         "--worktree",
         worktreePath,
         "--json",
@@ -5139,6 +5178,23 @@ describe("dev-nexus cli", () => {
         hostId: "windows-devbox",
         agentId: "codex",
         branch: "codex/shared-coordination",
+        qualityDelta: {
+          producer: "static-analysis",
+          status: "regressed",
+          sourcePath: qualityDeltaPath,
+          summary: {
+            newFindingCount: 2,
+            touchedNewFindingCount: 2,
+            newCriticalOrBlockerCount: 1,
+            newBugCount: 1,
+          },
+          attention: [
+            {
+              severity: "critical",
+              rule: "complexity:S3776",
+            },
+          ],
+        },
       },
       comment: {
         id: "local-comment-1",
@@ -9157,6 +9213,175 @@ describe("dev-nexus cli", () => {
           agentId: "agent-a",
           leaseToken: "cli-token-1",
           expiresAt: "2026-05-20T10:10:00.000Z",
+        },
+      },
+    });
+  });
+
+  it("releases authority-backed GitHub work item claims through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-release-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const claimAuthority = new NexusMemoryWorkItemClaimAuthority();
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-7", "Release through CLI", {
+        labels: ["automation", "dogfood"],
+      }),
+    ]);
+    const claimOutput = captureOutput();
+
+    const claimExitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--component",
+        "core",
+        "--tracker",
+        "github",
+        "--host",
+        "host-a",
+        "--agent",
+        "agent-a",
+        "--lease-ms",
+        "600000",
+        "--json",
+      ],
+      {
+        stdout: claimOutput.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimAuthority: claimAuthority,
+        workItemClaimLeaseTokenFactory: () => "cli-token-1",
+      },
+    );
+    const claimPayload = JSON.parse(claimOutput.output());
+
+    expect(claimExitCode).toBe(0);
+    expect(claimPayload).toMatchObject({
+      claim: {
+        authorityClaim: {
+          authorityKind: "memory",
+          fencingToken: 1,
+        },
+      },
+    });
+
+    const releaseOutput = captureOutput();
+    const releaseExitCode = await main(
+      [
+        "work-item",
+        "claim-release",
+        projectRoot,
+        "github-7",
+        "--component",
+        "core",
+        "--tracker",
+        "github",
+        "--lease-token",
+        "cli-token-1",
+        "--fencing-token",
+        "1",
+        "--json",
+      ],
+      {
+        stdout: releaseOutput.writer,
+        now: fixedClock("2026-05-20T10:05:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimAuthority: claimAuthority,
+      },
+    );
+
+    expect(releaseExitCode).toBe(0);
+    expect(JSON.parse(releaseOutput.output())).toMatchObject({
+      ok: true,
+      release: {
+        workItem: {
+          id: "github-7",
+        },
+        authorityKind: "memory",
+        release: {
+          status: "released",
+          claim: {
+            state: "released",
+            releasedAt: "2026-05-20T10:05:00.000Z",
+            fencingToken: 1,
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects claim-release when the fencing token is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-release-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const claimAuthority = new NexusMemoryWorkItemClaimAuthority();
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-7", "Reject stale release", {
+        labels: ["automation", "dogfood"],
+      }),
+    ]);
+    const claimOutput = captureOutput();
+
+    await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--component",
+        "core",
+        "--tracker",
+        "github",
+        "--host",
+        "host-a",
+        "--lease-ms",
+        "600000",
+        "--json",
+      ],
+      {
+        stdout: claimOutput.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimAuthority: claimAuthority,
+        workItemClaimLeaseTokenFactory: () => "cli-token-1",
+      },
+    );
+
+    const releaseOutput = captureOutput();
+    const releaseExitCode = await main(
+      [
+        "work-item",
+        "claim-release",
+        projectRoot,
+        "github-7",
+        "--component",
+        "core",
+        "--tracker",
+        "github",
+        "--lease-token",
+        "cli-token-1",
+        "--fencing-token",
+        "2",
+        "--json",
+      ],
+      {
+        stdout: releaseOutput.writer,
+        now: fixedClock("2026-05-20T10:05:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimAuthority: claimAuthority,
+      },
+    );
+
+    expect(releaseExitCode).toBe(1);
+    expect(JSON.parse(releaseOutput.output())).toMatchObject({
+      ok: false,
+      release: {
+        release: {
+          status: "rejected",
+          reason: "fencing_token_mismatch",
+          claim: {
+            state: "active",
+            fencingToken: 1,
+          },
         },
       },
     });

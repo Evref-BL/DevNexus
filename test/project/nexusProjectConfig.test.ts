@@ -2039,6 +2039,10 @@ describe("workspace config", () => {
         allowDependencyInstall: false,
         allowLiveServices: false,
       },
+      gitWorkflows: {
+        activeProfileId: null,
+        profiles: [],
+      },
       publication: {
         strategy: "direct_integration",
         remote: "origin",
@@ -2250,6 +2254,199 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts generic Git workflow profiles", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "git-workflow-project",
+      name: "Git Workflow Project",
+      automation: {
+        gitWorkflows: {
+          activeProfileId: "feature",
+          profiles: [
+            {
+              id: "direct",
+              branchStrategy: "direct",
+              update: {
+                behind: "none",
+                diverged: "merge",
+                wrongBase: "recreate",
+                publicRewrite: "never",
+              },
+            },
+            {
+              id: "feature",
+              branchStrategy: "feature_branch",
+              targetBranch: "main",
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+                allowedIntentPrefixes: ["feat", "fix"],
+                featureBranchPattern: "{intent}/{feature}",
+                reviewBranchPattern: "{intent}/{feature}/{change}",
+              },
+              review: {
+                mode: "review_branch_pr",
+                finalPullRequest: true,
+                finalPullRequestCreation: "at_review_gate",
+              },
+              provider: {
+                commentPolicy: "status_only",
+              },
+              branchPublication: {
+                strategy: "push_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
+            },
+            {
+              id: "stacked",
+              branchStrategy: "stacked",
+              update: {
+                behind: "restack",
+                publicRewrite: "with_human_approval",
+              },
+            },
+            {
+              id: "hybrid",
+              branchStrategy: "hybrid",
+              update: {
+                behind: "restack",
+                publicRewrite: "with_human_approval",
+              },
+            },
+            {
+              id: "release",
+              branchStrategy: "release_maintenance",
+              release: {
+                branches: ["release/1.x", "release/2.x"],
+                flow: "oldest_to_newest",
+              },
+            },
+            {
+              id: "environment",
+              branchStrategy: "environment_branch",
+              environment: {
+                branch: "staging",
+                promotion: "pull_request",
+              },
+            },
+            {
+              id: "rehearsal",
+              branchStrategy: "throwaway_rehearsal",
+              review: {
+                finalPullRequest: false,
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(config.automation?.gitWorkflows).toMatchObject({
+      activeProfileId: "feature",
+      profiles: [
+        {
+          id: "direct",
+          branchStrategy: "direct",
+          update: {
+            behind: "none",
+            diverged: "merge",
+            wrongBase: "recreate",
+            publicRewrite: "never",
+          },
+        },
+        {
+          id: "feature",
+          branchStrategy: "feature_branch",
+          targetBranch: "main",
+          branchPublication: {
+            strategy: "push_remote_then_fallback",
+            fallbackRemote: "fork",
+          },
+        },
+        {
+          id: "stacked",
+          branchStrategy: "stacked",
+          update: {
+            behind: "restack",
+            publicRewrite: "with_human_approval",
+          },
+        },
+        {
+          id: "hybrid",
+          branchStrategy: "hybrid",
+        },
+        {
+          id: "release",
+          branchStrategy: "release_maintenance",
+          release: {
+            branches: ["release/1.x", "release/2.x"],
+            flow: "oldest_to_newest",
+          },
+        },
+        {
+          id: "environment",
+          branchStrategy: "environment_branch",
+          environment: {
+            branch: "staging",
+            promotion: "pull_request",
+          },
+        },
+        {
+          id: "rehearsal",
+          branchStrategy: "throwaway_rehearsal",
+          review: {
+            finalPullRequest: false,
+          },
+        },
+      ],
+    });
+  });
+
+  it("maps enabled release-train feature branch delivery to a legacy Git workflow profile", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "feature-delivery-project",
+      name: "Feature Branch Delivery Project",
+      automation: {
+        publication: {
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            featureBranchDelivery: {
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              allowedBranchStrategies: ["direct", "stacked", "hybrid"],
+              branchPublication: {
+                strategy: "push_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(config.automation?.gitWorkflows).toMatchObject({
+      activeProfileId: "legacy-feature-branch-delivery",
+      profiles: [
+        {
+          id: "legacy-feature-branch-delivery",
+          source: "legacy_feature_branch_delivery",
+          branchStrategy: "hybrid",
+          targetBranch: "main",
+          activeFeatureId: "codex-goals",
+          allowedBranchStrategies: ["direct", "stacked", "hybrid"],
+          branchPublication: {
+            strategy: "push_remote_then_fallback",
+            fallbackRemote: "fork",
+          },
+        },
+      ],
+    });
+  });
+
   it("validates component review policy", () => {
     const config = validateProjectConfig({
       version: 1,
@@ -2450,6 +2647,127 @@ describe("workspace config", () => {
         },
       }),
     ).toThrow(/fallbackRemote is required/);
+  });
+
+  it("rejects incoherent Git workflow profile policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            activeProfileId: "missing",
+            profiles: [
+              {
+                id: "direct",
+                branchStrategy: "direct",
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/activeProfileId must reference a configured profile/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "direct",
+                branchStrategy: "direct",
+                update: {
+                  behind: "restack",
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/restack update actions require stacked or hybrid branchStrategy/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "linear",
+                branchStrategy: "feature_branch",
+                update: {
+                  behind: "rebase",
+                  publicRewrite: "never",
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/publicRewrite never conflicts with rebase or restack update actions/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "release",
+                branchStrategy: "release_maintenance",
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/release is required when branchStrategy is release_maintenance/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "environment",
+                branchStrategy: "environment_branch",
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/environment is required when branchStrategy is environment_branch/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "rehearsal",
+                branchStrategy: "throwaway_rehearsal",
+                review: {
+                  finalPullRequest: true,
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/throwaway_rehearsal profiles cannot create a final pull request/);
   });
 
   it("accepts publication identity and remote guardrails", () => {
@@ -3191,6 +3509,62 @@ describe("workspace config", () => {
       url: "http://127.0.0.1:3050/mcp",
       targetAgents: ["codex"],
     });
+  });
+
+  it("accepts provider-neutral agent package plugin capability records", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "agent-package-project",
+        name: "Agent Package Project",
+        plugins: [
+          {
+            id: "agent-tools",
+            capabilities: [
+              {
+                kind: "agent_package",
+                id: "claude-native",
+                description: "Use the upstream Claude agent package.",
+                packageKind: "native",
+                packageName: "@example/claude-agent-pack",
+                repositoryUrl: "https://example.invalid/claude-agent-pack",
+                installCommand: "claude plugin install @example/claude-agent-pack",
+                checkCommand: "claude plugin list",
+                versionPolicy: "Track approved releases.",
+                license: "MIT",
+                provenance: "Synthetic plugin fixture",
+                required: true,
+                targetAgents: ["claude"],
+                surfaces: ["skills", "commands", "hooks", "references"],
+                setupInstructions: [
+                  "Confirm project policy before installing.",
+                ],
+              },
+            ],
+          },
+        ],
+      }).plugins?.[0]?.capabilities,
+    ).toEqual([
+      {
+        kind: "agent_package",
+        id: "claude-native",
+        description: "Use the upstream Claude agent package.",
+        packageKind: "native",
+        packageName: "@example/claude-agent-pack",
+        repositoryUrl: "https://example.invalid/claude-agent-pack",
+        installCommand: "claude plugin install @example/claude-agent-pack",
+        checkCommand: "claude plugin list",
+        versionPolicy: "Track approved releases.",
+        license: "MIT",
+        provenance: "Synthetic plugin fixture",
+        required: true,
+        targetAgents: ["claude"],
+        surfaces: ["skills", "commands", "hooks", "references"],
+        setupInstructions: [
+          "Confirm project policy before installing.",
+        ],
+      },
+    ]);
   });
 
   it("rejects invalid URL-backed plugin MCP server combinations", () => {

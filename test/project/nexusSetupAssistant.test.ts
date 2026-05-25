@@ -1430,6 +1430,142 @@ describe("nexus setup assistant", () => {
     expect(checks).not.toContain(".agents/skills");
   });
 
+  it("shows provider-native agent package guidance for active agent targets", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-packages-");
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [
+          { provider: "claude" },
+          { provider: "codex" },
+          { provider: "opencode" },
+          { provider: "manual" },
+          { provider: "custom" },
+        ],
+      },
+      plugins: [
+        {
+          id: "agent-tools",
+          name: "Agent Tools",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "agent_package",
+              id: "claude-native",
+              description: "Use the upstream Claude agent package.",
+              packageKind: "native",
+              packageName: "@example/claude-agent-pack",
+              repositoryUrl: "https://example.invalid/claude-agent-pack",
+              installCommand: "claude plugin install @example/claude-agent-pack",
+              checkCommand: "claude plugin list",
+              license: "MIT",
+              required: true,
+              targetAgents: ["claude"],
+              surfaces: ["skills", "commands"],
+            },
+            {
+              kind: "agent_package",
+              id: "codex-shim",
+              packageKind: "shim",
+              packageName: "@example/codex-agent-shim",
+              repositoryUrl: "https://example.invalid/codex-agent-shim",
+              installCommand: "codex skill install @example/codex-agent-shim",
+              checkCommand: "codex skill list",
+              targetAgents: ["codex"],
+              surfaces: ["skills", "commands", "references"],
+            },
+            {
+              kind: "agent_package",
+              id: "opencode-manual",
+              packageKind: "manual_guidance",
+              packageName: "@example/opencode-agent-plan",
+              required: true,
+              targetAgents: ["opencode"],
+              setupInstructions: [
+                "Use the project-local package plan until a native package exists.",
+              ],
+            },
+            {
+              kind: "agent_package",
+              id: "agent-fallback",
+              packageKind: "bundled_fallback",
+              packageName: "@example/bundled-agent-fallback",
+              targetAgents: ["manual", "custom"],
+            },
+            {
+              kind: "agent_package",
+              id: "other-agent",
+              packageKind: "native",
+              packageName: "other-agent-package",
+              targetAgents: ["other-agent"],
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const guidance = refreshStep.manualInstructions.join("\n");
+
+    expect(guidance).toContain(
+      "Agent Tools claude/native @example/claude-agent-pack",
+    );
+    expect(guidance).toContain(
+      "Agent Tools codex/shim @example/codex-agent-shim",
+    );
+    expect(guidance).toContain(
+      "Agent Tools opencode/manual_guidance @example/opencode-agent-plan",
+    );
+    expect(guidance).toContain(
+      "Agent Tools custom/bundled_fallback @example/bundled-agent-fallback",
+    );
+    expect(guidance).toContain(
+      "Agent Tools manual/bundled_fallback @example/bundled-agent-fallback",
+    );
+    expect(guidance).not.toContain("other-agent-package");
+    expect(refreshStep.checks).toContain("claude plugin list");
+    expect(refreshStep.checks).toContain("codex skill list");
+
+    const setupCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-agent-tools-agent-package-claude-native-claude",
+        status: "warning",
+        summary: expect.stringContaining("native agent package"),
+        nextAction: expect.stringContaining(
+          "claude plugin install @example/claude-agent-pack",
+        ),
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-agent-tools-agent-package-opencode-manual-opencode",
+        status: "warning",
+        nextAction: expect.stringContaining(
+          "Use the project-local package plan until a native package exists.",
+        ),
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-agent-tools-agent-package-agent-fallback-custom",
+        status: "passed",
+        summary: expect.stringContaining("bundled_fallback agent package"),
+      }),
+    );
+  });
+
   it("reports expected, stale, manual, unsupported, and disallowed agent workspaceions", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-agent-projections-");
     writeProject(projectRoot, {

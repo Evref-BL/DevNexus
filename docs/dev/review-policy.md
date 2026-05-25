@@ -275,6 +275,50 @@ That context should be compared against the current branch and requested action
 when DevNexus plans publication. If the branch head or action changed, the tool
 should ask for fresh authorization.
 
+## Authorization Ledger Decision
+
+DevNexus does not need a general local review authorization ledger for normal
+projects. Provider review records remain canonical where a provider review
+object exists. Local authorization stays action-scoped input to the current
+publication or finalization decision, not a source-controlled approval file.
+
+The default storage mode is therefore `none`: DevNexus keeps the current
+provider-only or current-session behavior and writes no approval records to the
+workspace repository. Small projects should stay on this path unless they have
+an audit requirement that provider reviews cannot satisfy.
+
+If a project later needs audit-grade local approvals, the ledger should be an
+explicit backend policy, not repo JSON. A minimal backend-backed ledger would
+be append-only and scoped to the action being authorized:
+
+- `id`: backend-generated unique id.
+- `project_id` and `component_id`.
+- `requested_action`: for example `pull_request.merge`,
+  `target_branch.push`, `release.publish`, or `package.publish`.
+- `branch_name`, `head_sha`, optional `target_ref`, and optional provider
+  review target such as pull request or merge request number.
+- `actor_id`, authority role or provider reviewer identity, and the authority
+  source used to accept the decision.
+- `decision`: `approved`, `rejected`, or `revoked`.
+- `summary` and `verification_summary`: short human-readable context.
+- `created_at`, optional `expires_at`, and optional `supersedes_id`.
+- Optional `evidence_uri` for provider evidence, CI evidence, or a local review
+  artifact that the backend can still read.
+- Opaque `metadata` for backend-specific audit fields.
+
+Retention should be explicit on the backend policy. A safe default is "retain
+until the project deletes or archives the backend record"; teams with stricter
+requirements can choose a fixed period such as one release cycle or one year.
+DevNexus should never prune audit records as part of ordinary workspace cleanup.
+
+The auth model should also be explicit. Agents may read ledger state and use it
+as review evidence, but they should not grant their own local approvals. Writing
+an approval record requires a configured human or service actor with reviewer
+or maintainer authority for the requested action. Provider-native approvals
+still win when the review transport is `pull_request`, `merge_request`, or
+another provider-backed surface; DevNexus should read those provider records
+rather than duplicating them into the local ledger.
+
 ## Initial DevNexus Behavior
 
 The first implementation is deliberately small:
@@ -293,8 +337,9 @@ push are blocked until the resolved review plan is ready. Further follow-up work
 should expand provider-native readback where needed.
 
 The first implementation should not add committed approval files or a general
-approval ledger. If a later project needs audit-grade local approvals, that
-should be a separate opt-in storage policy with its own review.
+approval ledger. The selected ledger posture is noop/provider-only by default.
+If a later project needs audit-grade local approvals, implement the
+backend-backed policy above as a separate opt-in feature with its own review.
 
 ## Examples
 
@@ -333,5 +378,3 @@ Stacked review branch:
 - How much provider-specific detail belongs in the generic review-plan result.
 - Whether path ownership should be DevNexus-native, provider-native only, or a
   provider-first model with optional local ownership rules.
-- Which authorization cache, if any, should exist for local review inside a
-  running agent session.
