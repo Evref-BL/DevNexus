@@ -198,6 +198,8 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("signal-components");
     expect(module).toContain("Not Git history");
     expect(module).toContain("Each rail is a workspace category");
+    expect(module).toContain(".dn-git-filters { display: flex; gap: 7px; margin: 0 0 10px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }");
+    expect(module).toContain(".dn-git-filters::-webkit-scrollbar { display: none; }");
     expect(module).toContain("--dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 30px);");
     expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px;");
     expect(module).toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto;");
