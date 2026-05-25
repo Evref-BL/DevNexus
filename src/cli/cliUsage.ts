@@ -308,7 +308,7 @@ export function usage(): string {
     "  --topic <text>            human-readable topic used when --work-item is omitted",
     "  --branch <name>           branch to create; defaults to codex/<scope>/<work-item-or-topic>",
     "  --worktree-name <name>    directory name under the configured worktrees root",
-    "  --base-ref <ref>          defaults to the component or workspace default branch",
+    "  --base-ref <ref>          defaults to the component publication target or workspace default branch",
     "  --no-base-ref             create the branch from the source checkout HEAD",
     "  --feature <id>         derive branch/base/context from feature branch delivery policy",
     "  --feature-change <slug> change slug for feature branch naming",
