@@ -270,7 +270,65 @@ worktrees, review policy, publication policy, release trains, feature branch
 delivery, provider auth, and authority. Deep Git workflows should extend that
 shape rather than put provider-specific branching logic in agents.
 
-A future workflow object should be a directed graph:
+Use `automation.gitWorkflows` to name the branching policy before a run starts.
+Profiles are provider-neutral. Publication config still owns push, pull-request,
+merge, evidence, package, and release mechanics.
+
+```json
+{
+  "automation": {
+    "gitWorkflows": {
+      "activeProfileId": "protected-feature",
+      "profiles": [
+        {
+          "id": "protected-feature",
+          "branchStrategy": "hybrid",
+          "targetBranch": "main",
+          "branchNaming": {
+            "defaultIntentPrefix": "feat",
+            "allowedIntentPrefixes": ["feat", "fix", "chore", "docs"],
+            "featureBranchPattern": "{intent}/{feature}",
+            "reviewBranchPattern": "{intent}/{feature}/{change}"
+          },
+          "review": {
+            "mode": "review_branch_pr",
+            "finalPullRequest": true,
+            "finalPullRequestCreation": "at_review_gate"
+          },
+          "update": {
+            "behind": "restack",
+            "diverged": "block",
+            "wrongBase": "recreate",
+            "publicRewrite": "with_human_approval"
+          },
+          "gates": {
+            "publication": [
+              "human_approval",
+              "provider_review",
+              "publication_authority"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Supported branch strategies are `direct`, `feature_branch`, `stacked`,
+`hybrid`, `release_maintenance`, `environment_branch`, and
+`throwaway_rehearsal`. Release-maintenance profiles declare their maintained
+branches and flow direction. Environment-branch profiles declare the environment
+branch and promotion method. Throwaway rehearsal profiles cannot create a final
+pull request.
+
+Older `automation.publication.releaseTrain.featureBranchDelivery` config remains
+readable. When it is enabled and `automation.gitWorkflows` is omitted,
+DevNexus projects it as `legacy-feature-branch-delivery`. New
+workspaces should prefer `automation.gitWorkflows`; release trains should stay
+focused on batching, candidate branches, CI tiers, and final publication.
+
+A workflow run object should then be a directed graph:
 
 - states are typed nodes;
 - transitions have conditions and required evidence;
