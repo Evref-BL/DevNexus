@@ -164,6 +164,9 @@ compatibility checks, but they should not become a hidden base for new work.
 
 A branch does not need to be updated just because the final target branch moved.
 DevNexus should classify the situation before recommending a branch update.
+Provider base status and mergeability are authoritative when available. When
+the provider cannot answer yet, DevNexus falls back to local Git facts such as
+ahead/behind counts and conflict probes.
 
 Update or block immediately when:
 
