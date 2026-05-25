@@ -895,6 +895,7 @@ describe("nexus coordination", () => {
     });
     const qualityDelta = {
       producer: "static-analysis",
+      sourcePath: ".quality/static-analysis-delta.json",
       readOnly: true,
       status: "regressed",
       touchedFiles: ["src/nexusCoordination.ts"],
@@ -961,6 +962,7 @@ describe("nexus coordination", () => {
       qualityDelta: {
         producer: "static-analysis",
         status: "regressed",
+        sourcePath: ".quality/static-analysis-delta.json",
         touchedFiles: ["src/nexusCoordination.ts"],
         summary: {
           newFindingCount: 3,

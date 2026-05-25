@@ -892,7 +892,12 @@ export function normalizeNexusCoordinationQualityDelta(
       qualityNullableString(record, "source", "qualityDelta") ??
       qualityNullableString(record, "tool", "qualityDelta"),
     status: qualityString(record, "status", "qualityDelta"),
-    sourcePath,
+    sourcePath:
+      sourcePath ??
+      optionalNullableTrimmedString(
+        qualityNullableString(record, "sourcePath", "qualityDelta"),
+      ) ??
+      null,
     touchedFiles: qualityStringArray(record.touchedFiles, "qualityDelta.touchedFiles"),
     summary: qualityDeltaCounts(record.summary),
     attention: qualityDeltaAttentionFindings(record),
