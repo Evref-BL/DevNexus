@@ -120,6 +120,8 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("dn-history-popover");
     expect(module).toContain("--dn-history-popover-accent");
     expect(module).toContain("--dn-history-popover-border-width");
+    expect(module).toContain("--dn-history-popover-radius");
+    expect(module).toContain("border-top-left-radius: calc(var(--dn-history-popover-radius) - var(--dn-history-popover-border-width))");
     expect(module).toContain("data-edge-side='left'");
     expect(module).toContain("height: var(--dn-history-popover-border-width)");
     expect(module).toContain("gitHistoryNodeAccentColor");
