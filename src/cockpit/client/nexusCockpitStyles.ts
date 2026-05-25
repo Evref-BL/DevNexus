@@ -161,8 +161,8 @@ button, input, select { font: inherit; }
 .dn-git-column-options { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; display: grid; gap: 6px; min-width: 150px; padding: 8px; border: 1px solid var(--dn-border-strong); border-radius: 8px; background: var(--dn-surface-raised); box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22); }
 .dn-git-column-option { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--dn-muted); font-size: 0.72rem; font-weight: 820; white-space: nowrap; }
 .dn-git-column-option input { accent-color: var(--dn-active); }
-.dn-git-graph-column { display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0; }
-.dn-git-board[data-git-detail-open='true'] .dn-git-graph-column { border-right: 1px solid var(--dn-border-muted); }
+.dn-git-graph-column { position: relative; display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0; }
+.dn-git-graph-detail-edge { position: absolute; right: 0; z-index: 1; width: 1px; background: var(--dn-border-muted); pointer-events: none; }
 .dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%; border-bottom: 0; background: color-mix(in srgb, var(--dn-surface-raised) 72%, transparent); }
 .dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }
 .dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width); align-items: center; gap: 4px; width: 100%; min-width: var(--dn-git-table-min-width); }

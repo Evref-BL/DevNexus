@@ -282,8 +282,9 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("--dn-git-row-height: 26px; --dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 12px);");
     expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px;");
     expect(module).toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto;");
-    expect(module).toContain(".dn-git-graph-column { display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0;");
-    expect(module).toContain(".dn-git-board[data-git-detail-open='true'] .dn-git-graph-column { border-right: 1px solid var(--dn-border-muted); }");
+    expect(module).toContain(".dn-git-graph-column { position: relative; display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0;");
+    expect(module).toContain(".dn-git-graph-detail-edge { position: absolute; right: 0; z-index: 1; width: 1px; background: var(--dn-border-muted); pointer-events: none; }");
+    expect(module).not.toContain(".dn-git-board[data-git-detail-open='true'] .dn-git-graph-column { border-right:");
     expect(module).toContain(".dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%;");
     expect(module).toContain(".dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }");
     expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");

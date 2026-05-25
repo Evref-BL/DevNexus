@@ -48,7 +48,7 @@ function renderGitHistoryBoard(snapshot, graph, selectedId) {
   const visibility = readStoredGitHistoryColumnVisibility();
   const visualGraph = gitHistoryVisualGraph(graph, selectedId);
   const detailOpen = isGitHistorySelection(selectedId) && graph.rows.some((row) => row.selectId === selectedId);
-  return `<div class="dn-git-board" data-git-board data-git-detail-open="${detailOpen ? 'true' : 'false'}" ${gitHistoryColumnVisibilityAttributes(visibility)} style="${escapeHtml(gitHistoryColumnStyle(widths, visibility))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths, visibility)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths, visibility)}${renderGitHistoryColumnHeader('date', 'Date', widths, visibility)}${renderGitHistoryColumnHeader('author', 'Author', widths, visibility)}${renderGitHistoryColumnHeader('commit', 'Commit', widths, visibility)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
+  return `<div class="dn-git-board" data-git-board data-git-detail-open="${detailOpen ? 'true' : 'false'}" ${gitHistoryColumnVisibilityAttributes(visibility)} style="${escapeHtml(gitHistoryColumnStyle(widths, visibility))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths, visibility)}${renderGitHistorySvg(visualGraph)}${renderGitHistoryGraphDetailEdge(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths, visibility)}${renderGitHistoryColumnHeader('date', 'Date', widths, visibility)}${renderGitHistoryColumnHeader('author', 'Author', widths, visibility)}${renderGitHistoryColumnHeader('commit', 'Commit', widths, visibility)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
 }
 
 function normalizeGitHistoryFilter(value) {
@@ -302,6 +302,16 @@ function renderGitHistorySvg(graph) {
     ariaLabel: 'Git history graph',
     rowHeight: gitHistoryRowHeight,
   });
+}
+
+function renderGitHistoryGraphDetailEdge(graph) {
+  const selectedRow = (graph.rows ?? []).find((row) => row.selected);
+  if (!selectedRow) return '';
+  const selectedIndex = Number(selectedRow.index);
+  if (!Number.isFinite(selectedIndex)) return '';
+  const top = 30 + (selectedIndex + 1) * gitHistoryRowHeight;
+  const height = gitHistoryInlineDetailRows * gitHistoryRowHeight;
+  return `<span class="dn-git-graph-detail-edge" aria-hidden="true" style="top:${top}px;height:${height}px;"></span>`;
 }
 
 function renderGitHistoryRows(snapshot, graph, selectedId) {
@@ -612,6 +622,7 @@ export function renderNexusCockpitEventHistoryClientSource() {
     gitHistoryCommitTime,
     gitHistoryEventId,
     renderGitHistorySvg,
+    renderGitHistoryGraphDetailEdge,
     renderGitHistoryRows,
     gitHistoryVisualGraph,
     gitHistoryVisualPathPoints,

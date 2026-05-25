@@ -180,6 +180,7 @@ describe("nexus dashboard history graph", () => {
     );
     expect(rendered).toContain('data-history-row-count="12"');
     expect(rendered).toContain("data-git-board");
+    expect(rendered).toContain('<span class="dn-git-graph-detail-edge" aria-hidden="true" style="top:82px;height:234px;"></span>');
     expect(rendered).toContain("data-git-column-menu");
     expect(rendered).toContain("data-git-column-toggle=\"graph\"");
     expect(rendered).toContain("data-git-column-graph=\"visible\"");
