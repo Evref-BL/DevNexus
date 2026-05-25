@@ -512,7 +512,7 @@ describe("nexus dashboard history graph", () => {
     expect(delayedCrossLanePaths).toEqual([]);
   });
 
-  it("anchors fractional git graph connector endpoints on routed lanes", async () => {
+  it("anchors side-branch git graph connectors at the base event", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -600,23 +600,27 @@ describe("nexus dashboard history graph", () => {
     };
 
     const graph = hooks.gitHistoryRows(snapshot);
-    const allPoints =
-      graph?.paths.flatMap((path) => path.points ?? []) ?? [];
-    const fractionalEndpoints =
-      graph?.paths.flatMap((path) => {
-        const points = path.points ?? [];
-        const last = points.at(-1);
-        return last && !Number.isInteger(last.index) ? [last] : [];
-      }) ?? [];
+    const feature = graph?.rows.find((row) => row.commit.hash.startsWith("feature"));
+    const base = graph?.rows.find((row) => row.commit.hash.startsWith("base"));
+    const sideToBase = graph?.paths.find(
+      (path) =>
+        path.fromLane === feature?.lane &&
+        path.fromIndex === feature?.index &&
+        path.toLane === base?.lane &&
+        path.toIndex === base?.index,
+    );
+    const lastFeatureLanePoint = sideToBase?.points
+      ?.filter((point) => point.lane === feature?.lane)
+      .slice(-1)[0];
 
     expect(graph?.paths.length).toBeGreaterThan(0);
-    expect(fractionalEndpoints.length).toBeGreaterThan(0);
-    for (const endpoint of fractionalEndpoints) {
-      const matches = allPoints.filter(
-        (point) => point.lane === endpoint.lane && point.index === endpoint.index,
-      );
-      expect(matches.length).toBeGreaterThanOrEqual(2);
-    }
+    expect(feature).toBeDefined();
+    expect(base).toBeDefined();
+    expect(sideToBase?.points?.slice(-1)[0]).toEqual({
+      lane: base?.lane,
+      index: base?.index,
+    });
+    expect(lastFeatureLanePoint?.index).toBeGreaterThan((base?.index ?? 0) - 0.7);
   });
 
   it("reuses git graph lanes for side branches with separate lifetimes", async () => {
@@ -761,7 +765,7 @@ describe("nexus dashboard history graph", () => {
     expect(rows?.maxLane).toBe(1);
   });
 
-  it("compacts git graph lanes after side branches rejoin active history", async () => {
+  it("keeps git graph side branches parallel until their shared base", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -887,8 +891,8 @@ describe("nexus dashboard history graph", () => {
     const rows = hooks.gitHistoryRows(snapshot);
     const sideB = rows?.rows.find((row) => row.commit.hash.startsWith("sideB"));
 
-    expect(sideB?.lane).toBe(1);
-    expect(Math.max(...(rows?.rows.map((row) => row.lane) ?? []))).toBe(1);
+    expect(sideB?.lane).toBe(2);
+    expect(Math.max(...(rows?.rows.map((row) => row.lane) ?? []))).toBe(2);
     expect(rows?.maxLane).toBe(2);
     expect(rows?.paths.some((path) => path.points?.some((point) => point.lane > 2))).toBe(false);
   });

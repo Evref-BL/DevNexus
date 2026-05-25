@@ -40,14 +40,14 @@ describe("nexus dashboard history layout", () => {
     expect(delayedCrossLaneSegments).toEqual([]);
   });
 
-  it("keeps event lanes separate from route lanes during compaction", () => {
+  it("keeps parallel tracks to the same base in separate event lanes", () => {
     const layout = buildNexusDashboardHistoryLayout({
       events: compactionFixture(),
     });
     const sideB = layout.nodes.find((node) => node.id === "sideB");
 
-    expect(sideB?.lane).toBe(1);
-    expect(layout.maxNodeLane).toBe(1);
+    expect(sideB?.lane).toBe(2);
+    expect(layout.maxNodeLane).toBe(2);
     expect(layout.maxRouteLane).toBe(2);
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
@@ -62,6 +62,30 @@ describe("nexus dashboard history layout", () => {
     expect(sideA?.lane).toBe(1);
     expect(sideB?.lane).toBe(1);
     expect(layout.maxNodeLane).toBe(1);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
+  });
+
+  it("keeps side tracks open until their base event", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: delayedBaseFixture(),
+    });
+    const base = layout.nodes.find((node) => node.id === "base");
+    const side = layout.nodes.find((node) => node.id === "side");
+    const sideToBase = layout.segments.find(
+      (segment) => segment.edgeId === "edge:side->base:0",
+    );
+    const lastSideLanePoint = sideToBase?.points
+      .filter((point) => point.lane === side?.lane)
+      .slice(-1)[0];
+
+    expect(base).toBeDefined();
+    expect(side).toBeDefined();
+    expect(sideToBase?.points.slice(-1)[0]).toEqual({
+      lane: base?.lane,
+      row: base?.row,
+    });
+    expect(lastSideLanePoint?.row).toBeGreaterThan((base?.row ?? 0) - 0.7);
+    expect(lastSideLanePoint?.row).toBeGreaterThan((side?.row ?? 0) + 1.5);
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
@@ -187,6 +211,18 @@ function compactionFixture(): NexusDashboardHistoryEvent[] {
     historyEvent("sideB", ["main2"]),
     historyEvent("main2", ["main1"]),
     historyEvent("main1", []),
+  ];
+}
+
+function delayedBaseFixture(): NexusDashboardHistoryEvent[] {
+  return [
+    historyEvent("main", ["base"]),
+    historyEvent("gap4", ["gap3"]),
+    historyEvent("gap3", ["gap2"]),
+    historyEvent("gap2", ["gap1"]),
+    historyEvent("side", ["base"]),
+    historyEvent("gap1", []),
+    historyEvent("base", []),
   ];
 }
 

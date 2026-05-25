@@ -67,6 +67,7 @@ Required invariants:
 - every active track has at most one lane in a row
 - no two active tracks occupy the same lane in the same row
 - graph edges are monotone in time
+- a split track becomes visible at its base event
 - connector endpoints touch an event node or routed track segment
 - lane changes occur in row corridors
 - colors belong to tracks, not temporary lane numbers

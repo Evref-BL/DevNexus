@@ -124,17 +124,25 @@ export function buildNexusDashboardHistoryLayout(
 
   for (const event of events) {
     const row = nodes.length;
-    let lane = active.findIndex((entry) => entry?.targetEventId === event.id);
+    const incomingRoutes = active
+      .map((route, lane) =>
+        route?.targetEventId === event.id ? { lane, route } : null,
+      )
+      .filter(
+        (route): route is { lane: number; route: ActiveHistoryRoute } =>
+          route !== null,
+      );
+    let lane = incomingRoutes[0]?.lane ?? -1;
     let incoming: ActiveHistoryRoute | null = null;
-    if (lane < 0) {
+    if (incomingRoutes.length === 0) {
       lane = firstOpenHistoryLane(active);
     } else {
-      incoming = active[lane];
-      active[lane] = null;
-      addHistoryRoutePoint(incoming, lane, row);
-      if (incoming) {
-        segments.push(historySegmentFromRoute(incoming, segments.length));
-        rememberHistoryTrack(tracks, incoming.trackId, incoming.colorIndex);
+      incoming = incomingRoutes[0]?.route ?? null;
+      for (const route of incomingRoutes) active[route.lane] = null;
+      for (const route of incomingRoutes) {
+        closeHistoryRouteAtEvent(route.route, route.lane, lane, row);
+        segments.push(historySegmentFromRoute(route.route, segments.length));
+        rememberHistoryTrack(tracks, route.route.trackId, route.route.colorIndex);
       }
     }
 
@@ -182,25 +190,6 @@ export function buildNexusDashboardHistoryLayout(
         fromEventId: event.id,
         toEventId: parentId,
       });
-
-      const existingLane = active.findIndex(
-        (entry) => entry?.targetEventId === parentId,
-      );
-      if (existingLane >= 0) {
-        const existing = active[existingLane];
-        addHistoryRoutePoint(existing, existingLane, row + 0.85);
-        const route = createHistoryRoute(
-          parentId,
-          edgeId,
-          parentIndex === 0 ? colorIndex : existing?.colorIndex ?? existingLane,
-          lane,
-          row,
-        );
-        addHistoryLaneTransition(route, existingLane, row + 0.85);
-        segments.push(historySegmentFromRoute(route, segments.length));
-        rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
-        continue;
-      }
 
       const preferredLane =
         parentIndex === 0 && !active[lane] ? lane : firstOpenHistoryLane(active);
@@ -261,6 +250,7 @@ export function renderNexusDashboardHistoryLayoutClientSource(): string {
     firstOpenHistoryLane,
     historyEdgeId,
     createHistoryRoute,
+    closeHistoryRouteAtEvent,
     historySegmentFromRoute,
     rememberHistoryTrack,
     addHistoryRoutePoint,
@@ -432,6 +422,23 @@ function createHistoryRoute(
     truncated,
     points: [{ lane, row }],
   };
+}
+
+function closeHistoryRouteAtEvent(
+  route: ActiveHistoryRoute,
+  routeLane: number,
+  eventLane: number,
+  row: number,
+): void {
+  if (routeLane === eventLane) {
+    addHistoryRoutePoint(route, eventLane, row);
+    return;
+  }
+  const last = route.points[route.points.length - 1];
+  const approachRow = Math.max(last?.row ?? row, row - 0.55);
+  addHistoryRoutePoint(route, routeLane, approachRow);
+  addHistoryLaneTransition(route, eventLane, Math.max(approachRow, row - 0.05));
+  addHistoryRoutePoint(route, eventLane, row);
 }
 
 function historySegmentFromRoute(
