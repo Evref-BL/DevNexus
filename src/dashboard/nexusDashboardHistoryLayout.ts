@@ -174,7 +174,7 @@ export function buildNexusDashboardHistoryLayout(
           true,
         );
         if (preferredLane !== lane) {
-          addHistoryLaneTransition(route, preferredLane, row + 0.85);
+          addHistoryLaneTransition(route, preferredLane, row + 1);
         }
         addHistoryRoutePoint(
           route,
@@ -226,12 +226,12 @@ export function buildNexusDashboardHistoryLayout(
         row,
       );
       if (preferredLane !== lane) {
-        addHistoryLaneTransition(route, preferredLane, row + 0.85);
+        addHistoryLaneTransition(route, preferredLane, row + 1);
       }
       active[preferredLane] = route;
     }
 
-    compactHistoryActiveLanes(active, row);
+    compactHistoryActiveLanes(active, row, rowByEventId);
   }
 
   const markerTargets = new Map(nodes.map((node) => [node.eventId, node]));
@@ -460,9 +460,8 @@ function closeHistoryRouteAtEvent(
     return;
   }
   const last = route.points[route.points.length - 1];
-  const approachRow = Math.max(last?.row ?? row, row - 0.55);
+  const approachRow = Math.max(last?.row ?? row, row - 1);
   addHistoryRoutePoint(route, routeLane, approachRow);
-  addHistoryLaneTransition(route, eventLane, Math.max(approachRow, row - 0.05));
   addHistoryRoutePoint(route, eventLane, row);
 }
 
@@ -530,28 +529,35 @@ function addHistoryLaneTransition(
     addHistoryRoutePoint(route, lane, row);
     return;
   }
-  const anchorRow = Math.max(last.row, row - 0.4);
-  addHistoryRoutePoint(route, last.lane, anchorRow);
-  addHistoryRoutePoint(route, lane, row);
+  addHistoryRoutePoint(route, lane, row <= last.row ? last.row + 1 : row);
 }
 
 function compactHistoryActiveLanes(
   active: Array<ActiveHistoryRoute | null>,
   row: number,
+  rowByEventId: ReadonlyMap<string, number>,
 ): void {
   let nextLane = 0;
+  let highestOccupiedLane = -1;
   for (let read = 0; read < active.length; read++) {
     const entry = active[read];
     if (!entry) continue;
+    const targetRow = rowByEventId.get(entry.targetEventId);
+    if (targetRow !== undefined && targetRow <= row + 1) {
+      highestOccupiedLane = Math.max(highestOccupiedLane, read);
+      nextLane = Math.max(nextLane, read + 1);
+      continue;
+    }
     if (read !== nextLane) {
-      addHistoryRoutePoint(entry, read, row + 0.45);
-      addHistoryLaneTransition(entry, nextLane, row + 0.95);
+      addHistoryRoutePoint(entry, read, row + 0.2);
+      addHistoryLaneTransition(entry, nextLane, row + 1);
       active[nextLane] = entry;
       active[read] = null;
     }
+    highestOccupiedLane = Math.max(highestOccupiedLane, nextLane);
     nextLane++;
   }
-  active.length = nextLane;
+  active.length = highestOccupiedLane + 1;
 }
 
 function firstOpenHistoryLane(

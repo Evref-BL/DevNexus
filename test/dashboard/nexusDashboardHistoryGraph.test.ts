@@ -388,7 +388,7 @@ describe("nexus dashboard history graph", () => {
     ).toBe("history:primary:core200000000000000000000000000000000000000");
   });
 
-  it("routes cross-lane git graph links through row corridors", async () => {
+  it("routes cross-lane git graph links through visible curves", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -505,10 +505,9 @@ describe("nexus dashboard history graph", () => {
     );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toContain("V 28.5");
+    expect(rendered).toContain("M 28 15 C 28 39, 50 21, 50 45");
     expect(rendered).toContain("V 105");
     expect(rendered).not.toContain("H 50 V 105");
-    expect(rendered).not.toMatch(/M 28 15 C .*50 .*105/);
     expect(delayedCrossLanePaths).toEqual([]);
   });
 
@@ -620,7 +619,7 @@ describe("nexus dashboard history graph", () => {
       lane: base?.lane,
       index: base?.index,
     });
-    expect(lastFeatureLanePoint?.index).toBeGreaterThan((base?.index ?? 0) - 0.7);
+    expect(lastFeatureLanePoint?.index).toBe(feature?.index);
   });
 
   it("reuses git graph lanes for side branches with separate lifetimes", async () => {

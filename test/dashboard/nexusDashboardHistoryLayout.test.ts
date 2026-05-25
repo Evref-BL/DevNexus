@@ -15,6 +15,20 @@ describe("nexus dashboard history layout", () => {
 
     const merge = layout.nodes.find((node) => node.id === "merge");
     const feature = layout.nodes.find((node) => node.id === "feature");
+    const mergeToFeature = layout.segments.find(
+      (segment) => segment.edgeId === "edge:merge->feature:1",
+    );
+    const featureLaneEntry = mergeToFeature?.points.findIndex(
+      (point) => point.lane === feature?.lane,
+    );
+    const branchCurveStart =
+      featureLaneEntry === undefined || featureLaneEntry <= 0
+        ? undefined
+        : mergeToFeature?.points[featureLaneEntry - 1];
+    const branchCurveEnd =
+      featureLaneEntry === undefined || featureLaneEntry < 0
+        ? undefined
+        : mergeToFeature?.points[featureLaneEntry];
     const delayedCrossLaneSegments = layout.segments.filter((segment) => {
       if (segment.fromLane === segment.toLane) return false;
       const firstCrossLanePoint = segment.points.find(
@@ -37,6 +51,8 @@ describe("nexus dashboard history layout", () => {
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
     expect(merge).toMatchObject({ eventClass: "source-change", lane: 0, row: 0 });
     expect(feature).toMatchObject({ eventClass: "source-change", lane: 1, row: 3 });
+    expect(branchCurveStart?.row).toBeCloseTo(0);
+    expect(branchCurveEnd?.row).toBeCloseTo(1);
     expect(delayedCrossLaneSegments).toEqual([]);
   });
 
@@ -84,8 +100,7 @@ describe("nexus dashboard history layout", () => {
       lane: base?.lane,
       row: base?.row,
     });
-    expect(lastSideLanePoint?.row).toBeGreaterThan((base?.row ?? 0) - 0.7);
-    expect(lastSideLanePoint?.row).toBeGreaterThan((side?.row ?? 0) + 1.5);
+    expect(lastSideLanePoint?.row).toBeCloseTo((base?.row ?? 0) - 1);
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 

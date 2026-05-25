@@ -278,33 +278,10 @@ function nexusCockpitHistoryGraphLaneTransitionD(
   to: NexusCockpitHistoryGraphSvgPoint,
   rowHeight: number,
 ): string {
-  const dx = to.x - from.x;
   const dy = to.y - from.y;
-  const directionX = Math.sign(dx) || 1;
   const directionY = Math.sign(dy) || 1;
-  const radius = Math.min(
-    Math.abs(dx) / 2,
-    Math.abs(dy) / 2,
-    rowHeight * 0.45,
-  );
-  const midY = from.y + dy / 2;
-  const firstY = midY - directionY * radius;
-  const secondY = midY + directionY * radius;
-  const firstX = from.x + directionX * radius;
-  const secondX = to.x - directionX * radius;
-  let d = "";
-  if (Math.abs(from.y - firstY) > 0.001) {
-    d += ` V ${formatNexusCockpitHistoryGraphNumber(firstY)}`;
-  }
-  d += ` Q ${formatNexusCockpitHistoryGraphNumber(from.x)} ${formatNexusCockpitHistoryGraphNumber(midY)} ${formatNexusCockpitHistoryGraphNumber(firstX)} ${formatNexusCockpitHistoryGraphNumber(midY)}`;
-  if (Math.abs(firstX - secondX) > 0.001) {
-    d += ` H ${formatNexusCockpitHistoryGraphNumber(secondX)}`;
-  }
-  d += ` Q ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(midY)} ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(secondY)}`;
-  if (Math.abs(secondY - to.y) > 0.001) {
-    d += ` V ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
-  }
-  return d;
+  const curve = Math.min(rowHeight * 0.8, Math.abs(dy) * 0.8);
+  return ` C ${formatNexusCockpitHistoryGraphNumber(from.x)} ${formatNexusCockpitHistoryGraphNumber(from.y + directionY * curve)}, ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(to.y - directionY * curve)}, ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
 }
 
 function nexusCockpitHistoryGraphColorIndex(
