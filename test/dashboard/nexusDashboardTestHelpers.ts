@@ -94,6 +94,30 @@ export async function loadDashboardClientTestHooks(): Promise<{
       toLane?: number;
     }>;
   } | null;
+  gitHistoryVisualGraph: (
+    graph: {
+      maxLane?: number;
+      repository?: unknown;
+      rows: Array<{ index: number; lane: number; selectId: string }>;
+      paths?: Array<{
+        fromIndex?: number;
+        fromLane?: number;
+        points?: Array<{ index: number; lane: number }>;
+        toIndex?: number;
+        toLane?: number;
+      }>;
+    },
+    selectedId?: string | null,
+  ) => {
+    rows: Array<{ index: number; lane: number; selectId: string; selected?: boolean }>;
+    paths: Array<{
+      fromIndex?: number;
+      fromLane?: number;
+      points?: Array<{ index: number; lane: number }>;
+      toIndex?: number;
+      toLane?: number;
+    }>;
+  };
   renderActionStrip: (
     actions: Array<{
       href: string;
@@ -149,7 +173,7 @@ export async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, defaultSelectedId, gitHistoryRows, historyRows, isCockpitTooltipTargetTruncated, nextDashboardSelectedId, renderActionStrip, renderBranchGraph, renderDashboard, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, shouldShowCockpitTooltipTarget, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, defaultSelectedId, gitHistoryRows, gitHistoryVisualGraph, historyRows, isCockpitTooltipTargetTruncated, nextDashboardSelectedId, renderActionStrip, renderBranchGraph, renderDashboard, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, shouldShowCockpitTooltipTarget, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 

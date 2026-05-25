@@ -212,8 +212,7 @@ button, input, select { font: inherit; }
 .dn-git-row-menu-item:hover, .dn-git-row-menu-item:focus-visible { color: var(--dn-strong); border-color: var(--dn-active); background: var(--dn-control-hover); outline: none; }
 .dn-git-subject { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dn-git-subject strong { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.86rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
-.dn-git-component { flex: 0 1 auto; max-width: 150px; overflow: hidden; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--dn-active) 42%, var(--dn-border)); border-radius: 6px; color: var(--dn-active); background: var(--dn-surface-raised); font-size: 0.68rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
-.dn-git-refs { display: inline-flex; flex: 0 1 auto; gap: 4px; max-width: 32%; overflow: hidden; }
+.dn-git-refs { display: inline-flex; flex: 0 1 auto; gap: 4px; max-width: 44%; overflow: hidden; }
 .dn-git-ref { max-width: 150px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-strong); border-left: 5px solid var(--dn-branch-color, var(--dn-active)); border-radius: 6px; color: var(--dn-pill-text); background: var(--dn-surface-raised); font-size: 0.68rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 30%; overflow: hidden; }
 .dn-git-badge { max-width: 130px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.66rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }

@@ -329,9 +329,50 @@ function gitHistoryVisualGraph(graph, selectedId) {
       ...path,
       fromIndex: path.fromIndex === undefined ? path.fromIndex : shiftIndex(path.fromIndex),
       toIndex: path.toIndex === undefined ? path.toIndex : shiftIndex(path.toIndex),
-      points: (path.points ?? []).map((point) => ({ ...point, index: shiftIndex(point.index) })),
+      points: gitHistoryVisualPathPoints(path.points ?? [], pivot, shiftIndex),
     })),
   };
+}
+
+function gitHistoryVisualPathPoints(points, pivot, shiftIndex) {
+  const visualPoints = [];
+  for (let index = 0; index < points.length; index++) {
+    const point = points[index];
+    const previous = points[index - 1];
+    const shiftedPoint = { ...point, index: shiftIndex(point.index) };
+    if (previous && gitHistoryPathSegmentCrossesDetailGap(previous, point, pivot)) {
+      const previousLane = Number(previous.lane);
+      const pointLane = Number(point.lane);
+      const shiftedIndex = Number(shiftedPoint.index);
+      if (Number.isFinite(previousLane) && Number.isFinite(pointLane) && Number.isFinite(shiftedIndex) && previousLane !== pointLane) {
+        if (previousLane < pointLane) {
+          appendGitHistoryVisualPoint(visualPoints, { ...point, index: point.index });
+          appendGitHistoryVisualPoint(visualPoints, shiftedPoint);
+        } else {
+          appendGitHistoryVisualPoint(visualPoints, {
+            ...previous,
+            index: Math.max(Number(previous.index), shiftedIndex - 1),
+          });
+          appendGitHistoryVisualPoint(visualPoints, shiftedPoint);
+        }
+        continue;
+      }
+    }
+    appendGitHistoryVisualPoint(visualPoints, shiftedPoint);
+  }
+  return visualPoints;
+}
+
+function gitHistoryPathSegmentCrossesDetailGap(previous, point, pivot) {
+  const previousIndex = Number(previous.index);
+  const pointIndex = Number(point.index);
+  return Number.isFinite(previousIndex) && Number.isFinite(pointIndex) && previousIndex <= pivot && pointIndex > pivot;
+}
+
+function appendGitHistoryVisualPoint(points, point) {
+  const last = points[points.length - 1];
+  if (last && last.lane === point.lane && last.index === point.index) return;
+  points.push(point);
 }
 
 function renderGitHistoryRow(snapshot, row, selectedId) {
@@ -339,7 +380,6 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
   const branchName = refs.find((ref) => ref.kind === 'branch' || ref.kind === 'remote')?.name ?? refs[0]?.name ?? '';
   const componentLabel = row.repository.componentName ?? row.repository.componentId ?? 'Workspace';
-  const componentChip = `<span class="dn-git-component" title="${escapeHtml([componentLabel, row.repository.repositoryPath].filter(Boolean).join(' · '))}">${escapeHtml(componentLabel)}</span>`;
   const refChips = refs.map((ref) => `<span class="dn-git-ref" style="--dn-branch-color:var(--dn-branch-${(row.colorLane ?? row.lane) % 7});" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join('');
   const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
   const date = formatTime(row.commit.committedAt);
@@ -360,7 +400,7 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const copyCommit = row.commit.hash ?? row.commit.shortHash ?? '';
   const copyBranch = branchName ? `<button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(branchName)}">Copy branch</button>` : '';
   const utilityMenu = `<details class="dn-git-row-menu"><summary class="dn-git-row-menu-trigger" aria-label="Event actions">...</summary><div class="dn-git-row-menu-options"><button class="dn-git-row-menu-item" type="button" data-select-id="${escapeHtml(row.selectId)}">Toggle details</button><button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(copyCommit)}">Copy commit</button>${copyBranch}</div></details>`;
-  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
+  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -569,6 +609,9 @@ export function renderNexusCockpitEventHistoryClientSource() {
     renderGitHistorySvg,
     renderGitHistoryRows,
     gitHistoryVisualGraph,
+    gitHistoryVisualPathPoints,
+    gitHistoryPathSegmentCrossesDetailGap,
+    appendGitHistoryVisualPoint,
     renderGitHistoryRow,
     renderGitHistoryDetailPanel,
     renderGitHistoryRelationChips,

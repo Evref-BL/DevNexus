@@ -141,6 +141,20 @@ describe("nexus dashboard history graph", () => {
 
     expect(rows?.rows).toHaveLength(3);
     expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
+    const expandedMergeGraph = rows
+      ? hooks.gitHistoryVisualGraph(
+          rows,
+          "history:primary:merge000000000000000000000000000000000000000",
+        )
+      : null;
+    const expandedMergeParentPath = expandedMergeGraph?.paths.find(
+      (path) => path.fromLane === 0 && path.toLane === 1,
+    );
+    expect(expandedMergeParentPath?.points).toEqual([
+      { lane: 0, index: 0 },
+      { lane: 1, index: 1 },
+      { lane: 1, index: 10 },
+    ]);
     expect(rendered).toContain("Project Events");
     expect(rendered).toContain('data-git-history-search');
     expect(rendered).toContain('data-git-history-search-input');
@@ -188,6 +202,7 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain("Codex</span>");
     expect(rendered).toContain("<span class=\"dn-git-sha\"");
     expect(rendered).toContain(">feature</span>");
+    expect(rendered).not.toContain("dn-git-component");
     expect(rendered).toContain("<svg");
     expect(rendered).toContain("dn-git-row-hit");
     expect(rendered).toContain("role=\"button\" tabindex=\"0\"");
