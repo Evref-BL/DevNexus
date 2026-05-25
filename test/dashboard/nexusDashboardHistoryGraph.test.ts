@@ -158,6 +158,7 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain("Project Events");
     expect(rendered).toContain('data-git-history-search');
     expect(rendered).toContain('data-git-history-search-input');
+    expect(rendered).toContain('data-git-detail-open="true"');
     expect(rendered).toContain('data-history-search-text="');
     expect(rendered).toContain("feature000");
     expect(rendered).toContain("Event details");
@@ -201,6 +202,11 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain("<span class=\"dn-git-author\"");
     expect(rendered).toContain("Codex</span>");
     expect(rendered).toContain("<span class=\"dn-git-sha\"");
+    expect(rendered).toContain("dn-git-history-row merge");
+    expect(rendered).toContain("<span class=\"dn-git-description\"");
+    expect(rendered.slice(selectedRowIndex, inlineDetailIndex)).not.toContain(
+      "<strong title=\"Add graph data\"",
+    );
     expect(rendered).toContain(">feature</span>");
     expect(rendered).not.toContain("dn-git-component");
     expect(rendered).toContain("<svg");
@@ -540,9 +546,9 @@ describe("nexus dashboard history graph", () => {
     );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toContain("M 28 15 C 28 39, 50 21, 50 45");
-    expect(rendered).toContain("V 105");
-    expect(rendered).not.toContain("H 50 V 105");
+    expect(rendered).toContain("M 28 13 C 28 33.8, 50 18.2, 50 39");
+    expect(rendered).toContain("V 91");
+    expect(rendered).not.toContain("H 50 V 91");
     expect(delayedCrossLanePaths).toEqual([]);
   });
 
@@ -1082,8 +1088,8 @@ describe("nexus dashboard history graph", () => {
     const rendered = hooks.renderGitHistory(snapshot);
 
     expect(rendered).toContain('width="148"');
-    expect(rendered).toContain('height="120"');
-    expect(rendered).toContain('viewBox="0 0 148 120"');
+    expect(rendered).toContain('height="104"');
+    expect(rendered).toContain('viewBox="0 0 148 104"');
     expect(rendered).toContain('data-history-row-count="4"');
     expect(rendered).toContain('data-history-lane-count="1"');
     expect(rendered).toContain('data-history-event-class="source-change"');

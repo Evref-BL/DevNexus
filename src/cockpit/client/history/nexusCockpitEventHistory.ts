@@ -25,6 +25,7 @@ import {
 import { renderNexusCockpitHistoryGraphSvg } from "./nexusCockpitHistoryGraphSvg.js";
 
 const gitHistoryInlineDetailRows = 9;
+const gitHistoryRowHeight = 26;
 
 function isGitHistorySelection(selectedId) {
   return String(selectedId ?? '').startsWith('history:');
@@ -46,7 +47,8 @@ function renderGitHistoryBoard(snapshot, graph, selectedId) {
   const widths = readStoredGitHistoryColumnWidths();
   const visibility = readStoredGitHistoryColumnVisibility();
   const visualGraph = gitHistoryVisualGraph(graph, selectedId);
-  return `<div class="dn-git-board" data-git-board ${gitHistoryColumnVisibilityAttributes(visibility)} style="${escapeHtml(gitHistoryColumnStyle(widths, visibility))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths, visibility)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths, visibility)}${renderGitHistoryColumnHeader('date', 'Date', widths, visibility)}${renderGitHistoryColumnHeader('author', 'Author', widths, visibility)}${renderGitHistoryColumnHeader('commit', 'Commit', widths, visibility)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
+  const detailOpen = isGitHistorySelection(selectedId) && graph.rows.some((row) => row.selectId === selectedId);
+  return `<div class="dn-git-board" data-git-board data-git-detail-open="${detailOpen ? 'true' : 'false'}" ${gitHistoryColumnVisibilityAttributes(visibility)} style="${escapeHtml(gitHistoryColumnStyle(widths, visibility))}"><div class="dn-git-graph-column">${renderGitHistoryColumnHeader('graph', 'Graph', widths, visibility)}${renderGitHistorySvg(visualGraph)}</div><div class="dn-git-table"><div class="dn-git-column-row">${renderGitHistoryColumnHeader('description', 'Description', widths, visibility)}${renderGitHistoryColumnHeader('date', 'Date', widths, visibility)}${renderGitHistoryColumnHeader('author', 'Author', widths, visibility)}${renderGitHistoryColumnHeader('commit', 'Commit', widths, visibility)}</div><div class="dn-git-rows">${renderGitHistoryRows(snapshot, graph, selectedId)}</div></div></div>`;
 }
 
 function normalizeGitHistoryFilter(value) {
@@ -298,6 +300,7 @@ function gitHistoryEventId(repository, hash) {
 function renderGitHistorySvg(graph) {
   return renderNexusCockpitHistoryGraphSvg(graph, {
     ariaLabel: 'Git history graph',
+    rowHeight: gitHistoryRowHeight,
   });
 }
 
@@ -377,6 +380,7 @@ function appendGitHistoryVisualPoint(points, point) {
 
 function renderGitHistoryRow(snapshot, row, selectedId) {
   const selected = row.selectId === selectedId ? ' selected' : '';
+  const merge = (row.commit.parents ?? []).length > 1 ? ' merge' : '';
   const refs = (row.commit.refs ?? []).filter((ref) => ref.kind !== 'head').slice(0, 3);
   const branchName = refs.find((ref) => ref.kind === 'branch' || ref.kind === 'remote')?.name ?? refs[0]?.name ?? '';
   const componentLabel = row.repository.componentName ?? row.repository.componentId ?? 'Workspace';
@@ -400,7 +404,7 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const copyCommit = row.commit.hash ?? row.commit.shortHash ?? '';
   const copyBranch = branchName ? `<button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(branchName)}">Copy branch</button>` : '';
   const utilityMenu = `<details class="dn-git-row-menu"><summary class="dn-git-row-menu-trigger" aria-label="Event actions">...</summary><div class="dn-git-row-menu-options"><button class="dn-git-row-menu-item" type="button" data-select-id="${escapeHtml(row.selectId)}">Toggle details</button><button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(copyCommit)}">Copy commit</button>${copyBranch}</div></details>`;
-  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description"><span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
+  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}${merge}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description"><span class="dn-git-refs">${refChips}</span><span class="dn-git-description" title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</span><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -581,6 +585,7 @@ function gitHistoryDetail(snapshot, id) {
 export function renderNexusCockpitEventHistoryClientSource() {
   return [
     `const gitHistoryInlineDetailRows = 9;`,
+    `const gitHistoryRowHeight = 26;`,
     isGitHistorySelection,
     renderGitHistory,
     renderGitHistoryBoard,
