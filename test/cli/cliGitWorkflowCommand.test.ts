@@ -1,0 +1,235 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { main } from "../../src/cli.js";
+import {
+  createNexusGitWorkflowRun,
+  defaultNexusAutomationConfig,
+  saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
+  type NexusProjectConfig,
+} from "../../src/index.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+function captureOutput() {
+  let output = "";
+  return {
+    writer: {
+      write(chunk: string): boolean {
+        output += chunk;
+        return true;
+      },
+    },
+    output: () => output,
+  };
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+describe("git-workflow CLI", () => {
+  it("prints a read-only JSON plan for a direct profile", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-plan-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("direct-protected", "direct"));
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--profile",
+        "direct-protected",
+        "--work-item",
+        "github-356",
+        "--repository-path",
+        sourceRoot,
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: readOnlyGitRunner(),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      result: {
+        mode: "plan",
+        mutates: false,
+        profile: {
+          id: "direct-protected",
+          branchStrategy: "direct",
+        },
+        refs: {
+          baseRef: "origin/main",
+          targetBranch: "main",
+        },
+      },
+    });
+    expect(payload.result.allowedNextCommands).toContainEqual(
+      expect.objectContaining({
+        id: "prepare-worktree",
+        command: expect.stringContaining("worktree prepare"),
+      }),
+    );
+  });
+
+  it("prints concise text status for a recorded feature-branch run", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-status-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      workItemId: "github-356",
+      branchName: "feat/git-workflows/plan-status",
+      currentRef: "feat/git-workflows/plan-status",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+      now: "2026-05-25T10:00:00.000Z",
+    });
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "status",
+        projectRoot,
+        "--component",
+        "primary",
+        "--run",
+        "run-1",
+        "--repository-path",
+        sourceRoot,
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: readOnlyGitRunner("feat/git-workflows/plan-status"),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(output.output()).toContain("DevNexus Git workflow status.");
+    expect(output.output()).toContain("Run: run-1 status=working");
+    expect(output.output()).toContain("Profile: feature-delivery (feature_branch)");
+    expect(output.output()).toContain("Next owner: agent/codex");
+  });
+});
+
+function projectConfig(
+  profileId: string,
+  branchStrategy: "direct" | "feature_branch",
+  profileOverrides: Record<string, unknown> = {},
+): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "demo-project",
+    name: "Demo Project",
+    home: null,
+    repo: {
+      kind: "git",
+      remoteUrl: "git@example.invalid:demo/project.git",
+      defaultBranch: "main",
+      sourceRoot: "source",
+    },
+    worktreesRoot: "worktrees",
+    components: [
+      {
+        id: "primary",
+        name: "Primary",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/project.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+        relationships: [],
+      },
+    ],
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        remote: "origin",
+        targetBranch: "main",
+      },
+      gitWorkflows: {
+        activeProfileId: profileId,
+        profiles: [
+          {
+            id: profileId,
+            branchStrategy,
+            targetBranch: "main",
+            ...profileOverrides,
+          },
+        ],
+      },
+    },
+  };
+}
+
+function readOnlyGitRunner(currentBranch = "main"): GitRunner {
+  return (args) => gitResult([...args], currentBranch);
+}
+
+function gitResult(args: string[], currentBranch: string): GitCommandResult {
+  if (args.join(" ") === "rev-parse --abbrev-ref HEAD") {
+    return success(args, `${currentBranch}\n`);
+  }
+  if (args.join(" ") === "rev-parse HEAD") {
+    return success(args, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n");
+  }
+  if (args.join(" ") === "rev-parse --verify --quiet origin/main^{commit}") {
+    return success(args, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+  }
+  if (args.join(" ") === "status --short --branch") {
+    return success(args, `## ${currentBranch}\n`);
+  }
+  return {
+    args,
+    stdout: "",
+    stderr: "not found",
+    exitCode: 1,
+  };
+}
+
+function success(args: string[], stdout: string): GitCommandResult {
+  return {
+    args,
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}

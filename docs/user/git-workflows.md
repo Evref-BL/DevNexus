@@ -103,6 +103,23 @@ dev-nexus coordination cleanup-plan <workspace-root> --component api
 
 Use dry-run options where available before mutating a provider.
 
+## Read-Only Plan And Status
+
+Before starting or resuming a workflow, inspect the selected profile and local
+Git evidence without changing Git, provider, tracker, or runtime state:
+
+```bash
+dev-nexus git-workflow plan <workspace-root> --component api --profile protected-main --work-item github-123
+dev-nexus git-workflow status <workspace-root> --component api --run run-123
+```
+
+`plan` explains the selected profile, branch strategy, base ref, target branch,
+evidence gaps, blockers, gates, next owner, and allowed next commands. `status`
+adds the recorded workflow run when one exists, then refreshes only safe local
+Git facts. Provider review and check evidence should be attached through the
+appropriate publication/provider evidence commands; read-only plan/status report
+missing provider evidence as a gap instead of silently guessing.
+
 ## Branch Strategies
 
 The branch strategy answers where reviewable changes flow.
