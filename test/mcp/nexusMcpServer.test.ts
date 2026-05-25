@@ -15,6 +15,7 @@ import {
   listDevNexusMcpTools,
   listMcpInputSchemaProviderIssues,
   maxNexusRemoteExecutionOutputTailLength,
+  NexusMemoryWorkItemClaimAuthority,
   nexusWorkerContextJsonPath,
   readNexusAutomationRunLedger,
   saveProjectConfig,
@@ -521,6 +522,7 @@ describe("DevNexus MCP server", () => {
       "work_item_create",
       "work_item_discovery_status",
       "work_item_claim_next",
+      "work_item_claim_release",
       "work_item_list",
       "work_item_get",
       "work_item_update",
@@ -570,6 +572,9 @@ describe("DevNexus MCP server", () => {
     const claimNext = listDevNexusMcpTools().find(
       (candidate) => candidate.name === "work_item_claim_next",
     );
+    const claimRelease = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "work_item_claim_release",
+    );
     const targetCycleRecord = listDevNexusMcpTools().find(
       (candidate) => candidate.name === "target_cycle_record",
     );
@@ -607,6 +612,14 @@ describe("DevNexus MCP server", () => {
         },
       },
       required: ["hostId"],
+    });
+    expect(claimRelease?.inputSchema).toMatchObject({
+      properties: {
+        itemId: { type: "string" },
+        leaseToken: { type: "string" },
+        fencingToken: { type: "number" },
+      },
+      required: ["itemId", "leaseToken"],
     });
     expect(targetCycleRecord?.inputSchema).toMatchObject({
       properties: {
@@ -1024,7 +1037,7 @@ describe("DevNexus MCP server", () => {
   it("upserts publication pull requests through MCP with configured App API credentials", async () => {
     const { projectRoot, homePath, sourceRoot } = createMcpPublicationProject();
     const commandRuns: Array<{ command: string; args: string[] }> = [];
-    const requests: Array<{ url: string; authorization: string | null; body: unknown }> = [];
+    const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
 
     const result = toolJson(
       await callDevNexusMcpTool(
@@ -1050,11 +1063,15 @@ describe("DevNexus MCP server", () => {
           publicationFetch: (async (input, init = {}) => {
             requests.push({
               url: String(input),
+              method: init.method ?? "GET",
               authorization:
                 ((init.headers as Record<string, string> | undefined)
                   ?.Authorization ?? null),
               body: init.body ? JSON.parse(String(init.body)) : null,
             });
+            if ((init.method ?? "GET") === "GET") {
+              return new Response(JSON.stringify([]), { status: 200 });
+            }
             return new Response(
               JSON.stringify({
                 number: 311,
@@ -1097,7 +1114,15 @@ describe("DevNexus MCP server", () => {
     ]);
     expect(requests).toEqual([
       {
+        url:
+          "https://api.github.com/repos/Evref-BL/DevNexus/pulls?head=Evref-BL%3Acodex%2Fdev-nexus%2Fmcp-publication-facade&base=main&state=open&per_page=2",
+        method: "GET",
+        authorization: "Bearer installation-token",
+        body: null,
+      },
+      {
         url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls",
+        method: "POST",
         authorization: "Bearer installation-token",
         body: {
           head: "codex/dev-nexus/mcp-publication-facade",
@@ -5252,6 +5277,81 @@ describe("DevNexus MCP server", () => {
           agentId: "agent-a",
           leaseToken: "mcp-token-1",
           expiresAt: "2026-05-20T10:10:00.000Z",
+        },
+      },
+    });
+  });
+
+  it("releases authority-backed GitHub work item claims through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-claim-release-");
+    saveProjectConfig(projectRoot, githubClaimProjectConfig());
+    const claimAuthority = new NexusMemoryWorkItemClaimAuthority();
+    const provider = new McpClaimMemoryProvider([
+      mcpGithubWorkItem("github-7", "Release through MCP", {
+        labels: ["automation"],
+      }),
+    ]);
+
+    const claimed = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_claim_next",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          hostId: "host-a",
+          agentId: "agent-a",
+          leaseDurationMs: 600000,
+        },
+        {
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+          workItemClaimProviderFactory: mcpClaimProviderFactory(provider),
+          workItemClaimAuthority: claimAuthority,
+          workItemClaimLeaseTokenFactory: () => "mcp-token-1",
+        },
+      ),
+    );
+
+    expect(claimed).toMatchObject({
+      claim: {
+        authorityClaim: {
+          fencingToken: 1,
+        },
+      },
+    });
+
+    const released = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_claim_release",
+        {
+          projectRoot,
+          componentId: "core",
+          trackerId: "github",
+          itemId: "github-7",
+          leaseToken: "mcp-token-1",
+          fencingToken: 1,
+        },
+        {
+          now: fixedClock("2026-05-20T10:05:00.000Z"),
+          workItemClaimProviderFactory: mcpClaimProviderFactory(provider),
+          workItemClaimAuthority: claimAuthority,
+        },
+      ),
+    );
+
+    expect(released).toMatchObject({
+      ok: true,
+      release: {
+        workItem: {
+          id: "github-7",
+        },
+        authorityKind: "memory",
+        release: {
+          status: "released",
+          claim: {
+            state: "released",
+            fencingToken: 1,
+          },
         },
       },
     });

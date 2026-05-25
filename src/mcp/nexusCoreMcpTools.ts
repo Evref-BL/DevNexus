@@ -44,6 +44,7 @@ export const devNexusCoreMcpToolNames = [
   "work_item_create",
   "work_item_discovery_status",
   "work_item_claim_next",
+  "work_item_claim_release",
   "work_item_list",
   "work_item_get",
   "work_item_update",
