@@ -42,6 +42,7 @@ import {
 } from "./nexusDashboardTestHelpers.js";
 import {
   gitHistoryNodePopoverContent,
+  isGitHistoryPopoverColor,
   renderGitHistoryNodePopoverContent,
 } from "../../src/cockpit/client/history/nexusCockpitHistoryInteractions.js";
 
@@ -88,6 +89,9 @@ describe("nexus dashboard client", () => {
     expect(html).toContain("Needs review");
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
+    expect(isGitHistoryPopoverColor("var(--dn-branch-4)")).toBe(true);
+    expect(isGitHistoryPopoverColor("rgb(53, 221, 84)")).toBe(true);
+    expect(isGitHistoryPopoverColor("url(javascript:alert(1))")).toBe(false);
   });
 
   it("renders a client module with explicit light and dark mode controls", () => {
@@ -106,6 +110,9 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("data-git-history-search");
     expect(module).toContain("applyGitHistorySearch");
     expect(module).toContain("dn-history-popover");
+    expect(module).toContain("--dn-history-popover-accent");
+    expect(module).toContain("data-edge-side='left'");
+    expect(module).toContain("gitHistoryNodeAccentColor");
     expect(module).toContain("showGitHistoryNodePopover");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");

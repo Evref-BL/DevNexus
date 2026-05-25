@@ -179,6 +179,7 @@ export function showGitHistoryNodePopover(
     return;
   }
   popover.innerHTML = renderGitHistoryNodePopoverContent(content);
+  popover.style.setProperty("--dn-history-popover-accent", gitHistoryNodeAccentColor(node));
   popover.classList.add("visible");
   popover.setAttribute("aria-hidden", "false");
   positionGitHistoryNodePopover(popover, node);
@@ -187,6 +188,20 @@ export function showGitHistoryNodePopover(
 export function hideGitHistoryNodePopover(popover: HTMLElement): void {
   popover.classList.remove("visible");
   popover.setAttribute("aria-hidden", "true");
+}
+
+export function gitHistoryNodeAccentColor(node: Element): string {
+  const fallback = "var(--dn-good)";
+  const computedFill = typeof window === "undefined"
+    ? ""
+    : window.getComputedStyle(node).fill;
+  const fill = computedFill || node.getAttribute("fill") || "";
+  return isGitHistoryPopoverColor(fill) ? fill : fallback;
+}
+
+export function isGitHistoryPopoverColor(value: string): boolean {
+  const trimmed = value.trim();
+  return /^(#[\da-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|color\([^)]+\)|var\(--dn-branch-\d+\))$/iu.test(trimmed);
 }
 
 export function gitHistoryNodeFromEventTarget(
@@ -257,16 +272,24 @@ export function positionGitHistoryNodePopover(
   const bounds = popover.getBoundingClientRect();
   const preferredLeft = anchor.right + 16;
   const fallbackLeft = anchor.left - bounds.width - 16;
-  const left = preferredLeft + bounds.width + margin <= viewportWidth
-    ? preferredLeft
-    : Math.max(margin, fallbackLeft);
+  const usesPreferredSide = preferredLeft + bounds.width + margin <= viewportWidth;
+  const left = usesPreferredSide ? preferredLeft : Math.max(margin, fallbackLeft);
   const anchorCenterY = anchor.top + anchor.height / 2;
   const top = Math.min(
     Math.max(margin, anchorCenterY - bounds.height / 2),
     Math.max(margin, viewportHeight - bounds.height - margin),
   );
+  const anchorCenterX = anchor.left + anchor.width / 2;
+  const edgeSide = usesPreferredSide ? "left" : "right";
+  const connectorWidth = edgeSide === "left"
+    ? Math.max(10, left - anchorCenterX)
+    : Math.max(10, anchorCenterX - (left + bounds.width));
+  const connectorY = Math.min(Math.max(14, anchorCenterY - top), Math.max(14, bounds.height - 14));
   popover.style.left = `${left}px`;
   popover.style.top = `${top}px`;
+  popover.style.setProperty("--dn-history-popover-connector-width", `${connectorWidth}px`);
+  popover.style.setProperty("--dn-history-popover-connector-y", `${connectorY}px`);
+  popover.dataset.edgeSide = edgeSide;
 }
 
 export function applyGitHistorySearch(
@@ -362,6 +385,8 @@ export function renderNexusCockpitHistoryInteractionsClientSource(): string {
     createGitHistoryNodePopover,
     showGitHistoryNodePopover,
     hideGitHistoryNodePopover,
+    gitHistoryNodeAccentColor,
+    isGitHistoryPopoverColor,
     gitHistoryNodeFromEventTarget,
     gitHistoryNodePopoverContent,
     renderGitHistoryNodePopoverContent,
