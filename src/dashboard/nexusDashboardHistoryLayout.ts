@@ -115,6 +115,9 @@ export function buildNexusDashboardHistoryLayout(
 ): NexusDashboardHistoryLayout {
   const events = input.events ?? [];
   const knownIds = new Set(events.map((event) => event.id));
+  const rowByEventId = new Map(
+    events.map((event, index) => [event.id, index]),
+  );
   const active: Array<ActiveHistoryRoute | null> = [];
   const nodes: NexusDashboardHistoryNode[] = [];
   const edges: NexusDashboardHistoryEdge[] = [];
@@ -190,6 +193,28 @@ export function buildNexusDashboardHistoryLayout(
         fromEventId: event.id,
         toEventId: parentId,
       });
+
+      const parentRow = rowByEventId.get(parentId);
+      const existingParentLane = active.findIndex(
+        (entry) => entry?.targetEventId === parentId,
+      );
+      if (
+        existingParentLane >= 0 &&
+        parentRow !== undefined &&
+        parentRow - row <= 1
+      ) {
+        const route = createHistoryRoute(
+          parentId,
+          edgeId,
+          parentIndex === 0 ? colorIndex : existingParentLane,
+          lane,
+          row,
+        );
+        closeHistoryRouteAtEvent(route, lane, existingParentLane, parentRow);
+        segments.push(historySegmentFromRoute(route, segments.length));
+        rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
+        continue;
+      }
 
       const preferredLane =
         parentIndex === 0 && !active[lane] ? lane : firstOpenHistoryLane(active);

@@ -89,6 +89,30 @@ describe("nexus dashboard history layout", () => {
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
+  it("connects immediate shared-base parents without an outward transit lane", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: immediateSharedBaseFixture(),
+    });
+    const merge = layout.nodes.find((node) => node.id === "merge");
+    const base = layout.nodes.find((node) => node.id === "base");
+    const mergeToBase = layout.segments.find(
+      (segment) => segment.edgeId === "edge:merge->base:1",
+    );
+    const minLane = Math.min(merge?.lane ?? 0, base?.lane ?? 0);
+    const maxLane = Math.max(merge?.lane ?? 0, base?.lane ?? 0);
+
+    expect(merge).toBeDefined();
+    expect(base).toBeDefined();
+    expect(mergeToBase?.points.slice(-1)[0]).toEqual({
+      lane: base?.lane,
+      row: base?.row,
+    });
+    expect(mergeToBase?.points.every((point) =>
+      point.lane >= minLane && point.lane <= maxLane,
+    )).toBe(true);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
+  });
+
   it("continues truncated parent tracks without inventing event rows", () => {
     const layout = buildNexusDashboardHistoryLayout({
       events: [
@@ -223,6 +247,15 @@ function delayedBaseFixture(): NexusDashboardHistoryEvent[] {
     historyEvent("side", ["base"]),
     historyEvent("gap1", []),
     historyEvent("base", []),
+  ];
+}
+
+function immediateSharedBaseFixture(): NexusDashboardHistoryEvent[] {
+  return [
+    historyEvent("top", ["base"]),
+    historyEvent("merge", ["other", "base"]),
+    historyEvent("base", []),
+    historyEvent("other", []),
   ];
 }
 
