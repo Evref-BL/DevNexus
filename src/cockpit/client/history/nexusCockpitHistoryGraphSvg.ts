@@ -57,7 +57,7 @@ export interface NexusCockpitHistoryGraphSvgRoute {
 export interface NexusCockpitHistoryGraphSvgNode {
   readonly id: string;
   readonly colorIndex: number;
-  readonly eventClass: "write";
+  readonly eventClass: "source-change";
   readonly lane: number;
   readonly index: number;
   readonly x: number;
@@ -81,7 +81,7 @@ export function renderNexusCockpitHistoryGraphSvg(
 ): string {
   const model = buildNexusCockpitHistoryGraphSvgModel(graph, options);
   const ariaLabel = escapeNexusCockpitHistoryGraphAttribute(
-    options.ariaLabel ?? "Write history graph",
+    options.ariaLabel ?? "History graph",
   );
   const paths = model.routes
     .map((route) => {
@@ -96,7 +96,7 @@ export function renderNexusCockpitHistoryGraphSvg(
       const id = escapeNexusCockpitHistoryGraphAttribute(node.id);
       const label = escapeNexusCockpitHistoryGraphAttribute(node.label);
       const color = `var(--dn-branch-${node.colorIndex})`;
-      return `<circle data-history-event-class="${node.eventClass}" data-history-write-event-id="${id}" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="var(--dn-surface)" stroke="${color}" stroke-width="3" />`;
+      return `<circle data-history-event-class="${node.eventClass}" data-history-event-id="${id}" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="var(--dn-surface)" stroke="${color}" stroke-width="3" />`;
     })
     .join("");
   return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${paths}${nodes}</svg>`;
@@ -174,7 +174,7 @@ export function buildNexusCockpitHistoryGraphSvgModel(
         row.colorLane ?? row.lane,
         metrics.branchColorCount,
       ),
-      eventClass: "write" as const,
+      eventClass: "source-change" as const,
       lane: row.lane,
       index: row.index,
       x: x(row.lane),
@@ -205,7 +205,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
   options: NexusCockpitHistoryGraphSvgOptions,
 ): Required<NexusCockpitHistoryGraphSvgOptions> {
   return {
-    ariaLabel: options.ariaLabel ?? "Write history graph",
+    ariaLabel: options.ariaLabel ?? "History graph",
     branchColorCount: Math.max(
       1,
       Math.floor(
@@ -287,7 +287,7 @@ function nexusCockpitHistoryGraphNodeId(
   row: NexusCockpitHistoryGraphRow,
   index: number,
 ): string {
-  return String(row.selectId ?? row.commit?.hash ?? `write:${index}`);
+  return String(row.selectId ?? row.commit?.hash ?? `event:${index}`);
 }
 
 function nexusCockpitHistoryGraphNodeLabel(
@@ -297,7 +297,7 @@ function nexusCockpitHistoryGraphNodeLabel(
   const subject = String(row.commit?.subject ?? "").trim();
   const shortHash = String(row.commit?.shortHash ?? "").trim();
   if (subject && shortHash) return `${subject} (${shortHash})`;
-  return subject || shortHash || `Write event ${index + 1}`;
+  return subject || shortHash || `Event ${index + 1}`;
 }
 
 function finiteNexusCockpitHistoryGraphNumber(

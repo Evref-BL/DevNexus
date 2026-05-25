@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildWriteHistoryLayout,
-  validateWriteHistoryLayout,
+  buildNexusDashboardHistoryLayout,
+  validateNexusDashboardHistoryLayout,
   type NexusDashboardHistoryMarker,
-  type NexusDashboardWriteEvent,
+  type NexusDashboardHistoryEvent,
 } from "../../src/dashboard/nexusDashboardHistoryLayout.js";
 
 describe("nexus dashboard history layout", () => {
-  it("models commits as primary write events with local cross-lane routing", () => {
-    const layout = buildWriteHistoryLayout({
-      writeEvents: mergeFixture(),
+  it("models commits as primary events with local cross-lane routing", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: mergeFixture(),
     });
 
     const merge = layout.nodes.find((node) => node.id === "merge");
@@ -26,7 +26,7 @@ describe("nexus dashboard history layout", () => {
     });
 
     expect(layout.nodes).toHaveLength(5);
-    expect(layout.edges.map((edge) => [edge.fromWriteEventId, edge.toWriteEventId]))
+    expect(layout.edges.map((edge) => [edge.fromEventId, edge.toEventId]))
       .toEqual([
         ["merge", "main2"],
         ["merge", "feature"],
@@ -34,27 +34,27 @@ describe("nexus dashboard history layout", () => {
         ["main1", "base"],
         ["feature", "base"],
       ]);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
-    expect(merge).toMatchObject({ eventClass: "write", lane: 0, row: 0 });
-    expect(feature).toMatchObject({ eventClass: "write", lane: 1, row: 3 });
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
+    expect(merge).toMatchObject({ eventClass: "source-change", lane: 0, row: 0 });
+    expect(feature).toMatchObject({ eventClass: "source-change", lane: 1, row: 3 });
     expect(delayedCrossLaneSegments).toEqual([]);
   });
 
-  it("keeps write-event lanes separate from route lanes during compaction", () => {
-    const layout = buildWriteHistoryLayout({
-      writeEvents: compactionFixture(),
+  it("keeps event lanes separate from route lanes during compaction", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: compactionFixture(),
     });
     const sideB = layout.nodes.find((node) => node.id === "sideB");
 
     expect(sideB?.lane).toBe(1);
     expect(layout.maxNodeLane).toBe(1);
     expect(layout.maxRouteLane).toBe(2);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
-  it("reuses lanes for non-overlapping side-branch write events", () => {
-    const layout = buildWriteHistoryLayout({
-      writeEvents: laneReuseFixture(),
+  it("reuses lanes for non-overlapping side-branch events", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: laneReuseFixture(),
     });
     const sideA = layout.nodes.find((node) => node.id === "sideA");
     const sideB = layout.nodes.find((node) => node.id === "sideB");
@@ -62,13 +62,13 @@ describe("nexus dashboard history layout", () => {
     expect(sideA?.lane).toBe(1);
     expect(sideB?.lane).toBe(1);
     expect(layout.maxNodeLane).toBe(1);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
-  it("continues truncated parent tracks without inventing write-event rows", () => {
-    const layout = buildWriteHistoryLayout({
-      writeEvents: [
-        writeEvent("head", ["parent-outside-window"]),
+  it("continues truncated parent tracks without inventing event rows", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: [
+        historyEvent("head", ["parent-outside-window"]),
       ],
     });
 
@@ -76,7 +76,7 @@ describe("nexus dashboard history layout", () => {
     expect(layout.edges).toEqual([]);
     expect(layout.segments).toEqual([
       expect.objectContaining({
-        targetWriteEventId: "parent-outside-window",
+        targetEventId: "parent-outside-window",
         truncated: true,
         fromLane: 0,
         toLane: 0,
@@ -89,18 +89,18 @@ describe("nexus dashboard history layout", () => {
       }),
     ]);
     expect(layout.truncatedParentIds).toEqual(["parent-outside-window"]);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
   it("connects a loaded branch head whose parent is outside the history window", () => {
-    const layout = buildWriteHistoryLayout({
-      writeEvents: [
-        writeEvent("merge", ["base"]),
-        writeEvent("side", ["parent-outside-window"]),
-        writeEvent("base", []),
+    const layout = buildNexusDashboardHistoryLayout({
+      events: [
+        historyEvent("merge", ["base"]),
+        historyEvent("side", ["parent-outside-window"]),
+        historyEvent("base", []),
       ],
     });
-    const side = layout.nodes.find((node) => node.writeEventId === "side");
+    const side = layout.nodes.find((node) => node.eventId === "side");
     const connectedSegments = layout.segments.filter((segment) =>
       segment.points.some(
         (point) => point.row === side?.row && point.lane === side?.lane,
@@ -110,11 +110,11 @@ describe("nexus dashboard history layout", () => {
     expect(side).toMatchObject({ row: 1, lane: 1 });
     expect(connectedSegments).toEqual([
       expect.objectContaining({
-        targetWriteEventId: "parent-outside-window",
+        targetEventId: "parent-outside-window",
         truncated: true,
       }),
     ]);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
   it("attaches decision events as markers and detail rows", () => {
@@ -122,13 +122,13 @@ describe("nexus dashboard history layout", () => {
       {
         id: "approval-1",
         eventClass: "decision",
-        targetWriteEventId: "merge",
+        targetEventId: "merge",
         label: "Approved",
         tone: "good",
       },
     ];
-    const layout = buildWriteHistoryLayout({
-      writeEvents: mergeFixture(),
+    const layout = buildNexusDashboardHistoryLayout({
+      events: mergeFixture(),
       markers,
     });
 
@@ -137,63 +137,63 @@ describe("nexus dashboard history layout", () => {
         id: "approval-1",
         row: 0,
         lane: 0,
-        targetWriteEventId: "merge",
+        targetEventId: "merge",
       }),
     ]);
     expect(layout.detailRows).toEqual([
       expect.objectContaining({
-        writeEventId: "merge",
+        eventId: "merge",
         markerIds: ["approval-1"],
       }),
     ]);
-    expect(validateWriteHistoryLayout(layout)).toEqual([]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
-  it("is stable across refreshes for the same write-event graph", () => {
-    const first = buildWriteHistoryLayout({ writeEvents: mergeFixture() });
-    const second = buildWriteHistoryLayout({ writeEvents: mergeFixture() });
+  it("is stable across refreshes for the same event graph", () => {
+    const first = buildNexusDashboardHistoryLayout({ events: mergeFixture() });
+    const second = buildNexusDashboardHistoryLayout({ events: mergeFixture() });
 
     expect(second).toEqual(first);
   });
 });
 
-function mergeFixture(): NexusDashboardWriteEvent[] {
+function mergeFixture(): NexusDashboardHistoryEvent[] {
   return [
-    writeEvent("merge", ["main2", "feature"]),
-    writeEvent("main2", ["main1"]),
-    writeEvent("main1", ["base"]),
-    writeEvent("feature", ["base"]),
-    writeEvent("base", []),
+    historyEvent("merge", ["main2", "feature"]),
+    historyEvent("main2", ["main1"]),
+    historyEvent("main1", ["base"]),
+    historyEvent("feature", ["base"]),
+    historyEvent("base", []),
   ];
 }
 
-function laneReuseFixture(): NexusDashboardWriteEvent[] {
+function laneReuseFixture(): NexusDashboardHistoryEvent[] {
   return [
-    writeEvent("mergeB", ["main3", "sideB"]),
-    writeEvent("sideB", ["main3"]),
-    writeEvent("main3", ["mergeA"]),
-    writeEvent("mergeA", ["main2", "sideA"]),
-    writeEvent("sideA", ["main2"]),
-    writeEvent("main2", ["main1"]),
-    writeEvent("main1", []),
+    historyEvent("mergeB", ["main3", "sideB"]),
+    historyEvent("sideB", ["main3"]),
+    historyEvent("main3", ["mergeA"]),
+    historyEvent("mergeA", ["main2", "sideA"]),
+    historyEvent("sideA", ["main2"]),
+    historyEvent("main2", ["main1"]),
+    historyEvent("main1", []),
   ];
 }
 
-function compactionFixture(): NexusDashboardWriteEvent[] {
+function compactionFixture(): NexusDashboardHistoryEvent[] {
   return [
-    writeEvent("top", ["main3", "sideA"]),
-    writeEvent("main3", ["main2", "sideB"]),
-    writeEvent("sideA", ["main2"]),
-    writeEvent("sideB", ["main2"]),
-    writeEvent("main2", ["main1"]),
-    writeEvent("main1", []),
+    historyEvent("top", ["main3", "sideA"]),
+    historyEvent("main3", ["main2", "sideB"]),
+    historyEvent("sideA", ["main2"]),
+    historyEvent("sideB", ["main2"]),
+    historyEvent("main2", ["main1"]),
+    historyEvent("main1", []),
   ];
 }
 
-function writeEvent(
+function historyEvent(
   id: string,
   parentIds: string[],
-): NexusDashboardWriteEvent {
+): NexusDashboardHistoryEvent {
   return {
     id,
     parentIds,

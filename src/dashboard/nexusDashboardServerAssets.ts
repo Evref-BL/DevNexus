@@ -4,7 +4,7 @@ import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardH
 import { renderNexusCockpitHistoryColumnsClientSource } from "../cockpit/client/history/nexusCockpitHistoryColumns.js";
 import { renderNexusCockpitHistoryGraphSvgClientSource } from "../cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
 import { renderNexusCockpitWorkMapClientSource } from "../cockpit/client/history/nexusCockpitWorkMap.js";
-import { renderNexusCockpitWriteHistoryClientSource } from "../cockpit/client/history/nexusCockpitWriteHistory.js";
+import { renderNexusCockpitEventHistoryClientSource } from "../cockpit/client/history/nexusCockpitEventHistory.js";
 import { renderNexusCockpitActionsClientSource } from "../cockpit/client/nexusCockpitActions.js";
 import { renderNexusCockpitFormatClientSource } from "../cockpit/client/nexusCockpitFormat.js";
 import { renderNexusCockpitStylesClientSource } from "../cockpit/client/nexusCockpitStyles.js";
@@ -84,8 +84,8 @@ function standaloneNexusCockpitClientSource(source: string): string {
       `${renderNexusCockpitWorkMapClientSource()}\n\n`,
     )
     .replace(
-      /^import \{\s*featureGitBranches,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitWriteHistory\.js["'];\s*/mu,
-      `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitWriteHistoryClientSource()}\n\n`,
+      /^import \{\s*featureGitBranches,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitEventHistory\.js["'];\s*/mu,
+      `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitEventHistoryClientSource()}\n\n`,
     )
     .replace(
       /^import \{\s*bindGitHistoryColumnResizers,?\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,

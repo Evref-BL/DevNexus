@@ -6,7 +6,7 @@ import {
 } from "../../src/cockpit/client/history/nexusCockpitHistoryGraphSvg.js";
 
 describe("nexus cockpit history graph SVG", () => {
-  it("renders write-event nodes and monotone routed tracks from graph geometry", () => {
+  it("renders event nodes and monotone routed tracks from graph geometry", () => {
     const graph = {
       maxLane: 1,
       rows: [
@@ -18,7 +18,7 @@ describe("nexus cockpit history graph SVG", () => {
           commit: {
             hash: "merge",
             shortHash: "merge00",
-            subject: "Merge write",
+            subject: "Merge change",
           },
         },
         {
@@ -29,7 +29,7 @@ describe("nexus cockpit history graph SVG", () => {
           commit: {
             hash: "feature",
             shortHash: "feature",
-            subject: "Feature write",
+            subject: "Feature change",
           },
         },
       ],
@@ -66,9 +66,9 @@ describe("nexus cockpit history graph SVG", () => {
     expect(model.routes[0]?.d).toContain("C");
     expect(rendered).toContain('data-history-row-count="2"');
     expect(rendered).toContain('data-history-lane-count="2"');
-    expect(rendered).toContain('data-history-event-class="write"');
+    expect(rendered).toContain('data-history-event-class="source-change"');
     expect(rendered).toContain(
-      'data-history-write-event-id="history:primary:merge"',
+      'data-history-event-id="history:primary:merge"',
     );
   });
 

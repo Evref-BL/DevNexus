@@ -1,5 +1,5 @@
 export type NexusDashboardHistoryEventClass =
-  | "write"
+  | "source-change"
   | "decision"
   | "review"
   | "publication"
@@ -12,7 +12,7 @@ export type NexusDashboardHistoryMarkerTone =
   | "danger"
   | "neutral";
 
-export interface NexusDashboardWriteEvent {
+export interface NexusDashboardHistoryEvent {
   readonly id: string;
   readonly parentIds: readonly string[];
   readonly subject?: string;
@@ -20,14 +20,14 @@ export interface NexusDashboardWriteEvent {
 
 export interface NexusDashboardHistoryMarker {
   readonly id: string;
-  readonly eventClass: Exclude<NexusDashboardHistoryEventClass, "write">;
-  readonly targetWriteEventId: string;
+  readonly eventClass: Exclude<NexusDashboardHistoryEventClass, "source-change">;
+  readonly targetEventId: string;
   readonly label: string;
   readonly tone?: NexusDashboardHistoryMarkerTone;
 }
 
 export interface NexusDashboardHistoryLayoutInput {
-  readonly writeEvents: readonly NexusDashboardWriteEvent[];
+  readonly events: readonly NexusDashboardHistoryEvent[];
   readonly markers?: readonly NexusDashboardHistoryMarker[];
 }
 
@@ -38,8 +38,8 @@ export interface NexusDashboardHistoryPoint {
 
 export interface NexusDashboardHistoryNode {
   readonly id: string;
-  readonly eventClass: "write";
-  readonly writeEventId: string;
+  readonly eventClass: "source-change";
+  readonly eventId: string;
   readonly row: number;
   readonly lane: number;
   readonly colorIndex: number;
@@ -55,14 +55,14 @@ export type NexusDashboardHistoryEdgeKind = "parent";
 export interface NexusDashboardHistoryEdge {
   readonly id: string;
   readonly kind: NexusDashboardHistoryEdgeKind;
-  readonly fromWriteEventId: string;
-  readonly toWriteEventId: string;
+  readonly fromEventId: string;
+  readonly toEventId: string;
 }
 
 export interface NexusDashboardHistorySegment {
   readonly id: string;
   readonly edgeId?: string;
-  readonly targetWriteEventId: string;
+  readonly targetEventId: string;
   readonly truncated?: boolean;
   readonly trackId: string;
   readonly colorIndex: number;
@@ -80,7 +80,7 @@ export interface NexusDashboardPlacedHistoryMarker
 }
 
 export interface NexusDashboardHistoryDetailRow {
-  readonly writeEventId: string;
+  readonly eventId: string;
   readonly markerIds: readonly string[];
 }
 
@@ -110,11 +110,11 @@ interface ActiveHistoryRoute {
   readonly points: NexusDashboardHistoryPoint[];
 }
 
-export function buildWriteHistoryLayout(
+export function buildNexusDashboardHistoryLayout(
   input: NexusDashboardHistoryLayoutInput,
 ): NexusDashboardHistoryLayout {
-  const writeEvents = input.writeEvents ?? [];
-  const knownIds = new Set(writeEvents.map((event) => event.id));
+  const events = input.events ?? [];
+  const knownIds = new Set(events.map((event) => event.id));
   const active: Array<ActiveHistoryRoute | null> = [];
   const nodes: NexusDashboardHistoryNode[] = [];
   const edges: NexusDashboardHistoryEdge[] = [];
@@ -122,7 +122,7 @@ export function buildWriteHistoryLayout(
   const tracks = new Map<string, NexusDashboardHistoryTrack>();
   const truncatedParentIds: string[] = [];
 
-  for (const event of writeEvents) {
+  for (const event of events) {
     const row = nodes.length;
     let lane = active.findIndex((entry) => entry?.targetEventId === event.id);
     let incoming: ActiveHistoryRoute | null = null;
@@ -141,8 +141,8 @@ export function buildWriteHistoryLayout(
     const colorIndex = incoming?.colorIndex ?? lane;
     nodes.push({
       id: event.id,
-      eventClass: "write",
-      writeEventId: event.id,
+      eventClass: "source-change",
+      eventId: event.id,
       row,
       lane,
       colorIndex,
@@ -168,7 +168,7 @@ export function buildWriteHistoryLayout(
         addHistoryRoutePoint(
           route,
           preferredLane,
-          Math.max(row + 0.5, writeEvents.length - 0.5),
+          Math.max(row + 0.5, events.length - 0.5),
         );
         segments.push(historySegmentFromRoute(route, segments.length));
         rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
@@ -179,8 +179,8 @@ export function buildWriteHistoryLayout(
       edges.push({
         id: edgeId,
         kind: "parent",
-        fromWriteEventId: event.id,
-        toWriteEventId: parentId,
+        fromEventId: event.id,
+        toEventId: parentId,
       });
 
       const existingLane = active.findIndex(
@@ -220,21 +220,21 @@ export function buildWriteHistoryLayout(
     compactHistoryActiveLanes(active, row);
   }
 
-  const markerTargets = new Map(nodes.map((node) => [node.writeEventId, node]));
+  const markerTargets = new Map(nodes.map((node) => [node.eventId, node]));
   const markers = (input.markers ?? [])
     .map((marker) => {
-      const target = markerTargets.get(marker.targetWriteEventId);
+      const target = markerTargets.get(marker.targetEventId);
       if (!target) return null;
       return { ...marker, row: target.row, lane: target.lane };
     })
     .filter((marker): marker is NexusDashboardPlacedHistoryMarker =>
       marker !== null,
     );
-  const detailRows = [...new Set(markers.map((marker) => marker.targetWriteEventId))]
-    .map((writeEventId) => ({
-      writeEventId,
+  const detailRows = [...new Set(markers.map((marker) => marker.targetEventId))]
+    .map((eventId) => ({
+      eventId,
       markerIds: markers
-        .filter((marker) => marker.targetWriteEventId === writeEventId)
+        .filter((marker) => marker.targetEventId === eventId)
         .map((marker) => marker.id),
     }));
   const maxNodeLane = Math.max(0, ...nodes.map((node) => node.lane));
@@ -266,53 +266,53 @@ export function renderNexusDashboardHistoryLayoutClientSource(): string {
     addHistoryRoutePoint,
     addHistoryLaneTransition,
     compactHistoryActiveLanes,
-    buildWriteHistoryLayout,
+    buildNexusDashboardHistoryLayout,
   ]
     .map((fn) => fn.toString())
     .join("\n\n");
 }
 
-export function validateWriteHistoryLayout(
+export function validateNexusDashboardHistoryLayout(
   layout: NexusDashboardHistoryLayout,
 ): NexusDashboardHistoryInvariantViolation[] {
   const violations: NexusDashboardHistoryInvariantViolation[] = [];
-  const nodeByWriteEventId = new Map(
-    layout.nodes.map((node) => [node.writeEventId, node]),
+  const nodeByEventId = new Map(
+    layout.nodes.map((node) => [node.eventId, node]),
   );
   const nodeSlots = new Set<string>();
 
   layout.nodes.forEach((node, index) => {
-    if (node.eventClass !== "write") {
+    if (node.eventClass !== "source-change") {
       violations.push({
         code: "node.eventClass",
-        message: `History node ${node.id} is not a write event.`,
+        message: `History node ${node.id} is not a source-change event.`,
       });
     }
     if (!Number.isInteger(node.row) || node.row !== index) {
       violations.push({
         code: "node.row",
-        message: `Write event ${node.writeEventId} is not on its instant slice.`,
+        message: `Event ${node.eventId} is not on its instant slice.`,
       });
     }
     if (!Number.isInteger(node.lane) || node.lane < 0) {
       violations.push({
         code: "node.lane",
-        message: `Write event ${node.writeEventId} has an invalid lane.`,
+        message: `Event ${node.eventId} has an invalid lane.`,
       });
     }
     const slot = `${node.row}:${node.lane}`;
     if (nodeSlots.has(slot)) {
       violations.push({
         code: "node.slot",
-        message: `Multiple write events occupy row ${node.row}, lane ${node.lane}.`,
+        message: `Multiple events occupy row ${node.row}, lane ${node.lane}.`,
       });
     }
     nodeSlots.add(slot);
   });
 
   for (const edge of layout.edges) {
-    const from = nodeByWriteEventId.get(edge.fromWriteEventId);
-    const to = nodeByWriteEventId.get(edge.toWriteEventId);
+    const from = nodeByEventId.get(edge.fromEventId);
+    const to = nodeByEventId.get(edge.toEventId);
     if (!from || !to) {
       violations.push({
         code: "edge.endpoint",
@@ -329,11 +329,11 @@ export function validateWriteHistoryLayout(
   }
 
   for (const segment of layout.segments) {
-    if (!nodeByWriteEventId.has(segment.targetWriteEventId)) {
+    if (!nodeByEventId.has(segment.targetEventId)) {
       if (!segment.truncated) {
         violations.push({
           code: "segment.target",
-          message: `History segment ${segment.id} targets an unknown write event.`,
+          message: `History segment ${segment.id} targets an unknown event.`,
         });
       }
     }
@@ -377,18 +377,18 @@ export function validateWriteHistoryLayout(
   }
 
   for (const marker of layout.markers) {
-    const target = nodeByWriteEventId.get(marker.targetWriteEventId);
+    const target = nodeByEventId.get(marker.targetEventId);
     if (!target) {
       violations.push({
         code: "marker.target",
-        message: `History marker ${marker.id} targets an unknown write event.`,
+        message: `History marker ${marker.id} targets an unknown event.`,
       });
       continue;
     }
     if (marker.row !== target.row || marker.lane !== target.lane) {
       violations.push({
         code: "marker.anchor",
-        message: `History marker ${marker.id} is not anchored to its write event.`,
+        message: `History marker ${marker.id} is not anchored to its event.`,
       });
     }
   }
@@ -403,7 +403,7 @@ export function validateWriteHistoryLayout(
   if (layout.maxNodeLane !== maxNodeLane) {
     violations.push({
       code: "maxNodeLane",
-      message: "History maxNodeLane does not match the write-event lanes.",
+      message: "History maxNodeLane does not match the event lanes.",
     });
   }
   if (layout.maxRouteLane !== maxRouteLane) {
@@ -447,7 +447,7 @@ function historySegmentFromRoute(
   return {
     id: `segment:${segmentIndex}`,
     edgeId: route.edgeId,
-    targetWriteEventId: route.targetEventId,
+    targetEventId: route.targetEventId,
     truncated: route.truncated || undefined,
     trackId: route.trackId,
     colorIndex: route.colorIndex,
@@ -460,11 +460,11 @@ function historySegmentFromRoute(
 }
 
 function historyEdgeId(
-  fromWriteEventId: string,
-  toWriteEventId: string,
+  fromEventId: string,
+  toEventId: string,
   parentIndex: number,
 ): string {
-  return `edge:${fromWriteEventId}->${toWriteEventId}:${parentIndex}`;
+  return `edge:${fromEventId}->${toEventId}:${parentIndex}`;
 }
 
 function rememberHistoryTrack(
@@ -507,19 +507,19 @@ function compactHistoryActiveLanes(
   active: Array<ActiveHistoryRoute | null>,
   row: number,
 ): void {
-  let write = 0;
+  let nextLane = 0;
   for (let read = 0; read < active.length; read++) {
     const entry = active[read];
     if (!entry) continue;
-    if (read !== write) {
+    if (read !== nextLane) {
       addHistoryRoutePoint(entry, read, row + 0.45);
-      addHistoryLaneTransition(entry, write, row + 0.95);
-      active[write] = entry;
+      addHistoryLaneTransition(entry, nextLane, row + 0.95);
+      active[nextLane] = entry;
       active[read] = null;
     }
-    write++;
+    nextLane++;
   }
-  active.length = write;
+  active.length = nextLane;
 }
 
 function firstOpenHistoryLane(

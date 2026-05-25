@@ -141,8 +141,8 @@ describe("nexus dashboard history graph", () => {
 
     expect(rows?.rows).toHaveLength(3);
     expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
-    expect(rendered).toContain("Project Writes");
-    expect(rendered).toContain("Selected write event");
+    expect(rendered).toContain("Project Events");
+    expect(rendered).toContain("Selected event");
     expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
     const selectedRowIndex = rendered.indexOf(
       "dn-git-history-row selected\" type=\"button\" data-select-id=\"history:primary:feature000000000000000000000000000000000000\"",
@@ -188,7 +188,7 @@ describe("nexus dashboard history graph", () => {
     expect(detail).toMatchObject({
       title: "Add graph data",
       facts: expect.arrayContaining([
-        ["Type", "write event"],
+        ["Type", "event"],
         ["Component", "DevNexus"],
         ["Commit", "feature"],
         ["Parents", "1"],
@@ -196,7 +196,7 @@ describe("nexus dashboard history graph", () => {
     });
   });
 
-  it("renders write history from every loaded component repository", async () => {
+  it("renders event history from every loaded component repository", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -295,18 +295,18 @@ describe("nexus dashboard history graph", () => {
     expect(pluginRows?.rows.map((row) => row.selectId)).toEqual([
       "history:plugin:plug100000000000000000000000000000000000000",
     ]);
-    expect(rendered).toContain("2 write events");
+    expect(rendered).toContain("2 events");
     expect(rendered).toContain("2 repos");
     expect(rendered).toContain("Update core cockpit");
     expect(rendered).toContain("Update TypeScript setup");
     expect(rendered).toContain("DevNexus-TypeScript");
-    expect(pluginRendered).toContain("1 write event");
+    expect(pluginRendered).toContain("1 event");
     expect(pluginRendered).toContain("1 repo");
     expect(pluginRendered).toContain("Update TypeScript setup");
     expect(pluginRendered).not.toContain("Update core cockpit");
   });
 
-  it("does not default-select a write event when history is available", async () => {
+  it("does not default-select an event when history is available", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       history: {
@@ -371,7 +371,7 @@ describe("nexus dashboard history graph", () => {
     expect(hooks.defaultSelectedId(snapshot)).toBe("project");
   });
 
-  it("toggles a selected write event closed when clicked again", async () => {
+  it("toggles a selected event closed when clicked again", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
     expect(
@@ -1048,9 +1048,9 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain('viewBox="0 0 148 120"');
     expect(rendered).toContain('data-history-row-count="4"');
     expect(rendered).toContain('data-history-lane-count="1"');
-    expect(rendered).toContain('data-history-event-class="write"');
+    expect(rendered).toContain('data-history-event-class="source-change"');
     expect(rendered).toContain(
-      'data-history-write-event-id="history:primary:head000000000000000000000000000000000000"',
+      'data-history-event-id="history:primary:head000000000000000000000000000000000000"',
     );
   });
 

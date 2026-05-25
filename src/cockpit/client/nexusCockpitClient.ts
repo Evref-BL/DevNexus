@@ -45,7 +45,7 @@ import {
   renderGitHistory,
   threadsForGitBranches,
   trackedWorkForGitBranches,
-} from "./history/nexusCockpitWriteHistory.js";
+} from "./history/nexusCockpitEventHistory.js";
 import { bindGitHistoryColumnResizers } from "./history/nexusCockpitHistoryColumns.js";
 import {
   cockpitTooltipText,
@@ -338,7 +338,7 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
   const threadsLoaded = sectionLoaded(snapshot, 'threads');
   const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');
   const pluginsLoaded = sectionLoaded(snapshot, 'plugins');
-  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Write history', 'Project Writes', 'Loading write events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
+  const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Event history', 'Project Events', 'Loading events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
   const workHistory = loading && !threadsLoaded ? renderProgressivePanel('parallel-work-map', 'Workspace map', 'Activity Lanes', 'Loading source checkout, branches, automation, and decisions.') : renderWorkHistory(snapshot, activeSelection);
   const features = loading && !threadsLoaded ? renderProgressivePanel('active-features', 'Project workflow', 'Active Features', 'Loading feature branches and active threads.') : renderFeatureOverview(snapshot, activeSelection);
   const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('hitl-queue', 'HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot, activeSelection);

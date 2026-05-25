@@ -261,7 +261,7 @@ describe("nexus dashboard client", () => {
     expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
   });
 
-  it("keeps the write history board before generic selected details", async () => {
+  it("keeps the event history board before generic selected details", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
       generatedAt: "2026-05-24T12:00:00.000Z",
