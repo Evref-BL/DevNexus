@@ -110,6 +110,37 @@ export interface NexusCoordinationWorkItemTrackerReference {
   externalRef: ExternalRef | null;
 }
 
+export interface NexusCoordinationQualityDeltaCounts {
+  newFindingCount: number;
+  resolvedFindingCount: number;
+  touchedNewFindingCount: number;
+  touchedResolvedFindingCount: number;
+  newCriticalOrBlockerCount: number;
+  newBugCount: number;
+  newVulnerabilityCount: number;
+  newSecurityHotspotCount: number;
+  qualityGateRegressed: boolean;
+}
+
+export interface NexusCoordinationQualityDeltaFinding {
+  source: string | null;
+  category: string | null;
+  severity: string | null;
+  rule: string | null;
+  filePath: string | null;
+  line: number | null;
+  message: string | null;
+}
+
+export interface NexusCoordinationQualityDeltaSummary {
+  producer: string | null;
+  status: string;
+  sourcePath: string | null;
+  touchedFiles: string[];
+  summary: NexusCoordinationQualityDeltaCounts;
+  attention: NexusCoordinationQualityDeltaFinding[];
+}
+
 export interface NexusCoordinationHandoffRecord {
   kind: typeof coordinationHandoffKind;
   version: 1;
@@ -140,6 +171,7 @@ export interface NexusCoordinationHandoffRecord {
   decisions: string[];
   verificationSummary: string | null;
   integrationPreference: string | null;
+  qualityDelta: NexusCoordinationQualityDeltaSummary | null;
   note: string | null;
 }
 
@@ -291,6 +323,7 @@ export interface NexusCoordinationIntegrationBranchPlan {
     decisions: string[];
     verificationSummary: string | null;
     integrationPreference: string | null;
+    qualityDelta: NexusCoordinationQualityDeltaSummary | null;
     note: string | null;
   };
   merge: NexusCoordinationIntegrationBranchMerge;
@@ -391,6 +424,8 @@ export interface NexusCoordinationHandoffOptions
   decisions?: string[];
   verificationSummary?: string | null;
   integrationPreference?: string | null;
+  qualityDelta?: unknown;
+  qualityDeltaSourcePath?: string | null;
   note?: string | null;
 }
 
@@ -580,6 +615,7 @@ export async function createNexusCoordinationHandoff(
       optionalNullableTrimmedString(options.verificationSummary) ?? null,
     integrationPreference:
       optionalNullableTrimmedString(options.integrationPreference) ?? null,
+    qualityDelta: coordinationQualityDeltaForHandoff(options),
     note: optionalNullableTrimmedString(options.note) ?? null,
   };
   if (!authority.allowed) {
@@ -833,12 +869,73 @@ export function formatCoordinationHandoffComment(
     `Host: ${record.hostId}`,
     `Branch: ${record.branch ?? "unknown"}`,
     `Head: ${record.headCommit ?? "unknown"}`,
+    ...(record.qualityDelta
+      ? ["", formatNexusCoordinationQualityDeltaSummary(record.qualityDelta)]
+      : []),
     "",
     "```json",
     JSON.stringify(record, null, 2),
     "```",
   ];
   return lines.join("\n");
+}
+
+export function normalizeNexusCoordinationQualityDelta(
+  value: unknown,
+  sourcePath: string | null = null,
+): NexusCoordinationQualityDeltaSummary {
+  const record = requiredQualityRecord(value, "qualityDelta");
+
+  return {
+    producer:
+      qualityNullableString(record, "producer", "qualityDelta") ??
+      qualityNullableString(record, "source", "qualityDelta") ??
+      qualityNullableString(record, "tool", "qualityDelta"),
+    status: qualityString(record, "status", "qualityDelta"),
+    sourcePath:
+      sourcePath ??
+      optionalNullableTrimmedString(
+        qualityNullableString(record, "sourcePath", "qualityDelta"),
+      ) ??
+      null,
+    touchedFiles: qualityStringArray(record.touchedFiles, "qualityDelta.touchedFiles"),
+    summary: qualityDeltaCounts(record.summary),
+    attention: qualityDeltaAttentionFindings(record),
+  };
+}
+
+export function formatNexusCoordinationQualityDeltaSummary(
+  qualityDelta: NexusCoordinationQualityDeltaSummary,
+): string {
+  const summary = qualityDelta.summary;
+  const details = [
+    `${summary.newFindingCount} new finding(s)`,
+    `${summary.touchedNewFindingCount} on touched file(s)`,
+    summary.newCriticalOrBlockerCount > 0
+      ? `${summary.newCriticalOrBlockerCount} critical/blocker`
+      : null,
+    summary.newBugCount > 0 ? `${summary.newBugCount} bug(s)` : null,
+    summary.newVulnerabilityCount > 0
+      ? `${summary.newVulnerabilityCount} vulnerability issue(s)`
+      : null,
+    summary.newSecurityHotspotCount > 0
+      ? `${summary.newSecurityHotspotCount} security hotspot(s)`
+      : null,
+    summary.qualityGateRegressed ? "quality gate regressed" : null,
+  ].filter((entry): entry is string => entry !== null);
+
+  return `Quality delta: ${qualityDelta.status}; ${details.join("; ")}`;
+}
+
+function coordinationQualityDeltaForHandoff(
+  options: NexusCoordinationHandoffOptions,
+): NexusCoordinationQualityDeltaSummary | null {
+  return options.qualityDelta === undefined || options.qualityDelta === null
+    ? null
+    : normalizeNexusCoordinationQualityDelta(
+        options.qualityDelta,
+        optionalNullableTrimmedString(options.qualityDeltaSourcePath) ?? null,
+      );
 }
 
 function resolveCoordinationContext(
@@ -1582,6 +1679,7 @@ function integrationBranchPlan(options: {
       decisions: options.record.decisions,
       verificationSummary: options.record.verificationSummary,
       integrationPreference: options.record.integrationPreference,
+      qualityDelta: options.record.qualityDelta,
       note: options.record.note,
     },
     merge,
@@ -2778,6 +2876,7 @@ function handoffRecordFromUnknown(
     decisions: recordStringArray(record, "decisions"),
     verificationSummary: nullableRecordString(record, "verificationSummary"),
     integrationPreference: nullableRecordString(record, "integrationPreference"),
+    qualityDelta: nullableRecordQualityDelta(record, "qualityDelta"),
     note: nullableRecordString(record, "note"),
   };
 }
@@ -2819,6 +2918,7 @@ function coordinationLeaseNotes(
     optionalNullableTrimmedString(options.verificationSummary) ?? null;
   const integrationPreference =
     optionalNullableTrimmedString(options.integrationPreference) ?? null;
+  const qualityDelta = coordinationQualityDeltaForHandoff(options);
 
   return [
     note,
@@ -2826,6 +2926,7 @@ function coordinationLeaseNotes(
     integrationPreference
       ? `Integration preference: ${integrationPreference}`
       : null,
+    qualityDelta ? formatNexusCoordinationQualityDeltaSummary(qualityDelta) : null,
   ].filter((entry): entry is string => entry !== null);
 }
 
@@ -3160,4 +3261,200 @@ function recordStringArray(
 
     return entry;
   });
+}
+
+function nullableRecordQualityDelta(
+  record: Record<string, unknown>,
+  key: string,
+): NexusCoordinationQualityDeltaSummary | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  return normalizeNexusCoordinationQualityDelta(value);
+}
+
+function qualityDeltaCounts(value: unknown): NexusCoordinationQualityDeltaCounts {
+  const record = requiredQualityRecord(value, "qualityDelta.summary");
+  return {
+    newFindingCount: qualityInteger(record, "newFindingCount", "qualityDelta.summary"),
+    resolvedFindingCount: qualityInteger(
+      record,
+      "resolvedFindingCount",
+      "qualityDelta.summary",
+    ),
+    touchedNewFindingCount: qualityInteger(
+      record,
+      "touchedNewFindingCount",
+      "qualityDelta.summary",
+    ),
+    touchedResolvedFindingCount: qualityInteger(
+      record,
+      "touchedResolvedFindingCount",
+      "qualityDelta.summary",
+    ),
+    newCriticalOrBlockerCount: qualityInteger(
+      record,
+      "newCriticalOrBlockerCount",
+      "qualityDelta.summary",
+    ),
+    newBugCount: qualityInteger(record, "newBugCount", "qualityDelta.summary"),
+    newVulnerabilityCount: qualityInteger(
+      record,
+      "newVulnerabilityCount",
+      "qualityDelta.summary",
+    ),
+    newSecurityHotspotCount: qualityInteger(
+      record,
+      "newSecurityHotspotCount",
+      "qualityDelta.summary",
+    ),
+    qualityGateRegressed: qualityBoolean(
+      record,
+      "qualityGateRegressed",
+      "qualityDelta.summary",
+    ),
+  };
+}
+
+function qualityDeltaAttentionFindings(
+  record: Record<string, unknown>,
+): NexusCoordinationQualityDeltaFinding[] {
+  const source = Array.isArray(record.attention)
+    ? record.attention
+    : Array.isArray(record.newFindings)
+      ? record.newFindings.filter(isAttentionQualityFinding)
+      : [];
+  return source
+    .slice(0, 10)
+    .map((entry, index) =>
+      qualityDeltaFinding(entry, `qualityDelta.attention[${index}]`),
+    );
+}
+
+function qualityDeltaFinding(
+  value: unknown,
+  pathName: string,
+): NexusCoordinationQualityDeltaFinding {
+  const record = requiredQualityRecord(value, pathName);
+  return {
+    source: qualityNullableString(record, "source", pathName),
+    category: qualityNullableString(record, "category", pathName),
+    severity: qualityNullableString(record, "severity", pathName),
+    rule: qualityNullableString(record, "rule", pathName),
+    filePath: qualityNullableString(record, "filePath", pathName),
+    line: qualityNullableInteger(record, "line", pathName),
+    message: qualityNullableString(record, "message", pathName),
+  };
+}
+
+function isAttentionQualityFinding(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const category = typeof record.category === "string"
+    ? record.category.toLowerCase()
+    : "";
+  const severity = typeof record.severity === "string"
+    ? record.severity.toLowerCase()
+    : "";
+  return (
+    category === "bug" ||
+    category === "vulnerability" ||
+    category === "security_hotspot" ||
+    severity === "critical" ||
+    severity === "blocker"
+  );
+}
+
+function requiredQualityRecord(
+  value: unknown,
+  pathName: string,
+): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function qualityString(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string {
+  const value = record[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${pathName}.${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+function qualityNullableString(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${pathName}.${key} must be a string or null`);
+  }
+  return value;
+}
+
+function qualityStringArray(value: unknown, pathName: string): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${pathName} must be an array`);
+  }
+  return value.map((entry, index) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new Error(`${pathName}[${index}] must be a non-empty string`);
+    }
+    return entry;
+  });
+}
+
+function qualityInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number {
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${pathName}.${key} must be an integer`);
+  }
+  return value;
+}
+
+function qualityNullableInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${pathName}.${key} must be an integer or null`);
+  }
+  return value;
+}
+
+function qualityBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): boolean {
+  const value = record[key];
+  if (typeof value !== "boolean") {
+    throw new Error(`${pathName}.${key} must be a boolean`);
+  }
+  return value;
 }

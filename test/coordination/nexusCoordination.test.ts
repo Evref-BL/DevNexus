@@ -893,6 +893,36 @@ describe("nexus coordination", () => {
       title: "Shared coordination",
       status: "in_progress",
     });
+    const qualityDelta = {
+      producer: "static-analysis",
+      sourcePath: ".quality/static-analysis-delta.json",
+      readOnly: true,
+      status: "regressed",
+      touchedFiles: ["src/nexusCoordination.ts"],
+      summary: {
+        newFindingCount: 3,
+        resolvedFindingCount: 0,
+        touchedNewFindingCount: 2,
+        touchedResolvedFindingCount: 0,
+        newCriticalOrBlockerCount: 1,
+        newBugCount: 1,
+        newVulnerabilityCount: 1,
+        newSecurityHotspotCount: 1,
+        qualityGateRegressed: true,
+      },
+      attention: [
+        {
+          id: "sonar-issue:bug",
+          source: "sonar_issue",
+          category: "bug",
+          severity: "blocker",
+          filePath: "src/nexusCoordination.ts",
+          line: 42,
+          rule: "complexity:S3776",
+          message: "Reduce cognitive complexity.",
+        },
+      ],
+    };
     const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
 
     const handoff = await createNexusCoordinationHandoff({
@@ -906,6 +936,7 @@ describe("nexus coordination", () => {
       decisions: ["Use advisory handoffs instead of locks."],
       verificationSummary: "npm test passed",
       integrationPreference: "direct_integration",
+      qualityDelta,
       note: "Ready to merge.",
       currentPath: worktreePath,
       gitRunner: fakeGitRunner(worktreePath, gitCalls),
@@ -928,6 +959,30 @@ describe("nexus coordination", () => {
       dirty: false,
       pushed: true,
       changedAreas: ["src/nexusCoordination.ts"],
+      qualityDelta: {
+        producer: "static-analysis",
+        status: "regressed",
+        sourcePath: ".quality/static-analysis-delta.json",
+        touchedFiles: ["src/nexusCoordination.ts"],
+        summary: {
+          newFindingCount: 3,
+          touchedNewFindingCount: 2,
+          newCriticalOrBlockerCount: 1,
+          newBugCount: 1,
+          newVulnerabilityCount: 1,
+          newSecurityHotspotCount: 1,
+          qualityGateRegressed: true,
+        },
+        attention: [
+          {
+            category: "bug",
+            severity: "blocker",
+            rule: "complexity:S3776",
+            filePath: "src/nexusCoordination.ts",
+            line: 42,
+          },
+        ],
+      },
     });
     expect(handoff.lease).toMatchObject({
       projectId: "coordination-demo",
@@ -945,6 +1000,9 @@ describe("nexus coordination", () => {
       writeScope: ["src/nexusCoordination.ts"],
     });
     expect(handoff.comment.body).toContain(coordinationHandoffCommentMarker);
+    expect(handoff.comment.body).toContain(
+      "Quality delta: regressed; 3 new finding(s); 2 on touched file(s); 1 critical/blocker; 1 bug(s); 1 vulnerability issue(s); 1 security hotspot(s); quality gate regressed",
+    );
     const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
     expect(store.comments["local-1"]?.[0]?.body).toContain(
       coordinationHandoffCommentMarker,

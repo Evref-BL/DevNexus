@@ -842,6 +842,12 @@ const tools: McpTool[] = [
         decisions: { type: "array", items: { type: "string" } },
         verificationSummary: { type: ["string", "null"] },
         integrationPreference: { type: ["string", "null"] },
+        qualityDelta: {
+          type: "object",
+          description:
+            "Optional local quality delta payload from a component or plugin check.",
+          additionalProperties: true,
+        },
         note: { type: ["string", "null"] },
       },
       required: ["workItemId", "status"],
@@ -2110,6 +2116,7 @@ async function callCoordinationMcpTool(
             "integrationPreference",
             "arguments",
           ),
+          qualityDelta: args.qualityDelta,
           note: optionalNullableString(args, "note", "arguments"),
           currentPath: optionalString(args, "currentPath", "arguments"),
           gitRunner: context.gitRunner,
