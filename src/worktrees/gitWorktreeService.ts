@@ -483,6 +483,9 @@ function resolvePreparedBaseRef(options: {
     kind,
     upstreamRef,
   });
+  if (warnings.length > 0) {
+    throw new GitWorktreeServiceError(warnings.join(" "));
+  }
   const resolvedCommit = resolveBaseCommit({
     gitRunner: options.gitRunner,
     commands: options.commands,
