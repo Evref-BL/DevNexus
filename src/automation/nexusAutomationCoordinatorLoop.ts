@@ -210,345 +210,29 @@ export async function runNexusAutomationCoordinatorLoop(
       break;
     }
 
-    const tickStartedAt = currentIso(options.now);
-    const tickIndex = ticks.length + 1;
-    await emitCoordinatorLoopProgress(options, {
-      type: "tick_started",
-      index: tickIndex,
-      startedAt: tickStartedAt,
-    });
-    const status = await getNexusAutomationStatus({
+    const tickResult = await runCoordinatorLoopTick({
+      options,
       projectRoot,
-      providerFactory: options.providerFactory,
-      providerOptions: options.providerOptions,
-      gitRunner: options.gitRunner,
-      now: options.now,
+      intervalOverride,
+      tickIndex: ticks.length + 1,
     });
-    const targetReport = buildNexusAutomationTargetReport({
-      projectRoot,
-      now: tickStartedAt,
+    ticks.push(tickResult.tick);
+    if (tickResult.run) {
+      runs.push(tickResult.run);
+    }
+    if (tickResult.stoppedReason) {
+      stoppedReason = tickResult.stoppedReason;
+      break;
+    }
+
+    const limitStopReason = coordinatorLoopLimitStopReason({
+      maxRuns,
+      runCount: runs.length,
+      maxTicks,
+      tickCount: ticks.length,
     });
-    const intervalMs =
-      intervalOverride ?? status.automationConfig?.schedule.intervalMs;
-    const cycleId = coordinatorLoopCycleId(
-      options.runIdPrefix,
-      ticks.length + 1,
-      tickStartedAt,
-    );
-    const runId = coordinatorLoopRunId(
-      options.runIdPrefix,
-      ticks.length + 1,
-      tickStartedAt,
-    );
-
-    if (!status.automationConfig?.enabled) {
-      const decision: NexusAutomationCoordinatorLoopDecision = {
-        type: "stop",
-        reason: status.summary,
-        nextTickNotBefore: null,
-      };
-      await emitCoordinatorLoopProgress(options, {
-        type: "decision",
-        index: tickIndex,
-        status: status.status,
-        summary: status.summary,
-        decision,
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-      });
-      const tick = coordinatorLoopTick({
-        index: tickIndex,
-        startedAt: tickStartedAt,
-        finishedAt: currentIso(options.now),
-        status,
-        targetReport,
-        decision,
-        action: "stopped",
-        waitMs: null,
-        run: null,
-        targetCycle: null,
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      await emitCoordinatorLoopProgress(options, {
-        type: "tick_finished",
-        index: tick.index,
-        finishedAt: tick.finishedAt,
-        action: tick.action,
-      });
-      stoppedReason = "disabled";
-      break;
-    }
-
-    if (!status.automationConfig.schedule.enabled || !intervalMs) {
-      const decision: NexusAutomationCoordinatorLoopDecision = {
-        type: "stop",
-        reason: "Automation schedule is disabled for this project",
-        nextTickNotBefore: null,
-      };
-      await emitCoordinatorLoopProgress(options, {
-        type: "decision",
-        index: tickIndex,
-        status: status.status,
-        summary: status.summary,
-        decision,
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-      });
-      const tick = recordDecisionTick({
-        projectRoot,
-        status,
-        targetReport,
-        index: tickIndex,
-        startedAt: tickStartedAt,
-        finishedAt: currentIso(options.now),
-        cycleId,
-        decision,
-        action: "stopped",
-        waitMs: null,
-        run: null,
-        cycleStatus: "skipped",
-        notes: [
-          "managed-loop: decision=stop",
-          "managed-loop: no coordinator launched",
-        ],
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      await emitCoordinatorLoopProgress(options, {
-        type: "tick_finished",
-        index: tick.index,
-        finishedAt: tick.finishedAt,
-        action: tick.action,
-      });
-      stoppedReason = "disabled";
-      break;
-    }
-
-    if (status.automationConfig.mode !== "agent_launch") {
-      const summary =
-        "Managed coordinator loop requires automation.mode to be agent_launch";
-      const decision: NexusAutomationCoordinatorLoopDecision = {
-        type: "block",
-        reason: summary,
-        nextTickNotBefore: null,
-      };
-      await emitCoordinatorLoopProgress(options, {
-        type: "decision",
-        index: tickIndex,
-        status: status.status,
-        summary: status.summary,
-        decision,
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-      });
-      const tick = recordDecisionTick({
-        projectRoot,
-        status,
-        targetReport,
-        index: tickIndex,
-        startedAt: tickStartedAt,
-        finishedAt: currentIso(options.now),
-        cycleId,
-        decision,
-        action: "blocked",
-        waitMs: null,
-        run: null,
-        cycleStatus: "blocked",
-        blockers: [summary],
-        notes: [
-          "managed-loop: decision=block",
-          "managed-loop: no coordinator launched",
-        ],
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      await emitCoordinatorLoopProgress(options, {
-        type: "tick_finished",
-        index: tick.index,
-        finishedAt: tick.finishedAt,
-        action: tick.action,
-      });
-      stoppedReason = "blocked";
-      break;
-    }
-
-    const statusBasedDecision = statusDecision(status, intervalMs, tickStartedAt);
-    const targetGate = targetReportGateDecision(targetReport);
-    const decision =
-      statusBasedDecision.type === "launch"
-        ? targetGate ?? statusBasedDecision
-        : statusBasedDecision;
-    await emitCoordinatorLoopProgress(options, {
-      type: "decision",
-      index: tickIndex,
-      status: status.status,
-      summary: status.summary,
-      decision,
-      eligibleWorkItemCount: eligibleWorkItemCount(status),
-    });
-    if (decision.type !== "launch") {
-      const action = actionForDecision(decision);
-      const waitMs = waitMsForDecision(decision, status, intervalMs, tickStartedAt);
-      const tick = recordDecisionTick({
-        projectRoot,
-        status,
-        targetReport,
-        index: tickIndex,
-        startedAt: tickStartedAt,
-        finishedAt: currentIso(options.now),
-        cycleId,
-        decision,
-        action,
-        waitMs,
-        run: null,
-        cycleStatus: cycleStatusForDecision(decision),
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-        workItems: targetCycleWorkItems(status),
-        blockers:
-          decision.type === "block" || decision.type === "fail"
-            ? [decision.reason]
-            : [],
-        nextCycleNotBefore: decision.nextTickNotBefore,
-        notes: [
-          `managed-loop: decision=${decision.type}`,
-          "managed-loop: no coordinator launched",
-        ],
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      await emitCoordinatorLoopProgress(options, {
-        type: "tick_finished",
-        index: tick.index,
-        finishedAt: tick.finishedAt,
-        action: tick.action,
-      });
-
-      if (decision.type === "block") {
-        stoppedReason = "blocked";
-        break;
-      }
-      if (decision.type === "fail") {
-        stoppedReason = "failed";
-        break;
-      }
-      if (
-        decision.type === "skip" &&
-        status.status === "idle" &&
-        status.automationConfig.target.stopWhenNoEligibleWork
-      ) {
-        stoppedReason = "no_work";
-        break;
-      }
-    } else {
-      recordCoordinatorLoopCycle({
-        projectRoot,
-        status,
-        targetReport,
-        cycleId,
-        runId,
-        cycleStatus: "dispatched",
-        startedAt: tickStartedAt,
-        finishedAt: null,
-        summary: "Coordinator launch dispatched",
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-        workItems: targetCycleWorkItems(status),
-        notes: [
-          "managed-loop: decision=launch",
-          "managed-loop: coordinator launched",
-        ],
-      });
-      await emitCoordinatorLoopProgress(options, {
-        type: "launch_dispatched",
-        index: tickIndex,
-        runId,
-        cycleId,
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-      });
-      await emitCoordinatorLoopProgress(options, {
-        type: "run_started",
-        index: tickIndex,
-        runId,
-      });
-
-      const run = await runNexusAutomationAgentLaunchOnce({
-        projectRoot,
-        providerFactory: options.providerFactory,
-        providerOptions: options.providerOptions,
-        gitRunner: options.gitRunner,
-        mcpRuntimeProcesses: options.mcpRuntimeProcesses,
-        workItemClaimOwner: options.workItemClaimOwner,
-        workItemClaimLeaseTokenFactory: options.workItemClaimLeaseTokenFactory,
-        owner: options.owner ?? "coordinator-loop",
-        now: options.now,
-        runId,
-        launcher: options.launcher,
-      });
-      runs.push(run);
-      await emitCoordinatorLoopProgress(options, {
-        type: "run_finished",
-        index: tickIndex,
-        runId,
-        status: run.status,
-        summary: run.summary,
-      });
-      const finishedAt = currentIso(options.now);
-      const finalization = await finalizeCoordinatorRun({
-        projectRoot,
-        initialStatus: status,
-        run,
-        finishedAt,
-        providerFactory: options.providerFactory,
-        providerOptions: options.providerOptions,
-        gitRunner: options.gitRunner,
-        now: options.now,
-      });
-      const targetCycle = recordCoordinatorLoopCycle({
-        projectRoot,
-        status: finalization.status,
-        targetReport,
-        cycleId,
-        runId,
-        cycleStatus: finalization.cycleStatus,
-        startedAt: tickStartedAt,
-        finishedAt,
-        summary: run.summary,
-        eligibleWorkItemCount: finalization.eligibleWorkItemCount,
-        workItems: finalization.workItems,
-        blockers: finalization.blockers,
-        notes: [
-          "managed-loop: decision=launch",
-          "managed-loop: coordinator launched",
-          `managed-loop: coordinator ${run.status}`,
-          ...finalization.notes,
-          ...agentLaunchTargetCycleNotes(run),
-        ],
-      });
-      const tick = coordinatorLoopTick({
-        index: tickIndex,
-        startedAt: tickStartedAt,
-        finishedAt,
-        status,
-        targetReport,
-        decision,
-        action: "launched",
-        waitMs: null,
-        run,
-        targetCycle,
-      });
-      ticks.push(tick);
-      await options.onTick?.(tick);
-      await emitCoordinatorLoopProgress(options, {
-        type: "tick_finished",
-        index: tick.index,
-        finishedAt: tick.finishedAt,
-        action: tick.action,
-      });
-    }
-
-    if (maxRuns !== undefined && runs.length >= maxRuns) {
-      stoppedReason = "max_runs";
-      break;
-    }
-    if (maxTicks !== undefined && ticks.length >= maxTicks) {
-      stoppedReason = "max_ticks";
+    if (limitStopReason) {
+      stoppedReason = limitStopReason;
       break;
     }
     if (options.shouldStop?.()) {
@@ -556,8 +240,7 @@ export async function runNexusAutomationCoordinatorLoop(
       break;
     }
 
-    const lastTick = ticks.at(-1);
-    await sleep(lastTick?.waitMs ?? intervalMs);
+    await sleep(tickResult.sleepMs);
   }
 
   const finishedAt = currentIso(options.now);
@@ -585,6 +268,491 @@ async function emitCoordinatorLoopProgress(
   event: NexusAutomationCoordinatorLoopProgressEvent,
 ): Promise<void> {
   await options.onProgress?.(event);
+}
+
+interface CoordinatorLoopTickRun {
+  tick: NexusAutomationCoordinatorLoopTick;
+  run: RunNexusAutomationAgentLaunchOnceResult | null;
+  stoppedReason: NexusAutomationCoordinatorLoopStopReason | null;
+  sleepMs: number;
+}
+
+async function runCoordinatorLoopTick(options: {
+  options: RunNexusAutomationCoordinatorLoopOptions;
+  projectRoot: string;
+  intervalOverride: number | undefined;
+  tickIndex: number;
+}): Promise<CoordinatorLoopTickRun> {
+  const tickStartedAt = currentIso(options.options.now);
+  await emitCoordinatorLoopProgress(options.options, {
+    type: "tick_started",
+    index: options.tickIndex,
+    startedAt: tickStartedAt,
+  });
+  const status = await getNexusAutomationStatus({
+    projectRoot: options.projectRoot,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    now: options.options.now,
+  });
+  const targetReport = buildNexusAutomationTargetReport({
+    projectRoot: options.projectRoot,
+    now: tickStartedAt,
+  });
+  const intervalMs =
+    options.intervalOverride ?? status.automationConfig?.schedule.intervalMs;
+  const cycleId = coordinatorLoopCycleId(
+    options.options.runIdPrefix,
+    options.tickIndex,
+    tickStartedAt,
+  );
+  const earlyStop = await coordinatorLoopEarlyStopTick({
+    options: options.options,
+    projectRoot: options.projectRoot,
+    status,
+    targetReport,
+    tickIndex: options.tickIndex,
+    tickStartedAt,
+    cycleId,
+    intervalMs,
+  });
+  if (earlyStop) {
+    return { ...earlyStop, run: null, sleepMs: 0 };
+  }
+
+  const activeIntervalMs = requiredCoordinatorLoopIntervalMs(intervalMs);
+  const decision = coordinatorLoopDecision(status, targetReport, activeIntervalMs, tickStartedAt);
+  await emitCoordinatorDecisionProgress(
+    { options: options.options, tickIndex: options.tickIndex, status },
+    decision,
+  );
+  if (decision.type !== "launch") {
+    const decisionTick = await coordinatorLoopNonLaunchDecisionTick({
+      options: options.options,
+      projectRoot: options.projectRoot,
+      status,
+      targetReport,
+      tickIndex: options.tickIndex,
+      tickStartedAt,
+      cycleId,
+      intervalMs: activeIntervalMs,
+      decision,
+    });
+    return { ...decisionTick, run: null, sleepMs: decisionTick.tick.waitMs ?? activeIntervalMs };
+  }
+
+  const launchTick = await coordinatorLoopLaunchTick({
+    options: options.options,
+    projectRoot: options.projectRoot,
+    status,
+    targetReport,
+    tickIndex: options.tickIndex,
+    tickStartedAt,
+    cycleId,
+    runId: coordinatorLoopRunId(options.options.runIdPrefix, options.tickIndex, tickStartedAt),
+    decision,
+  });
+  return { ...launchTick, stoppedReason: null, sleepMs: activeIntervalMs };
+}
+
+function coordinatorLoopDecision(
+  status: NexusAutomationStatus,
+  targetReport: NexusAutomationTargetReport,
+  intervalMs: number,
+  tickStartedAt: string,
+): NexusAutomationCoordinatorLoopDecision {
+  const statusBasedDecision = statusDecision(status, intervalMs, tickStartedAt);
+  const targetGate = targetReportGateDecision(targetReport);
+  return statusBasedDecision.type === "launch"
+    ? targetGate ?? statusBasedDecision
+    : statusBasedDecision;
+}
+
+function coordinatorLoopLimitStopReason(options: {
+  maxRuns: number | undefined;
+  runCount: number;
+  maxTicks: number | undefined;
+  tickCount: number;
+}): NexusAutomationCoordinatorLoopStopReason | null {
+  if (options.maxRuns !== undefined && options.runCount >= options.maxRuns) {
+    return "max_runs";
+  }
+  if (options.maxTicks !== undefined && options.tickCount >= options.maxTicks) {
+    return "max_ticks";
+  }
+  return null;
+}
+
+interface CoordinatorLoopStoppedTick {
+  tick: NexusAutomationCoordinatorLoopTick;
+  stoppedReason: NexusAutomationCoordinatorLoopStopReason;
+}
+
+interface CoordinatorLoopDecisionTick {
+  tick: NexusAutomationCoordinatorLoopTick;
+  stoppedReason: NexusAutomationCoordinatorLoopStopReason | null;
+}
+
+interface CoordinatorLoopLaunchTick {
+  tick: NexusAutomationCoordinatorLoopTick;
+  run: RunNexusAutomationAgentLaunchOnceResult;
+}
+
+async function coordinatorLoopEarlyStopTick(options: {
+  options: RunNexusAutomationCoordinatorLoopOptions;
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  targetReport: NexusAutomationTargetReport;
+  tickIndex: number;
+  tickStartedAt: string;
+  cycleId: string;
+  intervalMs: number | undefined;
+}): Promise<CoordinatorLoopStoppedTick | null> {
+  if (!options.status.automationConfig?.enabled) {
+    const decision: NexusAutomationCoordinatorLoopDecision = {
+      type: "stop",
+      reason: options.status.summary,
+      nextTickNotBefore: null,
+    };
+    await emitCoordinatorDecisionProgress(options, decision);
+    const tick = coordinatorLoopTick({
+      index: options.tickIndex,
+      startedAt: options.tickStartedAt,
+      finishedAt: currentIso(options.options.now),
+      status: options.status,
+      targetReport: options.targetReport,
+      decision,
+      action: "stopped",
+      waitMs: null,
+      run: null,
+      targetCycle: null,
+    });
+    await finishCoordinatorLoopTick(options.options, tick);
+    return { tick, stoppedReason: "disabled" };
+  }
+
+  if (!options.status.automationConfig.schedule.enabled || !options.intervalMs) {
+    return coordinatorLoopRecordedStopTick({
+      ...options,
+      decision: {
+        type: "stop",
+        reason: "Automation schedule is disabled for this project",
+        nextTickNotBefore: null,
+      },
+      cycleStatus: "skipped",
+      stoppedReason: "disabled",
+      notes: [
+        "managed-loop: decision=stop",
+        "managed-loop: no coordinator launched",
+      ],
+    });
+  }
+
+  if (options.status.automationConfig.mode !== "agent_launch") {
+    const summary =
+      "Managed coordinator loop requires automation.mode to be agent_launch";
+    return coordinatorLoopRecordedStopTick({
+      ...options,
+      decision: {
+        type: "block",
+        reason: summary,
+        nextTickNotBefore: null,
+      },
+      action: "blocked",
+      cycleStatus: "blocked",
+      stoppedReason: "blocked",
+      blockers: [summary],
+      notes: [
+        "managed-loop: decision=block",
+        "managed-loop: no coordinator launched",
+      ],
+    });
+  }
+
+  return null;
+}
+
+function requiredCoordinatorLoopIntervalMs(intervalMs: number | undefined): number {
+  if (intervalMs === undefined) {
+    throw new NexusAutomationCoordinatorLoopError(
+      "Automation schedule interval is not configured for this project",
+    );
+  }
+  return intervalMs;
+}
+
+async function coordinatorLoopRecordedStopTick(options: {
+  options: RunNexusAutomationCoordinatorLoopOptions;
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  targetReport: NexusAutomationTargetReport;
+  tickIndex: number;
+  tickStartedAt: string;
+  cycleId: string;
+  decision: NexusAutomationCoordinatorLoopDecision;
+  action?: NexusAutomationCoordinatorLoopAction;
+  cycleStatus: NexusAutomationTargetCycleStatus;
+  stoppedReason: NexusAutomationCoordinatorLoopStopReason;
+  blockers?: string[];
+  notes: string[];
+}): Promise<CoordinatorLoopStoppedTick> {
+  await emitCoordinatorDecisionProgress(options, options.decision);
+  const tick = recordDecisionTick({
+    projectRoot: options.projectRoot,
+    status: options.status,
+    targetReport: options.targetReport,
+    index: options.tickIndex,
+    startedAt: options.tickStartedAt,
+    finishedAt: currentIso(options.options.now),
+    cycleId: options.cycleId,
+    decision: options.decision,
+    action: options.action ?? "stopped",
+    waitMs: null,
+    run: null,
+    cycleStatus: options.cycleStatus,
+    blockers: options.blockers,
+    notes: options.notes,
+  });
+  await finishCoordinatorLoopTick(options.options, tick);
+  return { tick, stoppedReason: options.stoppedReason };
+}
+
+async function coordinatorLoopNonLaunchDecisionTick(options: {
+  options: RunNexusAutomationCoordinatorLoopOptions;
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  targetReport: NexusAutomationTargetReport;
+  tickIndex: number;
+  tickStartedAt: string;
+  cycleId: string;
+  intervalMs: number;
+  decision: NexusAutomationCoordinatorLoopDecision;
+}): Promise<CoordinatorLoopDecisionTick> {
+  const action = actionForDecision(options.decision);
+  const waitMs = waitMsForDecision(
+    options.decision,
+    options.status,
+    options.intervalMs,
+    options.tickStartedAt,
+  );
+  const tick = recordDecisionTick({
+    projectRoot: options.projectRoot,
+    status: options.status,
+    targetReport: options.targetReport,
+    index: options.tickIndex,
+    startedAt: options.tickStartedAt,
+    finishedAt: currentIso(options.options.now),
+    cycleId: options.cycleId,
+    decision: options.decision,
+    action,
+    waitMs,
+    run: null,
+    cycleStatus: cycleStatusForDecision(options.decision),
+    eligibleWorkItemCount: eligibleWorkItemCount(options.status),
+    workItems: targetCycleWorkItems(options.status),
+    blockers: coordinatorDecisionBlockers(options.decision),
+    nextCycleNotBefore: options.decision.nextTickNotBefore,
+    notes: [
+      `managed-loop: decision=${options.decision.type}`,
+      "managed-loop: no coordinator launched",
+    ],
+  });
+  await finishCoordinatorLoopTick(options.options, tick);
+  return {
+    tick,
+    stoppedReason: stoppedReasonForCoordinatorDecision(
+      options.decision,
+      options.status,
+    ),
+  };
+}
+
+async function coordinatorLoopLaunchTick(options: {
+  options: RunNexusAutomationCoordinatorLoopOptions;
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  targetReport: NexusAutomationTargetReport;
+  tickIndex: number;
+  tickStartedAt: string;
+  cycleId: string;
+  runId: string;
+  decision: NexusAutomationCoordinatorLoopDecision;
+}): Promise<CoordinatorLoopLaunchTick> {
+  recordCoordinatorLoopCycle({
+    projectRoot: options.projectRoot,
+    status: options.status,
+    targetReport: options.targetReport,
+    cycleId: options.cycleId,
+    runId: options.runId,
+    cycleStatus: "dispatched",
+    startedAt: options.tickStartedAt,
+    finishedAt: null,
+    summary: "Coordinator launch dispatched",
+    eligibleWorkItemCount: eligibleWorkItemCount(options.status),
+    workItems: targetCycleWorkItems(options.status),
+    notes: [
+      "managed-loop: decision=launch",
+      "managed-loop: coordinator launched",
+    ],
+  });
+  await emitCoordinatorLoopProgress(options.options, {
+    type: "launch_dispatched",
+    index: options.tickIndex,
+    runId: options.runId,
+    cycleId: options.cycleId,
+    eligibleWorkItemCount: eligibleWorkItemCount(options.status),
+  });
+  await emitCoordinatorLoopProgress(options.options, {
+    type: "run_started",
+    index: options.tickIndex,
+    runId: options.runId,
+  });
+
+  const run = await runNexusAutomationAgentLaunchOnce({
+    projectRoot: options.projectRoot,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    mcpRuntimeProcesses: options.options.mcpRuntimeProcesses,
+    workItemClaimOwner: options.options.workItemClaimOwner,
+    workItemClaimLeaseTokenFactory: options.options.workItemClaimLeaseTokenFactory,
+    owner: options.options.owner ?? "coordinator-loop",
+    now: options.options.now,
+    runId: options.runId,
+    launcher: options.options.launcher,
+  });
+  await emitCoordinatorLoopProgress(options.options, {
+    type: "run_finished",
+    index: options.tickIndex,
+    runId: options.runId,
+    status: run.status,
+    summary: run.summary,
+  });
+  const finishedAt = currentIso(options.options.now);
+  const finalization = await finalizeCoordinatorRun({
+    projectRoot: options.projectRoot,
+    initialStatus: options.status,
+    run,
+    finishedAt,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    gitRunner: options.options.gitRunner,
+    now: options.options.now,
+  });
+  const targetCycle = recordCoordinatorFinishedCycle({
+    ...options,
+    run,
+    finishedAt,
+    finalization,
+  });
+  const tick = coordinatorLoopTick({
+    index: options.tickIndex,
+    startedAt: options.tickStartedAt,
+    finishedAt,
+    status: options.status,
+    targetReport: options.targetReport,
+    decision: options.decision,
+    action: "launched",
+    waitMs: null,
+    run,
+    targetCycle,
+  });
+  await finishCoordinatorLoopTick(options.options, tick);
+  return { tick, run };
+}
+
+function recordCoordinatorFinishedCycle(options: {
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  targetReport: NexusAutomationTargetReport;
+  tickStartedAt: string;
+  cycleId: string;
+  runId: string;
+  run: RunNexusAutomationAgentLaunchOnceResult;
+  finishedAt: string;
+  finalization: Awaited<ReturnType<typeof finalizeCoordinatorRun>>;
+}): NexusAutomationTargetCycleRecord {
+  return recordCoordinatorLoopCycle({
+    projectRoot: options.projectRoot,
+    status: options.finalization.status,
+    targetReport: options.targetReport,
+    cycleId: options.cycleId,
+    runId: options.runId,
+    cycleStatus: options.finalization.cycleStatus,
+    startedAt: options.tickStartedAt,
+    finishedAt: options.finishedAt,
+    summary: options.run.summary,
+    eligibleWorkItemCount: options.finalization.eligibleWorkItemCount,
+    workItems: options.finalization.workItems,
+    blockers: options.finalization.blockers,
+    notes: [
+      "managed-loop: decision=launch",
+      "managed-loop: coordinator launched",
+      `managed-loop: coordinator ${options.run.status}`,
+      ...options.finalization.notes,
+      ...agentLaunchTargetCycleNotes(options.run),
+    ],
+  });
+}
+
+async function finishCoordinatorLoopTick(
+  options: RunNexusAutomationCoordinatorLoopOptions,
+  tick: NexusAutomationCoordinatorLoopTick,
+): Promise<void> {
+  await options.onTick?.(tick);
+  await emitCoordinatorLoopProgress(options, {
+    type: "tick_finished",
+    index: tick.index,
+    finishedAt: tick.finishedAt,
+    action: tick.action,
+  });
+}
+
+function emitCoordinatorDecisionProgress(
+  options: {
+    options: RunNexusAutomationCoordinatorLoopOptions;
+    tickIndex: number;
+    status: NexusAutomationStatus;
+  },
+  decision: NexusAutomationCoordinatorLoopDecision,
+): Promise<void> {
+  return emitCoordinatorLoopProgress(options.options, {
+    type: "decision",
+    index: options.tickIndex,
+    status: options.status.status,
+    summary: options.status.summary,
+    decision,
+    eligibleWorkItemCount: eligibleWorkItemCount(options.status),
+  });
+}
+
+function coordinatorDecisionBlockers(
+  decision: NexusAutomationCoordinatorLoopDecision,
+): string[] {
+  return decision.type === "block" || decision.type === "fail"
+    ? [decision.reason]
+    : [];
+}
+
+function stoppedReasonForCoordinatorDecision(
+  decision: NexusAutomationCoordinatorLoopDecision,
+  status: NexusAutomationStatus,
+): NexusAutomationCoordinatorLoopStopReason | null {
+  if (decision.type === "block") {
+    return "blocked";
+  }
+  if (decision.type === "fail") {
+    return "failed";
+  }
+  if (
+    decision.type === "skip" &&
+    status.status === "idle" &&
+    status.automationConfig?.target.stopWhenNoEligibleWork
+  ) {
+    return "no_work";
+  }
+  return null;
 }
 
 function statusDecision(
@@ -914,70 +1082,113 @@ function mapCoordinatorResultWorkItems(
   const blockers: string[] = [];
   const results = new Map<string, NexusAutomationAgentResultWorkItem>();
   if (!explicitResults || explicitResults.length === 0) {
-    if (selectedItems.length === 1) {
-      const selected = selectedItems[0]!;
-      results.set(workItemKey(selected), {
-        componentId: selected.componentId,
-        trackerId: selected.trackerId,
-        id: selected.id,
-        status: defaultWorkItemResultStatus(run.status),
-        summary: run.summary,
-      });
-    } else if (selectedItems.length > 1 && run.status !== "completed") {
-      for (const selected of selectedItems) {
-        results.set(workItemKey(selected), {
-          componentId: selected.componentId,
-          trackerId: selected.trackerId,
-          id: selected.id,
-          status: defaultWorkItemResultStatus(run.status),
-          summary: run.summary,
-        });
-      }
-    } else if (selectedItems.length > 1) {
-      blockers.push(
-        "Coordinator result contract is missing workItems for a multi-item completed run",
-      );
-    }
-
-    return { results, blockers };
+    return defaultCoordinatorResultWorkItems(run, selectedItems);
   }
 
   for (const result of explicitResults) {
-    const matched = matchResultToSelectedWorkItem(result, selectedItems);
-    if (!matched) {
-      blockers.push(
-        reconciliationBlocker({
-          componentId: result.componentId ?? null,
-          trackerId: result.trackerId ?? null,
-          trackerProvider: null,
-          itemId: result.id,
-          reason: "Coordinator result referenced an item that was not selected",
-        }),
-      );
-      continue;
-    }
-
-    const key = workItemKey(matched);
-    if (results.has(key)) {
-      blockers.push(
-        reconciliationBlocker({
-          componentId: matched.componentId,
-          trackerId: matched.trackerId,
-          trackerProvider: matched.trackerProvider,
-          itemId: matched.id,
-          reason: "Coordinator result reported the selected item more than once",
-        }),
-      );
-      continue;
-    }
-
-    results.set(key, {
-      ...result,
-      componentId: matched.componentId,
-      trackerId: matched.trackerId,
+    recordExplicitCoordinatorResult({
+      result,
+      selectedItems,
+      results,
+      blockers,
     });
   }
 
+  appendMissingCoordinatorResultBlockers(selectedItems, results, blockers);
+
+  return { results, blockers };
+}
+
+function defaultCoordinatorResultWorkItems(
+  run: RunNexusAutomationAgentLaunchOnceResult,
+  selectedItems: SelectedCoordinatorWorkItem[],
+): {
+  results: Map<string, NexusAutomationAgentResultWorkItem>;
+  blockers: string[];
+} {
+  const results = new Map<string, NexusAutomationAgentResultWorkItem>();
+  if (selectedItems.length === 1) {
+    recordDefaultCoordinatorResult(run, selectedItems[0]!, results);
+    return { results, blockers: [] };
+  }
+  if (selectedItems.length > 1 && run.status !== "completed") {
+    for (const selected of selectedItems) {
+      recordDefaultCoordinatorResult(run, selected, results);
+    }
+    return { results, blockers: [] };
+  }
+  return {
+    results,
+    blockers:
+      selectedItems.length > 1
+        ? ["Coordinator result contract is missing workItems for a multi-item completed run"]
+        : [],
+  };
+}
+
+function recordDefaultCoordinatorResult(
+  run: RunNexusAutomationAgentLaunchOnceResult,
+  selected: SelectedCoordinatorWorkItem,
+  results: Map<string, NexusAutomationAgentResultWorkItem>,
+): void {
+  results.set(workItemKey(selected), {
+    componentId: selected.componentId,
+    trackerId: selected.trackerId,
+    id: selected.id,
+    status: defaultWorkItemResultStatus(run.status),
+    summary: run.summary,
+  });
+}
+
+function recordExplicitCoordinatorResult(options: {
+  result: NexusAutomationAgentResultWorkItem;
+  selectedItems: SelectedCoordinatorWorkItem[];
+  results: Map<string, NexusAutomationAgentResultWorkItem>;
+  blockers: string[];
+}): void {
+  const matched = matchResultToSelectedWorkItem(
+    options.result,
+    options.selectedItems,
+  );
+  if (!matched) {
+    options.blockers.push(
+      reconciliationBlocker({
+        componentId: options.result.componentId ?? null,
+        trackerId: options.result.trackerId ?? null,
+        trackerProvider: null,
+        itemId: options.result.id,
+        reason: "Coordinator result referenced an item that was not selected",
+      }),
+    );
+    return;
+  }
+
+  const key = workItemKey(matched);
+  if (options.results.has(key)) {
+    options.blockers.push(
+      reconciliationBlocker({
+        componentId: matched.componentId,
+        trackerId: matched.trackerId,
+        trackerProvider: matched.trackerProvider,
+        itemId: matched.id,
+        reason: "Coordinator result reported the selected item more than once",
+      }),
+    );
+    return;
+  }
+
+  options.results.set(key, {
+    ...options.result,
+    componentId: matched.componentId,
+    trackerId: matched.trackerId,
+  });
+}
+
+function appendMissingCoordinatorResultBlockers(
+  selectedItems: SelectedCoordinatorWorkItem[],
+  results: Map<string, NexusAutomationAgentResultWorkItem>,
+  blockers: string[],
+): void {
   for (const selected of selectedItems) {
     if (!results.has(workItemKey(selected))) {
       blockers.push(
@@ -991,8 +1202,6 @@ function mapCoordinatorResultWorkItems(
       );
     }
   }
-
-  return { results, blockers };
 }
 
 async function reconcileSelectedWorkItem(options: {
