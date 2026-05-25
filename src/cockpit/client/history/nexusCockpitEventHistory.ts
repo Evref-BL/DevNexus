@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { buildNexusDashboardHistoryLayout } from "../../../dashboard/nexusDashboardHistoryLayout.js";
+import { buildNexusDashboardHistoryLayout } from "../../server/nexusDashboardHistoryLayout.js";
 import {
   cloudFetchIcon,
   gearIcon,

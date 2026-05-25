@@ -5,7 +5,7 @@ import {
   validateNexusDashboardHistoryLayout,
   type NexusDashboardHistoryMarker,
   type NexusDashboardHistoryEvent,
-} from "../../src/dashboard/nexusDashboardHistoryLayout.js";
+} from "../../src/cockpit/server/nexusDashboardHistoryLayout.js";
 
 describe("nexus dashboard history layout", () => {
   it("models commits as primary events with local cross-lane routing", () => {

@@ -127,17 +127,17 @@ import {
 import {
   buildNexusDashboardSnapshot,
   type NexusDashboardSnapshot,
-} from "./dashboard/nexusDashboard.js";
+} from "./cockpit/server/nexusDashboard.js";
 import {
   startNexusDashboardServer,
   type NexusDashboardServerHandle,
-} from "./dashboard/nexusDashboardServer.js";
+} from "./cockpit/server/nexusDashboardServer.js";
 import {
   listNexusDashboardServerStatuses,
   restartNexusDashboardServerForPort,
   type NexusDashboardServerStatus,
   type RestartNexusDashboardServerForPortResult,
-} from "./dashboard/nexusDashboardServerRegistry.js";
+} from "./cockpit/server/nexusDashboardServerRegistry.js";
 import {
   defaultNexusAutomationConfig,
 } from "./automation/nexusAutomationConfig.js";
