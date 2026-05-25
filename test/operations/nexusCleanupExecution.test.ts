@@ -90,6 +90,56 @@ describe("nexus cleanup execution", () => {
       });
   });
 
+  it("finalizes a safe lease-only candidate when the branch is already absent", () => {
+    const fixture = initCleanupFixture();
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/orphan-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "orphan-merged"),
+      status: "working",
+      now: () => "2026-05-18T09:00:00.000Z",
+      gitFacts: { headCommit: "orphanMerged123", dirty: false, pushed: true },
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const result = executeNexusCleanup({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      candidateId: "component:primary:branch:fix/primary/orphan-merged",
+      gitRunner: cleanupGitRunner(fixture, calls, {
+        missingRefs: ["fix/primary/orphan-merged"],
+        mergedRefs: ["orphanMerged123"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      candidate: {
+        id: "component:primary:branch:fix/primary/orphan-merged",
+        safeToDelete: true,
+      },
+      actions: {
+        removedWorktree: null,
+        deletedBranch: null,
+        updatedLeaseIds: [lease.id],
+        skipped: [
+          {
+            candidateId: "component:primary:branch:fix/primary/orphan-merged",
+            action: "branch_delete",
+            reason: "Branch is already absent from the local repository.",
+          },
+        ],
+      },
+    });
+    expect(cleanupCommands(calls)).toEqual([]);
+    expect(readNexusWorktreeLeaseStore(fixture.projectRoot).leases[0])
+      .toMatchObject({
+        id: lease.id,
+        status: "merged",
+        updatedAt: "2026-05-18T10:00:00.000Z",
+      });
+  });
+
   it("refuses dirty or unpushed candidates without mutating git or lease state", () => {
     const fixture = initCleanupFixture();
     const worktreePath = path.join(fixture.worktreesRoot, "dirty");
@@ -508,6 +558,7 @@ function cleanupGitRunner(
     mergedRefs?: string[];
     upstreams?: Record<string, string>;
     aheadBehind?: Record<string, { ahead: number; behind: number }>;
+    missingRefs?: string[];
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
@@ -564,6 +615,9 @@ function cleanupGitRunner(
     }
     if (argsArray[0] === "rev-parse") {
       const ref = argsArray[1]!;
+      if (options.missingRefs?.includes(ref)) {
+        return gitResult(argsArray, "", 1);
+      }
       return gitResult(argsArray, `${branchHeads.get(ref) ?? ref}\n`);
     }
     if (argsArray[0] === "status") {

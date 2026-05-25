@@ -91,6 +91,106 @@ describe("nexus cleanup plan", () => {
       .not.toContain("active_lease");
   });
 
+  it("includes a safe lease-only candidate when cleanup already removed the branch and worktree", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/orphan-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "orphan-merged"),
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "orphanMerged123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["fix/primary/orphan-merged"],
+        mergedRefs: ["orphanMerged123"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "fix/primary/orphan-merged")).toMatchObject({
+      kind: "branch",
+      worktreePath: null,
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["superseded", "safe"]),
+      blockers: [],
+      proof: expect.arrayContaining([
+        "Recorded head orphanMerged123 is contained in main.",
+      ]),
+    });
+  });
+
+  it("allows stale lease-only cleanup when the recorded head is already merged", () => {
+    const fixture = initCleanupFixture();
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/stale-orphan-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "stale-orphan-merged"),
+      status: "working",
+      now: () => "2026-05-16T09:55:00.000Z",
+      gitFacts: { headCommit: "staleOrphanMerged123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["fix/primary/stale-orphan-merged"],
+        mergedRefs: ["staleOrphanMerged123"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "fix/primary/stale-orphan-merged"))
+      .toMatchObject({
+        kind: "branch",
+        worktreePath: null,
+        safeToDelete: true,
+        classifications: expect.arrayContaining(["stale", "superseded", "safe"]),
+        blockers: [],
+        proof: expect.arrayContaining([
+          "Recorded head staleOrphanMerged123 is contained in main.",
+        ]),
+      });
+    expect(candidateFor(plan, "fix/primary/stale-orphan-merged").classifications)
+      .not.toContain("blocked");
+  });
+
+  it("does not materialize an existing lease worktree outside the cleanup scope", () => {
+    const fixture = initCleanupFixture();
+    const outOfScopeWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "other-scope",
+      "still-present",
+    );
+    fs.mkdirSync(outOfScopeWorktree, { recursive: true });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "fix/primary/out-of-scope",
+      worktreePath: outOfScopeWorktree,
+      status: "working",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "outOfScope123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(plan.candidates.some((candidate) =>
+      candidate.worktreePath === outOfScopeWorktree ||
+      candidate.branch === "fix/primary/out-of-scope",
+    )).toBe(false);
+  });
+
   it("blocks dirty and untracked worktrees and marks them for rescue", () => {
     const fixture = initCleanupFixture();
     const dirtyWorktree = path.join(fixture.worktreesRoot, "dirty");
@@ -646,6 +746,7 @@ function cleanupGitRunner(
     mergedRefs?: string[];
     upstreams?: Record<string, string>;
     aheadBehind?: Record<string, { ahead: number; behind: number }>;
+    missingRefs?: string[];
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
@@ -703,6 +804,9 @@ function cleanupGitRunner(
     }
     if (argsArray[0] === "rev-parse") {
       const ref = argsArray[1]!;
+      if (options.missingRefs?.includes(ref)) {
+        return gitResult(argsArray, "", 1);
+      }
       return gitResult(argsArray, `${branchHeads.get(ref) ?? ref}\n`);
     }
     if (argsArray[0] === "status") {
