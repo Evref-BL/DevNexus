@@ -4,6 +4,9 @@ DevNexus starts with a simple publication posture. A normal workspace can use
 work items, isolated worktrees, focused verification, and review handoff without
 configuring versions, release trains, or CI budgets.
 
+For the higher-level branch strategy and pause/resume model around Git
+workflows, see [Git workflow integration](git-workflows.md).
+
 Use the advanced publication tools only when the workspace needs them. A team
 can opt into green-main checks, CI tiers, candidate branches, merge queues,
 remote runners, or version-scoped release trains later.
