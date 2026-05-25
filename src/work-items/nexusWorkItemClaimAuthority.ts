@@ -179,7 +179,12 @@ export type NexusWorkItemClaimAuthorityReleaseResult =
     }
   | {
       status: "rejected";
-      reason: "missing_claim" | "token_mismatch" | "expired" | "released";
+      reason:
+        | "missing_claim"
+        | "token_mismatch"
+        | "fencing_token_mismatch"
+        | "expired"
+        | "released";
       claim?: NexusWorkItemClaimAuthorityRecord;
     };
 
@@ -230,6 +235,7 @@ export interface NexusWorkItemClaimAuthority {
   releaseClaim?(options: {
     key: NexusWorkItemClaimAuthorityKey;
     leaseToken: string;
+    fencingToken?: number | null;
     now: Date;
   }): Promise<NexusWorkItemClaimAuthorityReleaseResult>;
   reclaimExpiredClaim?(
@@ -336,6 +342,7 @@ export class NexusMemoryWorkItemClaimAuthority
   async releaseClaim(options: {
     key: NexusWorkItemClaimAuthorityKey;
     leaseToken: string;
+    fencingToken?: number | null;
     now: Date;
   }): Promise<NexusWorkItemClaimAuthorityReleaseResult> {
     const serializedKey = serializedClaimAuthorityKey(options.key);
@@ -351,6 +358,13 @@ export class NexusMemoryWorkItemClaimAuthority
         reason: verifyStatusToRejectedReason(result.status),
         ...(result.claim ? { claim: result.claim } : {}),
       };
+    }
+    const fencingTokenRejection = verifyReleaseFencingToken({
+      claim: result.claim,
+      fencingToken: options.fencingToken,
+    });
+    if (fencingTokenRejection) {
+      return fencingTokenRejection;
     }
 
     const released = {
@@ -465,13 +479,28 @@ export function nexusWorkItemClaimAuthorityKey(
     "projectId" | "candidate" | "tracker"
   >,
 ): NexusWorkItemClaimAuthorityKey {
-  const externalRef = options.candidate.externalRef;
-  return {
+  return nexusWorkItemClaimAuthorityKeyForWorkItem({
     projectId: options.projectId,
     componentId: options.candidate.componentId,
+    tracker: options.tracker,
+    workItem: options.candidate,
+  });
+}
+
+export function nexusWorkItemClaimAuthorityKeyForWorkItem(options: {
+  projectId: string;
+  componentId: string;
+  tracker: ResolvedNexusProjectWorkTracker;
+  workItem: WorkItem;
+}): NexusWorkItemClaimAuthorityKey {
+  const externalRef = options.workItem.externalRef;
+  const provider = externalRef?.provider ?? options.workItem.provider;
+  return {
+    projectId: options.projectId,
+    componentId: options.componentId,
     trackerId: options.tracker.id,
-    provider: options.candidate.provider,
-    workItemId: externalRef?.itemId ?? options.candidate.id,
+    provider,
+    workItemId: externalRef?.itemId ?? options.workItem.id,
     repositoryId:
       externalRef?.repositoryId ??
       options.tracker.workTracking.repository?.id ??
@@ -487,6 +516,28 @@ export function nexusWorkItemClaimAuthorityKey(
     itemNumber: externalRef?.itemNumber ?? null,
     itemKey: externalRef?.itemKey ?? null,
     nodeId: externalRef?.nodeId ?? null,
+  };
+}
+
+function verifyReleaseFencingToken(options: {
+  claim: NexusWorkItemClaimAuthorityRecord;
+  fencingToken: number | null | undefined;
+}): Extract<
+  NexusWorkItemClaimAuthorityReleaseResult,
+  { status: "rejected" }
+> | null {
+  if (
+    options.fencingToken === undefined ||
+    options.fencingToken === null ||
+    options.fencingToken === options.claim.fencingToken
+  ) {
+    return null;
+  }
+
+  return {
+    status: "rejected",
+    reason: "fencing_token_mismatch",
+    claim: cloneClaimAuthorityRecord(options.claim),
   };
 }
 
