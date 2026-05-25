@@ -188,6 +188,7 @@ import {
   executeNexusCleanup,
   selectNexusCleanupCandidate,
   type NexusCleanupExecutionResult,
+  type NexusCleanupExecutionRescueOptions,
 } from "./operations/nexusCleanupExecution.js";
 import {
   buildNexusSetupCheck,
@@ -892,6 +893,10 @@ interface ParsedCoordinationCleanupExecuteCommand {
   keepBranch?: boolean;
   force?: boolean;
   forceReason?: string | null;
+  rescueBranch?: string;
+  rescueReason?: string | null;
+  archiveSummary?: string;
+  archiveUrl?: string | null;
   json?: boolean;
 }
 
@@ -1868,6 +1873,7 @@ async function handleCoordinationCommand(
       deleteBranch: parsed.keepBranch ? false : undefined,
       force: parsed.force,
       forceReason: parsed.forceReason,
+      rescue: coordinationCleanupRescueOptions(parsed),
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -4447,6 +4453,18 @@ function parseCoordinationCleanupExecuteCommand(
       case "--force-reason":
         parsed.forceReason = next();
         break;
+      case "--rescue-branch":
+        parsed.rescueBranch = next();
+        break;
+      case "--rescue-reason":
+        parsed.rescueReason = next();
+        break;
+      case "--archive-record":
+        parsed.archiveSummary = next();
+        break;
+      case "--archive-url":
+        parsed.archiveUrl = next();
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -4460,6 +4478,32 @@ function parseCoordinationCleanupExecuteCommand(
   }
 
   return parsed as ParsedCoordinationCleanupExecuteCommand;
+}
+
+function coordinationCleanupRescueOptions(
+  parsed: ParsedCoordinationCleanupExecuteCommand,
+): NexusCleanupExecutionRescueOptions | undefined {
+  if (parsed.rescueBranch && parsed.archiveSummary) {
+    throw new Error(
+      "coordination cleanup-execute accepts either --rescue-branch or --archive-record, not both",
+    );
+  }
+  if (parsed.rescueBranch) {
+    return {
+      mode: "branch",
+      branchName: parsed.rescueBranch,
+      reason: parsed.rescueReason ?? null,
+    };
+  }
+  if (parsed.archiveSummary) {
+    return {
+      mode: "archive_record",
+      summary: parsed.archiveSummary,
+      url: parsed.archiveUrl ?? null,
+    };
+  }
+
+  return undefined;
 }
 
 function parseCoordinationRequestCommand(
@@ -7556,11 +7600,29 @@ function printCoordinationCleanupExecuteResult(
   if (result.actions.deletedBranch) {
     writeLine(stdout, `  Deleted branch: ${result.actions.deletedBranch}`);
   }
+  if (result.rescue.createdBranch) {
+    writeLine(
+      stdout,
+      `  Rescue branch: ${result.rescue.createdBranch} at ${result.rescue.startPoint ?? "unknown"}`,
+    );
+  }
+  if (result.rescue.archiveRecord) {
+    writeLine(
+      stdout,
+      `  Archive record: ${result.rescue.archiveRecord.summary}`,
+    );
+  }
+  for (const skipped of result.actions.skipped) {
+    writeLine(stdout, `  Skipped ${skipped.action}: ${skipped.reason}`);
+  }
   if (result.actions.updatedLeaseIds.length > 0) {
     writeLine(
       stdout,
       `  Updated leases: ${result.actions.updatedLeaseIds.join(", ")}`,
     );
+  }
+  for (const guidance of result.recoveryGuidance) {
+    writeLine(stdout, `  Recovery: ${guidance}`);
   }
   for (const command of result.git.commands) {
     writeLine(

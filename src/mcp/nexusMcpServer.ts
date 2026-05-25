@@ -149,6 +149,7 @@ import {
 import {
   executeNexusCleanup,
   selectNexusCleanupCandidate,
+  type NexusCleanupExecutionRescueOptions,
 } from "../operations/nexusCleanupExecution.js";
 import {
   createNexusRemoteExecutionRequest,
@@ -890,6 +891,10 @@ const tools: McpTool[] = [
         keepBranch: { type: "boolean" },
         force: { type: "boolean" },
         forceReason: { type: ["string", "null"], maxLength: 500 },
+        rescueBranch: { type: "string" },
+        rescueReason: { type: ["string", "null"], maxLength: 500 },
+        archiveSummary: { type: "string", maxLength: 1000 },
+        archiveUrl: { type: ["string", "null"], maxLength: 1000 },
       },
       required: ["candidateId"],
       additionalProperties: false,
@@ -2181,6 +2186,7 @@ async function callCoordinationMcpTool(
             : undefined,
           force: optionalBoolean(args, "force", "arguments"),
           forceReason: optionalNullableString(args, "forceReason", "arguments"),
+          rescue: coordinationCleanupRescueOptionsFromArgs(args),
           gitRunner: context.gitRunner,
           now: context.now,
         }),
@@ -2811,6 +2817,34 @@ function assertMcpMutationAllowed(
     gitRunner: context.gitRunner,
     override: context.sharedCheckoutGuardOverride,
   });
+}
+
+function coordinationCleanupRescueOptionsFromArgs(
+  args: Record<string, unknown>,
+): NexusCleanupExecutionRescueOptions | undefined {
+  const rescueBranch = optionalString(args, "rescueBranch", "arguments");
+  const archiveSummary = optionalString(args, "archiveSummary", "arguments");
+  if (rescueBranch && archiveSummary) {
+    throw new Error(
+      "arguments accepts either rescueBranch or archiveSummary, not both",
+    );
+  }
+  if (rescueBranch) {
+    return {
+      mode: "branch",
+      branchName: rescueBranch,
+      reason: optionalNullableString(args, "rescueReason", "arguments") ?? null,
+    };
+  }
+  if (archiveSummary) {
+    return {
+      mode: "archive_record",
+      summary: archiveSummary,
+      url: optionalNullableString(args, "archiveUrl", "arguments") ?? null,
+    };
+  }
+
+  return undefined;
 }
 
 export async function handleDevNexusMcpJsonRpcMessage(

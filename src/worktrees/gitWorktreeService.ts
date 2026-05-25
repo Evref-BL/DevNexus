@@ -115,6 +115,22 @@ export interface DeleteGitBranchResult {
   };
 }
 
+export interface CreateGitBranchOptions {
+  sourceRoot: string;
+  branchName: string;
+  startPoint: string;
+  gitRunner?: GitRunner;
+}
+
+export interface CreateGitBranchResult {
+  sourceRoot: string;
+  branchName: string;
+  startPoint: string;
+  git: {
+    commands: GitCommandResult[];
+  };
+}
+
 export class GitWorktreeServiceError extends Error {
   constructor(message: string) {
     super(message);
@@ -255,6 +271,31 @@ export function deleteGitBranch(
     sourceRoot,
     branchName,
     force,
+    git: {
+      commands,
+    },
+  };
+}
+
+export function createGitBranch(
+  options: CreateGitBranchOptions,
+): CreateGitBranchResult {
+  const sourceRoot = path.resolve(options.sourceRoot);
+  const branchName = normalizeBranchName(options.branchName);
+  const startPoint = requiredNonEmptyString(options.startPoint, "startPoint");
+  const gitRunner = options.gitRunner ?? defaultGitRunner;
+  const commands: GitCommandResult[] = [];
+  runGitCommand(
+    gitRunner,
+    commands,
+    ["branch", branchName, startPoint],
+    sourceRoot,
+  );
+
+  return {
+    sourceRoot,
+    branchName,
+    startPoint,
     git: {
       commands,
     },
