@@ -140,6 +140,76 @@ describe("nexus cleanup execution", () => {
       });
   });
 
+  it("finalizes a stale duplicate lease when another scope already finalized the same head", () => {
+    const fixture = initCleanupFixture();
+    const metadataWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "metadata",
+      "duplicate",
+    );
+    const mergedLease = createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      projectMeta: true,
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "merged",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123", dirty: false, pushed: true },
+    });
+    const duplicateLease = createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "ready",
+      now: () => "2026-05-16T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123", dirty: false, pushed: true },
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const result = executeNexusCleanup({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      candidateId: "component:primary:branch:codex/metadata/duplicate",
+      gitRunner: cleanupGitRunner(fixture, calls, {
+        missingRefs: ["codex/metadata/duplicate"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      candidate: {
+        id: "component:primary:branch:codex/metadata/duplicate",
+        safeToDelete: true,
+      },
+      actions: {
+        removedWorktree: null,
+        deletedBranch: null,
+        updatedLeaseIds: [duplicateLease.id],
+        skipped: [
+          {
+            candidateId: "component:primary:branch:codex/metadata/duplicate",
+            action: "branch_delete",
+            reason: "Branch is already absent from the local repository.",
+          },
+        ],
+      },
+    });
+    expect(cleanupCommands(calls)).toEqual([]);
+    expect(readNexusWorktreeLeaseStore(fixture.projectRoot).leases)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: mergedLease.id,
+          status: "merged",
+        }),
+        expect.objectContaining({
+          id: duplicateLease.id,
+          status: "merged",
+          updatedAt: "2026-05-18T10:00:00.000Z",
+        }),
+      ]));
+  });
+
   it("refuses dirty or unpushed candidates without mutating git or lease state", () => {
     const fixture = initCleanupFixture();
     const worktreePath = path.join(fixture.worktreesRoot, "dirty");

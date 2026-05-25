@@ -543,12 +543,18 @@ function classifyCleanupCandidate(
   const aheadBehind = branch && upstream
     ? branchAheadBehind(context.gitRunner, candidate.repositoryPath, branch, upstream)
     : { ahead: null, behind: null };
-  const superseded = supersededByRecordedMergedHead({
-    context,
-    lease,
-    targetBranch: candidate.targetBranch,
-    branchHeadCommit: headCommit,
-  });
+  const superseded =
+    supersededByRecordedMergedHead({
+      context,
+      lease,
+      targetBranch: candidate.targetBranch,
+      branchHeadCommit: headCommit,
+    }) ??
+    supersededByMergedDuplicateLease({
+      context,
+      lease,
+      branchHeadCommit: headCommit,
+    });
 
   if ((statusFacts.untrackedCount ?? 0) > 0) {
     classifications.push("needs_rescue", "blocked");
@@ -569,22 +575,18 @@ function classifyCleanupCandidate(
     } else if (lease.stale) {
       classifications.push("stale");
       if (mergedIntoTarget === true || superseded) {
-        proof.push(
-          `Lease is stale, but Git proves the ${
-            mergedIntoTarget === true ? "branch" : "recorded head"
-          } is contained in the target branch.`,
-        );
+        proof.push(mergedIntoTarget === true
+          ? "Lease is stale, but Git proves the branch is contained in the target branch."
+          : "Lease is stale, but cleanup evidence supersedes it.");
       } else {
         classifications.push("blocked");
         blockers.push("Lease is stale; refresh ownership or inspect manually before cleanup.");
       }
     } else if (!["merged"].includes(lease.record.status)) {
       if ((mergedIntoTarget === true || superseded) && cleanStatusFacts(statusFacts)) {
-        proof.push(
-          `Lease status ${lease.record.status} is advisory; Git proves the ${
-            mergedIntoTarget === true ? "branch" : "recorded head"
-          } is contained in the target branch.`,
-        );
+        proof.push(mergedIntoTarget === true
+          ? `Lease status ${lease.record.status} is advisory; Git proves the branch is contained in the target branch.`
+          : `Lease status ${lease.record.status} is advisory; cleanup evidence supersedes it.`);
       } else {
         classifications.push("active_lease", "blocked");
         blockers.push(`Lease status ${lease.record.status} indicates active or pending work.`);
@@ -916,6 +918,51 @@ function supersededByRecordedMergedHead(options: {
   }
 
   return `Recorded head ${observedHead} is contained in ${options.targetBranch}.`;
+}
+
+function supersededByMergedDuplicateLease(options: {
+  context: ClassificationContext;
+  lease: { record: NexusWorktreeLeaseRecord; stale: boolean } | null;
+  branchHeadCommit: string | null;
+}): string | null {
+  if (!options.lease || options.branchHeadCommit !== null) {
+    return null;
+  }
+  if (["merged", "abandoned"].includes(options.lease.record.status)) {
+    return null;
+  }
+  const branchName = options.lease.record.branchName;
+  const observedHead = options.lease.record.lastObservedHeadCommit;
+  if (!branchName || !observedHead) {
+    return null;
+  }
+
+  const duplicate = options.context.leases.find((candidate) =>
+    candidate.id !== options.lease?.record.id &&
+    candidate.status === "merged" &&
+    candidate.branchName === branchName &&
+    candidate.lastObservedHeadCommit === observedHead &&
+    !sameLeaseScope(candidate, options.lease!.record)
+  );
+  if (!duplicate) {
+    return null;
+  }
+
+  return `Merged lease ${duplicate.id} in ${leaseScopeLabel(duplicate)} has the same branch and recorded head ${observedHead}.`;
+}
+
+function sameLeaseScope(
+  left: NexusWorktreeLeaseRecord,
+  right: NexusWorktreeLeaseRecord,
+): boolean {
+  return left.scope.kind === right.scope.kind &&
+    left.scope.componentId === right.scope.componentId;
+}
+
+function leaseScopeLabel(lease: NexusWorktreeLeaseRecord): string {
+  return lease.scope.kind === "project_meta"
+    ? "project metadata"
+    : `component ${lease.scope.componentId ?? "unknown"}`;
 }
 
 function worktreeStatusFacts(
