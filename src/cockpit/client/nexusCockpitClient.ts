@@ -353,9 +353,8 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
     </header>
     ${renderHostOverview(host, snapshot, selectedWorkspaceId)}
     ${renderSignals(snapshot.signals, activeSelection)}
-    ${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}
     <section class="dn-main-grid">
-      <div class="dn-work-stack">${gitHistory}${features}${workHistory}${threadInbox}${trackedWork}</div>
+      <div class="dn-work-stack">${gitHistory}${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}${features}${workHistory}${threadInbox}${trackedWork}</div>
     </section>
     <section class="dn-plugin-row">${plugins}</section>
     <section class="dn-grid dn-secondary-grid">

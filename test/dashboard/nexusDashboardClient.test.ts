@@ -198,9 +198,15 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("signal-components");
     expect(module).toContain("Not Git history");
     expect(module).toContain("Each rail is a workspace category");
+    expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px; display: grid; grid-template-columns: minmax(96px, var(--dn-git-graph-width)) max-content;");
+    expect(module).toContain("width: max-content; max-width: 100%; overflow: auto;");
     expect(module).toContain(".dn-git-graph-column { display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr);");
     expect(module).toContain(".dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%;");
+    expect(module).toContain(".dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: max-content; overflow: visible; }");
     expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: var(--dn-git-description-width) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");
+    expect(module).toContain("width: max-content; min-width: 0;");
+    expect(module).not.toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr);");
+    expect(module).not.toContain("width: max-content; min-width: 100%;");
     expect(module).toContain("Source checkout");
     expect(module).toContain("Active branch");
     expect(module).toContain("More branches");
@@ -246,6 +252,96 @@ describe("nexus dashboard client", () => {
     );
     expect(hooks.isCockpitTooltipTargetTruncated(truncatedTarget)).toBe(true);
     expect(hooks.isCockpitTooltipTargetTruncated(fittingTarget)).toBe(false);
+  });
+
+  it("keeps the write history board before generic selected details", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-24T12:00:00.000Z",
+      summary: "Dashboard demo summary.",
+      project: {
+        name: "Dashboard Demo",
+        root: "/workspace",
+      },
+      signals: [],
+      components: [],
+      events: [],
+      blockers: [],
+      features: {
+        records: [],
+      },
+      threads: {
+        records: [],
+      },
+      trackedWork: {
+        records: [],
+      },
+      plugins: {
+        enabled: [],
+        available: [],
+        disabled: [],
+      },
+      worktrees: {
+        records: [],
+      },
+      weave: {
+        lanes: [
+          {
+            id: "project",
+            label: "Project",
+          },
+        ],
+        nodes: [
+          {
+            id: "project",
+            kind: "project",
+            laneId: "project",
+            label: "Dashboard Demo",
+            status: "active",
+          },
+        ],
+        edges: [],
+      },
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "core100000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "core100000000000000000000000000000000000000",
+                shortHash: "core100",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Update core cockpit",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered.indexOf('id="project-git-history"')).toBeLessThan(
+      rendered.indexOf('id="selected-item"'),
+    );
   });
 
   it("keeps visible dashboard content stable during background refresh", () => {

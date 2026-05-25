@@ -66,6 +66,14 @@ export async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ index: number }>,
   ) => string;
   renderFeatureOverview: (snapshot: unknown, selectedId?: string | null) => string;
+  renderDashboard: (
+    snapshot: unknown,
+    themeMode?: string,
+    selectedId?: string | null,
+    host?: unknown,
+    selectedWorkspaceId?: string,
+    gitHistoryFilter?: string | null,
+  ) => string;
   renderGitHistory: (snapshot: unknown, selectedId?: string | null, filter?: string | null) => string;
   gitHistoryRows: (snapshot: unknown, filter?: string | null) => {
     maxLane: number;
@@ -134,7 +142,7 @@ export async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, defaultSelectedId, gitHistoryRows, historyRows, isCockpitTooltipTargetTruncated, nextDashboardSelectedId, renderActionStrip, renderBranchGraph, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, defaultSelectedId, gitHistoryRows, historyRows, isCockpitTooltipTargetTruncated, nextDashboardSelectedId, renderActionStrip, renderBranchGraph, renderDashboard, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
