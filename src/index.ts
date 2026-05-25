@@ -7,6 +7,7 @@ export * from "./worktrees/gitWorktreeService.js";
 export * from "./git/nexusGitIdentity.js";
 export * from "./git/nexusGitRemoteFacts.js";
 export * from "./git-workflows/nexusGitWorkflowBranchFreshness.js";
+export * from "./git-workflows/nexusGitWorkflowLifecycle.js";
 export * from "./git-workflows/nexusGitWorkflowPlanStatus.js";
 export * from "./git-workflows/nexusGitWorkflowRunState.js";
 export * from "./git-workflows/nexusGitWorkflowStart.js";

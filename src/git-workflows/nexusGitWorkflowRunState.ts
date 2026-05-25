@@ -29,6 +29,12 @@ export type NexusGitWorkflowRunTerminalOutcome =
   | "rescued"
   | "merged";
 
+export type NexusGitWorkflowRunPreservationKind =
+  | "archive_record"
+  | "rescue_branch"
+  | "merged"
+  | "empty";
+
 export type NexusGitWorkflowRunOwnerKind =
   | "agent"
   | "human"
@@ -70,6 +76,14 @@ export interface NexusGitWorkflowRunTransition {
   requiresApproval: boolean;
 }
 
+export interface NexusGitWorkflowRunPreservation {
+  kind: NexusGitWorkflowRunPreservationKind;
+  summary: string;
+  ref: string | null;
+  url: string | null;
+  recordedAt: string;
+}
+
 export interface NexusGitWorkflowRunNode {
   id: string;
   kind: NexusGitWorkflowRunNodeKind;
@@ -94,6 +108,7 @@ export interface NexusGitWorkflowRunRecord {
   baseCommit: string | null;
   targetBranch: string | null;
   owner: NexusGitWorkflowRunOwner;
+  preservation: NexusGitWorkflowRunPreservation | null;
   providerLinks: NexusGitWorkflowProviderLink[];
   evidence: NexusGitWorkflowRunEvidence[];
   allowedTransitions: NexusGitWorkflowRunTransition[];
@@ -122,6 +137,14 @@ export interface NexusGitWorkflowRunEvidenceInput {
   observedAt?: string | null;
 }
 
+export interface NexusGitWorkflowRunPreservationInput {
+  kind: NexusGitWorkflowRunPreservationKind;
+  summary: string;
+  ref?: string | null;
+  url?: string | null;
+  recordedAt?: string | null;
+}
+
 export interface NexusGitWorkflowRunTransitionInput {
   id: string;
   to: NexusGitWorkflowRunStatus;
@@ -143,6 +166,7 @@ export interface CreateNexusGitWorkflowRunOptions {
   baseCommit?: string | null;
   targetBranch?: string | null;
   owner?: NexusGitWorkflowRunOwner | null;
+  preservation?: NexusGitWorkflowRunPreservationInput | null;
   providerLinks?: NexusGitWorkflowProviderLink[];
   evidence?: NexusGitWorkflowRunEvidenceInput[];
   allowedTransitions?: NexusGitWorkflowRunTransitionInput[];
@@ -157,6 +181,7 @@ export interface UpdateNexusGitWorkflowRunOptions {
   terminalOutcome?: NexusGitWorkflowRunTerminalOutcome | null;
   currentRef?: string | null;
   owner?: NexusGitWorkflowRunOwner | null;
+  preservation?: NexusGitWorkflowRunPreservationInput | null;
   providerLinks?: NexusGitWorkflowProviderLink[];
   evidence?: NexusGitWorkflowRunEvidenceInput[];
   allowedTransitions?: NexusGitWorkflowRunTransitionInput[];
@@ -185,6 +210,7 @@ export interface NexusGitWorkflowRunSummary {
   workItemId: string | null;
   currentNodeId: string | null;
   nextOwner: NexusGitWorkflowRunOwner;
+  preservation: NexusGitWorkflowRunPreservation | null;
   evidenceCount: number;
   allowedTransitionCount: number;
   updatedAt: string;
@@ -232,6 +258,13 @@ const terminalOutcomes = new Set<NexusGitWorkflowRunTerminalOutcome>([
   "archived",
   "rescued",
   "merged",
+]);
+
+const preservationKinds = new Set<NexusGitWorkflowRunPreservationKind>([
+  "archive_record",
+  "rescue_branch",
+  "merged",
+  "empty",
 ]);
 
 const ownerKinds = new Set<NexusGitWorkflowRunOwnerKind>([
@@ -333,6 +366,7 @@ export function createNexusGitWorkflowRun(
     baseCommit: options.baseCommit ?? null,
     targetBranch: options.targetBranch ?? null,
     owner: options.owner ?? { kind: "none", id: null },
+    preservation: normalizePreservationInput(options.preservation ?? null, timestamp),
     providerLinks: options.providerLinks ?? [],
     evidence: normalizeEvidenceInputs(options.evidence ?? [], timestamp),
     allowedTransitions: normalizeTransitionInputs(
@@ -390,6 +424,9 @@ export function updateNexusGitWorkflowRun(
     owner: options.owner === undefined
       ? existing.owner
       : options.owner ?? { kind: "none", id: null },
+    preservation: Object.prototype.hasOwnProperty.call(options, "preservation")
+      ? normalizePreservationInput(options.preservation ?? null, timestamp)
+      : existing.preservation,
     providerLinks: options.providerLinks ?? existing.providerLinks,
     evidence: [
       ...existing.evidence,
@@ -449,6 +486,7 @@ export function summarizeNexusGitWorkflowRun(
     workItemId: run.workItemId,
     currentNodeId: currentNode?.id ?? null,
     nextOwner: run.owner,
+    preservation: run.preservation,
     evidenceCount: run.evidence.length,
     allowedTransitionCount: run.allowedTransitions.length,
     updatedAt: run.updatedAt,
@@ -530,6 +568,7 @@ export function normalizeNexusGitWorkflowRun(
     targetBranch:
       optionalNullableString(record.targetBranch, "run.targetBranch") ?? null,
     owner: normalizeOwner(record.owner, "run.owner"),
+    preservation: normalizePreservation(record.preservation, "run.preservation"),
     providerLinks: normalizeArray(
       record.providerLinks,
       "run.providerLinks",
@@ -599,6 +638,22 @@ function normalizeTransitionInputs(
       },
       `transition[${index}]`,
     )
+  );
+}
+
+function normalizePreservationInput(
+  value: NexusGitWorkflowRunPreservationInput | null,
+  timestamp: string,
+): NexusGitWorkflowRunPreservation | null {
+  if (!value) {
+    return null;
+  }
+  return normalizePreservation(
+    {
+      ...value,
+      recordedAt: value.recordedAt ?? timestamp,
+    },
+    "preservation",
   );
 }
 
@@ -683,6 +738,26 @@ function normalizeTransition(
   };
 }
 
+function normalizePreservation(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowRunPreservation | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusGitWorkflowRunStateError(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    kind: normalizePreservationKind(record.kind, `${pathName}.kind`),
+    summary: requiredNonEmptyString(record.summary, `${pathName}.summary`),
+    ref: optionalNullableString(record.ref, `${pathName}.ref`) ?? null,
+    url: optionalNullableString(record.url, `${pathName}.url`) ?? null,
+    recordedAt: requiredNonEmptyString(record.recordedAt, `${pathName}.recordedAt`),
+  };
+}
+
 function normalizeNode(value: unknown, pathName: string): NexusGitWorkflowRunNode {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new NexusGitWorkflowRunStateError(`${pathName} must be an object`);
@@ -715,6 +790,18 @@ function normalizeTerminalOutcome(
   }
   throw new NexusGitWorkflowRunStateError(
     `${pathName} must be a known terminal outcome`,
+  );
+}
+
+function normalizePreservationKind(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowRunPreservationKind {
+  if (preservationKinds.has(value as NexusGitWorkflowRunPreservationKind)) {
+    return value as NexusGitWorkflowRunPreservationKind;
+  }
+  throw new NexusGitWorkflowRunStateError(
+    `${pathName} must be a known preservation kind`,
   );
 }
 

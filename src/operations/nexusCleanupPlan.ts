@@ -20,6 +20,14 @@ import {
   readNexusWorktreeLeaseStore,
   type NexusWorktreeLeaseRecord,
 } from "../worktrees/nexusWorktreeLease.js";
+import {
+  readNexusGitWorkflowRunStore,
+  type NexusGitWorkflowRunOwner,
+  type NexusGitWorkflowRunPreservation,
+  type NexusGitWorkflowRunRecord,
+  type NexusGitWorkflowRunStatus,
+  type NexusGitWorkflowRunTerminalOutcome,
+} from "../git-workflows/nexusGitWorkflowRunState.js";
 
 export type NexusCleanupCandidateKind = "branch" | "worktree";
 
@@ -35,7 +43,13 @@ export type NexusCleanupClassification =
   | "unknown_merge_state"
   | "active_lease"
   | "abandoned"
-  | "needs_rescue";
+  | "needs_rescue"
+  | "workflow_active"
+  | "workflow_paused"
+  | "workflow_abandoned"
+  | "workflow_aborted"
+  | "workflow_archived"
+  | "workflow_rescued";
 
 export interface NexusCleanupGitFacts {
   repositoryPath: string | null;
@@ -64,6 +78,18 @@ export interface NexusCleanupLeaseSummary {
   notes: string[];
 }
 
+export interface NexusCleanupWorkflowRunSummary {
+  id: string;
+  status: NexusGitWorkflowRunStatus;
+  terminalOutcome: NexusGitWorkflowRunTerminalOutcome | null;
+  workItemId: string | null;
+  branchName: string | null;
+  currentRef: string | null;
+  nextOwner: NexusGitWorkflowRunOwner;
+  preservation: NexusGitWorkflowRunPreservation | null;
+  updatedAt: string;
+}
+
 export interface NexusCleanupCandidate {
   id: string;
   kind: NexusCleanupCandidateKind;
@@ -81,6 +107,7 @@ export interface NexusCleanupCandidate {
   };
   git: NexusCleanupGitFacts;
   lease: NexusCleanupLeaseSummary | null;
+  workflowRun: NexusCleanupWorkflowRunSummary | null;
 }
 
 export interface NexusCleanupPlan {
@@ -382,6 +409,9 @@ function classifyCleanupCandidate(
   const branch = candidate.branch;
   const repositoryPath = candidate.worktreePath ?? candidate.repositoryPath;
   const lease = matchingLease(context);
+  const workflowRun = matchingWorkflowRun(context, lease?.record ?? null);
+  const workflowAllowsUnmergedCleanup =
+    workflowRunAllowsUnmergedCleanup(workflowRun);
   const statusFacts = candidate.worktreePath
     ? worktreeStatusFacts(candidate.worktreePath, context.gitRunner)
     : { stagedCount: null, unstagedCount: null, untrackedCount: null };
@@ -448,7 +478,12 @@ function classifyCleanupCandidate(
       classifications.push("active_lease", "blocked");
       blockers.push(`Lease status ${lease.record.status} indicates active or pending work.`);
     }
-  } else if (branch && mergedIntoTarget !== true) {
+  } else if (
+    branch &&
+    mergedIntoTarget !== true &&
+    !workflowRun &&
+    !workflowAllowsUnmergedCleanup
+  ) {
     classifications.push("missing_handoff", "blocked");
     blockers.push("No matching handoff or lease evidence was found for this unmerged branch.");
   }
@@ -457,7 +492,12 @@ function classifyCleanupCandidate(
     classifications.push("unpushed", "blocked");
     blockers.push(`Branch has ${aheadBehind.ahead} commit(s) not present on upstream ${upstream}.`);
   }
-  if (branch && !upstream && mergedIntoTarget !== true) {
+  if (
+    branch &&
+    !upstream &&
+    mergedIntoTarget !== true &&
+    !workflowAllowsUnmergedCleanup
+  ) {
     classifications.push("unknown_merge_state", "blocked");
     blockers.push("Branch has no upstream, so remote recoverability is unknown.");
   }
@@ -475,6 +515,15 @@ function classifyCleanupCandidate(
   } else if (mergedIntoTarget === false) {
     proof.push(`Branch ${branch ?? "HEAD"} is not contained in ${candidate.targetBranch}.`);
   }
+
+  applyWorkflowRunCleanupEvidence({
+    workflowRun,
+    branch,
+    statusFacts,
+    proof,
+    blockers,
+    classifications,
+  });
 
   const uniqueClassifications = uniqueStrings(classifications) as NexusCleanupClassification[];
   const safeToDelete =
@@ -519,6 +568,7 @@ function classifyCleanupCandidate(
       mergedIntoTarget,
     },
     lease: lease ? leaseSummary(lease.record, lease.stale) : null,
+    workflowRun: workflowRun ? workflowRunSummary(workflowRun) : null,
   };
 }
 
@@ -565,6 +615,162 @@ function matchingLease(context: ClassificationContext): {
   return {
     record,
     stale: leaseIsStale(record, context.now, context.staleAfterMs),
+  };
+}
+
+function matchingWorkflowRun(
+  context: ClassificationContext,
+  lease: NexusWorktreeLeaseRecord | null,
+): NexusGitWorkflowRunRecord | null {
+  const candidate = context.candidate;
+  if (!candidate.worktreePath) {
+    return null;
+  }
+
+  let runs: NexusGitWorkflowRunRecord[];
+  try {
+    runs = readNexusGitWorkflowRunStore(candidate.worktreePath).runs;
+  } catch {
+    return null;
+  }
+  if (runs.length === 0) {
+    return null;
+  }
+
+  const componentId = candidate.componentId;
+  const matching = runs
+    .filter((run) => componentId ? run.componentId === componentId : true)
+    .filter((run) => {
+      if (candidate.branch) {
+        return run.branchName === candidate.branch || run.currentRef === candidate.branch;
+      }
+      if (lease?.workItemId) {
+        return run.workItemId === lease.workItemId;
+      }
+      return true;
+    })
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return matching[0] ?? null;
+}
+
+function applyWorkflowRunCleanupEvidence(options: {
+  workflowRun: NexusGitWorkflowRunRecord | null;
+  branch: string | null;
+  statusFacts: {
+    stagedCount: number | null;
+    unstagedCount: number | null;
+    untrackedCount: number | null;
+  };
+  proof: string[];
+  blockers: string[];
+  classifications: NexusCleanupClassification[];
+}): void {
+  const run = options.workflowRun;
+  if (!run) {
+    return;
+  }
+  options.proof.push(`Matched Git workflow run ${run.id} with status ${run.status}.`);
+
+  if (run.status === "paused") {
+    options.classifications.push("workflow_paused", "blocked");
+    options.blockers.push(
+      `Git workflow run ${run.id} is paused for ${ownerLabel(run.owner)}; resume it or choose abandon, archive, or rescue before cleanup.`,
+    );
+    return;
+  }
+
+  if (!isTerminalWorkflowStatus(run.status)) {
+    options.classifications.push("workflow_active", "blocked");
+    options.blockers.push(
+      `Git workflow run ${run.id} is still ${run.status}; finish, pause, archive, or rescue it before cleanup.`,
+    );
+    return;
+  }
+
+  if (run.status === "abandoned") {
+    options.classifications.push("workflow_abandoned");
+    if (!run.preservation) {
+      options.classifications.push("needs_rescue", "blocked");
+      options.blockers.push(
+        `Git workflow run ${run.id} was abandoned without archive or rescue preservation.`,
+      );
+    }
+    return;
+  }
+
+  if (run.status === "aborted") {
+    options.classifications.push("workflow_aborted");
+    if (!options.branch && cleanStatusFacts(options.statusFacts)) {
+      options.classifications.push("safe");
+      options.proof.push(
+        `Workflow run ${run.id} was cleanly aborted before durable branch work existed.`,
+      );
+    } else if (run.preservation?.kind === "empty") {
+      options.classifications.push("safe");
+      options.proof.push(
+        `Workflow run ${run.id} records empty-work preservation before cleanup.`,
+      );
+    }
+    return;
+  }
+
+  if (run.status === "archived") {
+    options.classifications.push("workflow_archived");
+    if (run.preservation?.kind === "archive_record") {
+      options.classifications.push("safe");
+      options.proof.push(
+        `Workflow run ${run.id} was archived: ${run.preservation.summary}`,
+      );
+    } else {
+      options.classifications.push("needs_rescue", "blocked");
+      options.blockers.push(
+        `Archived workflow run ${run.id} does not include archive preservation evidence.`,
+      );
+    }
+    return;
+  }
+
+  if (run.status === "rescued") {
+    options.classifications.push("workflow_rescued");
+    if (run.preservation?.kind === "rescue_branch") {
+      options.classifications.push("safe");
+      options.proof.push(
+        `Workflow run ${run.id} was rescued: ${run.preservation.summary}`,
+      );
+    } else {
+      options.classifications.push("needs_rescue", "blocked");
+      options.blockers.push(
+        `Rescued workflow run ${run.id} does not include rescue preservation evidence.`,
+      );
+    }
+  }
+}
+
+function workflowRunAllowsUnmergedCleanup(
+  run: NexusGitWorkflowRunRecord | null,
+): boolean {
+  return (
+    run?.status === "archived" &&
+    run.preservation?.kind === "archive_record"
+  ) || (
+    run?.status === "rescued" &&
+    run.preservation?.kind === "rescue_branch"
+  );
+}
+
+function workflowRunSummary(
+  run: NexusGitWorkflowRunRecord,
+): NexusCleanupWorkflowRunSummary {
+  return {
+    id: run.id,
+    status: run.status,
+    terminalOutcome: run.terminalOutcome,
+    workItemId: run.workItemId,
+    branchName: run.branchName,
+    currentRef: run.currentRef,
+    nextOwner: run.owner,
+    preservation: run.preservation,
+    updatedAt: run.updatedAt,
   };
 }
 
@@ -784,6 +990,29 @@ function leaseSummary(
     lastSeenAt: lease.lastSeenAt,
     notes: lease.notes,
   };
+}
+
+function isTerminalWorkflowStatus(status: NexusGitWorkflowRunStatus): boolean {
+  return status === "completed" ||
+    status === "aborted" ||
+    status === "abandoned" ||
+    status === "archived" ||
+    status === "rescued" ||
+    status === "merged";
+}
+
+function ownerLabel(owner: NexusGitWorkflowRunOwner): string {
+  return owner.id ? `${owner.kind} ${owner.id}` : owner.kind;
+}
+
+function cleanStatusFacts(statusFacts: {
+  stagedCount: number | null;
+  unstagedCount: number | null;
+  untrackedCount: number | null;
+}): boolean {
+  return (statusFacts.stagedCount ?? 0) === 0 &&
+    (statusFacts.unstagedCount ?? 0) === 0 &&
+    (statusFacts.untrackedCount ?? 0) === 0;
 }
 
 function leaseIsStale(

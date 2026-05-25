@@ -7526,6 +7526,12 @@ function printCoordinationCleanupPlan(
         candidate.safeToDelete ? "safe" : "blocked"
       }`,
     );
+    if (candidate.workflowRun) {
+      writeLine(
+        stdout,
+        `      Workflow run: ${candidate.workflowRun.id} ${candidate.workflowRun.status}`,
+      );
+    }
   }
 }
 
