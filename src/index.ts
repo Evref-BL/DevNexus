@@ -8,6 +8,7 @@ export * from "./git/nexusGitIdentity.js";
 export * from "./git/nexusGitRemoteFacts.js";
 export * from "./git-workflows/nexusGitWorkflowPlanStatus.js";
 export * from "./git-workflows/nexusGitWorkflowRunState.js";
+export * from "./git-workflows/nexusGitWorkflowStart.js";
 export * from "./automation/nexusAutomation.js";
 export * from "./automation/nexusAutomationHeartbeat.js";
 export * from "./authority/nexusAuthority.js";

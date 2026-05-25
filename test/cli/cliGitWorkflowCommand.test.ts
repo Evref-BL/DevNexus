@@ -146,6 +146,65 @@ describe("git-workflow CLI", () => {
     expect(output.output()).toContain("Profile: feature-delivery (feature_branch)");
     expect(output.output()).toContain("Next owner: agent/codex");
   });
+
+  it("starts a workflow and reports the prepared worktree and run", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-start-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("direct-protected", "direct"));
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "start",
+        projectRoot,
+        "--component",
+        "primary",
+        "--profile",
+        "direct-protected",
+        "--work-item",
+        "github-357",
+        "--work-item-title",
+        "Start workflows",
+        "--branch",
+        "codex/primary/github-357-start",
+        "--worktree-name",
+        "workflow-start",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: startGitRunner(),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      result: {
+        profile: {
+          id: "direct-protected",
+          branchStrategy: "direct",
+        },
+        preparedWorktree: {
+          worktree: {
+            branchName: "codex/primary/github-357-start",
+            baseRef: "origin/main",
+            resolvedBaseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        },
+        run: {
+          profileId: "direct-protected",
+          branchStrategy: "direct",
+          workItemId: "github-357",
+          baseRef: "origin/main",
+          baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      },
+    });
+  });
 });
 
 function projectConfig(
@@ -202,6 +261,49 @@ function projectConfig(
 
 function readOnlyGitRunner(currentBranch = "main"): GitRunner {
   return (args) => gitResult([...args], currentBranch);
+}
+
+function startGitRunner(): GitRunner {
+  return (args, cwd) => {
+    const argsArray = [...args];
+    if (argsArray[0] === "worktree" && argsArray[1] === "add") {
+      const worktreePath = argsArray.includes("-b") ? argsArray[4]! : argsArray[2]!;
+      fs.mkdirSync(path.join(worktreePath, ".git"), { recursive: true });
+      return success(argsArray, "");
+    }
+    if (
+      argsArray[0] === "show-ref" &&
+      argsArray[1] === "--verify" &&
+      argsArray[2] === "--quiet"
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "not found",
+        exitCode: 1,
+      };
+    }
+    if (
+      argsArray[0] === "rev-parse" &&
+      argsArray[1] === "--abbrev-ref" &&
+      argsArray[2] === "--symbolic-full-name" &&
+      argsArray[3]?.endsWith("@{upstream}")
+    ) {
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "not found",
+        exitCode: 1,
+      };
+    }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+      return success(argsArray, path.join(cwd ?? "", ".git", "info", "exclude"));
+    }
+    if (argsArray[0] === "for-each-ref") {
+      return success(argsArray, "");
+    }
+    return gitResult(argsArray, "main");
+  };
 }
 
 function gitResult(args: string[], currentBranch: string): GitCommandResult {

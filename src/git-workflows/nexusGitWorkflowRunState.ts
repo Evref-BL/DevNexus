@@ -84,6 +84,7 @@ export interface NexusGitWorkflowRunRecord {
   projectId: string;
   componentId: string | null;
   profileId: string;
+  branchStrategy: string | null;
   status: NexusGitWorkflowRunStatus;
   terminalOutcome: NexusGitWorkflowRunTerminalOutcome | null;
   workItemId: string | null;
@@ -134,6 +135,7 @@ export interface CreateNexusGitWorkflowRunOptions {
   projectId: string;
   componentId?: string | null;
   profileId: string;
+  branchStrategy?: string | null;
   workItemId?: string | null;
   branchName?: string | null;
   currentRef?: string | null;
@@ -174,6 +176,7 @@ export interface NexusGitWorkflowRunSummary {
   projectId: string;
   componentId: string | null;
   profileId: string;
+  branchStrategy: string | null;
   status: NexusGitWorkflowRunStatus;
   terminalOutcome: NexusGitWorkflowRunTerminalOutcome | null;
   branchName: string | null;
@@ -320,6 +323,7 @@ export function createNexusGitWorkflowRun(
     projectId: options.projectId,
     componentId: options.componentId ?? null,
     profileId: options.profileId,
+    branchStrategy: options.branchStrategy ?? null,
     status: "working",
     terminalOutcome: null,
     workItemId: options.workItemId ?? null,
@@ -436,6 +440,7 @@ export function summarizeNexusGitWorkflowRun(
     projectId: run.projectId,
     componentId: run.componentId,
     profileId: run.profileId,
+    branchStrategy: run.branchStrategy,
     status: run.status,
     terminalOutcome: run.terminalOutcome,
     branchName: run.branchName,
@@ -509,6 +514,8 @@ export function normalizeNexusGitWorkflowRun(
     componentId:
       optionalNullableString(record.componentId, "run.componentId") ?? null,
     profileId: requiredNonEmptyString(record.profileId, "run.profileId"),
+    branchStrategy:
+      optionalNullableString(record.branchStrategy, "run.branchStrategy") ?? null,
     status,
     terminalOutcome,
     workItemId:

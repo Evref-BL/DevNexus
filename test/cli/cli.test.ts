@@ -476,6 +476,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus worktree prepare");
     expect(output.output()).toContain("dev-nexus git-workflow plan");
     expect(output.output()).toContain("dev-nexus git-workflow status");
+    expect(output.output()).toContain("dev-nexus git-workflow start");
     expect(output.output()).toContain("dev-nexus publication green-main plan");
     expect(output.output()).toContain("dev-nexus review plan");
     expect(output.output()).toContain("dev-nexus quick-fix plan");
