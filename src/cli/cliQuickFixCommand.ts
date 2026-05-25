@@ -1,8 +1,16 @@
+import path from "node:path";
+import process from "node:process";
+import { buildNexusQuickFixPlan } from "../operations/nexusQuickFix.js";
 import {
+  prepareNexusManualWorktree,
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "../worktrees/nexusManualWorktree.js";
 import type { NexusQuickFixPlan } from "../operations/nexusQuickFix.js";
+import {
+  assertCliMutationAllowed,
+  type DevNexusCliDependencies,
+} from "./cliCommandContext.js";
 import {
   parsePositiveInteger,
   writeJson,
@@ -25,6 +33,61 @@ export interface ParsedQuickFixPlanCommand {
   verificationSummary?: string | null;
   cleanupActions: string[];
   json?: boolean;
+}
+
+export async function handleQuickFixCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  if (argv[1] === "plan" || argv[1] === "start" || argv[1] === "finish") {
+    const parsed = parseQuickFixPlanCommand(argv);
+    const plan = buildNexusQuickFixPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      topic: parsed.topic,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      writeScope: parsed.writeScope,
+      verificationCommands: parsed.verificationCommands,
+    });
+    if (parsed.command === "start") {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "quick-fix start",
+        mutationClass: "worktree_bootstrap",
+        componentId: parsed.componentId,
+      });
+      const prepared = prepareNexusManualWorktree({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        workItemId: parsed.workItemId,
+        topic: plan.branch.topic,
+        branchName: plan.branch.name,
+        worktreeName: plan.branch.worktreeName,
+        writeScope: parsed.writeScope,
+        leaseNotes: [`Quick-fix work for ${plan.issue.repository}#${plan.issue.number}.`],
+        gitRunner: dependencies.gitRunner,
+        now: dependencies.now,
+      });
+      printQuickFixStart(
+        plan,
+        prepared,
+        parsed,
+        dependencies.stdout ?? process.stdout,
+      );
+      return 0;
+    }
+    if (parsed.command === "finish") {
+      printQuickFixFinish(plan, parsed, dependencies.stdout ?? process.stdout);
+      return 0;
+    }
+
+    printQuickFixPlan(plan, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  throw new Error("quick-fix requires plan, start, or finish");
 }
 
 export function parseQuickFixPlanCommand(argv: string[]): ParsedQuickFixPlanCommand {
