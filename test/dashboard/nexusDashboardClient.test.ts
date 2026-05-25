@@ -57,6 +57,8 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("color-scheme");
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
+    expect(module).toContain("data-git-history-search");
+    expect(module).toContain("applyGitHistorySearch");
     expect(module).toContain("Activity Lanes");
     expect(module).toContain("Host cockpit");
     expect(module).toContain("Workspaces");

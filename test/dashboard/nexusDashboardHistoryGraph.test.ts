@@ -142,6 +142,10 @@ describe("nexus dashboard history graph", () => {
     expect(rows?.rows).toHaveLength(3);
     expect(rows?.paths.some((path) => path.fromLane !== path.toLane)).toBe(true);
     expect(rendered).toContain("Project Events");
+    expect(rendered).toContain('data-git-history-search');
+    expect(rendered).toContain('data-git-history-search-input');
+    expect(rendered).toContain('data-history-search-text="');
+    expect(rendered).toContain("feature000");
     expect(rendered).toContain("Selected event");
     expect(rendered).toContain("data-history-detail-for=\"history:primary:feature000000000000000000000000000000000000\"");
     const selectedRowIndex = rendered.indexOf(

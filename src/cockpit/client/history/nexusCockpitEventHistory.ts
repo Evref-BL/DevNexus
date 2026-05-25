@@ -31,7 +31,7 @@ function renderGitHistory(snapshot, selectedId, filter = 'all') {
   const count = `${countLabel(graph.rows.length, 'event')} · ${countLabel(graph.repositories.length, 'repo')} · ${countLabel(branchCount, 'branch', 'branches')}`;
   const cappedRepositories = graph.repositories.filter((repository) => repository.moreAvailable);
   const note = cappedRepositories.length ? `<p class="dn-git-note">Showing the newest loaded events for ${countLabel(cappedRepositories.length, 'repo')}. Branch filters use each loaded history window.</p>` : '';
-  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Event history</span><h2>Project Events</h2><p class="dn-history-note">Git commits are events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repositories, activeFilter)}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
+  return `<div class="dn-panel dn-git-panel" id="project-git-history"><div class="dn-panel-heading"><div><span class="dn-eyebrow">Event history</span><h2>Project Events</h2><p class="dn-history-note">Git commits are events; parent edges define the graph topology.</p></div><span class="dn-count">${escapeHtml(count)}</span></div>${renderGitHistoryFilters(snapshot, repositories, activeFilter)}${renderGitHistorySearchControls()}${renderGitHistoryBoard(snapshot, graph, selectedId)}${note}</div>`;
 }
 
 function renderGitHistoryBoard(snapshot, graph, selectedId) {
@@ -53,6 +53,10 @@ function renderGitHistoryFilters(snapshot, repositories, activeFilter) {
   const filters = gitHistoryFilters(snapshot, repositories);
   if (filters.length <= 1) return '';
   return `<div class="dn-git-filters" aria-label="Event history filters">${filters.map((filter) => `<button class="dn-git-filter" type="button" data-git-history-filter="${escapeHtml(filter.id)}" aria-pressed="${filter.id === activeFilter ? 'true' : 'false'}" title="${escapeHtml(filter.title ?? filter.label)}">${escapeHtml(filter.label)}</button>`).join('')}</div>`;
+}
+
+function renderGitHistorySearchControls() {
+  return `<div class="dn-git-search" data-git-history-search role="search" aria-label="Search event history"><input class="dn-git-search-input" type="search" data-git-history-search-input placeholder="Search events" autocomplete="off" spellcheck="false" /><span class="dn-git-search-status" data-git-history-search-status aria-live="polite"></span><button class="dn-git-search-button" type="button" data-git-history-search-action="previous" aria-label="Previous event match" title="Previous match">Prev</button><button class="dn-git-search-button" type="button" data-git-history-search-action="next" aria-label="Next event match" title="Next match">Next</button><button class="dn-git-search-button" type="button" data-git-history-search-action="clear" aria-label="Clear event search" title="Clear search">Clear</button></div>`;
 }
 
 function gitHistoryFilters(snapshot, repositories) {
@@ -285,7 +289,19 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const date = formatTime(row.commit.committedAt);
   const author = row.commit.authorName ?? '';
   const authorTitle = [row.commit.authorName, row.commit.authorEmail].filter(Boolean).join(' · ');
-  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}"><span class="dn-git-subject">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
+  const searchText = [
+    componentLabel,
+    row.repository.repositoryPath,
+    ...refs.map((ref) => ref.name),
+    row.commit.subject,
+    date,
+    row.commit.committedAt,
+    author,
+    row.commit.authorEmail,
+    row.commit.shortHash,
+    row.commit.hash,
+  ].filter(Boolean).join(' ');
+  return `<button class="dn-git-history-row${selected}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject">${componentChip}<span class="dn-git-refs">${refChips}</span><strong title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</strong><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>`;
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -442,6 +458,7 @@ export function renderNexusCockpitEventHistoryClientSource() {
     renderGitHistoryBoard,
     normalizeGitHistoryFilter,
     renderGitHistoryFilters,
+    renderGitHistorySearchControls,
     gitHistoryFilters,
     gitHistoryBranchNames,
     featureGitBranches,

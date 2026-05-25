@@ -130,7 +130,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   applyThemePreference(themeMode);
   injectStyles();
   const tooltipController = installCockpitTooltips(root);
-  const disposeGitHistoryInteractions = bindGitHistoryInteractions(root);
+  const gitHistoryInteractions = bindGitHistoryInteractions(root);
   const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const onSystemThemeChange = () => {
     if (themeMode !== 'system') return;
@@ -192,6 +192,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
     bindHostSignalControls(root, setHostFocus);
     bindGitHistoryColumnResizers(root);
+    gitHistoryInteractions.refresh();
     bindWorkspaceControls(root, setWorkspaceId);
     bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));
   }
@@ -322,7 +323,7 @@ export function mountDevNexusDashboard(root, options = {}) {
   renderCurrent();
   void refresh();
   const timer = setInterval(refresh, refreshMs);
-  return { dispose() { disposed = true; clearInterval(timer); disposeGitHistoryInteractions(); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
+  return { dispose() { disposed = true; clearInterval(timer); gitHistoryInteractions.dispose(); tooltipController.dispose(); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };
 }
 
 function injectStyles() {
