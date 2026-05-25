@@ -328,6 +328,8 @@ import {
 } from "./work-items/nexusWorkItemDiscoveryStatus.js";
 import {
   claimNexusEligibleWorkItem,
+  releaseNexusWorkItemAuthorityClaim,
+  type NexusWorkItemAuthorityClaimReleaseResult,
   type NexusWorkItemClaimResult,
   type NexusWorkItemStaleClaimPolicy,
 } from "./work-items/nexusWorkItemClaim.js";
@@ -589,6 +591,17 @@ interface ParsedWorkItemClaimNextCommand {
   ownerId?: string | null;
   leaseDurationMs?: number;
   staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
+  json?: boolean;
+}
+
+interface ParsedWorkItemClaimReleaseCommand {
+  projectRoot: string;
+  itemId: string;
+  homePath?: string;
+  componentId?: string;
+  trackerId?: string;
+  leaseToken: string;
+  fencingToken?: number | null;
   json?: boolean;
 }
 
@@ -2145,6 +2158,23 @@ async function handleWorkItemCommand(
     return 0;
   }
 
+  if (command === "claim-release") {
+    const parsed = parseWorkItemClaimReleaseCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item claim-release",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
+    const release = await releaseWorkItemClaim(parsed, dependencies);
+    printWorkItemClaimReleaseResult(
+      release,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return release.release.status === "released" ? 0 : 1;
+  }
+
   if (command === "list") {
     const parsed = parseWorkItemListCommand(argv);
     const items = await workItemService(parsed.projectRoot, dependencies)
@@ -2496,7 +2526,7 @@ async function handleWorkItemCommand(
   }
 
   throw new Error(
-    "work-item requires create, discovery-status, claim-next, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
+    "work-item requires create, discovery-status, claim-next, claim-release, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
   );
 }
 
@@ -3023,8 +3053,35 @@ async function claimNextWorkItem(
     leaseDurationMs: parsed.leaseDurationMs,
     staleClaimPolicy: parsed.staleClaimPolicy,
     providerFactory: dependencies.workItemClaimProviderFactory,
+    claimAuthority: dependencies.workItemClaimAuthority,
     env: dependencies.env,
     leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
+    now: dependencies.now,
+  });
+}
+
+async function releaseWorkItemClaim(
+  parsed: ParsedWorkItemClaimReleaseCommand,
+  dependencies: DevNexusCliDependencies,
+): Promise<NexusWorkItemAuthorityClaimReleaseResult> {
+  const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  return releaseNexusWorkItemAuthorityClaim({
+    projectRoot,
+    projectConfig,
+    components: resolveProjectComponents(projectRoot, projectConfig),
+    automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    homePath: parsed.homePath
+      ? resolvedCommandHomePath(parsed.homePath)
+      : undefined,
+    componentId: parsed.componentId,
+    trackerId: parsed.trackerId,
+    workItemId: parsed.itemId,
+    leaseToken: parsed.leaseToken,
+    fencingToken: parsed.fencingToken,
+    providerFactory: dependencies.workItemClaimProviderFactory,
+    claimAuthority: dependencies.workItemClaimAuthority,
+    env: dependencies.env,
     now: dependencies.now,
   });
 }
@@ -4735,6 +4792,62 @@ function parseWorkItemClaimNextCommand(
   }
 
   return parsed as ParsedWorkItemClaimNextCommand;
+}
+
+function parseWorkItemClaimReleaseCommand(
+  argv: string[],
+): ParsedWorkItemClaimReleaseCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item claim-release requires a workspace root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item claim-release requires a work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemClaimReleaseCommand> = {
+    projectRoot,
+    itemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--lease-token":
+        parsed.leaseToken = next();
+        break;
+      case "--fencing-token":
+        parsed.fencingToken = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item claim-release option: ${arg}`);
+    }
+  }
+  if (!parsed.leaseToken) {
+    throw new Error("work-item claim-release requires --lease-token");
+  }
+
+  return parsed as ParsedWorkItemClaimReleaseCommand;
 }
 
 function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
@@ -7760,6 +7873,39 @@ function printWorkItemClaimNextResult(
           `lease ${active.owner.leaseToken} expires ${active.owner.expiresAt}`,
       );
     }
+  }
+}
+
+function printWorkItemClaimReleaseResult(
+  release: NexusWorkItemAuthorityClaimReleaseResult,
+  parsed: ParsedWorkItemClaimReleaseCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: release.release.status === "released",
+    release,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  if (release.release.status === "released") {
+    writeLine(stdout, "DevNexus work item claim released.");
+    writeLine(stdout, `  Id: ${release.workItem.id}`);
+    writeLine(stdout, `  Authority: ${release.authorityKind}`);
+    writeLine(stdout, `  Fencing token: ${release.release.claim.fencingToken}`);
+    writeLine(stdout, `  Released: ${release.release.claim.releasedAt}`);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item claim release rejected.");
+  writeLine(stdout, `  Id: ${release.workItem.id}`);
+  writeLine(stdout, `  Authority: ${release.authorityKind}`);
+  writeLine(stdout, `  Reason: ${release.release.reason}`);
+  if (release.release.claim) {
+    writeLine(stdout, `  Fencing token: ${release.release.claim.fencingToken}`);
+    writeLine(stdout, `  State: ${release.release.claim.state}`);
   }
 }
 

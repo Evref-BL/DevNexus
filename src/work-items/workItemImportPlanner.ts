@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   createWorkItemService,
   type ResolvedWorkItemProviderContext,
+  type WorkItemService,
   type WorkItemProjectResolver,
   type WorkItemProviderFactory,
 } from "./workItemService.js";
@@ -17,6 +18,7 @@ import {
   createWorkItemTrackerLinkService,
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
+  type WorkItemTrackerLinkService,
   type WorkItemTrackerReference,
 } from "./workItemTrackerLinks.js";
 import {
@@ -569,82 +571,22 @@ export async function executeWorkItemImport(
   ];
 
   if (blockers.length === 0) {
-    for (const createPlan of plan.creates) {
-      try {
-        const target = await service.createWorkItem({
-          ...selector,
-          trackerId: plan.policy.targetTrackerId,
-          ...createInputFromImportPlan(createPlan),
-        });
-        const link = await linkService.linkReference({
-          ...selector,
-          logicalItemId: target.id,
-          trackerId: createPlan.plannedLink.trackerId,
-          ...linkInputFromPlannedLink(createPlan.plannedLink),
-        });
-        localLinks.push({
-          action: "created",
-          source: createPlan.source,
-          target: summarizeWorkItem(target, plan.policy.targetTrackerId),
-          linkAction: link.action,
-          reference: link.reference,
-        });
-      } catch (error) {
-        blockers.push({
-          operation: "create",
-          message: errorMessage(error),
-          source: createPlan.source,
-        });
-      }
-    }
-
-    for (const updatePlan of plan.updates) {
-      try {
-        const target = updatePlan.fields.length > 0
-          ? await service.updateWorkItem({
-              ...selector,
-              trackerId: plan.policy.targetTrackerId,
-              ref: { id: updatePlan.target.id },
-              patch: patchFromChanges(updatePlan.fields),
-            })
-          : await service.getWorkItem({
-              ...selector,
-              trackerId: plan.policy.targetTrackerId,
-              id: updatePlan.target.id,
-            });
-        const link = await linkService.linkReference({
-          ...selector,
-          logicalItemId: target.id,
-          trackerId: updatePlan.plannedLink.trackerId,
-          ...linkInputFromPlannedLink(updatePlan.plannedLink),
-        });
-        localLinks.push({
-          action: updatePlan.fields.length > 0 ? "updated" : "linked",
-          source: updatePlan.source,
-          target: summarizeWorkItem(target, plan.policy.targetTrackerId),
-          linkAction: link.action,
-          reference: link.reference,
-        });
-      } catch (error) {
-        blockers.push({
-          operation: updatePlan.fields.length > 0 ? "update" : "link",
-          message: errorMessage(error),
-          source: updatePlan.source,
-          target: updatePlan.target,
-        });
-      }
-    }
+    const execution = {
+      service,
+      linkService,
+      selector,
+      plan,
+      localLinks,
+      blockers,
+    };
+    await executeWorkItemImportCreates(execution);
+    await executeWorkItemImportUpdates(execution);
   }
 
   const finishedAt = nowString(input.now);
   const summary = importRunSummary({
     plan,
-    status:
-      blockers.length > 0
-        ? localLinks.length > 0
-          ? "failed"
-          : "blocked"
-        : "completed",
+    status: workItemImportRunStatus(blockers, localLinks),
     startedAt,
     finishedAt,
     created: localLinks.filter((link) => link.action === "created").length,
@@ -670,6 +612,115 @@ export async function executeWorkItemImport(
     staleLinks: plan.staleLinks,
     authority,
   };
+}
+
+interface WorkItemImportExecutionContext {
+  service: WorkItemService;
+  linkService: WorkItemTrackerLinkService;
+  selector: ReturnType<typeof executionSelector>;
+  plan: WorkItemImportPlan;
+  localLinks: WorkItemImportLocalLink[];
+  blockers: WorkItemImportRunBlocker[];
+}
+
+async function executeWorkItemImportCreates(
+  context: WorkItemImportExecutionContext,
+): Promise<void> {
+  for (const createPlan of context.plan.creates) {
+    try {
+      await executeWorkItemImportCreate(context, createPlan);
+    } catch (error) {
+      context.blockers.push({
+        operation: "create",
+        message: errorMessage(error),
+        source: createPlan.source,
+      });
+    }
+  }
+}
+
+async function executeWorkItemImportCreate(
+  context: WorkItemImportExecutionContext,
+  createPlan: WorkItemImportCreatePlan,
+): Promise<void> {
+  const { service, linkService, selector, plan } = context;
+  const target = await service.createWorkItem({
+    ...selector,
+    trackerId: plan.policy.targetTrackerId,
+    ...createInputFromImportPlan(createPlan),
+  });
+  const link = await linkService.linkReference({
+    ...selector,
+    logicalItemId: target.id,
+    trackerId: createPlan.plannedLink.trackerId,
+    ...linkInputFromPlannedLink(createPlan.plannedLink),
+  });
+  context.localLinks.push({
+    action: "created",
+    source: createPlan.source,
+    target: summarizeWorkItem(target, plan.policy.targetTrackerId),
+    linkAction: link.action,
+    reference: link.reference,
+  });
+}
+
+async function executeWorkItemImportUpdates(
+  context: WorkItemImportExecutionContext,
+): Promise<void> {
+  for (const updatePlan of context.plan.updates) {
+    try {
+      await executeWorkItemImportUpdate(context, updatePlan);
+    } catch (error) {
+      context.blockers.push({
+        operation: updatePlan.fields.length > 0 ? "update" : "link",
+        message: errorMessage(error),
+        source: updatePlan.source,
+        target: updatePlan.target,
+      });
+    }
+  }
+}
+
+async function executeWorkItemImportUpdate(
+  context: WorkItemImportExecutionContext,
+  updatePlan: WorkItemImportUpdatePlan,
+): Promise<void> {
+  const { service, linkService, selector, plan } = context;
+  const target = updatePlan.fields.length > 0
+    ? await service.updateWorkItem({
+        ...selector,
+        trackerId: plan.policy.targetTrackerId,
+        ref: { id: updatePlan.target.id },
+        patch: patchFromChanges(updatePlan.fields),
+      })
+    : await service.getWorkItem({
+        ...selector,
+        trackerId: plan.policy.targetTrackerId,
+        id: updatePlan.target.id,
+      });
+  const link = await linkService.linkReference({
+    ...selector,
+    logicalItemId: target.id,
+    trackerId: updatePlan.plannedLink.trackerId,
+    ...linkInputFromPlannedLink(updatePlan.plannedLink),
+  });
+  context.localLinks.push({
+    action: updatePlan.fields.length > 0 ? "updated" : "linked",
+    source: updatePlan.source,
+    target: summarizeWorkItem(target, plan.policy.targetTrackerId),
+    linkAction: link.action,
+    reference: link.reference,
+  });
+}
+
+function workItemImportRunStatus(
+  blockers: WorkItemImportRunBlocker[],
+  localLinks: WorkItemImportLocalLink[],
+): WorkItemImportRunStatus {
+  if (blockers.length === 0) {
+    return "completed";
+  }
+  return localLinks.length > 0 ? "failed" : "blocked";
 }
 
 export function parseWorkItemImportDirection(

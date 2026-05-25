@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   createWorkItemService,
   type ResolvedWorkItemProviderContext,
+  type WorkItemService,
   type WorkItemProjectResolver,
   type WorkItemProviderFactory,
 } from "./workItemService.js";
@@ -12,6 +13,7 @@ import {
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
   type WorkItemTrackerLinkRecord,
+  type WorkItemTrackerLinkService,
   type WorkItemTrackerReference,
 } from "./workItemTrackerLinks.js";
 import {
@@ -565,111 +567,23 @@ export async function executeWorkItemSync(
   ];
 
   if (blockers.length === 0) {
-    for (const createPlan of plan.creates) {
-      try {
-        const target = await service.createWorkItem({
-          ...selector,
-          trackerId: plan.policy.targetTrackerId,
-          ...createInputFromPlan(createPlan),
-        });
-        const link = await linkService.linkReference({
-          ...selector,
-          logicalItemId: createPlan.source.id,
-          trackerId: plan.policy.targetTrackerId,
-          ...linkInputFromTarget(target),
-        });
-        const targetSummary = summarizeWorkItem(
-          target,
-          plan.policy.targetTrackerId,
-        );
-        providerLinks.push({
-          action: "created",
-          source: createPlan.source,
-          target: targetSummary,
-          linkAction: link.action,
-          reference: link.reference,
-        });
-        const comment = await maybeAddSyncComment({
-          service,
-          selector,
-          plan,
-          source: createPlan.source,
-          target,
-          action: "created",
-          fields: createPlan.fields.map((field) => field.field),
-        });
-        if (comment) {
-          comments.push(comment);
-        }
-      } catch (error) {
-        blockers.push({
-          operation: "create",
-          message: errorMessage(error),
-          source: createPlan.source,
-        });
-      }
-    }
-
-    for (const updatePlan of plan.updates) {
-      try {
-        const target = await service.updateWorkItem({
-          ...selector,
-          trackerId: plan.policy.targetTrackerId,
-          ref: {
-            id: updatePlan.targetReference.itemId,
-            externalRef: updatePlan.targetReference,
-          },
-          patch: patchFromChanges(updatePlan.fields),
-        });
-        const link = await linkService.linkReference({
-          ...selector,
-          logicalItemId: updatePlan.source.id,
-          trackerId: plan.policy.targetTrackerId,
-          ...linkInputFromTarget(target),
-        });
-        const targetSummary = summarizeWorkItem(
-          target,
-          plan.policy.targetTrackerId,
-        );
-        providerLinks.push({
-          action: "updated",
-          source: updatePlan.source,
-          target: targetSummary,
-          linkAction: link.action,
-          reference: link.reference,
-        });
-        const comment = await maybeAddSyncComment({
-          service,
-          selector,
-          plan,
-          source: updatePlan.source,
-          target,
-          action: "updated",
-          fields: updatePlan.fields.map((field) => field.field),
-        });
-        if (comment) {
-          comments.push(comment);
-        }
-      } catch (error) {
-        blockers.push({
-          operation: "update",
-          message: errorMessage(error),
-          source: updatePlan.source,
-          target: updatePlan.target,
-        });
-      }
-    }
+    const execution = {
+      service,
+      linkService,
+      selector,
+      plan,
+      providerLinks,
+      comments,
+      blockers,
+    };
+    await executeWorkItemSyncCreates(execution);
+    await executeWorkItemSyncUpdates(execution);
   }
 
   const finishedAt = nowString(input.now);
   const summary = runSummary({
     plan,
-    status:
-      blockers.length > 0
-        ? providerLinks.length > 0
-          ? "failed"
-          : "blocked"
-        : "completed",
+    status: workItemSyncRunStatus(blockers, providerLinks),
     startedAt,
     finishedAt,
     created: providerLinks.filter((link) => link.action === "created").length,
@@ -692,14 +606,155 @@ export async function executeWorkItemSync(
   };
 
   if (input.recordRun !== false) {
-    const storePath = appendWorkItemSyncRunRecord(plan.projectRoot, run, finishedAt);
-    return {
-      ...run,
-      storePath,
-    };
+    return withRecordedWorkItemSyncRun(plan, run, finishedAt);
   }
 
   return run;
+}
+
+interface WorkItemSyncExecutionContext {
+  service: WorkItemService;
+  linkService: WorkItemTrackerLinkService;
+  selector: ReturnType<typeof executionSelector>;
+  plan: WorkItemSyncPlan;
+  providerLinks: WorkItemSyncProviderLink[];
+  comments: WorkComment[];
+  blockers: WorkItemSyncRunBlocker[];
+}
+
+async function executeWorkItemSyncCreates(
+  context: WorkItemSyncExecutionContext,
+): Promise<void> {
+  for (const createPlan of context.plan.creates) {
+    try {
+      await executeWorkItemSyncCreate(context, createPlan);
+    } catch (error) {
+      context.blockers.push({
+        operation: "create",
+        message: errorMessage(error),
+        source: createPlan.source,
+      });
+    }
+  }
+}
+
+async function executeWorkItemSyncCreate(
+  context: WorkItemSyncExecutionContext,
+  createPlan: WorkItemSyncCreatePlan,
+): Promise<void> {
+  const { service, linkService, selector, plan } = context;
+  const target = await service.createWorkItem({
+    ...selector,
+    trackerId: plan.policy.targetTrackerId,
+    ...createInputFromPlan(createPlan),
+  });
+  const link = await linkService.linkReference({
+    ...selector,
+    logicalItemId: createPlan.source.id,
+    trackerId: plan.policy.targetTrackerId,
+    ...linkInputFromTarget(target),
+  });
+  const targetSummary = summarizeWorkItem(target, plan.policy.targetTrackerId);
+  context.providerLinks.push({
+    action: "created",
+    source: createPlan.source,
+    target: targetSummary,
+    linkAction: link.action,
+    reference: link.reference,
+  });
+  const comment = await maybeAddSyncComment({
+    service,
+    selector,
+    plan,
+    source: createPlan.source,
+    target,
+    action: "created",
+    fields: createPlan.fields.map((field) => field.field),
+  });
+  if (comment) {
+    context.comments.push(comment);
+  }
+}
+
+async function executeWorkItemSyncUpdates(
+  context: WorkItemSyncExecutionContext,
+): Promise<void> {
+  for (const updatePlan of context.plan.updates) {
+    try {
+      await executeWorkItemSyncUpdate(context, updatePlan);
+    } catch (error) {
+      context.blockers.push({
+        operation: "update",
+        message: errorMessage(error),
+        source: updatePlan.source,
+        target: updatePlan.target,
+      });
+    }
+  }
+}
+
+async function executeWorkItemSyncUpdate(
+  context: WorkItemSyncExecutionContext,
+  updatePlan: WorkItemSyncUpdatePlan,
+): Promise<void> {
+  const { service, linkService, selector, plan } = context;
+  const target = await service.updateWorkItem({
+    ...selector,
+    trackerId: plan.policy.targetTrackerId,
+    ref: {
+      id: updatePlan.targetReference.itemId,
+      externalRef: updatePlan.targetReference,
+    },
+    patch: patchFromChanges(updatePlan.fields),
+  });
+  const link = await linkService.linkReference({
+    ...selector,
+    logicalItemId: updatePlan.source.id,
+    trackerId: plan.policy.targetTrackerId,
+    ...linkInputFromTarget(target),
+  });
+  const targetSummary = summarizeWorkItem(target, plan.policy.targetTrackerId);
+  context.providerLinks.push({
+    action: "updated",
+    source: updatePlan.source,
+    target: targetSummary,
+    linkAction: link.action,
+    reference: link.reference,
+  });
+  const comment = await maybeAddSyncComment({
+    service,
+    selector,
+    plan,
+    source: updatePlan.source,
+    target,
+    action: "updated",
+    fields: updatePlan.fields.map((field) => field.field),
+  });
+  if (comment) {
+    context.comments.push(comment);
+  }
+}
+
+function workItemSyncRunStatus(
+  blockers: WorkItemSyncRunBlocker[],
+  providerLinks: WorkItemSyncProviderLink[],
+): WorkItemSyncRunStatus {
+  if (blockers.length === 0) {
+    return "completed";
+  }
+  return providerLinks.length > 0 ? "failed" : "blocked";
+}
+
+function withRecordedWorkItemSyncRun(
+  plan: WorkItemSyncPlan,
+  run: WorkItemSyncRun,
+  finishedAt: string,
+): WorkItemSyncRun {
+  const storePath = appendWorkItemSyncRunRecord(plan.projectRoot, run, finishedAt);
+  return {
+    ...run,
+    storePath,
+  };
 }
 
 export function defaultWorkItemSyncRunStorePath(projectRoot: string): string {

@@ -61,6 +61,7 @@ import {
 } from "../providers/nexusProviderCredentialBroker.js";
 import {
   claimNexusEligibleWorkItem,
+  releaseNexusWorkItemAuthorityClaim,
   type NexusEligibleWorkClaimProviderFactory,
   type NexusWorkItemClaimAuthority,
   type NexusWorkItemStaleClaimPolicy,
@@ -1140,6 +1141,25 @@ const tools: McpTool[] = [
         },
       },
       required: ["hostId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "work_item_claim_release",
+    description: "Release an authority-backed work item claim by lease token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        trackerId: { type: "string" },
+        itemId: { type: "string" },
+        leaseToken: { type: "string" },
+        fencingToken: { type: "number" },
+      },
+      required: ["itemId", "leaseToken"],
       additionalProperties: false,
     },
   },
@@ -2275,9 +2295,44 @@ export async function callDevNexusMcpTool(
               "arguments",
             ),
             providerFactory: context.workItemClaimProviderFactory,
+            claimAuthority: context.workItemClaimAuthority,
             leaseTokenFactory: context.workItemClaimLeaseTokenFactory,
             now: context.now,
           }),
+        });
+      }
+      case "work_item_claim_release": {
+        const componentId = optionalString(args, "componentId", "arguments");
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_claim_release",
+          mutationClass: "local_tracker",
+          componentId,
+        });
+        const projectRoot = projectRootFromArgs(args);
+        const projectConfig = loadProjectConfig(projectRoot);
+        const release = await releaseNexusWorkItemAuthorityClaim({
+          projectRoot,
+          projectConfig,
+          components: resolveProjectComponents(projectRoot, projectConfig),
+          automationConfig:
+            projectConfig.automation ?? defaultNexusAutomationConfig,
+          componentId,
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          workItemId: requiredString(args, "itemId", "arguments"),
+          leaseToken: requiredString(args, "leaseToken", "arguments"),
+          fencingToken: optionalPositiveInteger(
+            args,
+            "fencingToken",
+            "arguments",
+          ),
+          homePath: optionalString(args, "homePath", "arguments"),
+          providerFactory: context.workItemClaimProviderFactory,
+          claimAuthority: context.workItemClaimAuthority,
+          now: context.now,
+        });
+        return toolResult({
+          ok: release.release.status === "released",
+          release,
         });
       }
       case "work_item_list": {
