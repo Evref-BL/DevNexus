@@ -160,6 +160,53 @@ describe("nexus cleanup plan", () => {
       .not.toContain("blocked");
   });
 
+  it("allows stale duplicate lease cleanup when another scope already finalized the same head", () => {
+    const fixture = initCleanupFixture();
+    const metadataWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "metadata",
+      "duplicate",
+    );
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      projectMeta: true,
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "merged",
+      now: () => "2026-05-18T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123" },
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      branchName: "codex/metadata/duplicate",
+      worktreePath: metadataWorktree,
+      status: "ready",
+      now: () => "2026-05-16T09:55:00.000Z",
+      gitFacts: { headCommit: "metadataHead123" },
+    });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        missingRefs: ["codex/metadata/duplicate"],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(candidateFor(plan, "codex/metadata/duplicate")).toMatchObject({
+      kind: "branch",
+      worktreePath: null,
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["stale", "superseded", "safe"]),
+      blockers: [],
+      proof: expect.arrayContaining([
+        expect.stringContaining("same branch and recorded head"),
+      ]),
+    });
+  });
+
   it("does not materialize an existing lease worktree outside the cleanup scope", () => {
     const fixture = initCleanupFixture();
     const outOfScopeWorktree = path.join(
