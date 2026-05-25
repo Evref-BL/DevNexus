@@ -81,6 +81,12 @@ export interface NexusCockpitHistoryGraphSvgHitTarget {
   readonly height: number;
 }
 
+export interface NexusCockpitHistoryGraphSvgDetailBand {
+  readonly y: number;
+  readonly height: number;
+  readonly dividerY: number;
+}
+
 export interface NexusCockpitHistoryGraphSvgModel {
   readonly width: number;
   readonly height: number;
@@ -88,6 +94,7 @@ export interface NexusCockpitHistoryGraphSvgModel {
   readonly rowCount: number;
   readonly rowHeight: number;
   readonly nodeRadius: number;
+  readonly detailBands: readonly NexusCockpitHistoryGraphSvgDetailBand[];
   readonly hitTargets: readonly NexusCockpitHistoryGraphSvgHitTarget[];
   readonly routes: readonly NexusCockpitHistoryGraphSvgRoute[];
   readonly nodes: readonly NexusCockpitHistoryGraphSvgNode[];
@@ -109,6 +116,14 @@ export function renderNexusCockpitHistoryGraphSvg(
       return `<g data-history-route-id="${id}" data-history-color-index="${route.colorIndex}"><path class="dn-git-line-shadow" d="${d}" /><path class="dn-git-line" d="${d}" stroke="${color}" /></g>`;
     })
     .join("");
+  const detailBands = model.detailBands
+    .map((band) => {
+      const y = formatNexusCockpitHistoryGraphNumber(band.y);
+      const height = formatNexusCockpitHistoryGraphNumber(band.height);
+      const dividerY = formatNexusCockpitHistoryGraphNumber(band.dividerY);
+      return `<rect class="dn-git-detail-band" x="0" y="${y}" width="${model.width}" height="${height}" /><path class="dn-git-detail-band-divider" d="M 0 ${dividerY} H ${model.width}" />`;
+    })
+    .join("");
   const hitTargets = model.hitTargets
     .map((target) => {
       const id = escapeNexusCockpitHistoryGraphAttribute(target.id);
@@ -126,7 +141,7 @@ export function renderNexusCockpitHistoryGraphSvg(
       return `<circle class="dn-git-node${selected}" data-select-id="${id}" data-history-event-class="${node.eventClass}" data-history-event-id="${id}" data-dn-tooltip="${tooltip}" data-dn-tooltip-mode="always" role="button" tabindex="0" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1.6" />`;
     })
     .join("");
-  return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${hitTargets}${paths}${nodes}</svg>`;
+  return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${detailBands}${hitTargets}${paths}${nodes}</svg>`;
 }
 
 export function buildNexusCockpitHistoryGraphSvgModel(
@@ -180,6 +195,11 @@ export function buildNexusCockpitHistoryGraphSvgModel(
     rowCount,
     rowHeight: metrics.rowHeight,
     nodeRadius: metrics.nodeRadius,
+    detailBands: nexusCockpitHistoryGraphDetailBands(
+      rows,
+      rowCount,
+      metrics.rowHeight,
+    ),
     hitTargets: rows.map((row, index) => {
       const id = nexusCockpitHistoryGraphNodeId(row, index);
       const nodeY = y(row.index);
@@ -235,6 +255,7 @@ export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
     renderNexusCockpitHistoryGraphSvg,
     buildNexusCockpitHistoryGraphSvgModel,
     nexusCockpitHistoryGraphSvgMetrics,
+    nexusCockpitHistoryGraphDetailBands,
     nexusCockpitHistoryGraphRoutePoints,
     nexusCockpitHistoryGraphRouteD,
     nexusCockpitHistoryGraphLaneTransitionD,
@@ -282,6 +303,38 @@ function nexusCockpitHistoryGraphSvgMetrics(
       finiteNexusCockpitHistoryGraphNumber(options.rowHeight, 30),
     ),
   };
+}
+
+function nexusCockpitHistoryGraphDetailBands(
+  rows: readonly NexusCockpitHistoryGraphRow[],
+  rowCount: number,
+  rowHeight: number,
+): readonly NexusCockpitHistoryGraphSvgDetailBand[] {
+  return rows
+    .filter((row) => row.selected === true)
+    .map((row) => {
+      const selectedIndex = finiteNexusCockpitHistoryGraphNumber(row.index, 0);
+      const nextIndex = Math.min(
+        ...rows
+          .map((candidate) =>
+            finiteNexusCockpitHistoryGraphNumber(candidate.index, 0),
+          )
+          .filter((index) => index > selectedIndex),
+        rowCount,
+      );
+      const gapRows = nextIndex - selectedIndex - 1;
+      if (gapRows <= 0) return null;
+      const y = (selectedIndex + 1) * rowHeight;
+      const height = gapRows * rowHeight;
+      return {
+        y,
+        height,
+        dividerY: y + height,
+      };
+    })
+    .filter(
+      (band): band is NexusCockpitHistoryGraphSvgDetailBand => band !== null,
+    );
 }
 
 function nexusCockpitHistoryGraphRoutePoints(

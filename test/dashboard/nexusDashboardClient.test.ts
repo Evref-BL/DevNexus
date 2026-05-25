@@ -292,6 +292,11 @@ describe("nexus dashboard client", () => {
     expect(module).toContain(".dn-git-column-header { position: relative; display: flex; align-items: center; justify-content: center;");
     expect(module).toContain(".dn-git-description { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.82rem; font-weight: 460;");
     expect(module).toContain(".dn-git-history-row.merge:not(.selected) .dn-git-description");
+    expect(module).toContain(".dn-git-detail-band { fill: color-mix(in srgb, var(--dn-surface-raised) 58%, var(--dn-control-active)); pointer-events: none; }");
+    expect(module).toContain(".dn-git-detail-band-divider { stroke: var(--dn-border-strong); stroke-width: 1;");
+    expect(module).toContain(".dn-git-history-row.selected { background: var(--dn-control-active); box-shadow: none; }");
+    expect(module).toContain(".dn-git-inline-detail { height: 234px; min-width: var(--dn-git-table-min-width); margin: 0; overflow: auto; border-width: 0 0 1px;");
+    expect(module).not.toContain(".dn-history-item.selected, .dn-git-history-row.selected { border-color: var(--dn-active);");
     expect(module).toContain(".dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-align: left;");
     expect(module).not.toContain(".dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }");
     expect(module).not.toContain(".dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }");

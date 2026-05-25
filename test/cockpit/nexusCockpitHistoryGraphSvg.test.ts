@@ -113,6 +113,43 @@ describe("nexus cockpit history graph SVG", () => {
     });
   });
 
+  it("renders selected detail bands across expanded graph gaps", () => {
+    const graph = {
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:head" },
+        {
+          lane: 1,
+          index: 1,
+          selectId: "history:primary:selected",
+          selected: true,
+        },
+        { lane: 0, index: 11, selectId: "history:primary:base" },
+      ],
+      paths: [],
+    };
+
+    const model = buildNexusCockpitHistoryGraphSvgModel(graph, {
+      rowHeight: 26,
+    });
+    const rendered = renderNexusCockpitHistoryGraphSvg(graph, {
+      rowHeight: 26,
+    });
+
+    expect(model.detailBands).toEqual([
+      {
+        y: 52,
+        height: 234,
+        dividerY: 286,
+      },
+    ]);
+    expect(rendered).toContain(
+      '<rect class="dn-git-detail-band" x="0" y="52" width="148" height="234" />',
+    );
+    expect(rendered).toContain(
+      '<path class="dn-git-detail-band-divider" d="M 0 286 H 148" />',
+    );
+  });
+
   it("keeps shallow lane-change curves from looping backward", () => {
     const model = buildNexusCockpitHistoryGraphSvgModel({
       maxLane: 12,
