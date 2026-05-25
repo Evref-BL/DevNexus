@@ -206,6 +206,10 @@ describe("nexus dashboard client", () => {
     expect(module).toContain(".dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }");
     expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");
     expect(module).toContain("width: 100%; min-width: var(--dn-git-table-min-width);");
+    expect(module).toContain(".dn-git-column-header { position: relative; display: flex; align-items: center; justify-content: center;");
+    expect(module).toContain(".dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-align: left;");
+    expect(module).not.toContain(".dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }");
+    expect(module).not.toContain(".dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }");
     expect(module).not.toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) max-content;");
     expect(module).not.toContain("width: max-content; min-width: 100%;");
     expect(module).toContain("Source checkout");

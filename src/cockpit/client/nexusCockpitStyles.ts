@@ -131,9 +131,8 @@ button, input, select { font: inherit; }
 .dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }
 .dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width); align-items: center; gap: 10px; width: 100%; min-width: var(--dn-git-table-min-width); }
 .dn-git-column-row { min-height: 30px; height: 30px; border-bottom: 1px solid var(--dn-border-muted); background: color-mix(in srgb, var(--dn-surface-raised) 72%, transparent); }
-.dn-git-column-header { position: relative; display: flex; align-items: center; min-width: 0; min-height: 30px; height: 30px; padding: 0 10px; color: var(--dn-label); font-size: 0.66rem; font-weight: 900; letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
-.dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }
-.dn-git-column-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dn-git-column-header { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 30px; height: 30px; padding: 0 10px; color: var(--dn-label); font-size: 0.66rem; font-weight: 900; letter-spacing: 0; text-align: center; text-transform: uppercase; white-space: nowrap; }
+.dn-git-column-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .dn-git-resize-handle { position: absolute; inset: 0 -5px 0 auto; z-index: 3; width: 10px; border-right: 1px solid transparent; cursor: col-resize; touch-action: none; }
 .dn-git-resize-handle::after { content: ''; position: absolute; top: 8px; bottom: 8px; right: 4px; width: 2px; border-radius: 999px; background: var(--dn-border-strong); opacity: 0; transition: opacity 120ms ease, background 120ms ease; }
 .dn-git-column-header:hover .dn-git-resize-handle::after, .dn-git-resize-handle:focus-visible::after { opacity: 1; background: var(--dn-active); }
@@ -154,8 +153,8 @@ button, input, select { font: inherit; }
 .dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 30%; overflow: hidden; }
 .dn-git-badge { max-width: 130px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.66rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-badge.tone-good { border-color: color-mix(in srgb, var(--dn-good) 48%, var(--dn-border)); color: var(--dn-good); } .dn-git-badge.tone-active { border-color: color-mix(in srgb, var(--dn-active) 48%, var(--dn-border)); color: var(--dn-active); } .dn-git-badge.tone-warn { border-color: color-mix(in srgb, var(--dn-warn) 48%, var(--dn-border)); color: var(--dn-warn-soft); } .dn-git-badge.tone-danger { border-color: color-mix(in srgb, var(--dn-danger) 54%, var(--dn-border)); color: var(--dn-danger-soft); }
-.dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
-.dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }
+.dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.dn-git-sha { color: var(--dn-label); font-weight: 850; }
 .dn-git-note { margin: 8px 0 0; color: var(--dn-muted); font-size: 0.8rem; }
 .dn-git-detail-panel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr); gap: 12px; margin: 0 0 10px; padding: 12px; border: 1px solid var(--dn-border-muted); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-raised) 82%, transparent); }
 .dn-git-inline-detail { height: 210px; min-width: var(--dn-git-table-min-width); margin: 0; overflow: auto; border-width: 0 0 1px; border-radius: 0; background: color-mix(in srgb, var(--dn-surface-raised) 58%, var(--dn-control-active)); }
