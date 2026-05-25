@@ -240,6 +240,12 @@ Cleanup should prove one of these facts before deleting anything:
 - a human approved archival or deletion;
 - the work was copied to a rescue branch or another durable record.
 
+DevNexus records pause, abort, abandon, archive, rescue, and merged outcomes in
+the Git workflow run. Cleanup planning reads that run state alongside Git facts
+and worktree leases: paused or active runs block deletion, abandoned runs require
+preservation, and archived or rescued runs only become cleanup-safe when the run
+contains the archive or rescue evidence.
+
 ## Workflow Profiles
 
 Use profiles as named defaults, not hardcoded product behavior.
