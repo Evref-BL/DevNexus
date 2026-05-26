@@ -421,17 +421,10 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
 function renderGitHistoryScopeTokens(refs, colorLane = 0) {
   return (refs ?? []).map((ref, index) => {
     const name = typeof ref === 'string' ? ref : ref.name;
-    const kind = gitHistoryScopeKindLabel(typeof ref === 'string' ? 'branch' : ref.kind);
     const baseColorLane = Number.isFinite(Number(colorLane)) ? Number(colorLane) : 0;
     const colorIndex = Math.abs(baseColorLane + index) % 12;
-    return `<span class="dn-history-scope-token scope-${escapeAttribute(kind)}" style="--dn-scope-color:var(--dn-branch-${colorIndex});" title="${escapeHtml([kind, name].filter(Boolean).join(': '))}"><span class="dn-history-scope-kind">${escapeHtml(kind)}</span><span class="dn-history-scope-name">${escapeHtml(name)}</span></span>`;
+    return `<span class="dn-history-scope-token" style="--dn-scope-color:var(--dn-branch-${colorIndex});" title="${escapeHtml(name)}"><span class="dn-history-scope-name">${escapeHtml(name)}</span></span>`;
   }).join('');
-}
-
-function gitHistoryScopeKindLabel(kind) {
-  if (kind === 'remote') return 'remote';
-  if (kind === 'tag') return 'tag';
-  return 'branch';
 }
 
 function renderGitHistoryDetailPanel(snapshot, graph, selectedId) {
@@ -649,7 +642,6 @@ export function renderNexusCockpitEventHistoryClientSource() {
     appendGitHistoryVisualPoint,
     renderGitHistoryRow,
     renderGitHistoryScopeTokens,
-    gitHistoryScopeKindLabel,
     renderGitHistoryDetailPanel,
     renderGitHistoryRelationChips,
     renderGitHistoryAnnotationDetails,
