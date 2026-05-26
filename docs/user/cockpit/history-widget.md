@@ -105,9 +105,10 @@ Keep topology, layout, and rendering separate.
 | Renderer | Draw SVG paths, nodes, row labels, markers, hover states, and detail rows. |
 | Interactions | Selection, filters, focus modes, detail expansion, and keyboard navigation. |
 
-The VS Code Git Graph project is a useful reference because it separates
-vertices, branches, line segments, and rendering. DevNexus should borrow that
-shape, not copy the implementation.
+Dense history tools are useful references when they keep topology, layout,
+line segments, rendering, and interaction as separate concerns. DevNexus should
+own that model in event-history terms so Git commits, HITL decisions, reviews,
+and provider state can share one history surface.
 
 ## Color Model
 

@@ -287,7 +287,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
     ),
     laneGap: Math.max(
       1,
-      finiteNexusCockpitHistoryGraphNumber(options.laneGap, 16),
+      finiteNexusCockpitHistoryGraphNumber(options.laneGap, 15),
     ),
     minWidth: Math.max(
       1,
@@ -295,7 +295,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
     ),
     nodeRadius: Math.max(
       0.5,
-      finiteNexusCockpitHistoryGraphNumber(options.nodeRadius, 4),
+      finiteNexusCockpitHistoryGraphNumber(options.nodeRadius, 3.8),
     ),
     offsetX: Math.max(
       0,
@@ -425,7 +425,7 @@ function nexusCockpitHistoryGraphLaneTransitionD(
 ): string {
   const dy = to.y - from.y;
   const directionY = Math.sign(dy) || 1;
-  const curve = Math.min(rowHeight * 0.8, Math.abs(dy) * 0.8);
+  const curve = Math.min(rowHeight * 0.72, Math.abs(dy) * 0.72);
   return ` C ${formatNexusCockpitHistoryGraphNumber(from.x)} ${formatNexusCockpitHistoryGraphNumber(from.y + directionY * curve)}, ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(to.y - directionY * curve)}, ${formatNexusCockpitHistoryGraphNumber(to.x)} ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
 }
 

@@ -198,8 +198,8 @@ button, input, select { font: inherit; }
 .dn-git-row-hit { fill: transparent; cursor: pointer; pointer-events: all; outline: none; }
 .dn-git-row-hit.dn-history-hovered { fill: var(--dn-control-hover); }
 .dn-git-row-hit.selected { fill: var(--dn-control-active); }
-.dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 4; opacity: 0.42; }
-.dn-git-line { stroke-width: 2; opacity: 0.82; }
+.dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 3.6; opacity: 0.42; }
+.dn-git-line { stroke-width: 2.1; opacity: 0.82; }
 .dn-git-line-shadow, .dn-git-line { pointer-events: none; }
 .dn-git-node { cursor: pointer; outline: none; transform-box: fill-box; transform-origin: center; vector-effect: non-scaling-stroke; transition: filter 120ms ease, transform 120ms ease; }
 .dn-git-node.selected { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dn-active) 42%, transparent)); stroke-width: 1.8; transform: scale(1.08); }
