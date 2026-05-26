@@ -101,138 +101,223 @@ export interface NexusDashboardHistoryInvariantViolation {
   readonly message: string;
 }
 
-interface ActiveHistoryRoute {
+interface HistoryParentReference {
+  readonly parentId: string;
+  readonly parentIndex: number;
+  readonly vertex: HistoryVertex | null;
+  readonly edgeId?: string;
+  readonly truncated: boolean;
+}
+
+interface HistoryConnection {
+  readonly connectsTo: HistoryVertex | null;
+  readonly branch: HistoryBranch;
+}
+
+interface HistoryLine {
   readonly edgeId?: string;
   readonly targetEventId: string;
-  readonly trackId: string;
-  readonly colorIndex: number;
   readonly truncated: boolean;
-  readonly points: NexusDashboardHistoryPoint[];
+  readonly p1: NexusDashboardHistoryPoint;
+  readonly p2: NexusDashboardHistoryPoint;
+}
+
+class HistoryBranch {
+  private end = 0;
+  private readonly routeLines: HistoryLine[] = [];
+
+  constructor(
+    public readonly id: string,
+    public readonly colorIndex: number,
+  ) {}
+
+  addLine(
+    p1: NexusDashboardHistoryPoint,
+    p2: NexusDashboardHistoryPoint,
+    parent: HistoryParentReference,
+  ): void {
+    if (p1.lane === p2.lane && p1.row === p2.row) return;
+    this.routeLines.push({
+      ...(parent.edgeId ? { edgeId: parent.edgeId } : {}),
+      targetEventId: parent.parentId,
+      truncated: parent.truncated,
+      p1,
+      p2,
+    });
+  }
+
+  get lines(): readonly HistoryLine[] {
+    return this.routeLines;
+  }
+
+  getEnd(): number {
+    return this.end;
+  }
+
+  setEnd(end: number): void {
+    this.end = end;
+  }
+}
+
+class HistoryVertex {
+  private branch: HistoryBranch | null = null;
+  private lane = 0;
+  private nextLane = 0;
+  private nextParentIndex = 0;
+  private readonly connections: Array<HistoryConnection | undefined> = [];
+  private readonly parentReferences: HistoryParentReference[] = [];
+
+  readonly children: HistoryVertex[] = [];
+
+  constructor(
+    readonly event: NexusDashboardHistoryEvent,
+    readonly row: number,
+  ) {}
+
+  addParent(parent: HistoryParentReference): void {
+    this.parentReferences.push(parent);
+  }
+
+  addChild(vertex: HistoryVertex): void {
+    this.children.push(vertex);
+  }
+
+  getNextParent(): HistoryParentReference | null {
+    return this.parentReferences[this.nextParentIndex] ?? null;
+  }
+
+  getParentProgress(): number {
+    return this.nextParentIndex;
+  }
+
+  registerParentProcessed(): void {
+    this.nextParentIndex++;
+  }
+
+  isMerge(): boolean {
+    return this.parentReferences.length > 1;
+  }
+
+  isNotOnBranch(): boolean {
+    return this.branch === null;
+  }
+
+  getBranch(): HistoryBranch | null {
+    return this.branch;
+  }
+
+  addToBranch(branch: HistoryBranch, lane: number): void {
+    if (this.branch !== null) return;
+    this.branch = branch;
+    this.lane = lane;
+  }
+
+  getLane(): number {
+    return this.lane;
+  }
+
+  getColorIndex(): number {
+    return this.branch?.colorIndex ?? 0;
+  }
+
+  getPoint(): NexusDashboardHistoryPoint {
+    return { lane: this.lane, row: this.row };
+  }
+
+  getNextPoint(minLane = 0): NexusDashboardHistoryPoint {
+    let lane = Math.max(this.nextLane, minLane);
+    while (this.connections[lane]) lane++;
+    return { lane, row: this.row };
+  }
+
+  getPointConnectingTo(
+    vertex: HistoryVertex | null,
+    branch: HistoryBranch,
+  ): NexusDashboardHistoryPoint | null {
+    const lane = this.connections.findIndex(
+      (connection) =>
+        connection?.connectsTo === vertex && connection.branch === branch,
+    );
+    return lane >= 0 ? { lane, row: this.row } : null;
+  }
+
+  registerUnavailablePoint(
+    lane: number,
+    connectsTo: HistoryVertex | null,
+    branch: HistoryBranch,
+  ): void {
+    this.connections[lane] = { connectsTo, branch };
+    while (this.connections[this.nextLane]) this.nextLane++;
+  }
 }
 
 export function buildNexusDashboardHistoryLayout(
   input: NexusDashboardHistoryLayoutInput,
 ): NexusDashboardHistoryLayout {
   const events = input.events ?? [];
-  const knownIds = new Set(events.map((event) => event.id));
-  const rowByEventId = new Map(
-    events.map((event, index) => [event.id, index]),
+  const vertices = events.map((event, row) => new HistoryVertex(event, row));
+  const vertexByEventId = new Map(
+    vertices.map((vertex) => [vertex.event.id, vertex]),
   );
-  const active: Array<ActiveHistoryRoute | null> = [];
-  const nodes: NexusDashboardHistoryNode[] = [];
   const edges: NexusDashboardHistoryEdge[] = [];
-  const segments: NexusDashboardHistorySegment[] = [];
-  const tracks = new Map<string, NexusDashboardHistoryTrack>();
   const truncatedParentIds: string[] = [];
 
-  for (const event of events) {
-    const row = nodes.length;
-    const incomingRoutes = active
-      .map((route, lane) =>
-        route?.targetEventId === event.id ? { lane, route } : null,
-      )
-      .filter(
-        (route): route is { lane: number; route: ActiveHistoryRoute } =>
-          route !== null,
-      );
-    let lane = incomingRoutes[0]?.lane ?? -1;
-    let incoming: ActiveHistoryRoute | null = null;
-    if (incomingRoutes.length === 0) {
-      lane = firstOpenHistoryLane(active);
-    } else {
-      incoming = incomingRoutes[0]?.route ?? null;
-      for (const route of incomingRoutes) active[route.lane] = null;
-      for (const route of incomingRoutes) {
-        closeHistoryRouteAtEvent(route.route, route.lane, lane, row);
-        segments.push(historySegmentFromRoute(route.route, segments.length));
-        rememberHistoryTrack(tracks, route.route.trackId, route.route.colorIndex);
-      }
-    }
-
-    const colorIndex = incoming?.colorIndex ?? lane;
-    nodes.push({
-      id: event.id,
-      eventClass: "source-change",
-      eventId: event.id,
-      row,
-      lane,
-      colorIndex,
-    });
-
-    for (let parentIndex = 0; parentIndex < event.parentIds.length; parentIndex++) {
-      const parentId = event.parentIds[parentIndex];
-      if (!knownIds.has(parentId)) {
+  for (const vertex of vertices) {
+    vertex.event.parentIds.forEach((parentId, parentIndex) => {
+      const parentVertex = vertexByEventId.get(parentId) ?? null;
+      const edgeId = parentVertex
+        ? historyEdgeId(vertex.event.id, parentId, parentIndex)
+        : undefined;
+      if (parentVertex) {
+        edges.push({
+          id: edgeId!,
+          kind: "parent",
+          fromEventId: vertex.event.id,
+          toEventId: parentId,
+        });
+        parentVertex.addChild(vertex);
+      } else {
         truncatedParentIds.push(parentId);
-        const preferredLane =
-          parentIndex === 0 ? lane : firstOpenHistoryLane(active);
-        const route = createHistoryRoute(
-          parentId,
-          undefined,
-          parentIndex === 0 ? colorIndex : preferredLane,
-          lane,
-          row,
-          true,
-        );
-        if (preferredLane !== lane) {
-          addHistoryLaneTransition(route, preferredLane, row + 1);
-        }
-        addHistoryRoutePoint(
-          route,
-          preferredLane,
-          Math.max(row + 0.5, events.length - 0.5),
-        );
-        segments.push(historySegmentFromRoute(route, segments.length));
-        rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
-        continue;
       }
-
-      const edgeId = historyEdgeId(event.id, parentId, parentIndex);
-      edges.push({
-        id: edgeId,
-        kind: "parent",
-        fromEventId: event.id,
-        toEventId: parentId,
-      });
-
-      const parentRow = rowByEventId.get(parentId);
-      const existingParentLane = active.findIndex(
-        (entry) => entry?.targetEventId === parentId,
-      );
-      if (
-        existingParentLane >= 0 &&
-        parentRow !== undefined &&
-        parentRow - row <= 1
-      ) {
-        const route = createHistoryRoute(
-          parentId,
-          edgeId,
-          parentIndex === 0 ? colorIndex : existingParentLane,
-          lane,
-          row,
-        );
-        closeHistoryRouteAtEvent(route, lane, existingParentLane, parentRow);
-        segments.push(historySegmentFromRoute(route, segments.length));
-        rememberHistoryTrack(tracks, route.trackId, route.colorIndex);
-        continue;
-      }
-
-      const preferredLane =
-        parentIndex === 0 && !active[lane] ? lane : firstOpenHistoryLane(active);
-      const route = createHistoryRoute(
+      vertex.addParent({
         parentId,
-        edgeId,
-        parentIndex === 0 ? colorIndex : preferredLane,
-        lane,
-        row,
-      );
-      if (preferredLane !== lane) {
-        addHistoryLaneTransition(route, preferredLane, row + 1);
-      }
-      active[preferredLane] = route;
-    }
-
-    compactHistoryActiveLanes(active, row, rowByEventId);
+        parentIndex,
+        vertex: parentVertex,
+        ...(edgeId ? { edgeId } : {}),
+        truncated: parentVertex === null,
+      });
+    });
   }
+
+  const branches: HistoryBranch[] = [];
+  const availableColorEnds: number[] = [];
+  let row = 0;
+  while (row < vertices.length) {
+    const vertex = vertices[row]!;
+    if (vertex.getNextParent() !== null || vertex.isNotOnBranch()) {
+      determineHistoryPath(row, vertices, branches, availableColorEnds);
+    } else {
+      row++;
+    }
+  }
+
+  const nodes: NexusDashboardHistoryNode[] = vertices.map((vertex) => ({
+    id: vertex.event.id,
+    eventClass: "source-change",
+    eventId: vertex.event.id,
+    row: vertex.row,
+    lane: vertex.getLane(),
+    colorIndex: vertex.getColorIndex(),
+  }));
+  const segments = historySegmentsFromBranches(branches);
+  const tracks = new Map(
+    branches
+      .filter((branch) => branch.lines.length > 0)
+      .map((branch) => [
+        branch.id,
+        { id: branch.id, colorIndex: branch.colorIndex },
+      ]),
+  );
 
   const markerTargets = new Map(nodes.map((node) => [node.eventId, node]));
   const markers = (input.markers ?? [])
@@ -272,15 +357,16 @@ export function buildNexusDashboardHistoryLayout(
 
 export function renderNexusDashboardHistoryLayoutClientSource(): string {
   return [
-    firstOpenHistoryLane,
+    HistoryBranch,
+    HistoryVertex,
     historyEdgeId,
-    createHistoryRoute,
-    closeHistoryRouteAtEvent,
-    historySegmentFromRoute,
-    rememberHistoryTrack,
-    addHistoryRoutePoint,
-    addHistoryLaneTransition,
-    compactHistoryActiveLanes,
+    determineHistoryPath,
+    determineHistoryMergePath,
+    determineNormalHistoryPath,
+    getAvailableHistoryColor,
+    historySegmentsFromBranches,
+    historySegmentFromPoints,
+    pointsConnect,
     buildNexusDashboardHistoryLayout,
   ]
     .map((fn) => fn.toString())
@@ -431,42 +517,176 @@ export function validateNexusDashboardHistoryLayout(
   return violations;
 }
 
-function createHistoryRoute(
-  targetEventId: string,
-  edgeId: string | undefined,
-  colorIndex: number,
-  lane: number,
-  row: number,
-  truncated = false,
-): ActiveHistoryRoute {
-  return {
-    edgeId,
-    targetEventId,
-    trackId: `track:${targetEventId}:${colorIndex}`,
-    colorIndex,
-    truncated,
-    points: [{ lane, row }],
-  };
-}
-
-function closeHistoryRouteAtEvent(
-  route: ActiveHistoryRoute,
-  routeLane: number,
-  eventLane: number,
-  row: number,
+function determineHistoryPath(
+  startAt: number,
+  vertices: readonly HistoryVertex[],
+  branches: HistoryBranch[],
+  availableColorEnds: number[],
 ): void {
-  if (routeLane === eventLane) {
-    addHistoryRoutePoint(route, eventLane, row);
+  const vertex = vertices[startAt];
+  const parent = vertex?.getNextParent();
+  if (!vertex) return;
+
+  if (
+    parent?.vertex &&
+    vertex.isMerge() &&
+    !vertex.isNotOnBranch() &&
+    !parent.vertex.isNotOnBranch()
+  ) {
+    determineHistoryMergePath(startAt, vertices, vertex, parent);
     return;
   }
-  const last = route.points[route.points.length - 1];
-  const approachRow = Math.max(last?.row ?? row, row - 1);
-  addHistoryRoutePoint(route, routeLane, approachRow);
-  addHistoryRoutePoint(route, eventLane, row);
+
+  determineNormalHistoryPath(startAt, vertices, vertex, branches, availableColorEnds);
 }
 
-function historySegmentFromRoute(
-  route: ActiveHistoryRoute,
+function determineHistoryMergePath(
+  startAt: number,
+  vertices: readonly HistoryVertex[],
+  vertex: HistoryVertex,
+  parent: HistoryParentReference,
+): void {
+  const parentBranch = parent.vertex?.getBranch();
+  if (!parent.vertex || !parentBranch) return;
+  let lastPoint = vertex.getPoint();
+  for (let index = startAt + 1; index < vertices.length; index++) {
+    const current = vertices[index]!;
+    const existingPoint = current.getPointConnectingTo(parent.vertex, parentBranch);
+    const foundParentConnection = existingPoint !== null;
+    const currentPoint = existingPoint ?? current.getNextPoint();
+    parentBranch.addLine(lastPoint, currentPoint, parent);
+    current.registerUnavailablePoint(currentPoint.lane, parent.vertex, parentBranch);
+    lastPoint = currentPoint;
+    if (foundParentConnection) {
+      vertex.registerParentProcessed();
+      break;
+    }
+  }
+}
+
+function determineNormalHistoryPath(
+  startAt: number,
+  vertices: readonly HistoryVertex[],
+  startVertex: HistoryVertex,
+  branches: HistoryBranch[],
+  availableColorEnds: number[],
+): void {
+  const colorIndex = getAvailableHistoryColor(startAt, availableColorEnds);
+  const branch = new HistoryBranch(`track:${branches.length}`, colorIndex);
+  let vertex = startVertex;
+  let parent = vertex.getNextParent();
+  let lastPoint = vertex.isNotOnBranch()
+    ? vertex.getNextPoint()
+    : vertex.getPoint();
+  const startParentProgress = vertex.getParentProgress();
+
+  vertex.addToBranch(branch, lastPoint.lane);
+  vertex.registerUnavailablePoint(lastPoint.lane, vertex, branch);
+
+  for (let index = startAt + 1; index < vertices.length; index++) {
+    if (!parent) break;
+    const current = vertices[index]!;
+    const currentPoint =
+      parent.vertex === current && !current.isNotOnBranch()
+        ? current.getPoint()
+        : current.getNextPoint(
+            index === startAt + 1 && startParentProgress > 0
+              ? lastPoint.lane
+              : 0,
+          );
+
+    branch.addLine(lastPoint, currentPoint, parent);
+    current.registerUnavailablePoint(currentPoint.lane, parent.vertex, branch);
+    lastPoint = currentPoint;
+
+    if (parent.vertex === current) {
+      vertex.registerParentProcessed();
+      const parentWasAlreadyOnBranch = !current.isNotOnBranch();
+      current.addToBranch(branch, currentPoint.lane);
+      vertex = current;
+      parent = vertex.getNextParent();
+      if (!parent || parentWasAlreadyOnBranch) break;
+    }
+  }
+
+  if (parent?.truncated) {
+    const bottomRow = Math.max(lastPoint.row + 0.5, vertices.length - 0.5);
+    if (bottomRow > lastPoint.row) {
+      const bottomPoint = { lane: lastPoint.lane, row: bottomRow };
+      branch.addLine(lastPoint, bottomPoint, parent);
+      lastPoint = bottomPoint;
+    }
+    vertex.registerParentProcessed();
+  }
+
+  branch.setEnd(Math.max(startAt, Math.ceil(lastPoint.row)));
+  branches.push(branch);
+  availableColorEnds[branch.colorIndex] = branch.getEnd();
+}
+
+function getAvailableHistoryColor(
+  startAt: number,
+  availableColorEnds: readonly number[],
+): number {
+  for (let index = 0; index < availableColorEnds.length; index++) {
+    if (startAt > (availableColorEnds[index] ?? 0)) return index;
+  }
+  return availableColorEnds.length;
+}
+
+function historySegmentsFromBranches(
+  branches: readonly HistoryBranch[],
+): NexusDashboardHistorySegment[] {
+  const segments: NexusDashboardHistorySegment[] = [];
+  for (const branch of branches) {
+    let current:
+      | {
+          edgeId?: string;
+          targetEventId: string;
+          truncated: boolean;
+          points: NexusDashboardHistoryPoint[];
+        }
+      | null = null;
+
+    const flush = () => {
+      if (!current || current.points.length < 2) return;
+      segments.push(
+        historySegmentFromPoints(branch, current, segments.length),
+      );
+    };
+
+    for (const line of branch.lines) {
+      const sameSegment =
+        current &&
+        current.edgeId === line.edgeId &&
+        current.targetEventId === line.targetEventId &&
+        current.truncated === line.truncated &&
+        pointsConnect(current.points[current.points.length - 1], line.p1);
+
+      if (!sameSegment) {
+        flush();
+        current = {
+          ...(line.edgeId ? { edgeId: line.edgeId } : {}),
+          targetEventId: line.targetEventId,
+          truncated: line.truncated,
+          points: [line.p1],
+        };
+      }
+      current?.points.push(line.p2);
+    }
+    flush();
+  }
+  return segments;
+}
+
+function historySegmentFromPoints(
+  branch: HistoryBranch,
+  route: {
+    readonly edgeId?: string;
+    readonly targetEventId: string;
+    readonly truncated: boolean;
+    readonly points: readonly NexusDashboardHistoryPoint[];
+  },
   segmentIndex: number,
 ): NexusDashboardHistorySegment {
   const points = route.points.map((point) => ({
@@ -477,11 +697,11 @@ function historySegmentFromRoute(
   const last = points[points.length - 1] ?? first;
   return {
     id: `segment:${segmentIndex}`,
-    edgeId: route.edgeId,
+    ...(route.edgeId ? { edgeId: route.edgeId } : {}),
     targetEventId: route.targetEventId,
     truncated: route.truncated || undefined,
-    trackId: route.trackId,
-    colorIndex: route.colorIndex,
+    trackId: branch.id,
+    colorIndex: branch.colorIndex,
     fromLane: first.lane,
     toLane: last.lane,
     fromRow: first.row,
@@ -490,79 +710,17 @@ function historySegmentFromRoute(
   };
 }
 
+function pointsConnect(
+  left: NexusDashboardHistoryPoint | undefined,
+  right: NexusDashboardHistoryPoint,
+): boolean {
+  return Boolean(left && left.lane === right.lane && left.row === right.row);
+}
+
 function historyEdgeId(
   fromEventId: string,
   toEventId: string,
   parentIndex: number,
 ): string {
   return `edge:${fromEventId}->${toEventId}:${parentIndex}`;
-}
-
-function rememberHistoryTrack(
-  tracks: Map<string, NexusDashboardHistoryTrack>,
-  id: string,
-  colorIndex: number,
-): void {
-  if (tracks.has(id)) return;
-  tracks.set(id, { id, colorIndex });
-}
-
-function addHistoryRoutePoint(
-  route: ActiveHistoryRoute | null | undefined,
-  lane: number,
-  row: number,
-): void {
-  if (!route) return;
-  const last = route.points[route.points.length - 1];
-  if (last && last.lane === lane && last.row === row) return;
-  route.points.push({ lane, row });
-}
-
-function addHistoryLaneTransition(
-  route: ActiveHistoryRoute | null | undefined,
-  lane: number,
-  row: number,
-): void {
-  if (!route) return;
-  const last = route.points[route.points.length - 1];
-  if (!last || last.lane === lane) {
-    addHistoryRoutePoint(route, lane, row);
-    return;
-  }
-  addHistoryRoutePoint(route, lane, row <= last.row ? last.row + 1 : row);
-}
-
-function compactHistoryActiveLanes(
-  active: Array<ActiveHistoryRoute | null>,
-  row: number,
-  rowByEventId: ReadonlyMap<string, number>,
-): void {
-  let nextLane = 0;
-  let highestOccupiedLane = -1;
-  for (let read = 0; read < active.length; read++) {
-    const entry = active[read];
-    if (!entry) continue;
-    const targetRow = rowByEventId.get(entry.targetEventId);
-    if (targetRow !== undefined && targetRow <= row + 1) {
-      highestOccupiedLane = Math.max(highestOccupiedLane, read);
-      nextLane = Math.max(nextLane, read + 1);
-      continue;
-    }
-    if (read !== nextLane) {
-      addHistoryRoutePoint(entry, read, row + 0.2);
-      addHistoryLaneTransition(entry, nextLane, row + 1);
-      active[nextLane] = entry;
-      active[read] = null;
-    }
-    highestOccupiedLane = Math.max(highestOccupiedLane, nextLane);
-    nextLane++;
-  }
-  active.length = highestOccupiedLane + 1;
-}
-
-function firstOpenHistoryLane(
-  active: Array<ActiveHistoryRoute | null>,
-): number {
-  const index = active.findIndex((value) => !value);
-  return index >= 0 ? index : active.length;
 }

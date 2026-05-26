@@ -81,6 +81,47 @@ describe("nexus dashboard history layout", () => {
     expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
   });
 
+  it("moves side branches back into the leftmost free lane", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: leftmostLaneReuseFixture(),
+    });
+    const merge = layout.nodes.find((node) => node.id === "merge");
+    const main = layout.nodes.find((node) => node.id === "main");
+    const side = layout.nodes.find((node) => node.id === "side");
+    const mergeToSide = layout.segments.find(
+      (segment) => segment.edgeId === "edge:merge->side:1",
+    );
+
+    expect(merge).toMatchObject({ lane: 0, colorIndex: 0 });
+    expect(main).toMatchObject({ lane: 0, colorIndex: 0 });
+    expect(side).toMatchObject({ lane: 0, colorIndex: 1 });
+    expect(mergeToSide?.points).toEqual([
+      { lane: 0, row: 0 },
+      { lane: 1, row: 1 },
+      { lane: 0, row: 2 },
+    ]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
+  });
+
+  it("starts additional parent routes straight or to the right", () => {
+    const layout = buildNexusDashboardHistoryLayout({
+      events: rightwardBranchStartFixture(),
+    });
+    const mergeToSide = layout.segments.find(
+      (segment) => segment.edgeId === "edge:merge->side:1",
+    );
+    const first = mergeToSide?.points[0];
+    const second = mergeToSide?.points[1];
+
+    expect(first).toEqual({ lane: 0, row: 0 });
+    expect(second?.lane).toBeGreaterThanOrEqual(first?.lane ?? 0);
+    expect(mergeToSide?.points.slice(0, 2)).not.toEqual([
+      { lane: 0, row: 0 },
+      { lane: -1, row: 1 },
+    ]);
+    expect(validateNexusDashboardHistoryLayout(layout)).toEqual([]);
+  });
+
   it("keeps side tracks open until their base event", () => {
     const layout = buildNexusDashboardHistoryLayout({
       events: delayedBaseFixture(),
@@ -250,6 +291,23 @@ function compactionFixture(): NexusDashboardHistoryEvent[] {
     historyEvent("sideB", ["main2"]),
     historyEvent("main2", ["main1"]),
     historyEvent("main1", []),
+  ];
+}
+
+function leftmostLaneReuseFixture(): NexusDashboardHistoryEvent[] {
+  return [
+    historyEvent("merge", ["main", "side"]),
+    historyEvent("main", []),
+    historyEvent("side", []),
+  ];
+}
+
+function rightwardBranchStartFixture(): NexusDashboardHistoryEvent[] {
+  return [
+    historyEvent("merge", ["main", "side"]),
+    historyEvent("main", ["base"]),
+    historyEvent("side", ["base"]),
+    historyEvent("base", []),
   ];
 }
 
