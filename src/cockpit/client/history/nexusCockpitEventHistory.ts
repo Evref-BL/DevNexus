@@ -396,6 +396,7 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const branchName = refs.find((ref) => ref.kind === 'branch' || ref.kind === 'remote')?.name ?? refs[0]?.name ?? '';
   const componentLabel = row.repository.componentName ?? row.repository.componentId ?? 'Workspace';
   const refChips = renderGitHistoryScopeTokens(refs, row.colorLane ?? row.lane);
+  const refChipStyle = gitHistoryScopeGroupStyle(refs);
   const badges = gitHistoryAnnotations(snapshot, row.repository, row.commit).slice(0, 3).map((annotation) => `<span class="dn-git-badge tone-${escapeAttribute(annotation.tone)}" title="${escapeHtml(annotation.title ?? annotation.label)}">${escapeHtml(annotation.label)}</span>`).join('');
   const date = formatTime(row.commit.committedAt);
   const author = row.commit.authorName ?? '';
@@ -415,7 +416,16 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
   const copyCommit = row.commit.hash ?? row.commit.shortHash ?? '';
   const copyBranch = branchName ? `<button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(branchName)}">Copy branch</button>` : '';
   const utilityMenu = `<details class="dn-git-row-menu"><summary class="dn-git-row-menu-trigger" aria-label="Event actions">...</summary><div class="dn-git-row-menu-options"><button class="dn-git-row-menu-item" type="button" data-select-id="${escapeHtml(row.selectId)}">Toggle details</button><button class="dn-git-row-menu-item" type="button" data-copy-text="${escapeHtml(copyCommit)}">Copy commit</button>${copyBranch}</div></details>`;
-  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}${merge}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description"><span class="dn-history-scopes">${refChips}</span><span class="dn-git-description" title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</span><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
+  return `<div class="dn-git-history-row-wrap"><button class="dn-git-history-row${selected}${merge}" type="button" data-select-id="${escapeHtml(row.selectId)}" data-history-search-text="${escapeAttribute(searchText)}"><span class="dn-git-subject" data-git-cell="description"><span class="dn-history-scopes" style="${escapeHtml(refChipStyle)}">${refChips}</span><span class="dn-git-description" title="${escapeHtml(row.commit.subject)}">${escapeHtml(row.commit.subject)}</span><span class="dn-git-badges">${badges}</span></span><span class="dn-git-date" data-git-cell="date" title="${escapeHtml(row.commit.committedAt)}">${escapeHtml(date)}</span><span class="dn-git-author" data-git-cell="author" title="${escapeHtml(authorTitle || author)}">${escapeHtml(author)}</span><span class="dn-git-sha" data-git-cell="commit" title="${escapeHtml(row.commit.hash ?? row.commit.shortHash)}">${escapeHtml(row.commit.shortHash)}</span></button>${utilityMenu}</div>`;
+}
+
+function gitHistoryScopeGroupStyle(refs) {
+  const count = (refs ?? []).length;
+  if (!count) return '--dn-history-scope-count:0;--dn-history-scope-target-width:0px;';
+  const longest = Math.max(...refs.map((ref) => String(typeof ref === 'string' ? ref : ref.name ?? '').length));
+  const tokenWidth = Math.min(170, Math.max(48, longest * 6 + 24));
+  const targetWidth = (tokenWidth * count) + ((count - 1) * 4);
+  return `--dn-history-scope-count:${count};--dn-history-scope-target-width:${targetWidth}px;`;
 }
 
 function renderGitHistoryScopeTokens(refs, colorLane = 0) {
@@ -641,6 +651,7 @@ export function renderNexusCockpitEventHistoryClientSource() {
     gitHistoryPathSegmentCrossesDetailGap,
     appendGitHistoryVisualPoint,
     renderGitHistoryRow,
+    gitHistoryScopeGroupStyle,
     renderGitHistoryScopeTokens,
     renderGitHistoryDetailPanel,
     renderGitHistoryRelationChips,

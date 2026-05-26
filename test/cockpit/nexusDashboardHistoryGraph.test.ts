@@ -1352,4 +1352,77 @@ describe("nexus dashboard history graph", () => {
       }),
     ]);
   });
+
+  it("gives each event row one shared scope token width", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "multi0000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["codex/dev-nexus/ui-main", "app/main", "origin/main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "multi0000000000000000000000000000000000000",
+                shortHash: "multi00",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Merge branch labels",
+                refs: [
+                  {
+                    name: "codex/dev-nexus/ui-main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                  {
+                    name: "app/main",
+                    kind: "remote",
+                    remote: "app",
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                  {
+                    name: "origin/main",
+                    kind: "remote",
+                    remote: "origin",
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderGitHistory(snapshot, null);
+
+    expect(rendered).toContain('--dn-history-scope-count:3;--dn-history-scope-target-width:494px;');
+    expect(rendered).toContain('data-dn-tooltip="codex/dev-nexus/ui-main" data-dn-tooltip-mode="always"');
+    expect(rendered).toContain('data-dn-tooltip="app/main" data-dn-tooltip-mode="always"');
+    expect(rendered).toContain('data-dn-tooltip="origin/main" data-dn-tooltip-mode="always"');
+  });
 });

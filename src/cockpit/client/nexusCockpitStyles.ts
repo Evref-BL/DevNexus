@@ -234,8 +234,9 @@ button, input, select { font: inherit; }
 .dn-git-subject { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .dn-git-description { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.82rem; font-weight: 460; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-history-row.merge:not(.selected) .dn-git-description { color: color-mix(in srgb, var(--dn-muted) 68%, var(--dn-bg)); }
-.dn-history-scopes { display: inline-flex; flex: 0 1 auto; gap: 4px; max-width: 48%; overflow: hidden; }
+.dn-history-scopes { --dn-history-scope-count: 0; --dn-history-scope-target-width: auto; display: inline-flex; flex: 0 0 var(--dn-history-scope-target-width); width: var(--dn-history-scope-target-width); gap: 4px; max-width: 48%; overflow: hidden; }
 .dn-history-scope-token { --dn-scope-color: var(--dn-active); display: inline-flex; align-items: center; max-width: 170px; min-width: 0; overflow: hidden; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--dn-scope-color) 42%, var(--dn-border)); border-left: 4px solid var(--dn-scope-color); border-radius: 7px; color: var(--dn-pill-text); background: color-mix(in srgb, var(--dn-surface-raised) 88%, var(--dn-scope-color) 12%); font-size: 0.66rem; font-weight: 820; white-space: nowrap; }
+.dn-history-scopes .dn-history-scope-token { flex: 1 1 0; max-width: none; }
 .dn-history-scope-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dn-git-badges { display: inline-flex; flex: 0 0 auto; gap: 4px; max-width: 30%; overflow: hidden; }
 .dn-git-badge { max-width: 130px; overflow: hidden; padding: 2px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.66rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
