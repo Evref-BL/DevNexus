@@ -423,7 +423,7 @@ function renderGitHistoryScopeTokens(refs, colorLane = 0) {
     const name = typeof ref === 'string' ? ref : ref.name;
     const baseColorLane = Number.isFinite(Number(colorLane)) ? Number(colorLane) : 0;
     const colorIndex = Math.abs(baseColorLane + index) % 12;
-    return `<span class="dn-history-scope-token" style="--dn-scope-color:var(--dn-branch-${colorIndex});" title="${escapeHtml(name)}"><span class="dn-history-scope-name">${escapeHtml(name)}</span></span>`;
+    return `<span class="dn-history-scope-token" style="--dn-scope-color:var(--dn-branch-${colorIndex});" data-dn-tooltip="${escapeHtml(name)}" data-dn-tooltip-mode="always"><span class="dn-history-scope-name">${escapeHtml(name)}</span></span>`;
   }).join('');
 }
 

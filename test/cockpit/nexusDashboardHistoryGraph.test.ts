@@ -1223,6 +1223,7 @@ describe("nexus dashboard history graph", () => {
     expect(rendered).toContain('data-git-history-branch-select');
     expect(rendered).toContain('value="component:primary|branch:feat/cockpit-graph" selected');
     expect(rendered).toContain("dn-history-scope-token");
+    expect(rendered).toContain('data-dn-tooltip="feat/cockpit-graph" data-dn-tooltip-mode="always"');
     expect(rendered).not.toContain("dn-history-scope-kind");
     expect(rendered).not.toContain("dn-git-ref");
     expect(rendered).toContain("Add graph data");
