@@ -58,9 +58,7 @@ function readNexusCockpitLegacyClientModuleSource(): string {
     const candidatePath = fileURLToPath(candidate);
     if (!fs.existsSync(candidatePath)) continue;
     const source = fs.readFileSync(candidatePath, "utf8");
-    return candidatePath.endsWith(".ts")
-      ? standaloneNexusCockpitClientSource(source)
-      : source;
+    return standaloneNexusCockpitClientSource(source);
   }
   throw new Error("DevNexus cockpit legacy client source is missing");
 }
@@ -131,7 +129,7 @@ export function auditNexusDashboardClientVisuals(
   );
   const branchAccents = uniqueMatches(
     moduleSource,
-    /--dn-branch-\d: (#[0-9a-f]{6})/giu,
+    /--dn-branch-\d+: (#[0-9a-f]{6})/giu,
   );
   const checks = [
     visualAuditCheck(
@@ -156,7 +154,7 @@ export function auditNexusDashboardClientVisuals(
     visualAuditCheck(
       "branch-accents",
       "Distinct branch accents",
-      branchAccents.length >= 7,
+      branchAccents.length >= 12,
       `${branchAccents.length} branch accent colors found.`,
     ),
     visualAuditCheck(

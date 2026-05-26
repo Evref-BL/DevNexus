@@ -264,7 +264,7 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("projectAccentStyle");
     expect(module).toContain("projectAccentCount = 7");
     expect(module).toContain("workspaceAccentMap");
-    expect(module).toContain("--dn-branch-6");
+    expect(module).toContain("--dn-branch-11");
     expect(module).toContain("stableAccentIndex");
     expect(module).not.toContain("--dn-warn: #9a641c");
     expect(module).toContain("providerIcon");

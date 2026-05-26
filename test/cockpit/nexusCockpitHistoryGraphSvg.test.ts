@@ -117,6 +117,28 @@ describe("nexus cockpit history graph SVG", () => {
     });
   });
 
+  it("wraps default history colors across the twelve branch accent slots", () => {
+    const rendered = renderNexusCockpitHistoryGraphSvg({
+      rows: [
+        {
+          lane: 0,
+          index: 0,
+          colorLane: 11,
+          selectId: "history:primary:last-color",
+        },
+        {
+          lane: 0,
+          index: 1,
+          colorLane: 12,
+          selectId: "history:primary:wrapped-color",
+        },
+      ],
+    });
+
+    expect(rendered).toContain('fill="var(--dn-branch-11)"');
+    expect(rendered).toContain('fill="var(--dn-branch-0)"');
+  });
+
   it("renders selected detail bands across expanded graph gaps", () => {
     const graph = {
       rows: [

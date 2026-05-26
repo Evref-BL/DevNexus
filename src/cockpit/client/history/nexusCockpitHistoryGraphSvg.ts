@@ -279,7 +279,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
     branchColorCount: Math.max(
       1,
       Math.floor(
-        finiteNexusCockpitHistoryGraphNumber(options.branchColorCount, 7),
+        finiteNexusCockpitHistoryGraphNumber(options.branchColorCount, 12),
       ),
     ),
     laneGap: Math.max(
