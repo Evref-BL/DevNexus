@@ -139,6 +139,67 @@ describe("nexus cockpit history graph SVG", () => {
     expect(rendered).toContain('fill="var(--dn-branch-0)"');
   });
 
+  it("draws connected pieces of one branch as a single shadowed route", () => {
+    const model = buildNexusCockpitHistoryGraphSvgModel({
+      maxLane: 1,
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:merge" },
+        { lane: 0, index: 1, selectId: "history:primary:main" },
+        { lane: 1, index: 2, selectId: "history:primary:side" },
+      ],
+      paths: [
+        {
+          trackId: "track:0",
+          colorLane: 0,
+          points: [
+            { lane: 0, index: 0 },
+            { lane: 0, index: 1 },
+          ],
+        },
+        {
+          trackId: "track:0",
+          colorLane: 0,
+          points: [
+            { lane: 0, index: 1 },
+            { lane: 1, index: 2 },
+          ],
+        },
+      ],
+    });
+    const rendered = renderNexusCockpitHistoryGraphSvg({
+      maxLane: 1,
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:merge" },
+        { lane: 0, index: 1, selectId: "history:primary:main" },
+        { lane: 1, index: 2, selectId: "history:primary:side" },
+      ],
+      paths: [
+        {
+          trackId: "track:0",
+          colorLane: 0,
+          points: [
+            { lane: 0, index: 0 },
+            { lane: 0, index: 1 },
+          ],
+        },
+        {
+          trackId: "track:0",
+          colorLane: 0,
+          points: [
+            { lane: 0, index: 1 },
+            { lane: 1, index: 2 },
+          ],
+        },
+      ],
+    });
+
+    expect(model.routes).toHaveLength(1);
+    expect(model.routes[0]?.d).toBe(
+      "M 28 15 V 45 C 28 69, 44 51, 44 75",
+    );
+    expect(rendered.match(/class="dn-git-line-shadow"/gu)).toHaveLength(1);
+  });
+
   it("renders selected detail bands across expanded graph gaps", () => {
     const graph = {
       rows: [

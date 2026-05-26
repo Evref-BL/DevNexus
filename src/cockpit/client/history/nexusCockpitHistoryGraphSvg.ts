@@ -4,6 +4,7 @@ export interface NexusCockpitHistoryGraphPoint {
 }
 
 export interface NexusCockpitHistoryGraphRoute {
+  readonly trackId?: string;
   readonly colorLane?: number;
   readonly fromLane?: number;
   readonly toLane?: number;
@@ -150,7 +151,7 @@ export function buildNexusCockpitHistoryGraphSvgModel(
 ): NexusCockpitHistoryGraphSvgModel {
   const metrics = nexusCockpitHistoryGraphSvgMetrics(options);
   const rows = graph.rows ?? [];
-  const routes = graph.paths ?? [];
+  const routes = nexusCockpitHistoryGraphVisualRoutes(graph.paths ?? []);
   const rowCount = Math.max(
     1,
     rows.length,
@@ -256,6 +257,8 @@ export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
     buildNexusCockpitHistoryGraphSvgModel,
     nexusCockpitHistoryGraphSvgMetrics,
     nexusCockpitHistoryGraphDetailBands,
+    nexusCockpitHistoryGraphVisualRoutes,
+    nexusCockpitHistoryGraphPointsConnect,
     nexusCockpitHistoryGraphRoutePoints,
     nexusCockpitHistoryGraphRouteD,
     nexusCockpitHistoryGraphLaneTransitionD,
@@ -335,6 +338,48 @@ function nexusCockpitHistoryGraphDetailBands(
     .filter(
       (band): band is NexusCockpitHistoryGraphSvgDetailBand => band !== null,
     );
+}
+
+function nexusCockpitHistoryGraphVisualRoutes(
+  routes: readonly NexusCockpitHistoryGraphRoute[],
+): readonly NexusCockpitHistoryGraphRoute[] {
+  const visualRoutes: NexusCockpitHistoryGraphRoute[] = [];
+  for (const route of routes) {
+    const points = nexusCockpitHistoryGraphRoutePoints(route);
+    const colorLane = route.colorLane ?? route.fromLane ?? 0;
+    const previous = visualRoutes[visualRoutes.length - 1];
+    const previousPoints = previous
+      ? nexusCockpitHistoryGraphRoutePoints(previous)
+      : [];
+    if (
+      route.trackId &&
+      previous?.trackId === route.trackId &&
+      previous.colorLane === colorLane &&
+      nexusCockpitHistoryGraphPointsConnect(
+        previousPoints[previousPoints.length - 1],
+        points[0],
+      )
+    ) {
+      visualRoutes[visualRoutes.length - 1] = {
+        ...previous,
+        points: [...previousPoints, ...points.slice(1)],
+      };
+    } else {
+      visualRoutes.push({
+        ...route,
+        colorLane,
+        points,
+      });
+    }
+  }
+  return visualRoutes;
+}
+
+function nexusCockpitHistoryGraphPointsConnect(
+  left: NexusCockpitHistoryGraphPoint | undefined,
+  right: NexusCockpitHistoryGraphPoint | undefined,
+): boolean {
+  return Boolean(left && right && left.lane === right.lane && left.index === right.index);
 }
 
 function nexusCockpitHistoryGraphRoutePoints(

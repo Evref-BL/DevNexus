@@ -263,6 +263,7 @@ function gitHistoryRows(snapshot, filter = '') {
     };
   }).filter(Boolean);
   const paths = layout.segments.map((segment) => ({
+    trackId: segment.trackId,
     colorLane: segment.colorIndex,
     fromLane: segment.fromLane,
     toLane: segment.toLane,
