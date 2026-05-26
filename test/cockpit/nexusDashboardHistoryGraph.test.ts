@@ -547,9 +547,9 @@ describe("nexus dashboard history graph", () => {
     );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toContain("M 28 13 C 28 33.8, 50 18.2, 50 39");
+    expect(rendered).toContain("M 28 13 C 28 33.8, 44 18.2, 44 39");
     expect(rendered).toContain("V 91");
-    expect(rendered).not.toContain("H 50 V 91");
+    expect(rendered).not.toContain("H 44 V 91");
     expect(delayedCrossLanePaths).toEqual([]);
   });
 

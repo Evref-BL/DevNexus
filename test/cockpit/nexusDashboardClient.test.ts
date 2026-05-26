@@ -128,6 +128,8 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("showGitHistoryNodePopover");
     expect(module).toContain("transform-box: fill-box");
     expect(module).toContain("vector-effect: non-scaling-stroke");
+    expect(module).toContain(".dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 4.6;");
+    expect(module).toContain(".dn-git-line { stroke-width: 2.4;");
     expect(module).toContain("dn-history-node-hovered");
     expect(module).toContain("transform: scale(1.24)");
     expect(module).toContain("Activity Lanes");

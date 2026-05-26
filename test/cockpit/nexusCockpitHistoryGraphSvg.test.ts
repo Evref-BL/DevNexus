@@ -172,7 +172,7 @@ describe("nexus cockpit history graph SVG", () => {
     });
 
     expect(model.routes[0]?.d).toBe(
-      "M 204 705 V 718.5 C 204 728.1, 292 720.9, 292 730.5 C 292 732.9, 138 731.1, 138 733.5 V 735",
+      "M 156 705 C 156 725.4, 220 710.1, 220 730.5 C 220 732.9, 108 731.1, 108 733.5 V 735",
     );
   });
 
@@ -195,7 +195,31 @@ describe("nexus cockpit history graph SVG", () => {
     });
 
     expect(model.routes[0]?.d).toBe(
-      "M 28 15 C 28 24.6, 116 17.4, 116 27",
+      "M 28 15 C 28 24.6, 92 17.4, 92 27",
+    );
+  });
+
+  it("curves short same-lane preludes as a clean branch departure", () => {
+    const model = buildNexusCockpitHistoryGraphSvgModel({
+      maxLane: 2,
+      rows: [
+        { lane: 0, index: 0, selectId: "history:primary:from" },
+        { lane: 2, index: 1, selectId: "history:primary:to" },
+      ],
+      paths: [
+        {
+          colorLane: 1,
+          points: [
+            { lane: 0, index: 0 },
+            { lane: 0, index: 0.85 },
+            { lane: 2, index: 1 },
+          ],
+        },
+      ],
+    });
+
+    expect(model.routes[0]?.d).toBe(
+      "M 28 15 C 28 39, 60 21, 60 45",
     );
   });
 });

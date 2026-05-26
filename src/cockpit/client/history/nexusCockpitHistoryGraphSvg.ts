@@ -258,6 +258,7 @@ export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
     nexusCockpitHistoryGraphDetailBands,
     nexusCockpitHistoryGraphRoutePoints,
     nexusCockpitHistoryGraphRouteD,
+    nexusCockpitHistoryGraphCanCurveDeparture,
     nexusCockpitHistoryGraphLaneTransitionD,
     nexusCockpitHistoryGraphColorIndex,
     nexusCockpitHistoryGraphNodeId,
@@ -284,7 +285,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
     ),
     laneGap: Math.max(
       1,
-      finiteNexusCockpitHistoryGraphNumber(options.laneGap, 22),
+      finiteNexusCockpitHistoryGraphNumber(options.laneGap, 16),
     ),
     minWidth: Math.max(
       1,
@@ -362,6 +363,12 @@ function nexusCockpitHistoryGraphRouteD(
   for (let index = 1; index < points.length; index++) {
     const from = points[index - 1]!;
     const to = points[index]!;
+    const next = points[index + 1];
+    if (next && nexusCockpitHistoryGraphCanCurveDeparture(from, to, next, rowHeight)) {
+      d += nexusCockpitHistoryGraphLaneTransitionD(from, next, rowHeight);
+      index++;
+      continue;
+    }
     if (from.x === to.x) {
       d += ` V ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
     } else if (from.y === to.y) {
@@ -371,6 +378,20 @@ function nexusCockpitHistoryGraphRouteD(
     }
   }
   return d;
+}
+
+function nexusCockpitHistoryGraphCanCurveDeparture(
+  from: NexusCockpitHistoryGraphSvgPoint,
+  via: NexusCockpitHistoryGraphSvgPoint,
+  to: NexusCockpitHistoryGraphSvgPoint,
+  rowHeight: number,
+): boolean {
+  return (
+    from.x === via.x &&
+    via.x !== to.x &&
+    via.y !== to.y &&
+    Math.abs(via.y - from.y) <= rowHeight
+  );
 }
 
 function nexusCockpitHistoryGraphLaneTransitionD(
