@@ -57,10 +57,13 @@ describe("nexus dashboard client", () => {
         if (name === "data-dn-tooltip") {
           return [
             "Classify Git workflow branch freshness",
-            "DevNexus · 8c61c96",
-            "Refs: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
-            "devnexus-automation[bot] · 25 mai, 14:52",
-            "Details: Needs review, Active, 1 thread, 28 issues",
+            "Event: Source change",
+            "Component: DevNexus",
+            "Source: Commit 8c61c96",
+            "Actor: devnexus-automation[bot]",
+            "Time: 25 mai, 14:52",
+            "Scopes: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
+            "Attached: Needs review, Active, 1 thread, 28 issues",
           ].join("\n");
         }
         return null;
@@ -75,18 +78,23 @@ describe("nexus dashboard client", () => {
 
     expect(content).toEqual({
       title: "Classify Git workflow branch freshness",
+      event: "Source change",
       component: "DevNexus",
-      commit: "8c61c96",
-      refs: [
+      source: "Commit 8c61c96",
+      actor: "devnexus-automation[bot]",
+      time: "25 mai, 14:52",
+      scopes: [
         "codex/dev-nexus/358-git-workflow-freshness",
         "app/codex/dev-nexus/358-git-workflow-freshness",
       ],
-      meta: "devnexus-automation[bot] · 25 mai, 14:52",
-      details: ["Needs review", "Active", "1 thread", "28 issues"],
+      attached: ["Needs review", "Active", "1 thread", "28 issues"],
     });
+    expect(html).toContain("Event preview");
+    expect(html).toContain("Source change");
     expect(html).toContain("Commit 8c61c96");
-    expect(html).toContain("Branches");
-    expect(html).toContain("Details");
+    expect(html).toContain("Scopes");
+    expect(html).toContain("Attached");
+    expect(html).toContain("dn-history-popover-field");
     expect(html).toContain("codex/dev-nexus/358-git-workflow-freshness");
     expect(html).toContain("Needs review");
     expect(html).toContain("&lt;script&gt;");
@@ -121,13 +129,16 @@ describe("nexus dashboard client", () => {
     expect(module).toContain("--dn-history-popover-accent");
     expect(module).toContain("--dn-history-popover-border-width");
     expect(module).toContain("--dn-history-popover-radius");
-    expect(module).toContain("border-top-left-radius: calc(var(--dn-history-popover-radius) - var(--dn-history-popover-border-width))");
+    expect(module).toContain("dn-history-popover-kicker");
+    expect(module).toContain("dn-history-popover-field");
     expect(module).toContain("data-edge-side='left'");
     expect(module).toContain("height: var(--dn-history-popover-border-width)");
     expect(module).toContain("gitHistoryNodeAccentColor");
     expect(module).toContain("showGitHistoryNodePopover");
     expect(module).toContain("transform-box: fill-box");
     expect(module).toContain("vector-effect: non-scaling-stroke");
+    expect(module).toContain("dn-history-scope-token");
+    expect(module).not.toContain("dn-git-ref");
     expect(module).toContain(".dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 3.6;");
     expect(module).toContain(".dn-git-line { stroke-width: 2.1;");
     expect(module).toContain("dn-history-node-hovered");
