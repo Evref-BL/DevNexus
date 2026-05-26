@@ -138,7 +138,7 @@ export function renderNexusCockpitHistoryGraphSvg(
       const tooltip = escapeNexusCockpitHistoryGraphAttribute(node.tooltip);
       const color = `var(--dn-branch-${node.colorIndex})`;
       const selected = node.selected ? " selected" : "";
-      return `<circle class="dn-git-node${selected}" data-select-id="${id}" data-history-event-class="${node.eventClass}" data-history-event-id="${id}" data-dn-tooltip="${tooltip}" data-dn-tooltip-mode="always" role="button" tabindex="0" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1.6" />`;
+      return `<circle class="dn-git-node${selected}" data-select-id="${id}" data-history-event-class="${node.eventClass}" data-history-event-id="${id}" data-dn-tooltip="${tooltip}" data-dn-tooltip-mode="always" role="button" tabindex="0" aria-label="${label}" cx="${node.x}" cy="${node.y}" r="${model.nodeRadius}" fill="${color}" stroke="var(--dn-surface)" stroke-width="1" />`;
     })
     .join("");
   return `<svg class="dn-git-graph dn-history-graph" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="${ariaLabel}" data-history-row-count="${model.rowCount}" data-history-lane-count="${model.laneCount}">${detailBands}${hitTargets}${paths}${nodes}</svg>`;
@@ -258,7 +258,6 @@ export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
     nexusCockpitHistoryGraphDetailBands,
     nexusCockpitHistoryGraphRoutePoints,
     nexusCockpitHistoryGraphRouteD,
-    nexusCockpitHistoryGraphCanCurveDeparture,
     nexusCockpitHistoryGraphLaneTransitionD,
     nexusCockpitHistoryGraphColorIndex,
     nexusCockpitHistoryGraphNodeId,
@@ -293,7 +292,7 @@ function nexusCockpitHistoryGraphSvgMetrics(
     ),
     nodeRadius: Math.max(
       0.5,
-      finiteNexusCockpitHistoryGraphNumber(options.nodeRadius, 5.2),
+      finiteNexusCockpitHistoryGraphNumber(options.nodeRadius, 4),
     ),
     offsetX: Math.max(
       0,
@@ -363,12 +362,6 @@ function nexusCockpitHistoryGraphRouteD(
   for (let index = 1; index < points.length; index++) {
     const from = points[index - 1]!;
     const to = points[index]!;
-    const next = points[index + 1];
-    if (next && nexusCockpitHistoryGraphCanCurveDeparture(from, to, next, rowHeight)) {
-      d += nexusCockpitHistoryGraphLaneTransitionD(from, next, rowHeight);
-      index++;
-      continue;
-    }
     if (from.x === to.x) {
       d += ` V ${formatNexusCockpitHistoryGraphNumber(to.y)}`;
     } else if (from.y === to.y) {
@@ -378,20 +371,6 @@ function nexusCockpitHistoryGraphRouteD(
     }
   }
   return d;
-}
-
-function nexusCockpitHistoryGraphCanCurveDeparture(
-  from: NexusCockpitHistoryGraphSvgPoint,
-  via: NexusCockpitHistoryGraphSvgPoint,
-  to: NexusCockpitHistoryGraphSvgPoint,
-  rowHeight: number,
-): boolean {
-  return (
-    from.x === via.x &&
-    via.x !== to.x &&
-    via.y !== to.y &&
-    Math.abs(via.y - from.y) <= rowHeight
-  );
 }
 
 function nexusCockpitHistoryGraphLaneTransitionD(

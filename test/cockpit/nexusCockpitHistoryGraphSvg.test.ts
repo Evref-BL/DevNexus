@@ -59,7 +59,9 @@ describe("nexus cockpit history graph SVG", () => {
       laneCount: 2,
       width: 148,
       height: 60,
+      nodeRadius: 4,
     });
+    expect(model.nodes.map((node) => node.x)).toEqual([28, 44]);
     expect(model.hitTargets[0]).toMatchObject({
       id: "history:primary:merge",
       selected: true,
@@ -81,6 +83,8 @@ describe("nexus cockpit history graph SVG", () => {
     expect(rendered).toContain('class="dn-git-node selected"');
     expect(rendered).toContain('data-select-id="history:primary:merge"');
     expect(rendered).toContain('data-dn-tooltip-mode="always"');
+    expect(rendered).toContain('r="4"');
+    expect(rendered).toContain('stroke-width="1"');
     expect(rendered).toContain('fill="var(--dn-branch-0)"');
     expect(rendered).toContain(
       'data-history-event-id="history:primary:merge"',
@@ -172,8 +176,9 @@ describe("nexus cockpit history graph SVG", () => {
     });
 
     expect(model.routes[0]?.d).toBe(
-      "M 156 705 C 156 725.4, 220 710.1, 220 730.5 C 220 732.9, 108 731.1, 108 733.5 V 735",
+      "M 156 705 V 718.5 C 156 728.1, 220 720.9, 220 730.5 C 220 732.9, 108 731.1, 108 733.5 V 735",
     );
+    expect(maxCurveDeltaY(model.routes[0]?.d ?? "")).toBeLessThanOrEqual(30);
   });
 
   it("curves lane changes without a flat horizontal corridor", () => {
@@ -199,27 +204,49 @@ describe("nexus cockpit history graph SVG", () => {
     );
   });
 
-  it("curves short same-lane preludes as a clean branch departure", () => {
+  it("keeps lane changes inside a single row span", () => {
     const model = buildNexusCockpitHistoryGraphSvgModel({
       maxLane: 2,
       rows: [
         { lane: 0, index: 0, selectId: "history:primary:from" },
-        { lane: 2, index: 1, selectId: "history:primary:to" },
+        { lane: 0, index: 1, selectId: "history:primary:via" },
+        { lane: 2, index: 2, selectId: "history:primary:to" },
       ],
       paths: [
         {
           colorLane: 1,
           points: [
             { lane: 0, index: 0 },
-            { lane: 0, index: 0.85 },
-            { lane: 2, index: 1 },
+            { lane: 0, index: 1 },
+            { lane: 2, index: 2 },
           ],
         },
       ],
     });
 
     expect(model.routes[0]?.d).toBe(
-      "M 28 15 C 28 39, 60 21, 60 45",
+      "M 28 15 V 45 C 28 69, 60 51, 60 75",
     );
+    expect(maxCurveDeltaY(model.routes[0]?.d ?? "")).toBeLessThanOrEqual(30);
   });
 });
+
+function maxCurveDeltaY(path: string): number {
+  const commandPattern =
+    /(M\s*[\d.-]+\s+([\d.-]+))|(V\s*([\d.-]+))|(C\s*[\d.-]+\s+[\d.-]+,\s*[\d.-]+\s+[\d.-]+,\s*[\d.-]+\s+([\d.-]+))/g;
+  let currentY = 0;
+  let max = 0;
+  let match: RegExpExecArray | null;
+  while ((match = commandPattern.exec(path)) !== null) {
+    if (match[2] !== undefined) {
+      currentY = Number(match[2]);
+    } else if (match[4] !== undefined) {
+      currentY = Number(match[4]);
+    } else if (match[6] !== undefined) {
+      const nextY = Number(match[6]);
+      max = Math.max(max, Math.abs(nextY - currentY));
+      currentY = nextY;
+    }
+  }
+  return max;
+}
