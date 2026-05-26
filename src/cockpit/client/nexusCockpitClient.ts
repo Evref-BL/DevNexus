@@ -1366,3 +1366,22 @@ export const fetchDevNexusCockpitSection = fetchDevNexusDashboardSection;
 export const fetchDevNexusCockpitHost = fetchDevNexusDashboardHost;
 export const fetchDevNexusCockpitProjects = fetchDevNexusDashboardProjects;
 export const mountDevNexusCockpit = mountDevNexusDashboard;
+
+export {
+  cockpitThreadPrompt,
+  dashboardRenderSignature,
+  defaultSelectedId,
+  nextDashboardSelectedId,
+  renderDashboard,
+  renderFeatureOverview,
+  renderHostDashboard,
+  renderHostOverview,
+  renderPlugins,
+  renderProjectHeaderActions,
+  renderSignal,
+  renderThreadActions,
+  renderThreadInbox,
+  renderTrackedWork,
+  selectedDetail,
+  signalPanelTarget,
+};

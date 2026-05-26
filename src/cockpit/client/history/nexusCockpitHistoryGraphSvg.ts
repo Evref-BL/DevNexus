@@ -251,29 +251,6 @@ export function buildNexusCockpitHistoryGraphSvgModel(
   };
 }
 
-export function renderNexusCockpitHistoryGraphSvgClientSource(): string {
-  return [
-    renderNexusCockpitHistoryGraphSvg,
-    buildNexusCockpitHistoryGraphSvgModel,
-    nexusCockpitHistoryGraphSvgMetrics,
-    nexusCockpitHistoryGraphDetailBands,
-    nexusCockpitHistoryGraphVisualRoutes,
-    nexusCockpitHistoryGraphPointsConnect,
-    nexusCockpitHistoryGraphRoutePoints,
-    nexusCockpitHistoryGraphRouteD,
-    nexusCockpitHistoryGraphLaneTransitionD,
-    nexusCockpitHistoryGraphColorIndex,
-    nexusCockpitHistoryGraphNodeId,
-    nexusCockpitHistoryGraphNodeLabel,
-    nexusCockpitHistoryGraphNodeTooltip,
-    finiteNexusCockpitHistoryGraphNumber,
-    formatNexusCockpitHistoryGraphNumber,
-    escapeNexusCockpitHistoryGraphAttribute,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
-}
-
 function nexusCockpitHistoryGraphSvgMetrics(
   options: NexusCockpitHistoryGraphSvgOptions,
 ): Required<NexusCockpitHistoryGraphSvgOptions> {

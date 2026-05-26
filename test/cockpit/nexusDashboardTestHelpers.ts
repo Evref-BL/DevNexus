@@ -4,7 +4,6 @@ import path from "node:path";
 import {
   defaultNexusAutomationConfig,
   nexusWorktreeLeaseKind,
-  renderNexusDashboardClientModule,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
   type CodexAppServerJsonRpcTransport,
@@ -17,6 +16,43 @@ import {
   type NexusProjectConfig,
   type NexusWorktreeLeaseRecord,
 } from "../../src/index.js";
+import {
+  cockpitThreadPrompt,
+  dashboardRenderSignature,
+  defaultSelectedId,
+  nextDashboardSelectedId,
+  renderDashboard,
+  renderFeatureOverview,
+  renderHostDashboard,
+  renderHostOverview,
+  renderPlugins,
+  renderProjectHeaderActions,
+  renderSignal,
+  renderThreadActions,
+  renderThreadInbox,
+  renderTrackedWork,
+  selectedDetail,
+  signalPanelTarget,
+} from "../../src/cockpit/client/nexusCockpitClient.js";
+import {
+  renderActionStrip,
+} from "../../src/cockpit/client/nexusCockpitActions.js";
+import {
+  cockpitTooltipText,
+  isCockpitTooltipTargetTruncated,
+  shouldShowCockpitTooltipTarget,
+} from "../../src/cockpit/client/nexusCockpitTooltips.js";
+import {
+  historyRows,
+  renderBranchGraph,
+  renderLaneKey,
+  timelineLanes,
+} from "../../src/cockpit/client/history/nexusCockpitWorkMap.js";
+import {
+  gitHistoryRows,
+  gitHistoryVisualGraph,
+  renderGitHistory,
+} from "../../src/cockpit/client/history/nexusCockpitEventHistory.js";
 
 const tempDirs: string[] = [];
 
@@ -160,21 +196,35 @@ export async function loadDashboardClientTestHooks(): Promise<{
     shortLabel: string;
   }>;
 }> {
-  const source = `${renderNexusDashboardClientModule()
-    .replace(
-      "export async function fetchDevNexusDashboard",
-      "async function fetchDevNexusDashboard",
-    )
-    .replace(
-      "export async function fetchDevNexusDashboardHost",
-      "async function fetchDevNexusDashboardHost",
-    )
-    .replace(
-      "export function mountDevNexusDashboard",
-      "function mountDevNexusDashboard",
-    )}
-export { cockpitThreadPrompt, cockpitTooltipText, dashboardRenderSignature, defaultSelectedId, gitHistoryRows, gitHistoryVisualGraph, historyRows, isCockpitTooltipTargetTruncated, nextDashboardSelectedId, renderActionStrip, renderBranchGraph, renderDashboard, renderFeatureOverview, renderGitHistory, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, shouldShowCockpitTooltipTarget, signalPanelTarget, timelineLanes };`;
-  return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+  return {
+    cockpitThreadPrompt,
+    cockpitTooltipText,
+    dashboardRenderSignature,
+    defaultSelectedId,
+    gitHistoryRows,
+    gitHistoryVisualGraph,
+    historyRows,
+    isCockpitTooltipTargetTruncated,
+    nextDashboardSelectedId,
+    renderActionStrip,
+    renderBranchGraph,
+    renderDashboard,
+    renderFeatureOverview,
+    renderGitHistory,
+    renderHostDashboard,
+    renderHostOverview,
+    renderLaneKey,
+    renderPlugins,
+    renderProjectHeaderActions,
+    renderSignal,
+    renderThreadActions,
+    renderThreadInbox,
+    renderTrackedWork,
+    selectedDetail,
+    shouldShowCockpitTooltipTarget,
+    signalPanelTarget,
+    timelineLanes,
+  };
 }
 
 export function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjectConfig {

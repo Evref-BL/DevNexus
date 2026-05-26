@@ -147,43 +147,6 @@ export function readStoredGitHistoryColumnVisibility(): GitHistoryColumnVisibili
   }
 }
 
-export function renderNexusCockpitHistoryColumnsClientSource(): string {
-  return [
-    `const gitHistoryColumnStorageKey = ${JSON.stringify(gitHistoryColumnStorageKey)};`,
-    `const gitHistoryColumnVisibilityStorageKey = ${JSON.stringify(gitHistoryColumnVisibilityStorageKey)};`,
-    `const gitHistoryColumnSpecs = ${JSON.stringify(gitHistoryColumnSpecs)};`,
-    `const gitHistoryColumnOrder = ${JSON.stringify(gitHistoryColumnOrder)};`,
-    `const gitHistoryColumnLabels = ${JSON.stringify(gitHistoryColumnLabels)};`,
-    bindGitHistoryColumnResizers,
-    renderGitHistoryColumnHeader,
-    gitHistoryColumnStyle,
-    gitHistoryColumnVisibilityAttributes,
-    renderGitHistoryColumnVisibilityMenu,
-    readStoredGitHistoryColumnWidths,
-    readStoredGitHistoryColumnVisibility,
-    writeStoredGitHistoryColumnWidths,
-    writeStoredGitHistoryColumnVisibility,
-    gitHistoryDefaultColumnVisibility,
-    normalizeGitHistoryColumnVisibility,
-    normalizeGitHistoryColumnWidth,
-    historyColumnFromAttribute,
-    nextGitHistoryColumn,
-    nextVisibleGitHistoryColumn,
-    bindGitHistoryColumnVisibilityControls,
-    applyGitHistoryColumnVisibility,
-    readGitHistoryColumnVisibilityFromControls,
-    updateGitHistoryColumnMenuControls,
-    startGitHistoryColumnResize,
-    updateGitHistoryColumnPairWidth,
-    gitHistoryColumnPairLeftWidth,
-    gitHistoryBoardColumnWidths,
-    gitHistoryColumnWidth,
-    escapeNexusCockpitHistoryColumnAttribute,
-  ]
-    .map((part) => part.toString())
-    .join("\n\n");
-}
-
 function writeStoredGitHistoryColumnWidths(widths: GitHistoryColumnWidths): void {
   if (typeof window === "undefined") return;
   try {

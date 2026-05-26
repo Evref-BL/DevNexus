@@ -88,40 +88,6 @@ export function uniqueActions(actions: readonly any[] | undefined): any[] {
   return unique;
 }
 
-export function renderNexusCockpitActionsClientSource(): string {
-  return [
-    renderActionStrip,
-    renderDisabledAction,
-    renderProviderAction,
-    actionChipLabel,
-    providerRecordId,
-    externalActionLabel,
-    providerIcon,
-    externalLinkIcon,
-    clipboardIcon,
-    folderIcon,
-    chevronDownIcon,
-    codeIcon,
-    localAppIcon,
-    finderIcon,
-    terminalIcon,
-    chatIcon,
-    searchIcon,
-    gearIcon,
-    cloudFetchIcon,
-    signalIcon,
-    uniqueActions,
-  ]
-    .map(standaloneNexusCockpitActionSource)
-    .join("\n\n");
-}
-
-function standaloneNexusCockpitActionSource(fn: Function): string {
-  return fn.toString()
-    .replace(/\b__vite_ssr_import_\d+__\.escapeHtml\b/gu, "escapeHtml")
-    .replace(/\b__vite_ssr_import_\d+__\.escapeAttribute\b/gu, "escapeAttribute");
-}
-
 function actionChipLabel(action: any): string {
   const label = action.label ?? "Open provider";
   if (action.title && (action.kind === "issue" || action.kind === "pull-request")) {

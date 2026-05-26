@@ -13,7 +13,6 @@ import {
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
-  renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import {
   buildNexusDashboardHistoryLayout as canonicalHistoryLayout,
-  renderNexusDashboardHistoryLayoutClientSource,
 } from "../../src/cockpit/server/nexusDashboardHistoryLayout.js";
 import {
   startNexusDashboardServer as canonicalServerStarter,
@@ -21,7 +22,10 @@ describe("nexus cockpit topology", () => {
   });
 
   it("keeps history layout internals in DevNexus event-model terms", () => {
-    const source = renderNexusDashboardHistoryLayoutClientSource();
+    const source = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardHistoryLayout.ts", import.meta.url)),
+      "utf8",
+    );
 
     expect(source).not.toContain("HistoryBranch");
     expect(source).not.toContain("HistoryVertex");

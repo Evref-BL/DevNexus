@@ -550,42 +550,6 @@ function wrapGitHistorySearchIndex(index: number, matchCount: number): number {
   return ((index % matchCount) + matchCount) % matchCount;
 }
 
-export function renderNexusCockpitHistoryInteractionsClientSource(): string {
-  return [
-    bindGitHistoryInteractions,
-    gitHistorySelectIdFromEventTarget,
-    updateGitHistoryHover,
-    gitHistoryKeyboardTarget,
-    nextGitHistoryKeyboardSelectId,
-    orderedGitHistorySelectIds,
-    focusGitHistoryEvent,
-    gitHistoryRowForSelectId,
-    gitHistoryGraphNodeForSelectId,
-    createGitHistoryNodePopover,
-    showGitHistoryNodePopover,
-    hideGitHistoryNodePopover,
-    gitHistoryNodeAccentColor,
-    isGitHistoryPopoverColor,
-    gitHistoryNodeFromEventTarget,
-    gitHistoryNodePopoverContent,
-    renderGitHistoryNodePopoverContent,
-    historyPopoverLineValue,
-    historyPopoverCsvValue,
-    positionGitHistoryNodePopover,
-    gitHistoryPopoverConnectorY,
-    gitHistoryPopoverPixelValue,
-    applyGitHistorySearch,
-    normalizeGitHistorySearchText,
-    clearGitHistorySearchClasses,
-    markGitHistorySearchElement,
-    wrapGitHistorySearchIndex,
-    escapeHistoryPopoverHtml,
-    gitHistoryInteractionElement,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
-}
-
 function gitHistoryInteractionElement(source: EventTarget | null): Element | null {
   if (source instanceof Element) return source;
   if (source instanceof Node) return source.parentElement;

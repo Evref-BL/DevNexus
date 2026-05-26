@@ -614,74 +614,6 @@ function gitHistoryDetail(snapshot, id) {
   return { title: commit?.subject ?? 'Event', body: commit?.subject ?? 'Source commit recorded as a history event.', facts, events: [], actions, chat: null };
 }
 
-export function renderNexusCockpitEventHistoryClientSource() {
-  return [
-    `const gitHistoryInlineDetailRows = 9;`,
-    `const gitHistoryRowHeight = 26;`,
-    isGitHistorySelection,
-    renderGitHistory,
-    renderGitHistoryBoard,
-    normalizeGitHistoryFilter,
-    activeGitHistoryFilter,
-    gitHistoryFilterProjectId,
-    gitHistoryFilterBranchName,
-    gitHistoryScopedFilter,
-    renderGitHistoryTopBar,
-    renderGitHistoryProjectControl,
-    renderGitHistoryBranchControl,
-    renderGitHistorySearchControls,
-    renderGitHistoryToolbarActions,
-    gitHistoryBranchNames,
-    featureGitBranches,
-    normalizeGitBranchName,
-    filteredGitHistoryCommits,
-    gitHistoryFilterHeadHashes,
-    branchHeadHashes,
-    collectGitAncestorHashes,
-    gitHistoryRows,
-    gitHistoryRepositories,
-    gitHistoryCommitRowCompare,
-    gitHistoryCommitTime,
-    gitHistoryEventId,
-    renderGitHistorySvg,
-    renderGitHistoryGraphDetailEdge,
-    renderGitHistoryRows,
-    gitHistoryVisualGraph,
-    gitHistoryVisualPathPoints,
-    gitHistoryPathSegmentCrossesDetailGap,
-    appendGitHistoryVisualPoint,
-    renderGitHistoryRow,
-    gitHistoryScopeGroupStyle,
-    renderGitHistoryScopeTokens,
-    renderGitHistoryDetailPanel,
-    renderGitHistoryRelationChips,
-    renderGitHistoryAnnotationDetails,
-    gitHistoryAnnotationItems,
-    gitHistoryParentCommits,
-    gitHistoryChildCommits,
-    gitHistoryEventLabel,
-    gitHistoryNodeTooltip,
-    gitHistoryAnnotations,
-    gitCommitBranchNames,
-    featuresForGitBranches,
-    threadsForGitBranches,
-    trackedWorkForGitBranches,
-    trackedWorkMentionsBranch,
-    normalizeBranchSearchToken,
-    branchSetsIntersect,
-    gitHistorySelectId,
-    firstGitHistoryCommit,
-    gitHistoryCommitBySelectId,
-    gitHistoryDetail,
-  ]
-    .map((part) => typeof part === 'string' ? part : standaloneNexusCockpitEventHistorySource(part))
-    .join('\n\n');
-}
-
-function standaloneNexusCockpitEventHistorySource(fn) {
-  return fn.toString().replace(/\b__vite_ssr_import_\d+__\.([A-Za-z_$][\w$]*)\b/gu, '$1');
-}
-
 export {
   featureGitBranches,
   firstGitHistoryCommit,
@@ -689,6 +621,7 @@ export {
   gitHistoryDetail,
   gitHistoryRows,
   gitHistorySelectId,
+  gitHistoryVisualGraph,
   isGitHistorySelection,
   normalizeGitHistoryFilter,
   renderGitHistory,

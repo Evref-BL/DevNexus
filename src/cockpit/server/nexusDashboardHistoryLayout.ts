@@ -186,35 +186,6 @@ export function buildNexusDashboardHistoryLayout(
   };
 }
 
-export function renderNexusDashboardHistoryLayoutClientSource(): string {
-  return [
-    historyEdgeId,
-    buildHistoryEventGraph,
-    historyMarkersForNodes,
-    historyDetailRows,
-    layoutHistoryTracks,
-    routeHistoryFromRow,
-    canRouteMergeParentOntoExistingTrack,
-    routeMergeParentOntoExistingTrack,
-    routePrimaryHistoryLineage,
-    nextParentLink,
-    createHistoryRouteTrack,
-    claimHistoryEventTrack,
-    historyEventPoint,
-    openHistoryLanePoint,
-    matchingHistoryReservationPoint,
-    reserveHistoryLanePoint,
-    appendHistoryRoutePiece,
-    chooseHistoryPaletteSlot,
-    historySegmentsFromTracks,
-    historySegmentFromRoute,
-    historyPointsTouch,
-    buildNexusDashboardHistoryLayout,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
-}
-
 export function validateNexusDashboardHistoryLayout(
   layout: NexusDashboardHistoryLayout,
 ): NexusDashboardHistoryInvariantViolation[] {
