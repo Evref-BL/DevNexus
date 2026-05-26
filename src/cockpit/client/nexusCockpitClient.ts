@@ -30,10 +30,6 @@ import {
 } from "./nexusCockpitFormat.js";
 import {
   historyRows,
-  renderBranchGraph,
-  renderLaneKey,
-  renderWorkHistory,
-  timelineLanes,
 } from "./history/nexusCockpitWorkMap.js";
 import {
   featureGitBranches,
@@ -340,37 +336,119 @@ function injectStyles() {
 }
 
 function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = '') {
-  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);
+  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : null;
   const loading = snapshot.partial === true;
   const componentsLoaded = sectionLoaded(snapshot, 'components');
   const threadsLoaded = sectionLoaded(snapshot, 'threads');
   const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');
-  const pluginsLoaded = sectionLoaded(snapshot, 'plugins');
   const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Event history', 'Project Events', 'Loading events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
-  const workHistory = loading && !threadsLoaded ? renderProgressivePanel('parallel-work-map', 'Workspace map', 'Activity Lanes', 'Loading source checkout, branches, automation, and decisions.') : renderWorkHistory(snapshot, activeSelection);
-  const features = loading && !threadsLoaded ? renderProgressivePanel('active-features', 'Project workflow', 'Active Features', 'Loading feature branches and active threads.') : renderFeatureOverview(snapshot, activeSelection);
   const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('hitl-queue', 'HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot, activeSelection);
   const trackedWork = loading && !trackedLoaded ? renderProgressivePanel('tracked-work-panel', 'Tracked work', 'Issues and Work Items', 'Loading provider and local work items.') : renderTrackedWork(snapshot, activeSelection);
-  const plugins = loading && !pluginsLoaded ? renderProgressivePanel('plugins-panel', 'Extensions', 'Plugins', 'Loading local plugin candidates and capability details.') : renderPlugins(snapshot.plugins);
   const activity = loading && !threadsLoaded ? renderProgressivePanel('activity-panel', 'Activity', 'Recent Signals', 'Loading workspace events.') : `<div class="dn-panel" id="activity-panel"><h2>Activity</h2><div class="dn-events">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>`;
   const blockers = loading && !trackedLoaded ? renderProgressivePanel('blockers-panel', 'Blockers', 'Blockers', 'Loading approvals and blockers.') : `<div class="dn-panel dn-blockers-panel" id="blockers-panel"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>`;
-  return `<div class="dn-shell">
-    <header class="dn-header">
-      <div><span class="dn-eyebrow">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>
-      ${renderProjectHeaderActions(snapshot, themeMode, selectedWorkspaceId)}
-    </header>
-    ${renderHostOverview(host, snapshot, selectedWorkspaceId)}
-    ${renderSignals(snapshot.signals, activeSelection)}
-    <section class="dn-main-grid">
-      <div class="dn-work-stack">${gitHistory}${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}${features}${workHistory}${threadInbox}${trackedWork}</div>
-    </section>
-    <section class="dn-plugin-row">${plugins}</section>
-    <section class="dn-grid dn-secondary-grid">
-      <div class="dn-panel dn-components-panel" id="components-panel"><h2>Components</h2>${renderComponents(snapshot.components, activeSelection)}</div>
-      ${activity}
-      ${blockers}
-    </section>
+  return `<div class="dn-shell dn-project-cockpit">
+    ${renderProjectTopBar(snapshot, themeMode, selectedWorkspaceId)}
+    <div class="dn-cockpit-layout">
+      ${renderCockpitLeftRail(snapshot, activeSelection)}
+      <main class="dn-cockpit-main" aria-label="Project state">${gitHistory}</main>
+      ${renderCockpitOperationsPanel(snapshot, { threadInbox, trackedWork, activity, blockers })}
+    </div>
   </div>`;
+}
+
+function renderProjectTopBar(snapshot, themeMode, selectedWorkspaceId = '') {
+  const metrics = cockpitMetrics(snapshot);
+  const status = [
+    cockpitTopbarMetric('Decisions', metrics.pendingDecisions, metrics.pendingDecisions > 0 ? 'warn' : 'good'),
+    cockpitTopbarMetric('Blockers', metrics.blockers, metrics.blockers > 0 ? 'danger' : 'good'),
+    cockpitTopbarMetric('Threads', metrics.activeThreads, metrics.activeThreads > 0 ? 'active' : 'neutral'),
+    cockpitTopbarMetric('Tracked', metrics.trackedWork, metrics.trackedWork > 0 ? 'active' : 'neutral'),
+  ].join('');
+  return `<header class="dn-cockpit-topbar"><div class="dn-topbar-title"><span class="dn-eyebrow">DevNexus cockpit</span><strong title="${escapeHtml(snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><span title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</span></div><div class="dn-topbar-status" aria-label="Workspace status">${status}</div><div class="dn-topbar-actions">${renderHostNavButton(selectedWorkspaceId)}<span class="dn-header-pill dn-header-stamp"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot?.generatedAt))}</strong></span>${renderPathOpenMenu('project', 'Project', snapshot?.project?.root ?? '')}${renderThemeToggle(themeMode)}</div></header>`;
+}
+
+function cockpitTopbarMetric(label, value, tone) {
+  return `<span class="dn-topbar-metric tone-${escapeAttribute(tone)}"><strong>${escapeHtml(String(value))}</strong><span>${escapeHtml(label)}</span></span>`;
+}
+
+function cockpitMetrics(snapshot) {
+  const threads = snapshot.threads ?? {};
+  const tracked = snapshot.trackedWork ?? {};
+  return {
+    pendingDecisions: Number(threads.needsDecisionCount ?? 0),
+    activeThreads: Number(threads.activeCount ?? threads.records?.length ?? 0),
+    blockers: Array.isArray(snapshot.blockers) ? snapshot.blockers.length : 0,
+    trackedWork: Number(tracked.readyCount ?? 0) + Number(tracked.blockedCount ?? 0) + Number(tracked.importCandidateCount ?? 0),
+    components: Array.isArray(snapshot.components) ? snapshot.components.length : 0,
+    plugins: Number(snapshot.plugins?.enabledCount ?? 0),
+  };
+}
+
+function renderCockpitLeftRail(snapshot, selectedId) {
+  const metrics = cockpitMetrics(snapshot);
+  return `<aside class="dn-left-rail" id="cockpit-left-rail" aria-label="Cockpit navigation"><section class="dn-rail-section dn-rail-project"><span class="dn-eyebrow">Project</span><strong title="${escapeHtml(snapshot.project.root ?? snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><p title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</p></section><nav class="dn-rail-nav" aria-label="Project sections"><a href="#project-git-history"><span>Events</span><strong>${escapeHtml(countLabel(snapshot.history?.totalCommitCount ?? 0, 'event'))}</strong></a><a href="#hitl-queue"><span>Decisions</span><strong>${escapeHtml(String(metrics.pendingDecisions))}</strong></a><a href="#tracked-work-panel"><span>Tracked work</span><strong>${escapeHtml(String(metrics.trackedWork))}</strong></a><a href="#blockers-panel"><span>Blockers</span><strong>${escapeHtml(String(metrics.blockers))}</strong></a></nav>${renderComponentRail(snapshot, selectedId)}${renderWorkflowRail(snapshot)}${renderWorktreeStateRail(snapshot)}${renderSettingsRail(snapshot)}</aside>`;
+}
+
+function renderComponentRail(snapshot, selectedId) {
+  const components = snapshot.components ?? [];
+  const visible = components.slice(0, 8);
+  const more = components.length > visible.length ? `<span class="dn-rail-muted">${escapeHtml(countLabel(components.length - visible.length, 'more component'))}</span>` : '';
+  const body = visible.length ? visible.map((component) => {
+    const id = `component:${component.id}`;
+    const git = component.git;
+    const tone = git?.dirty ? 'warn' : component.sourceRootExists ? 'good' : 'danger';
+    const branch = git?.branch ?? 'no branch';
+    return `<button class="dn-rail-item ${id === selectedId ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button>`;
+  }).join('') : '<p>No components loaded.</p>';
+  return `<section class="dn-rail-section" id="components-panel"><span class="dn-rail-heading">Components</span><div class="dn-rail-list">${body}${more}</div></section>`;
+}
+
+function renderWorkflowRail(snapshot) {
+  const workflows = snapshot.gitWorkflows;
+  const features = snapshot.features;
+  const counters = [
+    workflows?.activeRunCount ? `${workflows.activeRunCount} active` : null,
+    workflows?.waitingRunCount ? `${workflows.waitingRunCount} waiting` : null,
+    workflows?.blockedRunCount ? `${workflows.blockedRunCount} blocked` : null,
+    features?.activeCount ? `${features.activeCount} features` : null,
+  ].filter(Boolean);
+  const runs = (workflows?.runs ?? []).slice(0, 3).map((run) => `<span class="dn-rail-run tone-${escapeAttribute(gitWorkflowRunTone(run))}" title="${escapeHtml(run.branchName ?? run.currentRef ?? run.id)}">${escapeHtml(truncate(run.statusLabel ?? run.status ?? 'workflow', 28))}</span>`).join('');
+  return `<section class="dn-rail-section" id="active-features"><span class="dn-rail-heading">Workflows</span><p>${escapeHtml(counters.join(' · ') || 'No workflow runs recorded.')}</p>${runs ? `<div class="dn-rail-runs">${runs}</div>` : ''}</section>`;
+}
+
+function renderWorktreeStateRail(snapshot) {
+  const rows = safeHistoryRows(snapshot);
+  const lanes = rows.lanes ?? [];
+  const worktreeCount = snapshot.worktrees?.records?.length ?? 0;
+  const laneItems = lanes.slice(0, 5).map((lane) => {
+    const count = rows.rows.filter((row) => row.lane === lane.index).length;
+    return `<span style="--dn-branch-color:var(--dn-branch-${lane.index});"><strong>${escapeHtml(lane.label)}</strong><em>${escapeHtml(countLabel(count, 'record'))}</em></span>`;
+  }).join('');
+  return `<section class="dn-rail-section" id="worktree-state-panel"><span class="dn-rail-heading">Worktree state</span><p>${escapeHtml(countLabel(worktreeCount, 'worktree'))} mapped onto event refs.</p><div class="dn-worktree-state-list">${laneItems}</div></section>`;
+}
+
+function safeHistoryRows(snapshot) {
+  try {
+    return historyRows({
+      ...snapshot,
+      weave: snapshot.weave ?? { nodes: [], lanes: [] },
+      worktrees: snapshot.worktrees ?? { records: [] },
+    });
+  } catch {
+    return { rows: [], lanes: [] };
+  }
+}
+
+function renderSettingsRail(snapshot) {
+  const plugins = snapshot.plugins ?? {};
+  const count = [countLabel(plugins.enabledCount ?? 0, 'enabled plugin'), plugins.capabilityCount ? countLabel(plugins.capabilityCount, 'capability', 'capabilities') : null].filter(Boolean).join(' · ');
+  return `<section class="dn-rail-section" id="plugins-panel"><span class="dn-rail-heading">Settings</span><p>Extensions, local tools, and cockpit options.</p><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
+}
+
+function renderCockpitOperationsPanel(snapshot, panels) {
+  const metrics = cockpitMetrics(snapshot);
+  const pendingLabel = `${metrics.pendingDecisions} pending`;
+  return `<details class="dn-ops-panel" id="cockpit-ops-panel" data-panel-state="closed" data-ops-pending-count="${escapeHtml(String(metrics.pendingDecisions))}"><summary aria-label="${escapeHtml(`Open operations panel, ${pendingLabel}`)}"><span class="dn-ops-icon">${signalIcon('worktrees')}</span><span class="dn-ops-summary-copy"><strong>Operations</strong><em>${escapeHtml(pendingLabel)}</em></span><span class="dn-ops-badge">${escapeHtml(String(metrics.pendingDecisions))}</span></summary><div class="dn-ops-panel-body">${panels.threadInbox}${panels.trackedWork}${panels.activity}${panels.blockers}</div></details>`;
 }
 
 function renderHostDashboard(host, themeMode, hostFocus = 'components') {

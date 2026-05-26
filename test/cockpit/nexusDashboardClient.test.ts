@@ -323,9 +323,89 @@ describe("nexus dashboard client", () => {
 
     const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
 
+    expect(rendered).toContain("dn-project-cockpit");
+    expect(rendered).toContain('class="dn-cockpit-topbar"');
+    expect(rendered).toContain('id="project-git-history"');
+    expect(rendered).toContain('id="cockpit-ops-panel"');
+    expect(rendered).toContain('data-panel-state="closed"');
+    expect(rendered).toContain('data-ops-pending-count="0"');
+    expect(rendered).toContain('id="cockpit-left-rail"');
+    expect(rendered).not.toContain('id="selected-item"');
+    expect(rendered).not.toContain('id="parallel-work-map"');
+    expect(rendered).not.toContain('aria-label="Current workspace signals"');
     expect(rendered.indexOf('id="project-git-history"')).toBeLessThan(
-      rendered.indexOf('id="selected-item"'),
+      rendered.indexOf('id="cockpit-ops-panel"'),
     );
+  });
+
+  it("keeps pending decisions as a closed side-panel indicator", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Needs decisions",
+      project: {
+        name: "Dashboard Demo",
+        root: "/workspace/source",
+      },
+      signals: [],
+      events: [],
+      blockers: ["Provider token approval needed"],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 1, capabilityCount: 2, records: [] },
+      trackedWork: {
+        readyCount: 2,
+        blockedCount: 1,
+        importCandidateCount: 0,
+        staleCount: 0,
+        records: [],
+      },
+      threads: {
+        totalCount: 3,
+        activeCount: 3,
+        needsDecisionCount: 2,
+        records: [
+          {
+            id: "thread-1",
+            title: "Review provider action",
+            decision: "review",
+            decisionLabel: "Needs review",
+            decisionDetail: "Provider action requires approval.",
+            updatedAt: "2026-05-23T11:00:00.000Z",
+          },
+        ],
+      },
+      history: {
+        totalCommitCount: 0,
+        repositories: [],
+        incomplete: false,
+        detail: null,
+      },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered).toContain('id="cockpit-ops-panel"');
+    expect(rendered).toContain('data-panel-state="closed"');
+    expect(rendered).toContain('data-ops-pending-count="2"');
+    expect(rendered).toContain("2 pending");
+    expect(rendered).toContain('id="hitl-queue"');
+    expect(rendered).toContain('id="tracked-work-panel"');
+    expect(rendered).toContain('id="activity-panel"');
+    expect(rendered).toContain('id="blockers-panel"');
+    expect(rendered).toContain("Provider token approval needed");
   });
 
   it("keeps visible dashboard content stable during background refresh", async () => {
