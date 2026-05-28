@@ -8726,8 +8726,13 @@ function formatPublicationGitIdentity(identity: NexusGitIdentityStatus): string 
     identity.observed.name || identity.observed.email
       ? `${identity.observed.name ?? "unknown"}<${identity.observed.email ?? "unknown"}>`
       : identity.observed.source;
+  const coAuthorCount = identity.expected?.coAuthors.length ?? 0;
+  const coAuthors =
+    coAuthorCount > 0
+      ? ` coAuthors=${coAuthorCount}`
+      : "";
 
-  return `${expected}->${observed}:${identity.status}`;
+  return `${expected}->${observed}:${identity.status}${coAuthors}`;
 }
 
 function formatPublicationActor(actor: NexusPublicationActorStatus): string {
