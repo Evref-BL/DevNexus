@@ -18,6 +18,13 @@ Workspaces often need two kinds of provider accounts:
 Do not let an agent silently fall back to a user account when workspace policy
 expects an automation actor. Configure the profile explicitly.
 
+Some teams want agent-created commits to use a visible human account as the
+primary Git author and to credit the agent through commit trailers. In that
+case, configure a human publication actor, point it at an explicit human auth
+profile, and set `automation.publication.gitIdentity.coAuthors` to every
+required `Co-authored-by` trailer. The list may contain any number of
+co-authors.
+
 ## Credential Methods
 
 DevNexus should reference credential context, not store secrets.
@@ -336,7 +343,9 @@ agent-created Git and provider activity. With GitHub Apps, the remote can be a
 plain HTTPS repository URL while DevNexus injects a short-lived token only for
 the Git operation that needs it. Use an installation-token profile when the App
 should be the actor, and a `github_app_user_token` profile when a human actor
-should be visible with the App recorded as the credential path.
+should be visible with the App recorded as the credential path. Configure
+`gitIdentity.coAuthors` when the human-authored workflow also needs agent or
+pairing credit in commit trailers.
 
 ## Authority Roles
 

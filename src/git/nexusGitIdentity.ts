@@ -5,6 +5,7 @@ import type {
 import type {
   NexusAutomationPublicationConfig,
   NexusPublicationActorConfig,
+  NexusPublicationGitCoAuthorConfig,
 } from "../automation/nexusAutomationConfig.js";
 import type { NexusHostingAuthProfileConfig } from "../project/nexusProjectHosting.js";
 
@@ -18,6 +19,7 @@ export type NexusGitIdentityStatusKind =
 export interface NexusExpectedGitIdentity {
   name: string | null;
   email: string | null;
+  coAuthors: NexusPublicationGitCoAuthorConfig[];
   source: string;
   warnings: string[];
 }
@@ -97,6 +99,7 @@ export function resolveExpectedAutomationGitIdentity(options: {
   return {
     name,
     email,
+    coAuthors: publicationGitIdentity?.coAuthors ?? [],
     source,
     warnings,
   };
@@ -179,7 +182,7 @@ export function compareGitIdentity(options: {
       status: "not_configured",
       expected: null,
       observed: options.observed,
-      message: "No automated Git identity is configured.",
+      message: "No Git identity is configured.",
     };
   }
 
@@ -210,8 +213,8 @@ export function compareGitIdentity(options: {
     expected,
     observed: options.observed,
     message: matched
-      ? `Observed Git identity ${options.observed.name} <${options.observed.email}> matches automation identity.`
-      : `Observed Git identity ${options.observed.name} <${options.observed.email}> does not match expected automation identity ${expected.name} <${expected.email}>.`,
+      ? `Observed Git identity ${options.observed.name} <${options.observed.email}> matches configured Git identity.`
+      : `Observed Git identity ${options.observed.name} <${options.observed.email}> does not match expected configured Git identity ${expected.name} <${expected.email}>.`,
   };
 }
 
@@ -228,6 +231,14 @@ export function gitIdentityEnvironment(
     GIT_COMMITTER_NAME: expected.name,
     GIT_COMMITTER_EMAIL: expected.email,
   };
+}
+
+export function gitCoAuthorTrailers(
+  expected: NexusExpectedGitIdentity | null,
+): string[] {
+  return (expected?.coAuthors ?? []).map(
+    (coAuthor) => `Co-authored-by: ${coAuthor.name} <${coAuthor.email}>`,
+  );
 }
 
 function findPublicationActorAuthProfile(

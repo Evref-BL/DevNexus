@@ -58,6 +58,46 @@ dev-nexus work-item comment <workspace-root> local-1 --component api --body "Pre
 The user or maintainer decides whether to push, open a pull request, merge, or
 ask for more work.
 
+When publication should be authored as a human account but credit one or more
+agent participants, configure the primary Git identity and every co-author
+trailer explicitly:
+
+```json
+{
+  "automation": {
+    "publication": {
+      "strategy": "review_handoff",
+      "remote": "origin",
+      "actor": {
+        "kind": "human",
+        "provider": "github",
+        "handle": "alice"
+      },
+      "gitIdentity": {
+        "name": "Alice",
+        "email": "123456+alice@users.noreply.github.com",
+        "coAuthors": [
+          {
+            "name": "Codex",
+            "email": "267193182+codex@users.noreply.github.com"
+          },
+          {
+            "name": "Pair Reviewer",
+            "email": "pair-reviewer@example.invalid"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+DevNexus prepares the worktree with the configured primary `user.name` and
+`user.email`. It also renders all configured `Co-authored-by` trailers in the
+worker briefing so the commit message can credit every configured co-author.
+GitHub and GitLab both use this trailer format for co-author attribution; GitLab
+also exposes the same trailer text through merge-request commit templates.
+
 DevNexus treats review and publication as separate concepts. Review decides how
 a change is checked and approved; publication decides whether it may be pushed,
 merged, queued, or released. The target review-policy design is recorded in
