@@ -431,6 +431,42 @@ function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
   };
 }
 
+function documentedCommandPaths(): string[] {
+  return usage()
+    .split("\n")
+    .filter((line) => line.startsWith("  dev-nexus "))
+    .map(commandPathFromUsageLine)
+    .filter((path): path is string => path !== null);
+}
+
+function documentedCommandFamilyPrefixes(): string[] {
+  const prefixes = new Set<string>();
+  for (const commandPath of documentedCommandPaths()) {
+    const tokens = commandPath.split(" ");
+    for (let length = 1; length < tokens.length; length += 1) {
+      prefixes.add(tokens.slice(0, length).join(" "));
+    }
+  }
+  return [...prefixes].sort();
+}
+
+function commandPathFromUsageLine(line: string): string | null {
+  const tokens = line.trim().slice("dev-nexus ".length).split(/\s+/u);
+  const commandTokens: string[] = [];
+  for (const token of tokens) {
+    if (
+      token.startsWith("<") ||
+      token.startsWith("[") ||
+      token.startsWith("--") ||
+      token.startsWith("(")
+    ) {
+      break;
+    }
+    commandTokens.push(token);
+  }
+  return commandTokens.length > 0 ? commandTokens.join(" ") : null;
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -799,6 +835,78 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--branch <branch>");
     expect(output.output()).toContain("--title <text>");
     expect(output.output()).not.toContain("Options for publication pull-request merge:");
+  });
+
+  it("prints help for every documented command path", async () => {
+    for (const commandPath of documentedCommandPaths()) {
+      const output = captureOutput();
+
+      await expect(
+        main([...commandPath.split(" "), "--help"], { stdout: output.writer }),
+      ).resolves.toBe(0);
+
+      expect(output.output()).toContain("Usage:");
+      expect(output.output()).toContain(`dev-nexus ${commandPath}`);
+    }
+  });
+
+  it("prints help for every documented command family prefix", async () => {
+    for (const commandPath of documentedCommandFamilyPrefixes()) {
+      const output = captureOutput();
+
+      await expect(
+        main([...commandPath.split(" "), "--help"], { stdout: output.writer }),
+      ).resolves.toBe(0);
+
+      expect(output.output()).toContain("Usage:");
+      expect(output.output()).toContain(`dev-nexus ${commandPath}`);
+      expect(output.output()).toContain(`Commands for ${commandPath}:`);
+    }
+  });
+
+  it("prints publication family help with Git co-author discovery hints", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["publication", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus publication <command> [options]");
+    expect(output.output()).toContain("Options for publication:");
+    expect(output.output()).toContain("gitIdentity.name/email");
+    expect(output.output()).toContain("gitIdentity.coAuthors[]");
+    expect(output.output()).toContain("Co-authored-by");
+    expect(output.output()).toContain("automation status <workspace-root> --full");
+  });
+
+  it("prints worktree help with generated Git identity context hints", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["worktree", "prepare", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus worktree prepare <workspace-root> [options]");
+    expect(output.output()).toContain("configured Git identity");
+    expect(output.output()).toContain("gitIdentity.coAuthors[]");
+    expect(output.output()).toContain("Co-authored-by");
+  });
+
+  it("prints automation status help with full publication identity discovery", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["automation", "status", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus automation status <workspace-root> [options]");
+    expect(output.output()).toContain("--full");
+    expect(output.output()).toContain("--detail <summary|full>");
+    expect(output.output()).toContain("publication Git identity");
+    expect(output.output()).toContain("coAuthors");
   });
 
   it("prints JSON errors when --json is present", async () => {

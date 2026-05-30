@@ -325,6 +325,9 @@ export function usage(): string {
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
     "  --json",
+    "  Prepared worker context includes the configured Git identity.",
+    "  If automation.publication.gitIdentity.coAuthors[] is configured,",
+    "  the briefing lists every exact Co-authored-by trailer to include.",
     "",
     "Options for git-workflow plan:",
     "  --component <id>          defaults to the primary component",
@@ -380,6 +383,20 @@ export function usage(): string {
     "  --write-scope <path>      repeatable",
     "  --lease-note <text>       repeatable",
     "  --json",
+    "",
+    "Options for publication:",
+    "  Commands: branch-push, pull-request upsert, pull-request merge,",
+    "    pull-request evidence, review-handoff, green-main plan,",
+    "    evidence normalize, merge-queue-readiness, release-train-readiness,",
+    "    candidate-plan, feature-plan, feature-report, feature-finalization",
+    "  automation.publication.gitIdentity.name/email set the primary Git author and committer.",
+    "  automation.publication.gitIdentity.coAuthors[] sets each Co-authored-by trailer rendered",
+    "    into prepared worker context.",
+    "  Discover active publication Git identity with:",
+    "    dev-nexus automation status <workspace-root> --full",
+    "  Prepare a worktree to see the exact agent-facing commit instructions:",
+    "    dev-nexus worktree prepare <workspace-root> [options]",
+    "  Docs: docs/user/publication-workflows.md",
     "",
     "Options for publication branch-push:",
     "  --component <id>          defaults to the primary component",
@@ -696,6 +713,8 @@ export function usage(): string {
     "",
     "Options for automation status:",
     "  --home <path>             host-local home config for auth profiles",
+    "  --full                    shortcut for --detail full",
+    "  --detail <summary|full>   full includes publication Git identity status and coAuthors",
     "  --json",
     "",
     "Options for automation eligible-work:",
@@ -816,11 +835,21 @@ export function focusedCommandUsageForArgv(argv: string[]): string | null {
   }
 
   const commandTokens = argv.filter((token) => token !== "--help" && token !== "-h");
-  const commandPath = usageCommandPaths()
+  const commandPaths = usageCommandPaths()
+    .sort((left, right) => right.split(" ").length - left.split(" ").length);
+  const commandPath = commandPaths
     .filter((path) => !usesCustomFocusedUsage(path))
-    .sort((left, right) => right.split(" ").length - left.split(" ").length)
     .find((path) => commandPathMatches(path, commandTokens));
-  return commandPath ? focusedCommandUsage(commandPath) : null;
+  if (commandPath) {
+    return focusedCommandUsage(commandPath);
+  }
+
+  const familyPaths = commandPaths.filter((path) =>
+    commandTokensMatchPathPrefix(commandTokens, path.split(" ")),
+  );
+  return familyPaths.length > 0
+    ? focusedCommandFamilyUsage(commandTokens, familyPaths)
+    : null;
 }
 
 function focusedCommandUsage(commandPath: string): string {
@@ -833,6 +862,32 @@ function focusedCommandUsage(commandPath: string): string {
     "Usage:",
     usageLine ?? `  dev-nexus ${commandPath} [options]`,
     ...(optionBlock.length > 0 ? ["", ...optionBlock] : []),
+  ].join("\n");
+}
+
+function focusedCommandFamilyUsage(
+  commandTokens: string[],
+  commandPaths: string[],
+): string {
+  const commandPath = commandTokens.join(" ");
+  const lines = usage().split("\n");
+  const directOptionBlock = commandOptionBlock(lines, `Options for ${commandPath}:`);
+  const commandOptionBlockLines =
+    directOptionBlock.length > 0
+      ? directOptionBlock
+      : commandOptionBlock(lines, `Options for ${commandPath} commands:`);
+  const commands = [...new Set(
+    commandPaths
+      .map((path) => path.split(" ").slice(commandTokens.length).join(" "))
+      .filter((command) => command.length > 0),
+  )].sort();
+  return [
+    "Usage:",
+    `  dev-nexus ${commandPath} <command> [options]`,
+    "",
+    `Commands for ${commandPath}:`,
+    ...commands.map((command) => `  ${command}`),
+    ...(commandOptionBlockLines.length > 0 ? ["", ...commandOptionBlockLines] : []),
   ].join("\n");
 }
 
@@ -889,6 +944,16 @@ function trimTrailingBlankLines(lines: string[]): string[] {
 function commandPathMatches(commandPath: string, tokens: string[]): boolean {
   const commandTokens = commandPath.split(" ");
   return commandTokens.every((token, index) => tokens[index] === token);
+}
+
+function commandTokensMatchPathPrefix(
+  commandTokens: string[],
+  pathTokens: string[],
+): boolean {
+  if (commandTokens.length === 0 || commandTokens.length >= pathTokens.length) {
+    return false;
+  }
+  return commandTokens.every((token, index) => pathTokens[index] === token);
 }
 
 function usesCustomFocusedUsage(commandPath: string): boolean {
