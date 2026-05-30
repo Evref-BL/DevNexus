@@ -193,6 +193,11 @@ describe("nexus dashboard client", () => {
     expect(cockpitStyles).toContain(".dn-git-board { --dn-git-graph-width: 230px;");
     expect(cockpitStyles).toContain(".dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 3.6;");
     expect(cockpitStyles).toContain(".dn-git-line { stroke-width: 2.1;");
+    expect(cockpitStyles).toContain(".dn-cockpit-layout { grid-template-columns: minmax(0, 1fr) auto;");
+    expect(cockpitStyles).toContain(".dn-cockpit-main { grid-column: 1; grid-row: 1;");
+    expect(cockpitStyles).toContain(".dn-left-rail { position: relative; top: auto; grid-column: 1 / -1; grid-row: 2;");
+    expect(cockpitStyles).toContain(".dn-ops-panel { grid-column: 2; grid-row: 1;");
+    expect(cockpitStyles).toContain(".dn-left-rail { grid-column: 1; grid-row: 3;");
     expect(cockpitStyles).toContain("dn-history-node-hovered");
     expect(cockpitStyles).toContain("transform: scale(1.24)");
     expect(cockpitStyles).toContain("--dn-branch-11");
