@@ -198,6 +198,9 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 - [Git workflow integration](docs/user/git-workflows.md) explains how DevNexus
   models branch strategies, freshness decisions, human gates, pause/resume, and
   cleanup around existing Git workflows.
+- [Configuration reference](docs/user/configuration-reference.md) lists
+  workspace and home config fields, value shapes, defaults, and parser field
+  coverage.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
   files.
