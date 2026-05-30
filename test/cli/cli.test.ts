@@ -505,6 +505,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus workspace hosting apply");
     expect(output.output()).toContain("dev-nexus workspace mcp refresh");
     expect(output.output()).toContain("dev-nexus workspace plugin refresh");
+    expect(output.output()).toContain("dev-nexus config reference");
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus diagnostics cli-version-skew");
     expect(output.output()).toContain("dev-nexus coordination status");
@@ -907,6 +908,44 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--detail <summary|full>");
     expect(output.output()).toContain("publication Git identity");
     expect(output.output()).toContain("coAuthors");
+  });
+
+  it("prints config reference help with parser-backed discovery hints", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["config", "reference", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus config reference [options]");
+    expect(output.output()).toContain("--scope <workspace|home|all>");
+    expect(output.output()).toContain("docs/user/configuration-reference.md");
+  });
+
+  it("prints the config reference as JSON for agents", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["config", "reference", "--scope", "workspace", "--json"], {
+        stdout: output.writer,
+      }),
+    ).resolves.toBe(0);
+
+    const payload = JSON.parse(output.output()) as {
+      ok: boolean;
+      scope: string;
+      entries: Array<{ scope: string; path: string }>;
+      parserFieldNames: string[];
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.scope).toBe("workspace");
+    expect(payload.entries.every((entry) => entry.scope === "workspace")).toBe(true);
+    expect(payload.entries.map((entry) => entry.path)).toContain(
+      "automation.publication.gitIdentity.coAuthors[]",
+    );
+    expect(payload.parserFieldNames).toContain("gitIdentity");
+    expect(payload.parserFieldNames).toContain("coAuthors");
   });
 
   it("prints JSON errors when --json is present", async () => {

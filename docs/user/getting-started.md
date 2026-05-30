@@ -214,3 +214,5 @@ become the primary component of a new DevNexus workspace.
 - [Providers, auth, and hosting](providers-auth-hosting.md) explains GitHub
   Apps, user accounts, machine-user accounts, provider CLI profiles, and
   workspace repository hosting.
+- [Configuration reference](configuration-reference.md) lists workspace and home
+  config fields, value shapes, defaults, and parser field coverage.

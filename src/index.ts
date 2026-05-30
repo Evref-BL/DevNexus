@@ -141,3 +141,4 @@ export * from "./operations/nexusVersionScopeResolver.js";
 export * from "./work-items/workTrackingLocalProvider.js";
 export * from "./work-items/workTrackingProviderService.js";
 export * from "./work-items/workTrackingTypes.js";
+export * from "./config-reference/nexusConfigReference.js";
