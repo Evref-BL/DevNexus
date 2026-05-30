@@ -421,11 +421,11 @@ function renderGitHistoryRow(snapshot, row, selectedId) {
 
 function gitHistoryScopeGroupStyle(refs) {
   const count = (refs ?? []).length;
-  if (!count) return '--dn-history-scope-count:0;--dn-history-scope-target-width:0px;';
+  if (!count) return '--dn-history-scope-count:0;--dn-history-scope-token-max-width:0px;--dn-history-scope-group-max-width:0px;';
   const longest = Math.max(...refs.map((ref) => String(typeof ref === 'string' ? ref : ref.name ?? '').length));
   const tokenWidth = Math.min(170, Math.max(48, longest * 6 + 24));
-  const targetWidth = (tokenWidth * count) + ((count - 1) * 4);
-  return `--dn-history-scope-count:${count};--dn-history-scope-target-width:${targetWidth}px;`;
+  const groupMaxWidth = (tokenWidth * count) + ((count - 1) * 4);
+  return `--dn-history-scope-count:${count};--dn-history-scope-token-max-width:${tokenWidth}px;--dn-history-scope-group-max-width:${groupMaxWidth}px;`;
 }
 
 function renderGitHistoryScopeTokens(refs, colorLane = 0) {
