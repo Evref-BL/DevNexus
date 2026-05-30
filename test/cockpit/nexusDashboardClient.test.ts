@@ -191,6 +191,7 @@ describe("nexus dashboard client", () => {
     expect(cockpitStyles).toContain("prefers-color-scheme");
     expect(cockpitStyles).toContain(".dn-git-topbar { display: grid; grid-template-columns:");
     expect(cockpitStyles).toContain(".dn-git-board { --dn-git-graph-width: 230px;");
+    expect(cockpitStyles).toContain(".dn-git-panel { container-type: inline-size;");
     expect(cockpitStyles).toContain(".dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 3.6;");
     expect(cockpitStyles).toContain(".dn-git-line { stroke-width: 2.1;");
     expect(cockpitStyles).toContain(".dn-cockpit-layout { grid-template-columns: minmax(0, 1fr) auto;");
@@ -198,6 +199,9 @@ describe("nexus dashboard client", () => {
     expect(cockpitStyles).toContain(".dn-left-rail { position: relative; top: auto; grid-column: 1 / -1; grid-row: 2;");
     expect(cockpitStyles).toContain(".dn-ops-panel { grid-column: 2; grid-row: 1;");
     expect(cockpitStyles).toContain(".dn-left-rail { grid-column: 1; grid-row: 3;");
+    expect(cockpitStyles).toContain("@container (max-width: 900px) { .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);");
+    expect(cockpitStyles).toContain("@media (max-width: 1000px) { .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);");
+    expect(cockpitStyles).toContain(".dn-git-search { grid-column: 1; min-width: 0;");
     expect(cockpitStyles).toContain("dn-history-node-hovered");
     expect(cockpitStyles).toContain("transform: scale(1.24)");
     expect(cockpitStyles).toContain("--dn-branch-11");
