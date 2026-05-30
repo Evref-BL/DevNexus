@@ -583,7 +583,7 @@ describe("nexus manual worktree worker target preparation", () => {
     ).toThrow(/Worker agent provider claude is not active/);
   });
 
-  it("prepares worktrees with repo-local automation Git identity from auth profile", () => {
+  it("prepares worktrees with repo-local configured Git identity from auth profile", () => {
     const { projectRoot, calls } = prepareProject({
       home: "home",
       automation: {
@@ -637,7 +637,7 @@ describe("nexus manual worktree worker target preparation", () => {
       source: "authProfile:bot-github",
     });
     expect(result.setup.context!.briefingMarkdown).toContain(
-      "- automation Git identity: Example Bot <bot@example.invalid>",
+      "- configured Git identity: Example Bot <bot@example.invalid>",
     );
   });
 
@@ -797,7 +797,7 @@ describe("nexus manual worktree worker target preparation", () => {
     });
   });
 
-  it("prepares worktrees with the project default automation Git identity", () => {
+  it("prepares worktrees with the project default configured Git identity", () => {
     const { projectRoot, calls } = prepareProject({
       home: "home",
       automation: {
@@ -819,6 +819,16 @@ describe("nexus manual worktree worker target preparation", () => {
           gitIdentity: {
             name: "Project Bot",
             email: "project-bot@example.invalid",
+            coAuthors: [
+              {
+                name: "Codex",
+                email: "267193182+codex@users.noreply.github.com",
+              },
+              {
+                name: "Pair Reviewer",
+                email: "pair@example.invalid",
+              },
+            ],
           },
         },
       },
@@ -852,10 +862,26 @@ describe("nexus manual worktree worker target preparation", () => {
     expect(context.gitIdentity).toMatchObject({
       name: "Project Bot",
       email: "project-bot@example.invalid",
+      coAuthors: [
+        {
+          name: "Codex",
+          email: "267193182+codex@users.noreply.github.com",
+        },
+        {
+          name: "Pair Reviewer",
+          email: "pair@example.invalid",
+        },
+      ],
       source: "publication.gitIdentity",
     });
     expect(result.setup.context!.briefingMarkdown).toContain(
-      "- raw git commit uses the prepared repo-local automation identity unless the worker overrides Git config.",
+      "- raw git commit uses the prepared repo-local configured identity unless the worker overrides Git config.",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "- configured Git co-author trailer: Co-authored-by: Codex <267193182+codex@users.noreply.github.com>",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "- configured Git co-author trailer: Co-authored-by: Pair Reviewer <pair@example.invalid>",
     );
   });
 });

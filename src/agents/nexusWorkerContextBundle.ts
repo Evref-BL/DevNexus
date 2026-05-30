@@ -21,6 +21,7 @@ import type {
 } from "../project/nexusPluginCapabilities.js";
 import type { NexusRunnerProfilePolicySummary } from "../remote-execution/nexusRunnerProfile.js";
 import type { NexusExpectedGitIdentity } from "../git/nexusGitIdentity.js";
+import { gitCoAuthorTrailers } from "../git/nexusGitIdentity.js";
 import type { PreparedGitWorktreeBaseRefKind } from "../worktrees/gitWorktreeService.js";
 
 export type NexusWorkerContextFileId =
@@ -1075,18 +1076,24 @@ function renderGitIdentityLines(
 ): string[] {
   if (!gitIdentity) {
     return [
-      "- automation Git identity: none",
-      "- automation Git identity warning: repo-local Git identity is not configured; raw git commit may use an inherited host identity.",
+      "- configured Git identity: none",
+      "- configured Git identity warning: repo-local Git identity is not configured; raw git commit may use an inherited host identity.",
     ];
   }
 
+  const coAuthorTrailers = gitCoAuthorTrailers(gitIdentity);
   return [
-    `- automation Git identity: ${gitIdentity.name ?? "unknown"} <${gitIdentity.email ?? "unknown"}>`,
-    `- automation Git identity source: ${gitIdentity.source}`,
+    `- configured Git identity: ${gitIdentity.name ?? "unknown"} <${gitIdentity.email ?? "unknown"}>`,
+    `- configured Git identity source: ${gitIdentity.source}`,
     gitIdentity.name && gitIdentity.email
-      ? "- raw git commit uses the prepared repo-local automation identity unless the worker overrides Git config."
-      : "- automation Git identity warning: repo-local Git identity is incomplete; raw git commit may use an inherited host identity.",
-    ...gitIdentity.warnings.map((warning) => `- automation Git identity warning: ${warning}`),
+      ? "- raw git commit uses the prepared repo-local configured identity unless the worker overrides Git config."
+      : "- configured Git identity warning: repo-local Git identity is incomplete; raw git commit may use an inherited host identity.",
+    ...coAuthorTrailers.map(
+      (trailer) => `- configured Git co-author trailer: ${trailer}`,
+    ),
+    ...gitIdentity.warnings.map(
+      (warning) => `- configured Git identity warning: ${warning}`,
+    ),
   ];
 }
 

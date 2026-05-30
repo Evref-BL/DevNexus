@@ -40,6 +40,7 @@ import {
   handleRemoteExecutionCommand,
   type ParsedRemoteExecutionRequestCreateCommand,
 } from "./cli/cliRemoteExecutionCommand.js";
+import { handleConfigReferenceCommand } from "./cli/cliConfigReferenceCommand.js";
 import {
   createNexusAutomationCommandExecutor,
 } from "./automation/nexusAutomationCommandExecutor.js";
@@ -1016,7 +1017,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, git-workflow, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, config, setup, diagnostics, host, coordination, remote-execution, worktree, git-workflow, publication, review, quick-fix, work-item, ci-failure-intake, cockpit, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1024,6 +1025,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
   home: handleHomeCommand,
   auth: handleAuthCommand,
   workspace: handleProjectCommand,
+  config: handleConfigReferenceCommand,
   setup: handleSetupCommand,
   diagnostics: (argv, dependencies) =>
     handleDiagnosticsCommand(argv, { ...dependencies, usage }),
@@ -8726,8 +8728,13 @@ function formatPublicationGitIdentity(identity: NexusGitIdentityStatus): string 
     identity.observed.name || identity.observed.email
       ? `${identity.observed.name ?? "unknown"}<${identity.observed.email ?? "unknown"}>`
       : identity.observed.source;
+  const coAuthorCount = identity.expected?.coAuthors.length ?? 0;
+  const coAuthors =
+    coAuthorCount > 0
+      ? ` coAuthors=${coAuthorCount}`
+      : "";
 
-  return `${expected}->${observed}:${identity.status}`;
+  return `${expected}->${observed}:${identity.status}${coAuthors}`;
 }
 
 function formatPublicationActor(actor: NexusPublicationActorStatus): string {

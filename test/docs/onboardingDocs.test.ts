@@ -212,6 +212,7 @@ describe("README onboarding guardrails", () => {
       "docs/user/git-workflows.md",
       "docs/user/providers-auth-hosting.md",
       "docs/user/publication-workflows.md",
+      "docs/user/configuration-reference.md",
     ]) {
       assertLocalMarkdownLinksExist(file);
     }

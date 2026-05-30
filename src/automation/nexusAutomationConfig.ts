@@ -200,6 +200,12 @@ export interface NexusPublicationActorConfig {
 export interface NexusPublicationGitIdentityConfig {
   name: string | null;
   email: string | null;
+  coAuthors?: NexusPublicationGitCoAuthorConfig[];
+}
+
+export interface NexusPublicationGitCoAuthorConfig {
+  name: string;
+  email: string;
 }
 
 export interface NexusAutomationGreenMainConfig {
@@ -2346,13 +2352,39 @@ function optionalPublicationGitIdentityField<Key extends string>(
 
   const identityPath = `${pathName}.${key}`;
   const identity = assertRecord(value, identityPath);
+  const coAuthors = optionalPublicationGitCoAuthors(
+    identity.coAuthors,
+    `${identityPath}.coAuthors`,
+  );
   return {
     [key]: {
       name: optionalNullableString(identity.name, `${identityPath}.name`) ?? null,
       email:
         optionalNullableString(identity.email, `${identityPath}.email`) ?? null,
+      ...(coAuthors !== undefined ? { coAuthors } : {}),
     },
   } as Record<Key, NexusPublicationGitIdentityConfig>;
+}
+
+function optionalPublicationGitCoAuthors(
+  value: unknown,
+  pathName: string,
+): NexusPublicationGitCoAuthorConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusAutomationConfigError(`${pathName} must be an array`);
+  }
+
+  return value.map((item, index) => {
+    const itemPath = `${pathName}[${index}]`;
+    const record = assertRecord(item, itemPath);
+    return {
+      name: requiredNonEmptyString(record.name, `${itemPath}.name`),
+      email: requiredNonEmptyString(record.email, `${itemPath}.email`),
+    };
+  });
 }
 
 function assertRecord(value: unknown, pathName: string): Record<string, unknown> {

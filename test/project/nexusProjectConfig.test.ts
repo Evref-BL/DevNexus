@@ -2792,6 +2792,16 @@ describe("workspace config", () => {
             gitIdentity: {
               name: "Example Bot",
               email: "bot@example.invalid",
+              coAuthors: [
+                {
+                  name: "Codex",
+                  email: "267193182+codex@users.noreply.github.com",
+                },
+                {
+                  name: "Pair Reviewer",
+                  email: "pair@example.invalid",
+                },
+              ],
             },
             manualRemote: "origin",
             manualActor: {
@@ -2824,6 +2834,16 @@ describe("workspace config", () => {
       gitIdentity: {
         name: "Example Bot",
         email: "bot@example.invalid",
+        coAuthors: [
+          {
+            name: "Codex",
+            email: "267193182+codex@users.noreply.github.com",
+          },
+          {
+            name: "Pair Reviewer",
+            email: "pair@example.invalid",
+          },
+        ],
       },
       manualRemote: "origin",
       manualActor: {
