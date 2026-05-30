@@ -417,6 +417,106 @@ describe("nexus dashboard client", () => {
     expect(rendered).toContain("Provider token approval needed");
   });
 
+  it("lets left rail components drive the event history project filter", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Two component histories",
+      project: { name: "Dashboard Demo", root: "/workspace/source" },
+      signals: [],
+      events: [],
+      blockers: [],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+        {
+          id: "secondary",
+          name: "DevNexus-Pharo",
+          role: "component",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 0, capabilityCount: 0, records: [] },
+      trackedWork: { readyCount: 0, blockedCount: 0, importCandidateCount: 0, staleCount: 0, records: [] },
+      threads: { totalCount: 0, activeCount: 0, needsDecisionCount: 0, records: [] },
+      history: {
+        totalCommitCount: 2,
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "primary0000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: { kind: "all", branches: [] },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "primary0000000000000000000000000000000000000",
+                shortHash: "primary",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Primary event",
+                refs: [],
+              },
+            ],
+          },
+          {
+            componentId: "secondary",
+            componentName: "DevNexus-Pharo",
+            repositoryPath: "/workspace/pharo",
+            head: "second00000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: { kind: "all", branches: [] },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "second00000000000000000000000000000000000000",
+                shortHash: "second",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:00:00.000Z",
+                subject: "Secondary event",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood", "component:secondary");
+
+    expect(rendered).toContain('data-select-id="component:secondary" data-git-history-filter="component:secondary"');
+    expect(rendered).toContain('data-scroll-target="project-git-history" aria-pressed="true"');
+    expect(rendered).toContain('<option value="component:secondary" selected');
+    expect(rendered).toContain("Secondary event");
+    expect(rendered).not.toContain("Primary event");
+  });
+
   it("keeps visible dashboard content stable during background refresh", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {

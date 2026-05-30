@@ -349,7 +349,7 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
   return `<div class="dn-shell dn-project-cockpit">
     ${renderProjectTopBar(snapshot, themeMode, selectedWorkspaceId)}
     <div class="dn-cockpit-layout">
-      ${renderCockpitLeftRail(snapshot, activeSelection)}
+      ${renderCockpitLeftRail(snapshot, activeSelection, gitHistoryFilter)}
       <main class="dn-cockpit-main" aria-label="Project state">${gitHistory}</main>
       ${renderCockpitOperationsPanel(snapshot, { threadInbox, trackedWork, activity, blockers })}
     </div>
@@ -384,23 +384,34 @@ function cockpitMetrics(snapshot) {
   };
 }
 
-function renderCockpitLeftRail(snapshot, selectedId) {
+function renderCockpitLeftRail(snapshot, selectedId, gitHistoryFilter = '') {
   const metrics = cockpitMetrics(snapshot);
-  return `<aside class="dn-left-rail" id="cockpit-left-rail" aria-label="Cockpit navigation"><section class="dn-rail-section dn-rail-project"><span class="dn-eyebrow">Project</span><strong title="${escapeHtml(snapshot.project.root ?? snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><p title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</p></section><nav class="dn-rail-nav" aria-label="Project sections"><a href="#project-git-history"><span>Events</span><strong>${escapeHtml(countLabel(snapshot.history?.totalCommitCount ?? 0, 'event'))}</strong></a><a href="#hitl-queue"><span>Decisions</span><strong>${escapeHtml(String(metrics.pendingDecisions))}</strong></a><a href="#tracked-work-panel"><span>Tracked work</span><strong>${escapeHtml(String(metrics.trackedWork))}</strong></a><a href="#blockers-panel"><span>Blockers</span><strong>${escapeHtml(String(metrics.blockers))}</strong></a></nav>${renderComponentRail(snapshot, selectedId)}${renderWorkflowRail(snapshot)}${renderWorktreeStateRail(snapshot)}${renderSettingsRail(snapshot)}</aside>`;
+  return `<aside class="dn-left-rail" id="cockpit-left-rail" aria-label="Cockpit navigation"><section class="dn-rail-section dn-rail-project"><span class="dn-eyebrow">Project</span><strong title="${escapeHtml(snapshot.project.root ?? snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><p title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</p></section><nav class="dn-rail-nav" aria-label="Project sections"><a href="#project-git-history"><span>Events</span><strong>${escapeHtml(countLabel(snapshot.history?.totalCommitCount ?? 0, 'event'))}</strong></a><a href="#hitl-queue"><span>Decisions</span><strong>${escapeHtml(String(metrics.pendingDecisions))}</strong></a><a href="#tracked-work-panel"><span>Tracked work</span><strong>${escapeHtml(String(metrics.trackedWork))}</strong></a><a href="#blockers-panel"><span>Blockers</span><strong>${escapeHtml(String(metrics.blockers))}</strong></a></nav>${renderComponentRail(snapshot, selectedId, gitHistoryFilter)}${renderWorkflowRail(snapshot)}${renderWorktreeStateRail(snapshot)}${renderSettingsRail(snapshot)}</aside>`;
 }
 
-function renderComponentRail(snapshot, selectedId) {
+function renderComponentRail(snapshot, selectedId, gitHistoryFilter = '') {
   const components = snapshot.components ?? [];
   const visible = components.slice(0, 8);
   const more = components.length > visible.length ? `<span class="dn-rail-muted">${escapeHtml(countLabel(components.length - visible.length, 'more component'))}</span>` : '';
+  const activeHistoryComponentId = cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter);
   const body = visible.length ? visible.map((component) => {
     const id = `component:${component.id}`;
     const git = component.git;
     const tone = git?.dirty ? 'warn' : component.sourceRootExists ? 'good' : 'danger';
     const branch = git?.branch ?? 'no branch';
-    return `<button class="dn-rail-item ${id === selectedId ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button>`;
+    const selected = activeHistoryComponentId ? component.id === activeHistoryComponentId : id === selectedId;
+    return `<button class="dn-rail-item ${selected ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}" data-git-history-filter="${escapeHtml(`component:${component.id}`)}" data-scroll-target="project-git-history" aria-pressed="${selected ? 'true' : 'false'}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button>`;
   }).join('') : '<p>No components loaded.</p>';
   return `<section class="dn-rail-section" id="components-panel"><span class="dn-rail-heading">Components</span><div class="dn-rail-list">${body}${more}</div></section>`;
+}
+
+function cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter = '') {
+  const normalized = normalizeGitHistoryFilter(gitHistoryFilter);
+  const componentMatch = /^component:([^|]+)/u.exec(normalized);
+  const requested = componentMatch?.[1] ?? '';
+  const repositories = snapshot.history?.repositories ?? [];
+  if (requested && repositories.some((repository) => repository.componentId === requested)) return requested;
+  return repositories[0]?.componentId ?? '';
 }
 
 function renderWorkflowRail(snapshot) {
@@ -728,6 +739,13 @@ function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
   });
   container.addEventListener('click', (event) => {
     const target = eventElementTarget(event.target);
+    const historyFilterButton = target?.closest?.('[data-git-history-filter]');
+    if (historyFilterButton && container.contains(historyFilterButton)) {
+      onGitHistoryFilter?.(historyFilterButton.getAttribute('data-git-history-filter'));
+      const targetId = historyFilterButton.getAttribute('data-scroll-target');
+      if (targetId) scrollToDashboardSection(targetId);
+      return;
+    }
     const button = target?.closest?.('[data-select-id]');
     if (!button || !container.contains(button)) return;
     onSelect(button.getAttribute('data-select-id'));
