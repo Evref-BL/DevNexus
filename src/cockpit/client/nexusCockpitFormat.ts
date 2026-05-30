@@ -99,26 +99,6 @@ export function displayBody(node: any, snapshot: any): string {
   return node.detail ?? snapshot.summary;
 }
 
-export function renderNexusCockpitFormatClientSource(): string {
-  return [
-    countLabel,
-    truncate,
-    compactPath,
-    compactBranchName,
-    formatTime,
-    formatDisplayText,
-    escapeHtml,
-    escapeAttribute,
-    toneForStatus,
-    displayTitle,
-    displayBody,
-    statusTitle,
-    readableBlocker,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
-}
-
 function statusTitle(prefix: string, status: string | undefined): string {
   const text = String(status ?? "").replace(/[-_]+/g, " ").trim();
   return text ? `${prefix} ${text}` : prefix;

@@ -299,7 +299,7 @@ export function showGitHistoryNodePopover(
     return;
   }
   const content = gitHistoryNodePopoverContent(node);
-  if (!content.title && !content.commit) {
+  if (!content.title && !content.source) {
     hideGitHistoryNodePopover(popover);
     return;
   }
@@ -339,11 +339,13 @@ export function gitHistoryNodeFromEventTarget(
 }
 
 export function gitHistoryNodePopoverContent(node: Element): {
-  readonly commit: string;
+  readonly actor: string;
+  readonly attached: readonly string[];
   readonly component: string;
-  readonly details: readonly string[];
-  readonly meta: string;
-  readonly refs: readonly string[];
+  readonly event: string;
+  readonly scopes: readonly string[];
+  readonly source: string;
+  readonly time: string;
   readonly title: string;
 } {
   const lines = String(node.getAttribute("data-dn-tooltip") ?? "")
@@ -353,37 +355,58 @@ export function gitHistoryNodePopoverContent(node: Element): {
   const title = lines[0] ?? String(node.getAttribute("aria-label") ?? "").trim();
   const identity = lines[1] ?? "";
   const identityParts = identity.split("·").map((part) => part.trim()).filter(Boolean);
-  const refsLine = lines.find((line) => line.startsWith("Refs:")) ?? "";
-  const detailsLine = lines.find((line) => line.startsWith("Details:")) ?? "";
-  const meta = lines.find((line) => !line.startsWith("Refs:") && !line.startsWith("Details:") && line !== title && line !== identity) ?? "";
+  const fallbackMeta = lines.find((line) => !line.includes(":") && line !== title && line !== identity) ?? "";
+  const fallbackMetaParts = fallbackMeta.split("·").map((part) => part.trim()).filter(Boolean);
   return {
     title,
-    component: identityParts[0] ?? "",
-    commit: identityParts[1] ?? "",
-    refs: refsLine.replace(/^Refs:\s*/u, "").split(",").map((ref) => ref.trim()).filter(Boolean),
-    meta,
-    details: detailsLine.replace(/^Details:\s*/u, "").split(",").map((detail) => detail.trim()).filter(Boolean),
+    event: historyPopoverLineValue(lines, "Event") || "Source change",
+    component: historyPopoverLineValue(lines, "Component") || identityParts[0] || "",
+    source: historyPopoverLineValue(lines, "Source") || identityParts[1] || "",
+    actor: historyPopoverLineValue(lines, "Actor") || fallbackMetaParts[0] || "",
+    time: historyPopoverLineValue(lines, "Time") || fallbackMetaParts.slice(1).join(" · "),
+    scopes: historyPopoverCsvValue(lines, "Scopes", "Refs"),
+    attached: historyPopoverCsvValue(lines, "Attached", "Details"),
   };
 }
 
 export function renderGitHistoryNodePopoverContent(content: {
-  readonly commit: string;
+  readonly actor: string;
+  readonly attached: readonly string[];
   readonly component: string;
-  readonly details: readonly string[];
-  readonly meta: string;
-  readonly refs: readonly string[];
+  readonly event: string;
+  readonly scopes: readonly string[];
+  readonly source: string;
+  readonly time: string;
   readonly title: string;
 }): string {
-  const heading = content.commit ? `Commit ${content.commit}` : "Commit";
-  const component = content.component ? `<span>${escapeHistoryPopoverHtml(content.component)}</span>` : "";
-  const meta = content.meta ? `<span>${escapeHistoryPopoverHtml(content.meta)}</span>` : "";
-  const refs = content.refs.length
-    ? content.refs.map((ref) => `<span class="dn-history-popover-chip">${escapeHistoryPopoverHtml(ref)}</span>`).join("")
-    : `<span class="dn-history-popover-muted">No branch refs loaded</span>`;
-  const details = content.details.length
-    ? content.details.map((detail) => `<span class="dn-history-popover-chip soft">${escapeHistoryPopoverHtml(detail)}</span>`).join("")
-    : `<span class="dn-history-popover-muted">No attached details</span>`;
-  return `<div class="dn-history-popover-heading">${escapeHistoryPopoverHtml(heading)}</div><div class="dn-history-popover-title">${escapeHistoryPopoverHtml(content.title)}</div><div class="dn-history-popover-meta">${component}${meta}</div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Branches</span><div class="dn-history-popover-chips">${refs}</div></div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Details</span><div class="dn-history-popover-chips">${details}</div></div>`;
+  const source = content.source ? `<span class="dn-history-popover-source">${escapeHistoryPopoverHtml(content.source)}</span>` : "";
+  const fields = [
+    ["Component", content.component],
+    ["Actor", content.actor],
+    ["Time", content.time],
+  ].filter(([, value]) => value).map(([label, value]) => `<span class="dn-history-popover-field"><span>${escapeHistoryPopoverHtml(label)}</span><strong>${escapeHistoryPopoverHtml(value)}</strong></span>`).join("");
+  const scopes = content.scopes.length
+    ? content.scopes.map((scope) => `<span class="dn-history-popover-token">${escapeHistoryPopoverHtml(scope)}</span>`).join("")
+    : `<span class="dn-history-popover-muted">No scopes loaded</span>`;
+  const attached = content.attached.length
+    ? content.attached.map((detail) => `<span class="dn-history-popover-token soft">${escapeHistoryPopoverHtml(detail)}</span>`).join("")
+    : `<span class="dn-history-popover-muted">No attached markers</span>`;
+  return `<div class="dn-history-popover-heading"><span class="dn-history-popover-kicker">Event preview</span><strong>${escapeHistoryPopoverHtml(content.event)}</strong>${source}</div><div class="dn-history-popover-title">${escapeHistoryPopoverHtml(content.title)}</div><div class="dn-history-popover-meta">${fields}</div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Scopes</span><div class="dn-history-popover-tokens">${scopes}</div></div><div class="dn-history-popover-section"><span class="dn-history-popover-label">Attached</span><div class="dn-history-popover-tokens">${attached}</div></div>`;
+}
+
+function historyPopoverLineValue(lines: readonly string[], label: string): string {
+  const prefix = `${label}:`;
+  const line = lines.find((candidate) => candidate.startsWith(prefix)) ?? "";
+  return line.slice(prefix.length).trim();
+}
+
+function historyPopoverCsvValue(
+  lines: readonly string[],
+  label: string,
+  fallbackLabel: string,
+): string[] {
+  const value = historyPopoverLineValue(lines, label) || historyPopoverLineValue(lines, fallbackLabel);
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
 export function positionGitHistoryNodePopover(
@@ -525,40 +548,6 @@ function markGitHistorySearchElement(
 function wrapGitHistorySearchIndex(index: number, matchCount: number): number {
   if (!matchCount) return 0;
   return ((index % matchCount) + matchCount) % matchCount;
-}
-
-export function renderNexusCockpitHistoryInteractionsClientSource(): string {
-  return [
-    bindGitHistoryInteractions,
-    gitHistorySelectIdFromEventTarget,
-    updateGitHistoryHover,
-    gitHistoryKeyboardTarget,
-    nextGitHistoryKeyboardSelectId,
-    orderedGitHistorySelectIds,
-    focusGitHistoryEvent,
-    gitHistoryRowForSelectId,
-    gitHistoryGraphNodeForSelectId,
-    createGitHistoryNodePopover,
-    showGitHistoryNodePopover,
-    hideGitHistoryNodePopover,
-    gitHistoryNodeAccentColor,
-    isGitHistoryPopoverColor,
-    gitHistoryNodeFromEventTarget,
-    gitHistoryNodePopoverContent,
-    renderGitHistoryNodePopoverContent,
-    positionGitHistoryNodePopover,
-    gitHistoryPopoverConnectorY,
-    gitHistoryPopoverPixelValue,
-    applyGitHistorySearch,
-    normalizeGitHistorySearchText,
-    clearGitHistorySearchClasses,
-    markGitHistorySearchElement,
-    wrapGitHistorySearchIndex,
-    escapeHistoryPopoverHtml,
-    gitHistoryInteractionElement,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
 }
 
 function gitHistoryInteractionElement(source: EventTarget | null): Element | null {

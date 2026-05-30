@@ -16,7 +16,6 @@ import {
   defaultNexusFeatureBranchDeliveryConfig,
   defaultNexusGitWorkflowGateConfig,
   defaultNexusGitWorkflowUpdatePolicyConfig,
-  renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,

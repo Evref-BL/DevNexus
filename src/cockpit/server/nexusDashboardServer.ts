@@ -64,7 +64,6 @@ import {
 export {
   auditNexusDashboardClientVisuals,
   renderNexusCockpitBrowserModule,
-  renderNexusDashboardClientModule,
 } from "./nexusDashboardServerAssets.js";
 export type {
   NexusDashboardVisualAuditCheck,

@@ -13,7 +13,6 @@ import {
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
-  renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
@@ -47,6 +46,7 @@ import {
   isGitHistoryPopoverColor,
   renderGitHistoryNodePopoverContent,
 } from "../../src/cockpit/client/history/nexusCockpitHistoryInteractions.js";
+import { cockpitStyles } from "../../src/cockpit/client/nexusCockpitStyles.js";
 
 afterEach(cleanupDashboardTestTempDirs);
 
@@ -57,10 +57,13 @@ describe("nexus dashboard client", () => {
         if (name === "data-dn-tooltip") {
           return [
             "Classify Git workflow branch freshness",
-            "DevNexus · 8c61c96",
-            "Refs: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
-            "devnexus-automation[bot] · 25 mai, 14:52",
-            "Details: Needs review, Active, 1 thread, 28 issues",
+            "Event: Source change",
+            "Component: DevNexus",
+            "Source: Commit 8c61c96",
+            "Actor: devnexus-automation[bot]",
+            "Time: 25 mai, 14:52",
+            "Scopes: codex/dev-nexus/358-git-workflow-freshness, app/codex/dev-nexus/358-git-workflow-freshness",
+            "Attached: Needs review, Active, 1 thread, 28 issues",
           ].join("\n");
         }
         return null;
@@ -75,18 +78,23 @@ describe("nexus dashboard client", () => {
 
     expect(content).toEqual({
       title: "Classify Git workflow branch freshness",
+      event: "Source change",
       component: "DevNexus",
-      commit: "8c61c96",
-      refs: [
+      source: "Commit 8c61c96",
+      actor: "devnexus-automation[bot]",
+      time: "25 mai, 14:52",
+      scopes: [
         "codex/dev-nexus/358-git-workflow-freshness",
         "app/codex/dev-nexus/358-git-workflow-freshness",
       ],
-      meta: "devnexus-automation[bot] · 25 mai, 14:52",
-      details: ["Needs review", "Active", "1 thread", "28 issues"],
+      attached: ["Needs review", "Active", "1 thread", "28 issues"],
     });
+    expect(html).toContain("Event preview");
+    expect(html).toContain("Source change");
     expect(html).toContain("Commit 8c61c96");
-    expect(html).toContain("Branches");
-    expect(html).toContain("Details");
+    expect(html).toContain("Scopes");
+    expect(html).toContain("Attached");
+    expect(html).toContain("dn-history-popover-field");
     expect(html).toContain("codex/dev-nexus/358-git-workflow-freshness");
     expect(html).toContain("Needs review");
     expect(html).toContain("&lt;script&gt;");
@@ -102,228 +110,103 @@ describe("nexus dashboard client", () => {
     expect(gitHistoryPopoverPixelValue("")).toBe(0);
   });
 
-  it("renders a client module with explicit light and dark mode controls", () => {
-    const module = renderNexusDashboardClientModule();
+  it("renders cockpit controls and styles through direct client modules", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const headerActions = hooks.renderProjectHeaderActions(
+      {
+        generatedAt: "2026-05-23T12:00:00.000Z",
+        project: { root: "/workspace/source" },
+      },
+      "system",
+      "dev-nexus-dogfood",
+    );
+    const host = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      workspaces: [
+        {
+          id: "dev-nexus-dogfood",
+          projectRoot: "/workspace",
+          name: "DevNexus Dogfood",
+          status: "active",
+          summary: "Current workspace",
+        },
+      ],
+      actions: [
+        {
+          id: "review-1",
+          title: "Review queued change",
+          decision: "review",
+          decisionLabel: "Needs review",
+          decisionDetail: "Provider action requires approval.",
+          hostId: "host",
+        },
+      ],
+      plugins: {
+        configured: [
+          {
+            id: "github",
+            name: "GitHub",
+            summary: "Provider integration",
+            enabled: true,
+          },
+        ],
+        local: [],
+        curated: [
+          {
+            id: "browser",
+            name: "Browser",
+            summary: "Inspect local cockpit pages",
+            enabled: false,
+          },
+        ],
+      },
+    };
+    const hostRendered = hooks.renderHostDashboard(host, "dark", "actions");
+    const pluginRendered = hooks.renderPlugins(host.plugins);
+    const threadActions = hooks.renderThreadActions({
+      id: "thread-1",
+      title: "Review queued change",
+      decision: "review",
+      decisionLabel: "Needs review",
+      decisionDetail: "Provider action requires approval.",
+    });
 
-    expect(module).toContain("dev-nexus-cockpit-theme");
-    expect(module).toContain("data-dev-nexus-theme");
-    expect(module).toContain("data-theme-mode=\"system\"");
-    expect(module).toContain("data-theme-mode=\"light\"");
-    expect(module).toContain("data-theme-mode=\"dark\"");
-    expect(module).toContain(":root[data-dev-nexus-theme='light']");
-    expect(module).toContain(":root[data-dev-nexus-theme='dark']");
-    expect(module).toContain("color-scheme");
-    expect(module).toContain("prefers-color-scheme");
-    expect(module).toContain("data-select-id");
-    expect(module).toContain("data-git-history-search");
-    expect(module).toContain("applyGitHistorySearch");
-    expect(module).toContain("dn-history-popover");
-    expect(module).toContain("--dn-history-popover-accent");
-    expect(module).toContain("--dn-history-popover-border-width");
-    expect(module).toContain("--dn-history-popover-radius");
-    expect(module).toContain("border-top-left-radius: calc(var(--dn-history-popover-radius) - var(--dn-history-popover-border-width))");
-    expect(module).toContain("data-edge-side='left'");
-    expect(module).toContain("height: var(--dn-history-popover-border-width)");
-    expect(module).toContain("gitHistoryNodeAccentColor");
-    expect(module).toContain("showGitHistoryNodePopover");
-    expect(module).toContain("transform-box: fill-box");
-    expect(module).toContain("vector-effect: non-scaling-stroke");
-    expect(module).toContain("dn-history-node-hovered");
-    expect(module).toContain("transform: scale(1.24)");
-    expect(module).toContain("Activity Lanes");
-    expect(module).toContain("Host cockpit");
-    expect(module).toContain("Workspaces");
-    expect(module).toContain("Action Needed");
-    expect(module).toContain("HITL queue");
-    expect(module).toContain("Plugins");
-    expect(module).toContain("renderThreadInbox");
-    expect(module).toContain("renderHostOverview");
-    expect(module).toContain("renderWorkspaceCard");
-    expect(module).toContain("renderHostDashboard");
-    expect(module).toContain("renderHostActionQueue");
-    expect(module).toContain("Host Cockpit");
-    expect(module).toContain("Host HITL");
-    expect(module).toContain("Action Queue");
-    expect(module).toContain("renderLoading");
-    expect(module).toContain("dn-loading-panel");
-    expect(module).toContain("dn-loader");
-    expect(module).toContain("dn-skeleton");
-    expect(module).toMatch(/if \(!workspaceId\) \{\s+if \(!latestHost\) \{/u);
-    expect(module).toContain("@keyframes dn-spin");
-    expect(module).toContain("@keyframes dn-shimmer");
-    expect(module).toContain("Loading host cockpit");
-    expect(module).toContain("Switching workspace");
-    expect(module).toContain("hostRefreshMs");
-    expect(module).toContain("hostInFlight");
-    expect(module).toContain("workspaceQuery");
-    expect(module).toContain("?workspace=");
-    expect(module).toContain("selectedWorkspaceId");
-    expect(module).toContain("readWorkspaceIdFromLocation");
-    expect(module).toContain("writeWorkspaceIdToLocation");
-    expect(module).toContain("bindWorkspaceControls");
-    expect(module).toContain("bindHostSignalControls");
-    expect(module).toContain("data-host-focus");
-    expect(module).toContain("data-scroll-target");
-    expect(module).toContain("scrollToDashboardSection");
-    expect(module).toContain("signalPanelTarget");
-    expect(module).toContain("filteredHostActions");
-    expect(module).toContain("filteredHostWorkspaces");
-    expect(module).toContain("host-action-queue");
-    expect(module).toContain("dn-host-action-shell");
-    expect(module).toContain("host-workspaces");
-    expect(module).not.toContain("dn-host-sticky-panel");
-    expect(module).toContain("data-workspace-id");
-    expect(module).toContain("data-workspace-selection-id");
-    expect(module).toContain("targetSelectionId");
-    expect(module).toContain("renderCurrent();");
-    expect(module).toContain("renderThreadActions");
-    expect(module).toContain("threadSelectId");
-    expect(module).toContain("threadDetail");
-    expect(module).toContain("id=\"hitl-queue\"");
-    expect(module).toContain("renderThreadPolicyAction");
-    expect(module).toContain("renderPlugins");
-    expect(module).toContain("pluginPills");
-    expect(module).toContain("renderPluginPolicyAction");
-    expect(module).toContain("renderDisabledAction");
-    expect(module).toContain("dn-policy-action");
-    expect(module).toContain("data-thread-action");
-    expect(module).toContain("/api/cockpit/thread-action");
-    expect(module).toContain("Needs plugin enable policy");
-    expect(module).toContain("Curated plugin catalogue entries copy a refresh command");
-    expect(module).toContain("data-copy-text");
-    expect(module).toContain("bindLocalActions");
-    expect(module).toContain("data-copy-prompt");
-    expect(module).toContain("Copy prompt");
-    expect(module).toContain("renderOpenMenu");
-    expect(module).toContain("chevronDownIcon");
-    expect(module).toContain("dn-open-chevron");
-    expect(module).toContain("dn-open-chevron-shell");
-    expect(module).toContain("min-width: 94px");
-    expect(module).toContain(".dn-open-menu[open] .dn-open-chevron");
-    expect(module).toContain("/api/local/open");
-    expect(module).toContain("data-open-target");
-    expect(module).toContain("data-open-app");
-    expect(module).toContain("/api/local/app-icon?app=");
-    expect(module).toContain("dn-app-icon-img");
-    expect(module).toContain(".dn-header-path-menu { flex: 0 1 auto; width: fit-content; min-width: min(100%, 320px); max-width: min(100%, 520px); }");
-    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }");
-    expect(module).toContain("@media (max-width: 560px) { .dn-header-actions { justify-content: stretch; } .dn-header-strip { justify-content: stretch; } .dn-header-path-menu { width: 100%; max-width: 100%; } }");
-    expect(module).not.toContain(".dn-header-strip, .dn-header-path-menu { width: 100%; }");
-    expect(module).toContain("Finder");
-    expect(module).toContain("VS Code");
-    expect(module).toContain("Terminal");
-    expect(module).not.toContain("<span aria-hidden=\"true\">v</span>");
-    expect(module).not.toContain("min-width: 116px");
-    expect(module).not.toContain("Copy brief");
-    expect(module).toContain("Start chat");
-    expect(module).toContain("Resume chat");
-    expect(module).toContain("data-start-chat-prompt");
-    expect(module).toContain("data-chat-target-id");
-    expect(module).toContain("/api/codex/thread");
-    expect(module).toContain("/api/codex/thread${workspaceQuery(workspaceId)}");
-    expect(module).toContain("/api/host");
-    expect(module).toContain("x-dev-nexus-action-token");
-    expect(module).toContain("renderChatActionStrip");
-    expect(module).toContain("detailPrompt");
-    expect(module).toContain("sentenceLine");
-    expect(module).toContain("stripTerminalPunctuation");
-    expect(module).not.toContain("Copy Codex brief");
-    expect(module).not.toContain("Start Codex chat");
-    expect(module).not.toContain("data-start-codex-prompt");
-    expect(module).toContain("Workspace map");
-    expect(module).toContain("dn-work-stack");
-    expect(module).toContain("dn-plugin-row");
-    expect(module).toContain("dn-workspace-card");
-    expect(module).toContain("Extensions");
-    expect(module).not.toContain("Capability layer");
-    expect(module).not.toContain("dn-side-stack");
-    expect(module).toContain("Approval");
-    expect(module).not.toContain("Human approval");
-    expect(module).toContain("selectedDetail");
-    expect(module).toContain("renderSelectedItem");
-    expect(module).toContain("dn-selected-panel");
-    expect(module).toContain("id=\"selected-item\"");
-    expect(module).toContain("id=\"tracked-work-panel\"");
-    expect(module).toContain("id=\"plugins-panel\"");
-    expect(module).toContain("id=\"components-panel\"");
-    expect(module).toContain("id=\"blockers-panel\"");
-    expect(module).toContain("Selected item");
-    expect(module).toContain("Summary");
-    expect(module).toContain("Actions");
-    expect(module).toContain("Evidence");
-    expect(module).toContain("Diagnostics");
-    expect(module).not.toContain("dn-inspector");
-    expect(module).toContain("timelineLanes");
-    expect(module).toContain("renderBranchGraph");
-    expect(module).toContain("dn-branch-svg");
-    expect(module).toContain("const rowHeight = 34");
-    expect(module).toContain("data-row-height");
-    expect(module).toContain("--dn-project-accent");
-    expect(module).toContain("projectAccentStyle");
-    expect(module).toContain("projectAccentCount = 7");
-    expect(module).toContain("workspaceAccentMap");
-    expect(module).toContain("--dn-branch-6");
-    expect(module).toContain("stableAccentIndex");
-    expect(module).not.toContain("--dn-warn: #9a641c");
-    expect(module).toContain("providerIcon");
-    expect(module).toContain("externalLinkIcon");
-    expect(module).toContain("clipboardIcon");
-    expect(module).toContain("signal-components");
-    expect(module).toContain("Not Git history");
-    expect(module).toContain("Each rail is a workspace category");
-    expect(module).toContain("data-git-history-project-select");
-    expect(module).toContain("data-git-history-branch-select");
-    expect(module).toContain("data-git-history-fetch-remotes");
-    expect(module).toContain("cloudFetchIcon");
-    expect(module).toContain("gearIcon");
-    expect(module).toContain(".dn-git-topbar { display: grid; grid-template-columns: minmax(160px, 0.32fr) minmax(220px, 0.48fr) minmax(260px, 1fr) auto;");
-    expect(module).not.toContain(".dn-git-filters { display: flex;");
-    expect(module).not.toContain("All events");
-    expect(module).toContain("--dn-git-row-height: 26px; --dn-git-table-min-width: calc(var(--dn-git-description-width) + var(--dn-git-date-width) + var(--dn-git-author-width) + var(--dn-git-commit-width) + 12px);");
-    expect(module).toContain(".dn-git-board { --dn-git-graph-width: 230px; --dn-git-description-width: 360px; --dn-git-date-width: 124px; --dn-git-author-width: 170px; --dn-git-commit-width: 78px;");
-    expect(module).toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) minmax(0, 1fr); gap: 0; width: 100%; overflow: auto;");
-    expect(module).toContain(".dn-git-graph-column { position: relative; display: grid; grid-template-rows: 30px auto; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; border-right: 0;");
-    expect(module).toContain(".dn-git-graph-detail-edge { position: absolute; right: 0; z-index: 1; width: 1px; background: var(--dn-border-muted); pointer-events: none; }");
-    expect(module).not.toContain(".dn-git-board[data-git-detail-open='true'] .dn-git-graph-column { border-right:");
-    expect(module).toContain(".dn-git-graph-column > .dn-git-column-header { box-sizing: border-box; width: 100%; max-width: 100%;");
-    expect(module).toContain(".dn-git-table { display: grid; grid-template-rows: 30px auto; min-width: var(--dn-git-table-min-width); overflow: visible; }");
-    expect(module).toContain(".dn-git-column-row, .dn-git-history-row { display: grid; grid-template-columns: minmax(var(--dn-git-description-width), 1fr) var(--dn-git-date-width) var(--dn-git-author-width) var(--dn-git-commit-width);");
-    expect(module).toContain("align-items: center; gap: 4px; width: 100%;");
-    expect(module).toContain("width: 100%; min-width: var(--dn-git-table-min-width);");
-    expect(module).toContain(".dn-git-column-header { position: relative; display: flex; align-items: center; justify-content: center;");
-    expect(module).toContain(".dn-git-description { min-width: 0; overflow: hidden; color: var(--dn-strong); font-size: 0.82rem; font-weight: 460;");
-    expect(module).toContain(".dn-git-history-row.merge:not(.selected) .dn-git-description");
-    expect(module).toContain(".dn-git-detail-band { fill: color-mix(in srgb, var(--dn-surface-raised) 58%, var(--dn-control-active)); pointer-events: none; }");
-    expect(module).toContain(".dn-git-detail-band-divider { stroke: var(--dn-border-strong); stroke-width: 1;");
-    expect(module).toContain(".dn-git-history-row.selected { background: var(--dn-control-active); box-shadow: none; }");
-    expect(module).toContain(".dn-git-inline-detail { height: 234px; min-width: var(--dn-git-table-min-width); margin: 0; overflow: auto; border-width: 0 0 1px;");
-    expect(module).not.toContain(".dn-history-item.selected, .dn-git-history-row.selected { border-color: var(--dn-active);");
-    expect(module).toContain(".dn-git-date, .dn-git-author, .dn-git-sha { min-width: 0; overflow: hidden; color: var(--dn-muted); font-size: 0.76rem; text-align: left;");
-    expect(module).not.toContain(".dn-git-column-header[data-git-column='commit'] { justify-content: flex-end; }");
-    expect(module).not.toContain(".dn-git-sha { color: var(--dn-label); font-weight: 850; text-align: right; }");
-    expect(module).not.toContain("grid-template-columns: minmax(96px, var(--dn-git-graph-width)) max-content;");
-    expect(module).not.toContain("width: max-content; min-width: 100%;");
-    expect(module).toContain("Source checkout");
-    expect(module).toContain("Active branch");
-    expect(module).toContain("More branches");
-    expect(module).toContain("Automation");
-    expect(module).toContain("Decisions");
-    expect(module).toContain("rowGuides");
-    expect(module).not.toContain("tonebox");
-    expect(module).not.toContain("renderRailLabels");
-    expect(module).toContain("threadDetail");
-    expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
-    expect(module).toContain("-webkit-line-clamp: 3");
-    expect(module).toContain("dn-action-strip");
-    expect(module).toContain("target=\"_blank\"");
-    expect(module).toContain("formatDisplayText");
-    expect(module).toContain("signalIcon");
-    expect(module.indexOf("await sectionRefresh;")).toBeGreaterThan(
-      module.indexOf("sectionRefresh = refreshWorkspaceSections"),
-    );
-    expect(module.indexOf("const snapshot = await fetchDevNexusDashboard")).toBeGreaterThan(
-      module.indexOf("await sectionRefresh;"),
-    );
+    expect(headerActions).toContain("data-theme-mode=\"system\"");
+    expect(headerActions).toContain("data-theme-mode=\"light\"");
+    expect(headerActions).toContain("data-theme-mode=\"dark\"");
+    expect(headerActions).toContain("data-open-target");
+    expect(headerActions).toContain("Finder");
+    expect(headerActions).toContain("VS Code");
+    expect(headerActions).toContain("Terminal");
+    expect(headerActions).not.toContain("Copy brief");
+    expect(hostRendered).toContain("Host cockpit");
+    expect(hostRendered).toContain("Workspaces");
+    expect(hostRendered).toContain("Action Queue");
+    expect(hostRendered).toContain("data-workspace-id");
+    expect(pluginRendered).toContain("Plugins");
+    expect(pluginRendered).toContain("Curated plugin catalogue entries copy a refresh command");
+    expect(threadActions).toContain("Start chat");
+    expect(cockpitStyles).toContain(":root[data-dev-nexus-theme='light']");
+    expect(cockpitStyles).toContain(":root[data-dev-nexus-theme='dark']");
+    expect(cockpitStyles).toContain("prefers-color-scheme");
+    expect(cockpitStyles).toContain(".dn-git-topbar { display: grid; grid-template-columns:");
+    expect(cockpitStyles).toContain(".dn-git-board { --dn-git-graph-width: 230px;");
+    expect(cockpitStyles).toContain(".dn-git-panel { container-type: inline-size;");
+    expect(cockpitStyles).toContain(".dn-git-line-shadow { stroke: var(--dn-bg); stroke-width: 3.6;");
+    expect(cockpitStyles).toContain(".dn-git-line { stroke-width: 2.1;");
+    expect(cockpitStyles).toContain(".dn-cockpit-layout { grid-template-columns: minmax(0, 1fr) auto;");
+    expect(cockpitStyles).toContain(".dn-cockpit-main { grid-column: 1; grid-row: 1;");
+    expect(cockpitStyles).toContain(".dn-left-rail { position: relative; top: auto; grid-column: 1 / -1; grid-row: 2;");
+    expect(cockpitStyles).toContain(".dn-ops-panel { grid-column: 2; grid-row: 1;");
+    expect(cockpitStyles).toContain(".dn-left-rail { grid-column: 1; grid-row: 3;");
+    expect(cockpitStyles).toContain("@container (max-width: 900px) { .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);");
+    expect(cockpitStyles).toContain("@media (max-width: 1000px) { .dn-git-topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);");
+    expect(cockpitStyles).toContain(".dn-git-search { grid-column: 1; min-width: 0;");
+    expect(cockpitStyles).toContain("dn-history-node-hovered");
+    expect(cockpitStyles).toContain("transform: scale(1.24)");
+    expect(cockpitStyles).toContain("--dn-branch-11");
+    expect(cockpitStyles).not.toContain("dn-git-ref");
+    expect(cockpitStyles).not.toContain("tonebox");
   });
 
   it("shows cockpit tooltip copy only for clipped title-backed text", async () => {
@@ -449,23 +332,272 @@ describe("nexus dashboard client", () => {
 
     const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
 
+    expect(rendered).toContain("dn-project-cockpit");
+    expect(rendered).toContain('class="dn-cockpit-topbar"');
+    expect(rendered).toContain('id="project-git-history"');
+    expect(rendered).toContain('id="cockpit-ops-panel"');
+    expect(rendered).toContain('data-panel-state="closed"');
+    expect(rendered).toContain('data-ops-pending-count="0"');
+    expect(rendered).toContain('id="cockpit-left-rail"');
+    expect(rendered).not.toContain('id="selected-item"');
+    expect(rendered).not.toContain('id="parallel-work-map"');
+    expect(rendered).not.toContain('aria-label="Current workspace signals"');
     expect(rendered.indexOf('id="project-git-history"')).toBeLessThan(
-      rendered.indexOf('id="selected-item"'),
+      rendered.indexOf('id="cockpit-ops-panel"'),
     );
   });
 
-  it("keeps visible dashboard content stable during background refresh", () => {
-    const module = renderNexusDashboardClientModule();
+  it("keeps pending decisions as a closed side-panel indicator", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Needs decisions",
+      project: {
+        name: "Dashboard Demo",
+        root: "/workspace/source",
+      },
+      signals: [],
+      events: [],
+      blockers: ["Provider token approval needed"],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 1, capabilityCount: 2, records: [] },
+      trackedWork: {
+        readyCount: 2,
+        blockedCount: 1,
+        importCandidateCount: 0,
+        staleCount: 0,
+        records: [],
+      },
+      threads: {
+        totalCount: 3,
+        activeCount: 3,
+        needsDecisionCount: 2,
+        records: [
+          {
+            id: "thread-1",
+            title: "Review provider action",
+            decision: "review",
+            decisionLabel: "Needs review",
+            decisionDetail: "Provider action requires approval.",
+            updatedAt: "2026-05-23T11:00:00.000Z",
+          },
+        ],
+      },
+      history: {
+        totalCommitCount: 0,
+        repositories: [],
+        incomplete: false,
+        detail: null,
+      },
+    };
 
-    expect(module).toContain("lastRenderSignature");
-    expect(module).toContain("dashboardRenderSignature");
-    expect(module).toContain("stripVolatileDashboardFields");
-    expect(module).toContain("if (signature && signature === lastRenderSignature) return;");
-    expect(module).toContain("const hasVisibleData = selectedWorkspaceId ? Boolean(latestSnapshot) : Boolean(latestHost);");
-    expect(module).toContain("if (!hasVisibleData) {");
-    expect(module).toContain("latestSnapshot = null;");
-    expect(module).not.toContain("catch (error) {\n      latestSnapshot = null;");
-    expect(module).not.toContain("catch {\n      latestHost = null;");
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered).toContain('id="cockpit-ops-panel"');
+    expect(rendered).toContain('data-panel-state="closed"');
+    expect(rendered).toContain('data-ops-pending-count="2"');
+    expect(rendered).toContain("2 pending");
+    expect(rendered).toContain('id="hitl-queue"');
+    expect(rendered).toContain('id="tracked-work-panel"');
+    expect(rendered).toContain('id="activity-panel"');
+    expect(rendered).toContain('id="blockers-panel"');
+    expect(rendered).toContain("Provider token approval needed");
+  });
+
+  it("lets left rail components drive the event history project filter", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Two component histories",
+      project: { name: "Dashboard Demo", root: "/workspace/source" },
+      signals: [],
+      events: [],
+      blockers: [],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+        {
+          id: "secondary",
+          name: "DevNexus-Pharo",
+          role: "component",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 0, capabilityCount: 0, records: [] },
+      trackedWork: { readyCount: 0, blockedCount: 0, importCandidateCount: 0, staleCount: 0, records: [] },
+      threads: { totalCount: 0, activeCount: 0, needsDecisionCount: 0, records: [] },
+      history: {
+        totalCommitCount: 2,
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "primary0000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: { kind: "all", branches: [] },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "primary0000000000000000000000000000000000000",
+                shortHash: "primary",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Primary event",
+                refs: [],
+              },
+            ],
+          },
+          {
+            componentId: "secondary",
+            componentName: "DevNexus-Pharo",
+            repositoryPath: "/workspace/pharo",
+            head: "second00000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: { kind: "all", branches: [] },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "second00000000000000000000000000000000000000",
+                shortHash: "second",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:00:00.000Z",
+                subject: "Secondary event",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood", "component:secondary");
+
+    expect(rendered).toContain('data-select-id="component:secondary" data-git-history-filter="component:secondary"');
+    expect(rendered).toContain('data-scroll-target="project-git-history" aria-pressed="true"');
+    expect(rendered).toContain('<option value="component:secondary" selected');
+    expect(rendered).toContain("Secondary event");
+    expect(rendered).not.toContain("Primary event");
+  });
+
+  it("surfaces component management actions in an overlapping configuration window", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Manage components",
+      project: { name: "Dashboard Demo", root: "/workspace/source" },
+      signals: [],
+      events: [],
+      blockers: [],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 0, capabilityCount: 0, records: [] },
+      trackedWork: { readyCount: 0, blockedCount: 0, importCandidateCount: 0, staleCount: 0, records: [] },
+      threads: { totalCount: 0, activeCount: 0, needsDecisionCount: 0, records: [] },
+      history: { totalCommitCount: 0, repositories: [], incomplete: false, detail: null },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered).toContain('data-cockpit-config-action="add-component"');
+    expect(rendered).toContain('data-cockpit-config-action="edit-component"');
+    expect(rendered).toContain('data-cockpit-config-action="remove-component"');
+    expect(rendered).toContain('data-cockpit-config-window hidden aria-hidden="true"');
+    expect(rendered).toContain('role="dialog"');
+    expect(rendered).toContain('id="cockpit-config-window-title"');
+    expect(rendered).toContain("Component configuration edits need a guarded project config action.");
+    expect(rendered).toContain("Save changes");
+    expect(rendered).toContain("Remove component");
+  });
+
+  it("keeps visible dashboard content stable during background refresh", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-21T10:00:00.000Z",
+      summary: "Ready",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:00.000Z",
+          title: "Snapshot refreshed",
+        },
+      ],
+      project: {
+        root: "/workspace/source",
+        name: "DevNexus",
+      },
+    };
+    const refreshed = {
+      ...snapshot,
+      generatedAt: "2026-05-21T10:00:15.000Z",
+      events: [
+        {
+          id: "snapshot-generated",
+          time: "2026-05-21T10:00:15.000Z",
+          title: "Snapshot refreshed",
+        },
+      ],
+    };
+    const changed = {
+      ...refreshed,
+      summary: "Blocked",
+    };
+
+    expect(hooks.dashboardRenderSignature(snapshot)).toBe(
+      hooks.dashboardRenderSignature(refreshed),
+    );
+    expect(hooks.dashboardRenderSignature(changed)).not.toBe(
+      hooks.dashboardRenderSignature(refreshed),
+    );
   });
 
   it("ignores refresh-clock activity timestamps in dashboard render signatures", async () => {

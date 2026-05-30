@@ -13,7 +13,6 @@ import {
   createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
-  renderNexusDashboardClientModule,
   saveProjectConfig,
   saveNexusHomeConfigFile,
   startNexusDashboardServer,
@@ -40,6 +39,7 @@ import {
   RecordingCodexChatStarter,
   worktreeLease,
 } from "./nexusDashboardTestHelpers.js";
+import { cockpitStyles } from "../../src/cockpit/client/nexusCockpitStyles.js";
 
 afterEach(cleanupDashboardTestTempDirs);
 
@@ -547,9 +547,9 @@ describe("nexus dashboard history graph", () => {
     );
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toContain("M 28 13 C 28 33.8, 50 18.2, 50 39");
+    expect(rendered).toContain("M 28 13 C 28 31.72, 43 20.28, 43 39");
     expect(rendered).toContain("V 91");
-    expect(rendered).not.toContain("H 50 V 91");
+    expect(rendered).not.toContain("H 44 V 91");
     expect(delayedCrossLanePaths).toEqual([]);
   });
 
@@ -1222,6 +1222,10 @@ describe("nexus dashboard history graph", () => {
     ]);
     expect(rendered).toContain('data-git-history-branch-select');
     expect(rendered).toContain('value="component:primary|branch:feat/cockpit-graph" selected');
+    expect(rendered).toContain("dn-history-scope-token");
+    expect(rendered).toContain('data-dn-tooltip="feat/cockpit-graph" data-dn-tooltip-mode="always"');
+    expect(rendered).not.toContain("dn-history-scope-kind");
+    expect(rendered).not.toContain("dn-git-ref");
     expect(rendered).toContain("Add graph data");
     expect(rendered).toContain("Prepare base");
     expect(rendered).not.toContain("Merge feature graph");
@@ -1347,5 +1351,82 @@ describe("nexus dashboard history graph", () => {
         href: "https://github.com/Evref-BL/DevNexus/issues/42",
       }),
     ]);
+  });
+
+  it("lets event scope tokens use content width up to one shared row maximum", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "multi0000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["codex/dev-nexus/ui-main", "app/main", "origin/main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "multi0000000000000000000000000000000000000",
+                shortHash: "multi00",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Merge branch labels",
+                refs: [
+                  {
+                    name: "codex/dev-nexus/ui-main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                  {
+                    name: "app/main",
+                    kind: "remote",
+                    remote: "app",
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                  {
+                    name: "origin/main",
+                    kind: "remote",
+                    remote: "origin",
+                    hash: "multi0000000000000000000000000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderGitHistory(snapshot, null);
+
+    expect(rendered).toContain('--dn-history-scope-count:3;--dn-history-scope-token-max-width:96px;--dn-history-scope-group-max-width:296px;');
+    expect(rendered).not.toContain('--dn-history-scope-target-width:494px;');
+    expect(cockpitStyles).toContain('.dn-history-scopes { --dn-history-scope-count: 0; --dn-history-scope-token-max-width: 96px; --dn-history-scope-group-max-width: auto; display: inline-flex; flex: 0 0 auto;');
+    expect(cockpitStyles).toContain('max-width: min(68%, var(--dn-history-scope-group-max-width));');
+    expect(cockpitStyles).toContain('.dn-history-scopes .dn-history-scope-token { flex: 0 1 auto; max-width: var(--dn-history-scope-token-max-width); }');
+    expect(rendered).toContain('data-dn-tooltip="codex/dev-nexus/ui-main" data-dn-tooltip-mode="always"');
+    expect(rendered).toContain('data-dn-tooltip="app/main" data-dn-tooltip-mode="always"');
+    expect(rendered).toContain('data-dn-tooltip="origin/main" data-dn-tooltip-mode="always"');
   });
 });

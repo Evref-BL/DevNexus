@@ -181,19 +181,6 @@ export function shouldShowCockpitTooltipTarget(target: Element | ({
   return isCockpitTooltipTargetTruncated(target);
 }
 
-export function renderNexusCockpitTooltipsClientSource(): string {
-  return [
-    installCockpitTooltips,
-    findCockpitTooltipTarget,
-    cockpitTooltipText,
-    isCockpitTooltipTargetTruncated,
-    shouldShowCockpitTooltipTarget,
-    positionCockpitTooltip,
-  ]
-    .map((fn) => fn.toString())
-    .join("\n\n");
-}
-
 function positionCockpitTooltip(
   tooltip: HTMLElement,
   target: Element,

@@ -160,30 +160,6 @@ function worktreeLaneKey(worktree) {
   return `worktree:${worktree.branchName ?? worktree.id}`;
 }
 
-export function renderNexusCockpitWorkMapClientSource() {
-  return [
-    renderWorkHistory,
-    renderHistoryItem,
-    renderLaneKey,
-    historyRows,
-    timelineLanes,
-    groupedBranchNodes,
-    worktreeRowTitle,
-    renderBranchGraph,
-    compareTimelineRows,
-    rowPriority,
-    compareNodesNewestFirst,
-    nodeTimeMs,
-    worktreeLaneKey,
-  ]
-    .map(standaloneNexusCockpitWorkMapSource)
-    .join('\n\n');
-}
-
-function standaloneNexusCockpitWorkMapSource(fn) {
-  return fn.toString().replace(/\b__vite_ssr_import_\d+__\.([A-Za-z_$][\w$]*)\b/gu, '$1');
-}
-
 export {
   historyRows,
   renderBranchGraph,

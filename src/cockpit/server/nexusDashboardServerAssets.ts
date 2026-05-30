@@ -1,32 +1,22 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { renderNexusDashboardHistoryLayoutClientSource } from "./nexusDashboardHistoryLayout.js";
-import { renderNexusCockpitHistoryColumnsClientSource } from "../client/history/nexusCockpitHistoryColumns.js";
-import { renderNexusCockpitHistoryGraphSvgClientSource } from "../client/history/nexusCockpitHistoryGraphSvg.js";
-import { renderNexusCockpitHistoryInteractionsClientSource } from "../client/history/nexusCockpitHistoryInteractions.js";
-import { renderNexusCockpitWorkMapClientSource } from "../client/history/nexusCockpitWorkMap.js";
-import { renderNexusCockpitEventHistoryClientSource } from "../client/history/nexusCockpitEventHistory.js";
-import { renderNexusCockpitActionsClientSource } from "../client/nexusCockpitActions.js";
-import { renderNexusCockpitFormatClientSource } from "../client/nexusCockpitFormat.js";
-import { renderNexusCockpitStylesClientSource } from "../client/nexusCockpitStyles.js";
-import { renderNexusCockpitTooltipsClientSource } from "../client/nexusCockpitTooltips.js";
-
-export function renderNexusDashboardClientModule(): string {
-  return readNexusCockpitLegacyClientModuleSource();
-}
 
 export function renderNexusCockpitBrowserModule(): string {
-  return readNexusCockpitBuiltClientModuleSource() ?? renderNexusDashboardClientModule();
+  const source = readNexusCockpitBuiltClientModuleSource();
+  if (source) return source;
+  throw new Error(
+    "DevNexus cockpit browser bundle is missing. Run `npm run build:cockpit` before serving the cockpit asset.",
+  );
 }
 
 export function nexusCockpitBrowserModuleAssetRevision(): string {
   const candidatePath = readNexusCockpitBuiltClientModulePath();
-  if (!candidatePath) return "legacy";
+  if (!candidatePath) return "missing";
   try {
     const stats = fs.statSync(candidatePath);
     return `${Math.round(stats.mtimeMs)}-${stats.size}`;
   } catch {
-    return "legacy";
+    return "missing";
   }
 }
 
@@ -49,63 +39,6 @@ function readNexusCockpitBuiltClientModulePath(): string | null {
   return null;
 }
 
-function readNexusCockpitLegacyClientModuleSource(): string {
-  const candidates = [
-    new URL("../client/nexusCockpitClient.js", import.meta.url),
-    new URL("../client/nexusCockpitClient.ts", import.meta.url),
-  ];
-  for (const candidate of candidates) {
-    const candidatePath = fileURLToPath(candidate);
-    if (!fs.existsSync(candidatePath)) continue;
-    const source = fs.readFileSync(candidatePath, "utf8");
-    return candidatePath.endsWith(".ts")
-      ? standaloneNexusCockpitClientSource(source)
-      : source;
-  }
-  throw new Error("DevNexus cockpit legacy client source is missing");
-}
-
-function standaloneNexusCockpitClientSource(source: string): string {
-  return source
-    .replace(/^\/\/ @ts-nocheck\s*/u, "")
-    .replace(/^export interface \w+ \{[^}]*\}\s*/gmu, "")
-    .replace(
-      /^import \{ cockpitStyles \} from ["'][^"']+nexusCockpitStyles\.js["'];\s*/mu,
-      `${renderNexusCockpitStylesClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*compactBranchName,\s*compactPath,\s*countLabel,\s*displayBody,\s*displayTitle,\s*escapeAttribute,\s*escapeHtml,\s*formatDisplayText,\s*formatTime,\s*toneForStatus,\s*truncate,\s*\} from ["'][^"']+nexusCockpitFormat\.js["'];\s*/mu,
-      `${renderNexusCockpitFormatClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*chatIcon,\s*chevronDownIcon,\s*clipboardIcon,\s*codeIcon,\s*finderIcon,\s*folderIcon,\s*localAppIcon,\s*renderActionStrip,\s*renderDisabledAction,\s*renderProviderAction,\s*signalIcon,\s*terminalIcon,\s*uniqueActions,\s*\} from ["'][^"']+nexusCockpitActions\.js["'];\s*/mu,
-      `${renderNexusCockpitActionsClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*historyRows,\s*renderBranchGraph,\s*renderLaneKey,\s*renderWorkHistory,\s*timelineLanes,\s*\} from ["'][^"']+nexusCockpitWorkMap\.js["'];\s*/mu,
-      `${renderNexusCockpitWorkMapClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*featureGitBranches,\s*gitHistoryCommitBySelectId,\s*gitHistoryDetail,\s*gitHistoryRows,\s*isGitHistorySelection,\s*normalizeGitHistoryFilter,\s*renderGitHistory,\s*threadsForGitBranches,\s*trackedWorkForGitBranches,\s*\} from ["'][^"']+nexusCockpitEventHistory\.js["'];\s*/mu,
-      `${renderNexusDashboardHistoryLayoutClientSource()}\n\n${renderNexusCockpitHistoryColumnsClientSource()}\n\n${renderNexusCockpitHistoryGraphSvgClientSource()}\n\n${renderNexusCockpitEventHistoryClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*bindGitHistoryColumnResizers,?\s*\} from ["'][^"']+nexusCockpitHistoryColumns\.js["'];\s*/mu,
-      "",
-    )
-    .replace(
-      /^import \{\s*bindGitHistoryInteractions,?\s*\} from ["'][^"']+nexusCockpitHistoryInteractions\.js["'];\s*/mu,
-      `${renderNexusCockpitHistoryInteractionsClientSource()}\n\n`,
-    )
-    .replace(
-      /^import \{\s*cockpitTooltipText,\s*installCockpitTooltips,\s*isCockpitTooltipTargetTruncated,\s*\} from ["'][^"']+nexusCockpitTooltips\.js["'];\s*/mu,
-      `${renderNexusCockpitTooltipsClientSource()}\n\n`,
-    )
-    .replace(/^export async function /gmu, "async function ")
-    .replace(/^export function /gmu, "function ")
-    .replace(/^export const /gmu, "const ");
-}
-
 export type NexusDashboardVisualAuditStatus = "passed" | "failed";
 
 export interface NexusDashboardVisualAuditCheck {
@@ -123,7 +56,7 @@ export interface NexusDashboardVisualAuditResult {
 }
 
 export function auditNexusDashboardClientVisuals(
-  moduleSource = renderNexusDashboardClientModule(),
+  moduleSource = readNexusCockpitAuditSource() || readNexusCockpitBuiltClientModuleSource() || "",
 ): NexusDashboardVisualAuditResult {
   const signalAccents = uniqueMatches(
     moduleSource,
@@ -131,7 +64,7 @@ export function auditNexusDashboardClientVisuals(
   );
   const branchAccents = uniqueMatches(
     moduleSource,
-    /--dn-branch-\d: (#[0-9a-f]{6})/giu,
+    /--dn-branch-\d+: (#[0-9a-f]{6})/giu,
   );
   const checks = [
     visualAuditCheck(
@@ -156,7 +89,7 @@ export function auditNexusDashboardClientVisuals(
     visualAuditCheck(
       "branch-accents",
       "Distinct branch accents",
-      branchAccents.length >= 7,
+      branchAccents.length >= 12,
       `${branchAccents.length} branch accent colors found.`,
     ),
     visualAuditCheck(
@@ -296,6 +229,35 @@ export function auditNexusDashboardClientVisuals(
       "Pixel screenshots still require a browser renderer and human review.",
     ],
   };
+}
+
+function readNexusCockpitAuditSource(): string {
+  const candidates = [
+    "../client/nexusCockpitClient.js",
+    "../client/nexusCockpitClient.ts",
+    "../client/nexusCockpitStyles.js",
+    "../client/nexusCockpitStyles.ts",
+    "../client/nexusCockpitActions.js",
+    "../client/nexusCockpitActions.ts",
+    "../client/nexusCockpitTooltips.js",
+    "../client/nexusCockpitTooltips.ts",
+    "../client/history/nexusCockpitWorkMap.js",
+    "../client/history/nexusCockpitWorkMap.ts",
+    "../client/history/nexusCockpitEventHistory.js",
+    "../client/history/nexusCockpitEventHistory.ts",
+    "../client/history/nexusCockpitHistoryColumns.js",
+    "../client/history/nexusCockpitHistoryColumns.ts",
+    "../client/history/nexusCockpitHistoryGraphSvg.js",
+    "../client/history/nexusCockpitHistoryGraphSvg.ts",
+    "../client/history/nexusCockpitHistoryInteractions.js",
+    "../client/history/nexusCockpitHistoryInteractions.ts",
+  ];
+  return candidates
+    .map((candidate) => {
+      const candidatePath = fileURLToPath(new URL(candidate, import.meta.url));
+      return fs.existsSync(candidatePath) ? fs.readFileSync(candidatePath, "utf8") : "";
+    })
+    .join("\n");
 }
 
 function visualAuditCheck(

@@ -7,12 +7,15 @@ import {
   codeIcon,
   finderIcon,
   folderIcon,
+  gearIcon,
   localAppIcon,
+  plusIcon,
   renderActionStrip,
   renderDisabledAction,
   renderProviderAction,
   signalIcon,
   terminalIcon,
+  trashIcon,
   uniqueActions,
 } from "./nexusCockpitActions.js";
 import {
@@ -30,10 +33,6 @@ import {
 } from "./nexusCockpitFormat.js";
 import {
   historyRows,
-  renderBranchGraph,
-  renderLaneKey,
-  renderWorkHistory,
-  timelineLanes,
 } from "./history/nexusCockpitWorkMap.js";
 import {
   featureGitBranches,
@@ -195,6 +194,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
     bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
+    bindCockpitConfigWindow(root);
     bindHostSignalControls(root, setHostFocus);
     bindGitHistoryColumnResizers(root);
     gitHistoryInteractions.refresh();
@@ -340,37 +340,153 @@ function injectStyles() {
 }
 
 function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '', gitHistoryFilter = '') {
-  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);
+  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : null;
   const loading = snapshot.partial === true;
   const componentsLoaded = sectionLoaded(snapshot, 'components');
   const threadsLoaded = sectionLoaded(snapshot, 'threads');
   const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');
-  const pluginsLoaded = sectionLoaded(snapshot, 'plugins');
   const gitHistory = loading && !componentsLoaded ? renderProgressivePanel('project-git-history', 'Event history', 'Project Events', 'Loading events, refs, and parent edges.') : renderGitHistory(snapshot, activeSelection, gitHistoryFilter);
-  const workHistory = loading && !threadsLoaded ? renderProgressivePanel('parallel-work-map', 'Workspace map', 'Activity Lanes', 'Loading source checkout, branches, automation, and decisions.') : renderWorkHistory(snapshot, activeSelection);
-  const features = loading && !threadsLoaded ? renderProgressivePanel('active-features', 'Project workflow', 'Active Features', 'Loading feature branches and active threads.') : renderFeatureOverview(snapshot, activeSelection);
   const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('hitl-queue', 'HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot, activeSelection);
   const trackedWork = loading && !trackedLoaded ? renderProgressivePanel('tracked-work-panel', 'Tracked work', 'Issues and Work Items', 'Loading provider and local work items.') : renderTrackedWork(snapshot, activeSelection);
-  const plugins = loading && !pluginsLoaded ? renderProgressivePanel('plugins-panel', 'Extensions', 'Plugins', 'Loading local plugin candidates and capability details.') : renderPlugins(snapshot.plugins);
   const activity = loading && !threadsLoaded ? renderProgressivePanel('activity-panel', 'Activity', 'Recent Signals', 'Loading workspace events.') : `<div class="dn-panel" id="activity-panel"><h2>Activity</h2><div class="dn-events">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>`;
   const blockers = loading && !trackedLoaded ? renderProgressivePanel('blockers-panel', 'Blockers', 'Blockers', 'Loading approvals and blockers.') : `<div class="dn-panel dn-blockers-panel" id="blockers-panel"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>`;
-  return `<div class="dn-shell">
-    <header class="dn-header">
-      <div><span class="dn-eyebrow">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>
-      ${renderProjectHeaderActions(snapshot, themeMode, selectedWorkspaceId)}
-    </header>
-    ${renderHostOverview(host, snapshot, selectedWorkspaceId)}
-    ${renderSignals(snapshot.signals, activeSelection)}
-    <section class="dn-main-grid">
-      <div class="dn-work-stack">${gitHistory}${isGitHistorySelection(activeSelection) ? '' : renderSelectedItem(snapshot, activeSelection)}${features}${workHistory}${threadInbox}${trackedWork}</div>
-    </section>
-    <section class="dn-plugin-row">${plugins}</section>
-    <section class="dn-grid dn-secondary-grid">
-      <div class="dn-panel dn-components-panel" id="components-panel"><h2>Components</h2>${renderComponents(snapshot.components, activeSelection)}</div>
-      ${activity}
-      ${blockers}
-    </section>
+  return `<div class="dn-shell dn-project-cockpit">
+    ${renderProjectTopBar(snapshot, themeMode, selectedWorkspaceId)}
+    <div class="dn-cockpit-layout">
+      ${renderCockpitLeftRail(snapshot, activeSelection, gitHistoryFilter)}
+      <main class="dn-cockpit-main" aria-label="Project state">${gitHistory}</main>
+      ${renderCockpitOperationsPanel(snapshot, { threadInbox, trackedWork, activity, blockers })}
+    </div>
+    ${renderCockpitConfigWindow(snapshot)}
   </div>`;
+}
+
+function renderProjectTopBar(snapshot, themeMode, selectedWorkspaceId = '') {
+  const metrics = cockpitMetrics(snapshot);
+  const status = [
+    cockpitTopbarMetric('Decisions', metrics.pendingDecisions, metrics.pendingDecisions > 0 ? 'warn' : 'good'),
+    cockpitTopbarMetric('Blockers', metrics.blockers, metrics.blockers > 0 ? 'danger' : 'good'),
+    cockpitTopbarMetric('Threads', metrics.activeThreads, metrics.activeThreads > 0 ? 'active' : 'neutral'),
+    cockpitTopbarMetric('Tracked', metrics.trackedWork, metrics.trackedWork > 0 ? 'active' : 'neutral'),
+  ].join('');
+  return `<header class="dn-cockpit-topbar"><div class="dn-topbar-title"><span class="dn-eyebrow">DevNexus cockpit</span><strong title="${escapeHtml(snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><span title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</span></div><div class="dn-topbar-status" aria-label="Workspace status">${status}</div><div class="dn-topbar-actions">${renderHostNavButton(selectedWorkspaceId)}<span class="dn-header-pill dn-header-stamp"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot?.generatedAt))}</strong></span>${renderPathOpenMenu('project', 'Project', snapshot?.project?.root ?? '')}${renderThemeToggle(themeMode)}</div></header>`;
+}
+
+function cockpitTopbarMetric(label, value, tone) {
+  return `<span class="dn-topbar-metric tone-${escapeAttribute(tone)}"><strong>${escapeHtml(String(value))}</strong><span>${escapeHtml(label)}</span></span>`;
+}
+
+function cockpitMetrics(snapshot) {
+  const threads = snapshot.threads ?? {};
+  const tracked = snapshot.trackedWork ?? {};
+  return {
+    pendingDecisions: Number(threads.needsDecisionCount ?? 0),
+    activeThreads: Number(threads.activeCount ?? threads.records?.length ?? 0),
+    blockers: Array.isArray(snapshot.blockers) ? snapshot.blockers.length : 0,
+    trackedWork: Number(tracked.readyCount ?? 0) + Number(tracked.blockedCount ?? 0) + Number(tracked.importCandidateCount ?? 0),
+    components: Array.isArray(snapshot.components) ? snapshot.components.length : 0,
+    plugins: Number(snapshot.plugins?.enabledCount ?? 0),
+  };
+}
+
+function renderCockpitLeftRail(snapshot, selectedId, gitHistoryFilter = '') {
+  const metrics = cockpitMetrics(snapshot);
+  return `<aside class="dn-left-rail" id="cockpit-left-rail" aria-label="Cockpit navigation"><section class="dn-rail-section dn-rail-project"><span class="dn-eyebrow">Project</span><strong title="${escapeHtml(snapshot.project.root ?? snapshot.project.name)}">${escapeHtml(snapshot.project.name)}</strong><p title="${escapeHtml(snapshot.summary)}">${escapeHtml(snapshot.summary)}</p></section><nav class="dn-rail-nav" aria-label="Project sections"><a href="#project-git-history"><span>Events</span><strong>${escapeHtml(countLabel(snapshot.history?.totalCommitCount ?? 0, 'event'))}</strong></a><a href="#hitl-queue"><span>Decisions</span><strong>${escapeHtml(String(metrics.pendingDecisions))}</strong></a><a href="#tracked-work-panel"><span>Tracked work</span><strong>${escapeHtml(String(metrics.trackedWork))}</strong></a><a href="#blockers-panel"><span>Blockers</span><strong>${escapeHtml(String(metrics.blockers))}</strong></a></nav>${renderComponentRail(snapshot, selectedId, gitHistoryFilter)}${renderWorkflowRail(snapshot)}${renderWorktreeStateRail(snapshot)}${renderSettingsRail(snapshot)}</aside>`;
+}
+
+function renderComponentRail(snapshot, selectedId, gitHistoryFilter = '') {
+  const components = snapshot.components ?? [];
+  const visible = components.slice(0, 8);
+  const more = components.length > visible.length ? `<span class="dn-rail-muted">${escapeHtml(countLabel(components.length - visible.length, 'more component'))}</span>` : '';
+  const activeHistoryComponentId = cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter);
+  const body = visible.length ? visible.map((component) => {
+    const id = `component:${component.id}`;
+    const git = component.git;
+    const tone = git?.dirty ? 'warn' : component.sourceRootExists ? 'good' : 'danger';
+    const branch = git?.branch ?? 'no branch';
+    const selected = activeHistoryComponentId ? component.id === activeHistoryComponentId : id === selectedId;
+    return `<div class="dn-component-rail-row ${selected ? 'selected' : ''}"><button class="dn-rail-item ${selected ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}" data-git-history-filter="${escapeHtml(`component:${component.id}`)}" data-scroll-target="project-git-history" aria-pressed="${selected ? 'true' : 'false'}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button><button class="dn-rail-icon-button" type="button" data-cockpit-config-action="edit-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Save changes')} aria-label="${escapeHtml(`Edit ${component.name} configuration`)}" title="${escapeHtml(`Edit ${component.name} configuration`)}">${gearIcon()}</button><button class="dn-rail-icon-button danger" type="button" data-cockpit-config-action="remove-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Remove component')} aria-label="${escapeHtml(`Remove ${component.name}`)}" title="${escapeHtml(`Remove ${component.name}`)}">${trashIcon()}</button></div>`;
+  }).join('') : '<p>No components loaded.</p>';
+  return `<section class="dn-rail-section" id="components-panel"><div class="dn-rail-heading-row"><span class="dn-rail-heading">Components</span><button class="dn-rail-icon-button primary" type="button" data-cockpit-config-action="add-component" data-config-kind="Project configuration" data-config-title="Add component" data-config-summary="Register a new DevNexus component in this workspace." data-config-action-label="Create component" data-config-name="New component" data-config-role="component" data-config-tracker="not configured" data-config-branch="not configured" data-config-path="${escapeHtml(snapshot.project?.root ?? '')}" aria-label="Add component" title="Add component">${plusIcon()}</button></div><div class="dn-rail-list">${body}${more}</div></section>`;
+}
+
+function cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter = '') {
+  const normalized = normalizeGitHistoryFilter(gitHistoryFilter);
+  const componentMatch = /^component:([^|]+)/u.exec(normalized);
+  const requested = componentMatch?.[1] ?? '';
+  const repositories = snapshot.history?.repositories ?? [];
+  if (requested && repositories.some((repository) => repository.componentId === requested)) return requested;
+  return repositories[0]?.componentId ?? '';
+}
+
+function cockpitComponentConfigAttributes(component, snapshot, actionLabel) {
+  const git = component.git ?? {};
+  const state = git.dirty ? 'dirty' : component.sourceRootExists ? 'clean' : 'missing';
+  const attrs = {
+    'data-config-kind': 'Component configuration',
+    'data-config-title': component.name ?? component.id ?? 'Component',
+    'data-config-summary': 'Manage component registration, source root, tracker, and branch defaults.',
+    'data-config-action-label': actionLabel,
+    'data-config-name': component.name ?? component.id ?? 'Component',
+    'data-config-role': component.role ?? 'component',
+    'data-config-tracker': component.defaultTrackerId ?? 'none',
+    'data-config-branch': git.branch ?? 'missing branch',
+    'data-config-path': component.sourceRoot ?? component.root ?? snapshot.project?.root ?? '',
+    'data-config-state': state,
+  };
+  return Object.entries(attrs).map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(' ');
+}
+
+function renderCockpitConfigWindow(snapshot) {
+  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Component configuration edits need a guarded project config action.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections"><button type="button" class="selected">Components</button><button type="button" disabled title="Workflow settings will use this window pattern.">Workflows</button><button type="button" disabled title="Extension settings will use this window pattern.">Extensions</button></nav><section class="dn-config-pane"><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component name</span><input type="text" data-config-window-input-name disabled /></label><label><span>Source root</span><input type="text" data-config-window-input-path disabled /></label></div><div class="dn-config-actions"><button class="dn-action" type="button" disabled data-config-window-primary>Save changes</button><button class="dn-action danger" type="button" disabled>Remove component</button><span>Component configuration edits need a guarded project config action.</span></div></section></div></div></section>`;
+}
+
+function renderWorkflowRail(snapshot) {
+  const workflows = snapshot.gitWorkflows;
+  const features = snapshot.features;
+  const counters = [
+    workflows?.activeRunCount ? `${workflows.activeRunCount} active` : null,
+    workflows?.waitingRunCount ? `${workflows.waitingRunCount} waiting` : null,
+    workflows?.blockedRunCount ? `${workflows.blockedRunCount} blocked` : null,
+    features?.activeCount ? `${features.activeCount} features` : null,
+  ].filter(Boolean);
+  const runs = (workflows?.runs ?? []).slice(0, 3).map((run) => `<span class="dn-rail-run tone-${escapeAttribute(gitWorkflowRunTone(run))}" title="${escapeHtml(run.branchName ?? run.currentRef ?? run.id)}">${escapeHtml(truncate(run.statusLabel ?? run.status ?? 'workflow', 28))}</span>`).join('');
+  return `<section class="dn-rail-section" id="active-features"><span class="dn-rail-heading">Workflows</span><p>${escapeHtml(counters.join(' · ') || 'No workflow runs recorded.')}</p>${runs ? `<div class="dn-rail-runs">${runs}</div>` : ''}</section>`;
+}
+
+function renderWorktreeStateRail(snapshot) {
+  const rows = safeHistoryRows(snapshot);
+  const lanes = rows.lanes ?? [];
+  const worktreeCount = snapshot.worktrees?.records?.length ?? 0;
+  const laneItems = lanes.slice(0, 5).map((lane) => {
+    const count = rows.rows.filter((row) => row.lane === lane.index).length;
+    return `<span style="--dn-branch-color:var(--dn-branch-${lane.index});"><strong>${escapeHtml(lane.label)}</strong><em>${escapeHtml(countLabel(count, 'record'))}</em></span>`;
+  }).join('');
+  return `<section class="dn-rail-section" id="worktree-state-panel"><span class="dn-rail-heading">Worktree state</span><p>${escapeHtml(countLabel(worktreeCount, 'worktree'))} mapped onto event refs.</p><div class="dn-worktree-state-list">${laneItems}</div></section>`;
+}
+
+function safeHistoryRows(snapshot) {
+  try {
+    return historyRows({
+      ...snapshot,
+      weave: snapshot.weave ?? { nodes: [], lanes: [] },
+      worktrees: snapshot.worktrees ?? { records: [] },
+    });
+  } catch {
+    return { rows: [], lanes: [] };
+  }
+}
+
+function renderSettingsRail(snapshot) {
+  const plugins = snapshot.plugins ?? {};
+  const count = [countLabel(plugins.enabledCount ?? 0, 'enabled plugin'), plugins.capabilityCount ? countLabel(plugins.capabilityCount, 'capability', 'capabilities') : null].filter(Boolean).join(' · ');
+  return `<section class="dn-rail-section" id="plugins-panel"><span class="dn-rail-heading">Settings</span><p>Extensions, local tools, and cockpit options.</p><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
+}
+
+function renderCockpitOperationsPanel(snapshot, panels) {
+  const metrics = cockpitMetrics(snapshot);
+  const pendingLabel = `${metrics.pendingDecisions} pending`;
+  return `<details class="dn-ops-panel" id="cockpit-ops-panel" data-panel-state="closed" data-ops-pending-count="${escapeHtml(String(metrics.pendingDecisions))}"><summary aria-label="${escapeHtml(`Open operations panel, ${pendingLabel}`)}"><span class="dn-ops-icon">${signalIcon('worktrees')}</span><span class="dn-ops-summary-copy"><strong>Operations</strong><em>${escapeHtml(pendingLabel)}</em></span><span class="dn-ops-badge">${escapeHtml(String(metrics.pendingDecisions))}</span></summary><div class="dn-ops-panel-body">${panels.threadInbox}${panels.trackedWork}${panels.activity}${panels.blockers}</div></details>`;
 }
 
 function renderHostDashboard(host, themeMode, hostFocus = 'components') {
@@ -641,6 +757,55 @@ function bindThemeControls(container, onSelect) {
   });
 }
 
+function bindCockpitConfigWindow(container) {
+  const overlay = container.querySelector('[data-cockpit-config-window]');
+  if (!overlay) return;
+  const close = () => {
+    overlay.hidden = true;
+    overlay.setAttribute('aria-hidden', 'true');
+  };
+  const setText = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.textContent = String(value ?? '');
+  };
+  const setInput = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.value = String(value ?? '');
+  };
+  const open = (button) => {
+    const action = button.getAttribute('data-cockpit-config-action') ?? '';
+    const primaryLabel = button.getAttribute('data-config-action-label') ?? (action === 'remove-component' ? 'Remove component' : 'Save changes');
+    setText('[data-config-window-kind]', button.getAttribute('data-config-kind') ?? 'Component configuration');
+    setText('[data-config-window-title]', button.getAttribute('data-config-title') ?? 'Configure component');
+    setText('[data-config-window-summary]', button.getAttribute('data-config-summary') ?? 'Component configuration edits need a guarded project config action.');
+    setText('[data-config-window-name]', button.getAttribute('data-config-name') ?? '');
+    setText('[data-config-window-role]', button.getAttribute('data-config-role') ?? '');
+    setText('[data-config-window-tracker]', button.getAttribute('data-config-tracker') ?? '');
+    setText('[data-config-window-branch]', button.getAttribute('data-config-branch') ?? '');
+    setText('[data-config-window-path]', button.getAttribute('data-config-path') ?? '');
+    setText('[data-config-window-state]', button.getAttribute('data-config-state') ?? 'pending configuration action');
+    setText('[data-config-window-primary]', primaryLabel);
+    setInput('[data-config-window-input-name]', button.getAttribute('data-config-name') ?? '');
+    setInput('[data-config-window-input-path]', button.getAttribute('data-config-path') ?? '');
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.querySelector('[data-cockpit-config-close]')?.focus?.();
+  };
+  container.querySelectorAll('[data-cockpit-config-action]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      open(button);
+    });
+  });
+  overlay.querySelectorAll('[data-cockpit-config-close]').forEach((button) => {
+    button.addEventListener('click', close);
+  });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+  });
+}
+
 function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
   container.addEventListener('change', (event) => {
     const target = eventElementTarget(event.target);
@@ -650,6 +815,13 @@ function bindSelectionControls(container, onSelect, onGitHistoryFilter = null) {
   });
   container.addEventListener('click', (event) => {
     const target = eventElementTarget(event.target);
+    const historyFilterButton = target?.closest?.('[data-git-history-filter]');
+    if (historyFilterButton && container.contains(historyFilterButton)) {
+      onGitHistoryFilter?.(historyFilterButton.getAttribute('data-git-history-filter'));
+      const targetId = historyFilterButton.getAttribute('data-scroll-target');
+      if (targetId) scrollToDashboardSection(targetId);
+      return;
+    }
     const button = target?.closest?.('[data-select-id]');
     if (!button || !container.contains(button)) return;
     onSelect(button.getAttribute('data-select-id'));
@@ -1366,3 +1538,22 @@ export const fetchDevNexusCockpitSection = fetchDevNexusDashboardSection;
 export const fetchDevNexusCockpitHost = fetchDevNexusDashboardHost;
 export const fetchDevNexusCockpitProjects = fetchDevNexusDashboardProjects;
 export const mountDevNexusCockpit = mountDevNexusDashboard;
+
+export {
+  cockpitThreadPrompt,
+  dashboardRenderSignature,
+  defaultSelectedId,
+  nextDashboardSelectedId,
+  renderDashboard,
+  renderFeatureOverview,
+  renderHostDashboard,
+  renderHostOverview,
+  renderPlugins,
+  renderProjectHeaderActions,
+  renderSignal,
+  renderThreadActions,
+  renderThreadInbox,
+  renderTrackedWork,
+  selectedDetail,
+  signalPanelTarget,
+};
