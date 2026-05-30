@@ -63,6 +63,14 @@ export function gearIcon(): string {
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M6.9 1.6h2.2l.4 1.8c.4.1.8.3 1.1.5l1.6-1 1.6 1.6-1 1.6c.2.4.4.7.5 1.1l1.8.4v2.2l-1.8.4c-.1.4-.3.8-.5 1.1l1 1.6-1.6 1.6-1.6-1c-.4.2-.7.4-1.1.5l-.4 1.8H6.9l-.4-1.8c-.4-.1-.8-.3-1.1-.5l-1.6 1-1.6-1.6 1-1.6c-.2-.4-.4-.7-.5-1.1L.9 9.8V7.6l1.8-.4c.1-.4.3-.8.5-1.1l-1-1.6 1.6-1.6 1.6 1c.4-.2.7-.4 1.1-.5l.4-1.8z"/><circle cx="8" cy="8.7" r="2.1" fill="none" stroke-width="1.6"/></svg>';
 }
 
+export function plusIcon(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.8" stroke-linecap="round" d="M8 3.2v9.6M3.2 8h9.6"/></svg>';
+}
+
+export function trashIcon(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M2.8 4.4h10.4M6.1 2.5h3.8l.5 1.9M4.2 4.4l.6 8.4a1.1 1.1 0 001.1 1h4.2a1.1 1.1 0 001.1-1l.6-8.4M6.9 6.7v4.5M9.1 6.7v4.5"/></svg>';
+}
+
 export function cloudFetchIcon(): string {
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5.1 12.8H4a2.8 2.8 0 01-.3-5.6 4.1 4.1 0 017.8-1.4 3.2 3.2 0 01.5 6.3h-1.1"/><path fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M8 8.2v6M5.8 12 8 14.2 10.2 12"/></svg>';
 }

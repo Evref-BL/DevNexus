@@ -7,12 +7,15 @@ import {
   codeIcon,
   finderIcon,
   folderIcon,
+  gearIcon,
   localAppIcon,
+  plusIcon,
   renderActionStrip,
   renderDisabledAction,
   renderProviderAction,
   signalIcon,
   terminalIcon,
+  trashIcon,
   uniqueActions,
 } from "./nexusCockpitActions.js";
 import {
@@ -191,6 +194,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
     bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
+    bindCockpitConfigWindow(root);
     bindHostSignalControls(root, setHostFocus);
     bindGitHistoryColumnResizers(root);
     gitHistoryInteractions.refresh();
@@ -353,6 +357,7 @@ function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspac
       <main class="dn-cockpit-main" aria-label="Project state">${gitHistory}</main>
       ${renderCockpitOperationsPanel(snapshot, { threadInbox, trackedWork, activity, blockers })}
     </div>
+    ${renderCockpitConfigWindow(snapshot)}
   </div>`;
 }
 
@@ -400,9 +405,9 @@ function renderComponentRail(snapshot, selectedId, gitHistoryFilter = '') {
     const tone = git?.dirty ? 'warn' : component.sourceRootExists ? 'good' : 'danger';
     const branch = git?.branch ?? 'no branch';
     const selected = activeHistoryComponentId ? component.id === activeHistoryComponentId : id === selectedId;
-    return `<button class="dn-rail-item ${selected ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}" data-git-history-filter="${escapeHtml(`component:${component.id}`)}" data-scroll-target="project-git-history" aria-pressed="${selected ? 'true' : 'false'}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button>`;
+    return `<div class="dn-component-rail-row ${selected ? 'selected' : ''}"><button class="dn-rail-item ${selected ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}" data-git-history-filter="${escapeHtml(`component:${component.id}`)}" data-scroll-target="project-git-history" aria-pressed="${selected ? 'true' : 'false'}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button><button class="dn-rail-icon-button" type="button" data-cockpit-config-action="edit-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Save changes')} aria-label="${escapeHtml(`Edit ${component.name} configuration`)}" title="${escapeHtml(`Edit ${component.name} configuration`)}">${gearIcon()}</button><button class="dn-rail-icon-button danger" type="button" data-cockpit-config-action="remove-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Remove component')} aria-label="${escapeHtml(`Remove ${component.name}`)}" title="${escapeHtml(`Remove ${component.name}`)}">${trashIcon()}</button></div>`;
   }).join('') : '<p>No components loaded.</p>';
-  return `<section class="dn-rail-section" id="components-panel"><span class="dn-rail-heading">Components</span><div class="dn-rail-list">${body}${more}</div></section>`;
+  return `<section class="dn-rail-section" id="components-panel"><div class="dn-rail-heading-row"><span class="dn-rail-heading">Components</span><button class="dn-rail-icon-button primary" type="button" data-cockpit-config-action="add-component" data-config-kind="Project configuration" data-config-title="Add component" data-config-summary="Register a new DevNexus component in this workspace." data-config-action-label="Create component" data-config-name="New component" data-config-role="component" data-config-tracker="not configured" data-config-branch="not configured" data-config-path="${escapeHtml(snapshot.project?.root ?? '')}" aria-label="Add component" title="Add component">${plusIcon()}</button></div><div class="dn-rail-list">${body}${more}</div></section>`;
 }
 
 function cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter = '') {
@@ -412,6 +417,28 @@ function cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter = '') {
   const repositories = snapshot.history?.repositories ?? [];
   if (requested && repositories.some((repository) => repository.componentId === requested)) return requested;
   return repositories[0]?.componentId ?? '';
+}
+
+function cockpitComponentConfigAttributes(component, snapshot, actionLabel) {
+  const git = component.git ?? {};
+  const state = git.dirty ? 'dirty' : component.sourceRootExists ? 'clean' : 'missing';
+  const attrs = {
+    'data-config-kind': 'Component configuration',
+    'data-config-title': component.name ?? component.id ?? 'Component',
+    'data-config-summary': 'Manage component registration, source root, tracker, and branch defaults.',
+    'data-config-action-label': actionLabel,
+    'data-config-name': component.name ?? component.id ?? 'Component',
+    'data-config-role': component.role ?? 'component',
+    'data-config-tracker': component.defaultTrackerId ?? 'none',
+    'data-config-branch': git.branch ?? 'missing branch',
+    'data-config-path': component.sourceRoot ?? component.root ?? snapshot.project?.root ?? '',
+    'data-config-state': state,
+  };
+  return Object.entries(attrs).map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(' ');
+}
+
+function renderCockpitConfigWindow(snapshot) {
+  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Component configuration edits need a guarded project config action.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections"><button type="button" class="selected">Components</button><button type="button" disabled title="Workflow settings will use this window pattern.">Workflows</button><button type="button" disabled title="Extension settings will use this window pattern.">Extensions</button></nav><section class="dn-config-pane"><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component name</span><input type="text" data-config-window-input-name disabled /></label><label><span>Source root</span><input type="text" data-config-window-input-path disabled /></label></div><div class="dn-config-actions"><button class="dn-action" type="button" disabled data-config-window-primary>Save changes</button><button class="dn-action danger" type="button" disabled>Remove component</button><span>Component configuration edits need a guarded project config action.</span></div></section></div></div></section>`;
 }
 
 function renderWorkflowRail(snapshot) {
@@ -727,6 +754,55 @@ function renderThemeToggle(themeMode) {
 function bindThemeControls(container, onSelect) {
   container.querySelectorAll('[data-theme-mode]').forEach((button) => {
     button.addEventListener('click', () => onSelect(button.getAttribute('data-theme-mode')));
+  });
+}
+
+function bindCockpitConfigWindow(container) {
+  const overlay = container.querySelector('[data-cockpit-config-window]');
+  if (!overlay) return;
+  const close = () => {
+    overlay.hidden = true;
+    overlay.setAttribute('aria-hidden', 'true');
+  };
+  const setText = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.textContent = String(value ?? '');
+  };
+  const setInput = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.value = String(value ?? '');
+  };
+  const open = (button) => {
+    const action = button.getAttribute('data-cockpit-config-action') ?? '';
+    const primaryLabel = button.getAttribute('data-config-action-label') ?? (action === 'remove-component' ? 'Remove component' : 'Save changes');
+    setText('[data-config-window-kind]', button.getAttribute('data-config-kind') ?? 'Component configuration');
+    setText('[data-config-window-title]', button.getAttribute('data-config-title') ?? 'Configure component');
+    setText('[data-config-window-summary]', button.getAttribute('data-config-summary') ?? 'Component configuration edits need a guarded project config action.');
+    setText('[data-config-window-name]', button.getAttribute('data-config-name') ?? '');
+    setText('[data-config-window-role]', button.getAttribute('data-config-role') ?? '');
+    setText('[data-config-window-tracker]', button.getAttribute('data-config-tracker') ?? '');
+    setText('[data-config-window-branch]', button.getAttribute('data-config-branch') ?? '');
+    setText('[data-config-window-path]', button.getAttribute('data-config-path') ?? '');
+    setText('[data-config-window-state]', button.getAttribute('data-config-state') ?? 'pending configuration action');
+    setText('[data-config-window-primary]', primaryLabel);
+    setInput('[data-config-window-input-name]', button.getAttribute('data-config-name') ?? '');
+    setInput('[data-config-window-input-path]', button.getAttribute('data-config-path') ?? '');
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.querySelector('[data-cockpit-config-close]')?.focus?.();
+  };
+  container.querySelectorAll('[data-cockpit-config-action]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      open(button);
+    });
+  });
+  overlay.querySelectorAll('[data-cockpit-config-close]').forEach((button) => {
+    button.addEventListener('click', close);
+  });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
   });
 }
 

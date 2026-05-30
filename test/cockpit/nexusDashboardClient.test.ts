@@ -517,6 +517,48 @@ describe("nexus dashboard client", () => {
     expect(rendered).not.toContain("Primary event");
   });
 
+  it("surfaces component management actions in an overlapping configuration window", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      generatedAt: "2026-05-23T12:00:00.000Z",
+      summary: "Manage components",
+      project: { name: "Dashboard Demo", root: "/workspace/source" },
+      signals: [],
+      events: [],
+      blockers: [],
+      components: [
+        {
+          id: "primary",
+          name: "DevNexus",
+          role: "primary",
+          sourceRootExists: true,
+          defaultTrackerId: "github",
+          git: { branch: "main", dirty: false },
+        },
+      ],
+      weave: { nodes: [], lanes: [] },
+      worktrees: { records: [] },
+      features: { activeCount: 0, needsAttentionCount: 0, records: [] },
+      gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
+      plugins: { enabledCount: 0, capabilityCount: 0, records: [] },
+      trackedWork: { readyCount: 0, blockedCount: 0, importCandidateCount: 0, staleCount: 0, records: [] },
+      threads: { totalCount: 0, activeCount: 0, needsDecisionCount: 0, records: [] },
+      history: { totalCommitCount: 0, repositories: [], incomplete: false, detail: null },
+    };
+
+    const rendered = hooks.renderDashboard(snapshot, "dark", null, null, "dev-nexus-dogfood");
+
+    expect(rendered).toContain('data-cockpit-config-action="add-component"');
+    expect(rendered).toContain('data-cockpit-config-action="edit-component"');
+    expect(rendered).toContain('data-cockpit-config-action="remove-component"');
+    expect(rendered).toContain('data-cockpit-config-window hidden aria-hidden="true"');
+    expect(rendered).toContain('role="dialog"');
+    expect(rendered).toContain('id="cockpit-config-window-title"');
+    expect(rendered).toContain("Component configuration edits need a guarded project config action.");
+    expect(rendered).toContain("Save changes");
+    expect(rendered).toContain("Remove component");
+  });
+
   it("keeps visible dashboard content stable during background refresh", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
