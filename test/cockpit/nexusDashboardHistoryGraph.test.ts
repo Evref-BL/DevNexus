@@ -1420,9 +1420,9 @@ describe("nexus dashboard history graph", () => {
 
     const rendered = hooks.renderGitHistory(snapshot, null);
 
-    expect(rendered).toContain('--dn-history-scope-count:3;--dn-history-scope-token-max-width:162px;');
+    expect(rendered).toContain('--dn-history-scope-count:3;--dn-history-scope-token-max-width:96px;--dn-history-scope-group-max-width:296px;');
     expect(rendered).not.toContain('--dn-history-scope-target-width:494px;');
-    expect(cockpitStyles).toContain('.dn-history-scopes { --dn-history-scope-count: 0; --dn-history-scope-token-max-width: 170px; --dn-history-scope-group-max-width: auto; display: inline-flex; flex: 0 0 auto;');
+    expect(cockpitStyles).toContain('.dn-history-scopes { --dn-history-scope-count: 0; --dn-history-scope-token-max-width: 96px; --dn-history-scope-group-max-width: auto; display: inline-flex; flex: 0 0 auto;');
     expect(cockpitStyles).toContain('max-width: min(68%, var(--dn-history-scope-group-max-width));');
     expect(cockpitStyles).toContain('.dn-history-scopes .dn-history-scope-token { flex: 0 1 auto; max-width: var(--dn-history-scope-token-max-width); }');
     expect(rendered).toContain('data-dn-tooltip="codex/dev-nexus/ui-main" data-dn-tooltip-mode="always"');
