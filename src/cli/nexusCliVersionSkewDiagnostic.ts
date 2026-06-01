@@ -115,6 +115,9 @@ function extractDevNexusCommandLine(line: string): string | null {
 
 function normalizeDevNexusCommandLine(value: string): string | null {
   const normalized = value.trim();
+  if (normalized.includes("${")) {
+    return null;
+  }
   return normalized.startsWith("dev-nexus ") ? normalized : null;
 }
 
