@@ -48,6 +48,8 @@ export interface ParsedGitWorkflowCommand {
   provider: NexusGitWorkflowAdvanceProviderEvidence;
   authority: NexusGitWorkflowAdvanceAuthority;
   providerEvidence?: boolean;
+  executeBranchUpdate?: boolean;
+  dryRun?: boolean;
   json?: boolean;
 }
 
@@ -90,6 +92,9 @@ export async function handleGitWorkflowCommand(
       repositoryPath: parsed.repositoryPath,
       provider: parsed.provider,
       authority: parsed.authority,
+      executeBranchUpdate: parsed.executeBranchUpdate,
+      dryRun: parsed.dryRun,
+      gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
     printGitWorkflowAdvanceResult(
@@ -97,7 +102,7 @@ export async function handleGitWorkflowCommand(
       parsed,
       dependencies.stdout ?? process.stdout,
     );
-    return 0;
+    return result.branchUpdate?.status === "failed" ? 1 : 0;
   }
   const baseOptions = {
     projectRoot: parsed.projectRoot,
@@ -233,6 +238,12 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
         break;
       case "--provider-evidence":
         parsed.providerEvidence = true;
+        break;
+      case "--execute-branch-update":
+        parsed.executeBranchUpdate = true;
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
         break;
       case "--allow-git-mutation":
         parsed.authority.gitMutation = true;
@@ -399,6 +410,12 @@ export function printGitWorkflowAdvanceResult(
   writeLine(stdout, `  Run: ${result.runAfter.id} status=${result.runAfter.status}`);
   writeLine(stdout, `  Action: ${result.decision.action}`);
   writeLine(stdout, `  Next owner: ${formatOwner(result.decision.nextOwner)}`);
+  if (result.branchUpdate) {
+    writeLine(
+      stdout,
+      `  Branch update: ${result.branchUpdate.status} ${result.branchUpdate.action}`,
+    );
+  }
   writeLine(stdout, "  Reasons:");
   for (const reason of result.decision.reasons) {
     writeLine(stdout, `    ${reason}`);

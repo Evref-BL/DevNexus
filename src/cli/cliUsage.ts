@@ -370,6 +370,8 @@ export function usage(): string {
     "  --validation-mode <strict_checks|loose_checks|merge_queue>",
     "  --merge-queue <available|queued|unavailable|unknown>",
     "  --publication <completed|pending|missing|unknown>",
+    "  --execute-branch-update  execute the selected branch update action when authority allows",
+    "  --dry-run                preview advance and branch update execution without recording or mutating Git",
     "  --allow-git-mutation",
     "  --allow-provider-write",
     "  --allow-final-publication",
