@@ -310,6 +310,69 @@ export type NexusGitWorkflowGate =
   | "publication_authority"
   | "manual_cleanup";
 
+export type NexusGitWorkflowDecisionGraphTemplate =
+  NexusGitWorkflowBranchStrategy;
+
+export type NexusGitWorkflowDecisionGraphSource =
+  | "builtin"
+  | "configured";
+
+export type NexusGitWorkflowDecisionGraphNodeKind =
+  | "observation"
+  | "decision"
+  | "action"
+  | "gate"
+  | "handoff"
+  | "wait"
+  | "terminal";
+
+export type NexusGitWorkflowDecisionGraphAuthority =
+  | "git_mutation"
+  | "provider_write"
+  | "final_publication"
+  | "force_with_lease"
+  | "human_approval";
+
+export type NexusGitWorkflowDecisionGraphOwnerKind =
+  | "agent"
+  | "human"
+  | "provider"
+  | "ci"
+  | "none";
+
+export interface NexusGitWorkflowDecisionGraphOwner {
+  kind: NexusGitWorkflowDecisionGraphOwnerKind;
+  id: string | null;
+}
+
+export interface NexusGitWorkflowDecisionGraphNodeConfig {
+  id: string;
+  kind: NexusGitWorkflowDecisionGraphNodeKind;
+  summary: string;
+}
+
+export interface NexusGitWorkflowDecisionGraphTransitionConfig {
+  id: string;
+  from: string;
+  to: string;
+  summary: string;
+  requiredEvidence: string[];
+  authority: NexusGitWorkflowDecisionGraphAuthority[];
+  dryRun: boolean;
+  providerWrites: string[];
+  resumeInputs: string[];
+  nextOwner: NexusGitWorkflowDecisionGraphOwner;
+}
+
+export interface NexusGitWorkflowDecisionGraphConfig {
+  id: string;
+  source: NexusGitWorkflowDecisionGraphSource;
+  template: NexusGitWorkflowDecisionGraphTemplate | null;
+  startNodeId: string;
+  nodes: NexusGitWorkflowDecisionGraphNodeConfig[];
+  transitions: NexusGitWorkflowDecisionGraphTransitionConfig[];
+}
+
 export type NexusGitWorkflowReleaseMaintenanceFlow =
   | "oldest_to_newest"
   | "trunk_to_release";
@@ -357,6 +420,7 @@ export interface NexusGitWorkflowProfileConfig {
   branchPublication: NexusFeatureBranchDeliveryBranchPublicationConfig;
   update: NexusGitWorkflowUpdatePolicyConfig;
   gates: NexusGitWorkflowGateConfig;
+  decisionGraph: NexusGitWorkflowDecisionGraphConfig;
   release: NexusGitWorkflowReleaseMaintenanceConfig | null;
   environment: NexusGitWorkflowEnvironmentBranchConfig | null;
 }
@@ -979,6 +1043,7 @@ function gitWorkflowsFromLegacyFeatureBranchDelivery(
         branchPublication: { ...config.branchPublication },
         update: defaultGitWorkflowUpdatePolicyFor(branchStrategy),
         gates: defaultGitWorkflowGatePolicyFor(review),
+        decisionGraph: defaultGitWorkflowDecisionGraphFor(branchStrategy),
         release: null,
         environment: null,
       },
@@ -1061,6 +1126,11 @@ function validateGitWorkflowProfile(
     `${pathName}.update`,
     branchStrategy,
   );
+  const decisionGraph = validateGitWorkflowDecisionGraph(
+    record.decisionGraph,
+    `${pathName}.decisionGraph`,
+    branchStrategy,
+  );
   assertGitWorkflowSpecializedConfig(branchStrategy, release, environment, pathName);
 
   return {
@@ -1097,6 +1167,7 @@ function validateGitWorkflowProfile(
     ),
     update,
     gates: validateGitWorkflowGatePolicy(record.gates, `${pathName}.gates`, review),
+    decisionGraph,
     release,
     environment,
   };
@@ -1350,6 +1421,393 @@ function validateGitWorkflowGate(
   throw new NexusAutomationConfigError(
     `${pathName} must contain only known Git workflow gates`,
   );
+}
+
+function validateGitWorkflowDecisionGraph(
+  value: unknown,
+  pathName: string,
+  branchStrategy: NexusGitWorkflowBranchStrategy,
+): NexusGitWorkflowDecisionGraphConfig {
+  if (value === undefined) {
+    return defaultGitWorkflowDecisionGraphFor(branchStrategy);
+  }
+  if (typeof value === "string") {
+    return defaultGitWorkflowDecisionGraphFor(
+      validateGitWorkflowDecisionGraphTemplate(value, pathName),
+    );
+  }
+
+  const record = assertRecord(value, pathName);
+  const selectedTemplate = record.template === undefined
+    ? null
+    : validateGitWorkflowDecisionGraphTemplate(
+        record.template,
+        `${pathName}.template`,
+      );
+  if (
+    selectedTemplate &&
+    record.nodes === undefined &&
+    record.transitions === undefined
+  ) {
+    const builtin = defaultGitWorkflowDecisionGraphFor(selectedTemplate);
+    return {
+      ...builtin,
+      id: record.id === undefined
+        ? builtin.id
+        : validateGitWorkflowGraphId(record.id, `${pathName}.id`),
+    };
+  }
+
+  const graph: NexusGitWorkflowDecisionGraphConfig = {
+    id: validateGitWorkflowGraphId(record.id, `${pathName}.id`),
+    source: "configured",
+    template: selectedTemplate,
+    startNodeId: validateGitWorkflowGraphId(
+      record.startNodeId,
+      `${pathName}.startNodeId`,
+    ),
+    nodes: optionalArray(
+      record.nodes,
+      `${pathName}.nodes`,
+      validateGitWorkflowDecisionGraphNode,
+    ),
+    transitions: optionalArray(
+      record.transitions,
+      `${pathName}.transitions`,
+      validateGitWorkflowDecisionGraphTransition,
+    ),
+  };
+  assertGitWorkflowDecisionGraph(graph, pathName);
+  return graph;
+}
+
+function defaultGitWorkflowDecisionGraphFor(
+  template: NexusGitWorkflowDecisionGraphTemplate,
+): NexusGitWorkflowDecisionGraphConfig {
+  const updateSummary = gitWorkflowUpdateSummary(template);
+  return {
+    id: `builtin:${template}`,
+    source: "builtin",
+    template,
+    startNodeId: "observe",
+    nodes: [
+      graphNode("observe", "observation", "Read local Git and profile facts."),
+      graphNode("prepare-worktree", "action", "Prepare or adopt the work branch."),
+      graphNode("wait-for-review", "gate", "Wait for provider review evidence."),
+      graphNode("wait-for-checks", "wait", "Wait for required checks and queue evidence."),
+      graphNode("update-branch", "action", updateSummary),
+      graphNode("publication-gate", "gate", "Wait for final publication authority."),
+      graphNode("complete", "terminal", "Record completed publication."),
+    ],
+    transitions: [
+      graphTransition({
+        id: "prepare-worktree",
+        from: "observe",
+        to: "prepare-worktree",
+        summary: "Prepare an isolated worktree from the selected base ref.",
+        requiredEvidence: ["selected-profile", "base-ref"],
+        authority: ["git_mutation"],
+        nextOwner: { kind: "agent", id: null },
+      }),
+      graphTransition({
+        id: "wait-for-review",
+        from: "prepare-worktree",
+        to: "wait-for-review",
+        summary: "Publish or hand off a review branch and wait for review.",
+        providerWrites: ["pull_request"],
+        nextOwner: { kind: "provider", id: null },
+      }),
+      graphTransition({
+        id: "checks-after-review",
+        from: "wait-for-review",
+        to: "wait-for-checks",
+        summary: "Move to check/queue waiting after provider review evidence.",
+        requiredEvidence: ["provider-review"],
+        nextOwner: { kind: "provider", id: null },
+      }),
+      graphTransition({
+        id: "update-branch",
+        from: "wait-for-checks",
+        to: "update-branch",
+        summary: updateSummary,
+        requiredEvidence: ["provider-review", "required-checks"],
+        authority: gitWorkflowUpdateAuthority(template),
+        dryRun: true,
+        resumeInputs: ["--base-status", "--required-checks"],
+        nextOwner: { kind: "agent", id: null },
+      }),
+      graphTransition({
+        id: "publication-gate",
+        from: "wait-for-checks",
+        to: "publication-gate",
+        summary: "Hand off final merge, merge queue, or publication authority.",
+        requiredEvidence: ["provider-review", "required-checks"],
+        authority: ["human_approval", "provider_write", "final_publication"],
+        dryRun: true,
+        providerWrites: ["merge_pull_request", "merge_queue"],
+        resumeInputs: ["--allow-final-publication"],
+        nextOwner: { kind: "human", id: null },
+      }),
+      graphTransition({
+        id: "complete-publication",
+        from: "publication-gate",
+        to: "complete",
+        summary: "Record publication completion evidence.",
+        requiredEvidence: ["publication"],
+        nextOwner: { kind: "none", id: null },
+      }),
+    ],
+  };
+}
+
+function graphNode(
+  id: string,
+  kind: NexusGitWorkflowDecisionGraphNodeKind,
+  summary: string,
+): NexusGitWorkflowDecisionGraphNodeConfig {
+  return { id, kind, summary };
+}
+
+function graphTransition(options: {
+  id: string;
+  from: string;
+  to: string;
+  summary: string;
+  requiredEvidence?: string[];
+  authority?: NexusGitWorkflowDecisionGraphAuthority[];
+  dryRun?: boolean;
+  providerWrites?: string[];
+  resumeInputs?: string[];
+  nextOwner?: NexusGitWorkflowDecisionGraphOwner;
+}): NexusGitWorkflowDecisionGraphTransitionConfig {
+  return {
+    id: options.id,
+    from: options.from,
+    to: options.to,
+    summary: options.summary,
+    requiredEvidence: options.requiredEvidence ?? [],
+    authority: options.authority ?? [],
+    dryRun: options.dryRun ?? false,
+    providerWrites: options.providerWrites ?? [],
+    resumeInputs: options.resumeInputs ?? [],
+    nextOwner: options.nextOwner ?? { kind: "agent", id: null },
+  };
+}
+
+function gitWorkflowUpdateSummary(
+  template: NexusGitWorkflowDecisionGraphTemplate,
+): string {
+  switch (template) {
+    case "stacked":
+    case "hybrid":
+      return "Restack the branch series when policy and authority allow it.";
+    case "release_maintenance":
+      return "Cherry-pick or merge maintenance updates across release branches.";
+    case "environment_branch":
+      return "Promote the candidate through the configured environment branch.";
+    case "throwaway_rehearsal":
+      return "Recreate the rehearsal branch from current source evidence.";
+    case "direct":
+    case "feature_branch":
+      return "Update the branch when freshness evidence requires it.";
+  }
+}
+
+function gitWorkflowUpdateAuthority(
+  template: NexusGitWorkflowDecisionGraphTemplate,
+): NexusGitWorkflowDecisionGraphAuthority[] {
+  if (
+    template === "stacked" ||
+    template === "hybrid" ||
+    template === "throwaway_rehearsal"
+  ) {
+    return ["git_mutation", "force_with_lease"];
+  }
+  return ["git_mutation"];
+}
+
+function validateGitWorkflowDecisionGraphTemplate(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphTemplate {
+  return validateGitWorkflowBranchStrategy(value, pathName);
+}
+
+function validateGitWorkflowDecisionGraphNode(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphNodeConfig {
+  const record = assertRecord(value, pathName);
+  return {
+    id: validateGitWorkflowGraphId(record.id, `${pathName}.id`),
+    kind: validateGitWorkflowDecisionGraphNodeKind(
+      record.kind,
+      `${pathName}.kind`,
+    ),
+    summary: requiredNonEmptyString(record.summary, `${pathName}.summary`),
+  };
+}
+
+function validateGitWorkflowDecisionGraphTransition(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphTransitionConfig {
+  const record = assertRecord(value, pathName);
+  return {
+    id: validateGitWorkflowGraphId(record.id, `${pathName}.id`),
+    from: validateGitWorkflowGraphId(record.from, `${pathName}.from`),
+    to: validateGitWorkflowGraphId(record.to, `${pathName}.to`),
+    summary: requiredNonEmptyString(record.summary, `${pathName}.summary`),
+    requiredEvidence: optionalStringArray(
+      record.requiredEvidence,
+      `${pathName}.requiredEvidence`,
+    ) ?? [],
+    authority: (optionalStringArray(record.authority, `${pathName}.authority`) ?? [])
+      .map((item) =>
+        validateGitWorkflowDecisionGraphAuthority(item, `${pathName}.authority`),
+      ),
+    dryRun: optionalBoolean(record, "dryRun", pathName) ?? false,
+    providerWrites: optionalStringArray(
+      record.providerWrites,
+      `${pathName}.providerWrites`,
+    ) ?? [],
+    resumeInputs: optionalStringArray(
+      record.resumeInputs,
+      `${pathName}.resumeInputs`,
+    ) ?? [],
+    nextOwner: record.nextOwner === undefined
+      ? { kind: "agent", id: null }
+      : validateGitWorkflowDecisionGraphOwner(
+          record.nextOwner,
+          `${pathName}.nextOwner`,
+        ),
+  };
+}
+
+function validateGitWorkflowDecisionGraphNodeKind(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphNodeKind {
+  if (
+    value === "observation" ||
+    value === "decision" ||
+    value === "action" ||
+    value === "gate" ||
+    value === "handoff" ||
+    value === "wait" ||
+    value === "terminal"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be observation, decision, action, gate, handoff, wait, or terminal`,
+  );
+}
+
+function validateGitWorkflowDecisionGraphAuthority(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphAuthority {
+  if (
+    value === "git_mutation" ||
+    value === "provider_write" ||
+    value === "final_publication" ||
+    value === "force_with_lease" ||
+    value === "human_approval"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must contain only known Git workflow graph authority ids`,
+  );
+}
+
+function validateGitWorkflowDecisionGraphOwner(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphOwner {
+  const record = assertRecord(value, pathName);
+  const kind = validateGitWorkflowDecisionGraphOwnerKind(
+    record.kind,
+    `${pathName}.kind`,
+  );
+  return {
+    kind,
+    id: optionalNullableString(record.id, `${pathName}.id`) ?? null,
+  };
+}
+
+function validateGitWorkflowDecisionGraphOwnerKind(
+  value: unknown,
+  pathName: string,
+): NexusGitWorkflowDecisionGraphOwnerKind {
+  if (
+    value === "agent" ||
+    value === "human" ||
+    value === "provider" ||
+    value === "ci" ||
+    value === "none"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be agent, human, provider, ci, or none`,
+  );
+}
+
+function validateGitWorkflowGraphId(value: unknown, pathName: string): string {
+  const id = requiredNonEmptyString(value, pathName);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(id)) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must start with a letter or digit and contain only letters, digits, dots, underscores, colons, or hyphens`,
+    );
+  }
+  return id;
+}
+
+function assertGitWorkflowDecisionGraph(
+  graph: NexusGitWorkflowDecisionGraphConfig,
+  pathName: string,
+): void {
+  const nodeIds = new Set<string>();
+  for (const node of graph.nodes) {
+    if (nodeIds.has(node.id)) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.nodes must not contain duplicate node id ${node.id}`,
+      );
+    }
+    nodeIds.add(node.id);
+  }
+  if (!nodeIds.has(graph.startNodeId)) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.startNodeId must reference a configured node`,
+    );
+  }
+
+  const transitionIds = new Set<string>();
+  for (const transition of graph.transitions) {
+    if (transitionIds.has(transition.id)) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.transitions must not contain duplicate transition id ${transition.id}`,
+      );
+    }
+    transitionIds.add(transition.id);
+    if (!nodeIds.has(transition.from)) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.transitions ${transition.id} references unknown node ${transition.from}`,
+      );
+    }
+    if (!nodeIds.has(transition.to)) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.transitions ${transition.id} references unknown node ${transition.to}`,
+      );
+    }
+  }
+  if (!graph.nodes.some((node) => node.kind === "terminal")) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.nodes must include at least one terminal node`,
+    );
+  }
 }
 
 function validateOptionalGitWorkflowReleaseMaintenance(

@@ -119,6 +119,14 @@ describe("git-workflow CLI", () => {
         kind: "agent",
         id: "codex",
       },
+      nodes: [
+        {
+          id: "wait-for-review",
+          kind: "gate",
+          summary: "Waiting for provider review.",
+          recordedAt: "2026-05-25T10:05:00.000Z",
+        },
+      ],
       now: "2026-05-25T10:00:00.000Z",
     });
     const output = captureOutput();
@@ -145,6 +153,12 @@ describe("git-workflow CLI", () => {
     expect(output.output()).toContain("DevNexus Git workflow status.");
     expect(output.output()).toContain("Run: run-1 status=working");
     expect(output.output()).toContain("Profile: feature-delivery (feature_branch)");
+    expect(output.output()).toContain(
+      "Decision graph: builtin:feature_branch node=wait-for-review",
+    );
+    expect(output.output()).toContain(
+      "checks-after-review: missing provider-review",
+    );
     expect(output.output()).toContain("Next owner: agent/codex");
   });
 

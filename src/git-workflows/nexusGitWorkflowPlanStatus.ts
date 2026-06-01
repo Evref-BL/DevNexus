@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import {
   defaultNexusAutomationConfig,
+  type NexusGitWorkflowDecisionGraphConfig,
+  type NexusGitWorkflowDecisionGraphNodeConfig,
+  type NexusGitWorkflowDecisionGraphTransitionConfig,
   type NexusGitWorkflowProfileConfig,
   type NexusGitWorkflowGate,
 } from "../automation/nexusAutomationConfig.js";
@@ -72,6 +75,21 @@ export interface NexusGitWorkflowPlanStatusRefs {
   targetBranch: string | null;
 }
 
+export interface NexusGitWorkflowPlanStatusDecisionGraphTransition
+  extends NexusGitWorkflowDecisionGraphTransitionConfig {
+  missingEvidence: string[];
+}
+
+export interface NexusGitWorkflowPlanStatusDecisionGraph {
+  id: string;
+  source: NexusGitWorkflowDecisionGraphConfig["source"];
+  template: NexusGitWorkflowDecisionGraphConfig["template"];
+  currentNode: NexusGitWorkflowDecisionGraphNodeConfig | null;
+  allowedTransitions: NexusGitWorkflowPlanStatusDecisionGraphTransition[];
+  missingEvidence: string[];
+  nextOwner: NexusGitWorkflowRunOwner;
+}
+
 export interface NexusGitWorkflowPlanStatusResult {
   mode: NexusGitWorkflowPlanStatusMode;
   mutates: false;
@@ -93,6 +111,7 @@ export interface NexusGitWorkflowPlanStatusResult {
   evidenceGaps: string[];
   blockers: string[];
   humanGates: NexusGitWorkflowGate[];
+  decisionGraph: NexusGitWorkflowPlanStatusDecisionGraph | null;
   allowedNextCommands: NexusGitWorkflowAllowedCommand[];
 }
 
@@ -172,6 +191,12 @@ function buildNexusGitWorkflowPlanStatus(
     ...(mode === "status" && !run ? ["No matching Git workflow run was recorded."] : []),
   ];
   const nextOwner = run?.owner ?? { kind: "agent", id: null };
+  const decisionGraph = buildDecisionGraphStatus({
+    profile,
+    run,
+    evidence,
+    fallbackOwner: nextOwner,
+  });
 
   return {
     mode,
@@ -199,6 +224,7 @@ function buildNexusGitWorkflowPlanStatus(
       ...profile.gates.publication,
       ...profile.gates.cleanup,
     ]) : [],
+    decisionGraph,
     allowedNextCommands: allowedNextCommands({
       mode,
       context,
@@ -208,6 +234,58 @@ function buildNexusGitWorkflowPlanStatus(
       branchName,
       baseRef,
     }),
+  };
+}
+
+function buildDecisionGraphStatus(options: {
+  profile: NexusGitWorkflowProfileConfig | null;
+  run: NexusGitWorkflowRunRecord | null;
+  evidence: NexusGitWorkflowPlanStatusEvidence[];
+  fallbackOwner: NexusGitWorkflowRunOwner;
+}): NexusGitWorkflowPlanStatusDecisionGraph | null {
+  const graph = options.profile?.decisionGraph;
+  if (!graph) {
+    return null;
+  }
+
+  const currentNodeId = options.run?.nodes.at(-1)?.id ?? graph.startNodeId;
+  const currentNode =
+    graph.nodes.find((candidate) => candidate.id === currentNodeId) ??
+    graph.nodes.find((candidate) => candidate.id === graph.startNodeId) ??
+    null;
+  const presentEvidenceIds = new Set([
+    ...options.evidence
+      .filter((item) => item.status === "present")
+      .map((item) => item.id),
+    ...(options.run?.evidence.map((item) => item.id) ?? []),
+  ]);
+  const allowedTransitions = currentNode
+    ? graph.transitions
+        .filter((transition) => transition.from === currentNode.id)
+        .map((transition) => ({
+          ...transition,
+          missingEvidence: transition.requiredEvidence.filter(
+            (evidenceId) => !presentEvidenceIds.has(evidenceId),
+          ),
+        }))
+    : [];
+  const missingEvidence = uniqueStrings(
+    allowedTransitions.flatMap((transition) => transition.missingEvidence),
+  );
+  const nextOwner =
+    allowedTransitions.find((transition) => transition.missingEvidence.length > 0)
+      ?.nextOwner ??
+    allowedTransitions[0]?.nextOwner ??
+    options.fallbackOwner;
+
+  return {
+    id: graph.id,
+    source: graph.source,
+    template: graph.template,
+    currentNode,
+    allowedTransitions,
+    missingEvidence,
+    nextOwner,
   };
 }
 
@@ -596,6 +674,10 @@ function gitWorkflowAdvanceCommand(options: {
 
 function uniqueGates(gates: NexusGitWorkflowGate[]): NexusGitWorkflowGate[] {
   return [...new Set(gates)];
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function requiredNonEmptyString(value: unknown, pathName: string): string {

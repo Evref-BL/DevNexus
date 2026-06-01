@@ -58,6 +58,28 @@ describe("nexus Git workflow plan and status", () => {
         id: "direct-protected",
         branchStrategy: "direct",
       },
+      decisionGraph: {
+        id: "builtin:direct",
+        template: "direct",
+        currentNode: {
+          id: "observe",
+          kind: "observation",
+        },
+        allowedTransitions: expect.arrayContaining([
+          expect.objectContaining({
+            id: "prepare-worktree",
+            from: "observe",
+            to: "prepare-worktree",
+            missingEvidence: [],
+            authority: expect.arrayContaining(["git_mutation"]),
+          }),
+        ]),
+        missingEvidence: [],
+        nextOwner: {
+          kind: "agent",
+          id: null,
+        },
+      },
       refs: {
         baseRef: "origin/main",
         baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -117,6 +139,14 @@ describe("nexus Git workflow plan and status", () => {
         kind: "agent",
         id: "codex",
       },
+      nodes: [
+        {
+          id: "wait-for-review",
+          kind: "gate",
+          summary: "Waiting for provider review.",
+          recordedAt: "2026-05-25T10:05:00.000Z",
+        },
+      ],
       now: "2026-05-25T10:00:00.000Z",
     });
     const updatedRun = buildNexusGitWorkflowStatus({
@@ -148,6 +178,26 @@ describe("nexus Git workflow plan and status", () => {
         status: "working",
         workItemId: "github-356",
         branchName: "feat/git-workflows/plan-status",
+        currentNodeId: "wait-for-review",
+      },
+      decisionGraph: {
+        id: "builtin:feature_branch",
+        currentNode: {
+          id: "wait-for-review",
+          kind: "gate",
+        },
+        allowedTransitions: expect.arrayContaining([
+          expect.objectContaining({
+            id: "checks-after-review",
+            from: "wait-for-review",
+            missingEvidence: ["provider-review"],
+            nextOwner: {
+              kind: "provider",
+              id: null,
+            },
+          }),
+        ]),
+        missingEvidence: ["provider-review"],
       },
       refs: {
         baseRef: "origin/main",
