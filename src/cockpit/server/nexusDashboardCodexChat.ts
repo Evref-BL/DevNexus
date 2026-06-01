@@ -221,6 +221,7 @@ class NexusDashboardCodexChatStarterImpl
           optOutNotificationMethods: [],
         },
       });
+      await client.notify("initialized", {});
     } catch (error) {
       try {
         await client.close();

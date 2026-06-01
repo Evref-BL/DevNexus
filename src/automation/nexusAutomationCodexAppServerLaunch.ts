@@ -1,4 +1,5 @@
 import {
+  defaultCodexAppServerInitializeParams,
   initializeCodexAppServerCapabilityAdapter,
   type CodexAppServerCapabilityAdapter,
 } from "../codex-app/codexAppServerCapabilityAdapter.js";
@@ -426,7 +427,13 @@ async function resolveCodexAppServerAdapter(options: {
         cwd: options.cwd,
         client,
       })
-    : await initializeCodexAppServerCapabilityAdapter({ client });
+    : await initializeCodexAppServerCapabilityAdapter({
+        client,
+        initializeParams: defaultCodexAppServerInitializeParams({
+          title: "DevNexus automation app-server launcher",
+          version: options.input.projectConfig.version,
+        }),
+      });
 
   return {
     adapter,
@@ -599,7 +606,12 @@ function codexTurnParams(options: {
 }): Record<string, unknown> {
   return compactRecord({
     threadId: options.threadId,
-    input: options.turnInput,
+    input: [
+      {
+        type: "text",
+        text: options.turnInput,
+      },
+    ],
     ...codexExecutionParams(options),
   });
 }
@@ -840,6 +852,7 @@ function isCodexThreadGoalUnavailableError(error: unknown): boolean {
 
   const message = error.message.toLowerCase();
   return /goals? feature is disabled/.test(message) ||
+    /ephemeral thread does not support goals?/.test(message) ||
     /goals? (are|is) (disabled|unavailable|unsupported)/.test(message);
 }
 

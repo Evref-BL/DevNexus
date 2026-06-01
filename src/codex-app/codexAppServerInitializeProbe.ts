@@ -1,8 +1,10 @@
 import {
   CodexAppServerCapabilityError,
+  defaultCodexAppServerInitializeParams,
   detectCodexAppServerCapabilities,
-  extractCodexAppServerMethodNames,
   missingCodexAppServerCapabilities,
+  resolveCodexAppServerMethodNames,
+  type CodexAppServerMethodSource,
 } from "./codexAppServerCapabilityAdapter.js";
 import {
   CodexAppServerJsonRpcClient,
@@ -45,6 +47,19 @@ export type CodexAppServerInitializeProbeBlockerKind =
   | "remote_failure"
   | "unknown_failure";
 
+export type CodexAppServerGoalRuntimeStatus =
+  | "enabled"
+  | "disabled"
+  | "unsupported"
+  | "not_checked"
+  | "failed";
+
+export interface CodexAppServerGoalRuntimeCheck {
+  status: CodexAppServerGoalRuntimeStatus;
+  method: string | null;
+  summary: string | null;
+}
+
 export interface CodexAppServerCapabilityStatus {
   capability: string;
   required: boolean;
@@ -64,10 +79,13 @@ export interface CodexAppServerInitializeProbeReport {
   };
   codexVersion: string | null;
   advertisedMethods: string[];
+  effectiveMethods: string[];
+  methodSource: CodexAppServerMethodSource | null;
   capabilities: CodexAppServerCapabilityStatus[];
   requiredCapabilities: CodexAppServerCapabilityStatus[];
   optionalCapabilities: CodexAppServerCapabilityStatus[];
   goalPolicy: NexusCodexGoalsPolicyDecision | null;
+  goalRuntime: CodexAppServerGoalRuntimeCheck;
   blockerKind: CodexAppServerInitializeProbeBlockerKind | null;
   blockerSummary: string | null;
   initializeResult: unknown;
@@ -187,33 +205,29 @@ export async function probeCodexAppServerInitializeForProfile(
   }
 
   try {
-    const initializeResult = await client.request("initialize", {
-      clientInfo: {
-        name: "dev-nexus",
+    const initializeResult = await client.request(
+      "initialize",
+      defaultCodexAppServerInitializeParams({
         title: "DevNexus Codex app-server initialize probe",
-        version: String(options.projectConfig.version),
-      },
-      clientCapabilities: {
-        probe: true,
-        durableThreads: false,
-        userPrompts: false,
-        automations: false,
-      },
-      devNexus: {
-        purpose: "diagnostic_probe",
-        projectId: options.projectConfig.id,
-        profileId: options.profile.id,
-        persistence: "none",
-      },
-    });
-    const advertisedMethods = extractCodexAppServerMethodNames(initializeResult);
-    const capabilities = capabilityStatuses(advertisedMethods);
-    const missingRequired = missingCodexAppServerCapabilities(
-      detectCodexAppServerCapabilities(advertisedMethods),
+        version: options.projectConfig.version,
+      }),
     );
+    await client.notify("initialized", {});
+    const methodNames = resolveCodexAppServerMethodNames(initializeResult);
+    const detectedCapabilities = detectCodexAppServerCapabilities(
+      methodNames.effectiveMethods,
+    );
+    const capabilities = capabilityStatuses(methodNames.effectiveMethods);
+    const missingRequired =
+      missingCodexAppServerCapabilities(detectedCapabilities);
     const blockerSummary = missingRequired.length > 0
       ? `Codex app-server is missing required JSON-RPC capabilities: ${missingRequired.join(", ")}`
       : null;
+    const goalRuntime = await probeCodexAppServerGoalRuntime({
+      client,
+      capabilities: detectedCapabilities,
+      goalPolicy,
+    });
 
     return {
       status: missingRequired.length > 0 ? "blocked" : "ready",
@@ -225,11 +239,14 @@ export async function probeCodexAppServerInitializeForProfile(
         version: String(options.projectConfig.version),
       },
       codexVersion: extractCodexVersion(initializeResult),
-      advertisedMethods,
+      advertisedMethods: methodNames.advertisedMethods,
+      effectiveMethods: methodNames.effectiveMethods,
+      methodSource: methodNames.methodSource,
       capabilities,
       requiredCapabilities: capabilities.filter((item) => item.required),
       optionalCapabilities: capabilities.filter((item) => !item.required),
       goalPolicy,
+      goalRuntime,
       blockerKind:
         missingRequired.length > 0 ? "missing_required_method" : null,
       blockerSummary,
@@ -317,6 +334,27 @@ export function createCodexAppServerHttpJsonRpcTransport(options: {
 
       return payload as CodexAppServerJsonRpcResponse;
     },
+    async sendNotification(notification) {
+      const response = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(notification),
+      });
+      if (response.status === 401 || response.status === 403) {
+        throw new CodexAppServerJsonRpcError({
+          kind: "transport",
+          method: notification.method,
+          message:
+            `Codex app-server endpoint rejected notification authentication: HTTP ${response.status}`,
+          code: response.status,
+        });
+      }
+      if (!response.ok) {
+        throw new Error(`Codex app-server endpoint returned HTTP ${response.status}`);
+      }
+    },
   };
 }
 
@@ -379,10 +417,12 @@ function capabilityStatuses(
     optionalMethodStatus("plugins", advertisedMethods, ["plugin/list", "plugins/list"]),
     optionalMethodStatus("hooks", advertisedMethods, ["hook/list", "hooks/list"]),
     optionalMethodStatus("filesystem", advertisedMethods, [
+      "fs/readFile",
       "filesystem/read",
       "fs/read",
     ]),
     optionalMethodStatus("command_execution", advertisedMethods, [
+      "command/exec",
       "command/execute",
       "exec",
     ]),
@@ -483,10 +523,17 @@ function emptyBlockedProbeReport(options: {
     },
     codexVersion: null,
     advertisedMethods: [],
+    effectiveMethods: [],
+    methodSource: null,
     capabilities: capabilityStatuses([]),
     requiredCapabilities: capabilityStatuses([]).filter((item) => item.required),
     optionalCapabilities: capabilityStatuses([]).filter((item) => !item.required),
     goalPolicy: options.goalPolicy ?? null,
+    goalRuntime: {
+      status: "not_checked",
+      method: null,
+      summary: null,
+    },
     blockerKind: options.blockerKind,
     blockerSummary: options.blockerSummary,
     initializeResult: null,
@@ -504,6 +551,16 @@ function extractCodexVersion(value: unknown): string | null {
     const candidate = valueAtPath(value, path);
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return candidate.trim();
+    }
+  }
+
+  const userAgent = valueAtPath(value, "userAgent");
+  if (typeof userAgent === "string") {
+    const match = /\bCodex(?: Desktop)?\/(?<version>\d+\.\d+\.\d+)\b/u.exec(
+      userAgent,
+    );
+    if (match?.groups?.version) {
+      return match.groups.version;
     }
   }
 
@@ -526,6 +583,71 @@ function isAuthFailure(error: CodexAppServerJsonRpcError): boolean {
   return error.code === 401 ||
     error.code === 403 ||
     /auth|unauthorized|forbidden|permission denied/iu.test(error.message);
+}
+
+async function probeCodexAppServerGoalRuntime(options: {
+  client: CodexAppServerJsonRpcClient;
+  capabilities: ReturnType<typeof detectCodexAppServerCapabilities>;
+  goalPolicy: NexusCodexGoalsPolicyDecision | null;
+}): Promise<CodexAppServerGoalRuntimeCheck> {
+  if (!options.goalPolicy || options.goalPolicy.mode === "disabled") {
+    return {
+      status: "not_checked",
+      method: null,
+      summary: "Codex Goals policy is disabled.",
+    };
+  }
+
+  if (!options.capabilities.threadGoalGet.available) {
+    return {
+      status: "unsupported",
+      method: null,
+      summary: "thread/goal/get is not available in the app-server protocol.",
+    };
+  }
+
+  const method = options.capabilities.threadGoalGet.method;
+  try {
+    await options.client.request(method, {
+      threadId: "00000000-0000-4000-8000-000000000001",
+    });
+    return {
+      status: "enabled",
+      method,
+      summary: "thread/goal/get accepted a read-only probe request.",
+    };
+  } catch (error) {
+    if (error instanceof CodexAppServerJsonRpcError) {
+      const message = error.message.toLowerCase();
+      if (error.code === -32601) {
+        return {
+          status: "unsupported",
+          method,
+          summary: error.message,
+        };
+      }
+      if (/goals? feature is disabled/.test(message)) {
+        return {
+          status: "disabled",
+          method,
+          summary: error.message,
+        };
+      }
+      if (/thread not found/.test(message)) {
+        return {
+          status: "enabled",
+          method,
+          summary: "thread/goal/get reached thread lookup; Goals are enabled.",
+        };
+      }
+    }
+
+    return {
+      status: "failed",
+      method,
+      summary: errorMessage(error),
+    };
+  }
 }
 
 function errorMessage(error: unknown): string {

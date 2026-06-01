@@ -54,6 +54,9 @@ export interface CodexAppServerJsonRpcTransport {
   send(
     request: CodexAppServerJsonRpcRequest,
   ): Promise<CodexAppServerJsonRpcResponse>;
+  sendNotification?(
+    notification: CodexAppServerJsonRpcNotification,
+  ): Promise<void> | void;
   waitForNotification?(
     predicate: CodexAppServerJsonRpcNotificationPredicate,
   ): Promise<CodexAppServerJsonRpcNotification>;
@@ -164,6 +167,34 @@ export class CodexAppServerJsonRpcClient {
     return record.result as Result;
   }
 
+  async notify(method: string, params?: unknown): Promise<void> {
+    const notificationMethod = requiredNonEmptyString(method, "method");
+    const notification: CodexAppServerJsonRpcNotification = {
+      method: notificationMethod,
+      ...(params === undefined ? {} : { params }),
+    };
+
+    if (!this.transport.sendNotification) {
+      throw new CodexAppServerJsonRpcError({
+        kind: "transport",
+        method: notificationMethod,
+        message:
+          `Codex app-server JSON-RPC transport failed while sending ${notificationMethod}: transport does not support client notifications`,
+      });
+    }
+
+    try {
+      await this.transport.sendNotification(notification);
+    } catch (error) {
+      throw new CodexAppServerJsonRpcError({
+        kind: "transport",
+        method: notificationMethod,
+        message: `Codex app-server JSON-RPC transport failed while sending ${notificationMethod}: ${errorMessage(error)}`,
+        cause: error,
+      });
+    }
+  }
+
   close(): Promise<void> | void {
     return this.transport.close?.();
   }
@@ -264,15 +295,34 @@ class CodexAppServerStdioJsonRpcTransport
         resolve,
         reject,
       });
-      const body = JSON.stringify(request);
-      const message = `${body}\n`;
-      this.child.stdin!.write(message, "utf8", (error?: Error | null) => {
+      this.writeMessage(request, (error?: Error | null) => {
         if (!error) {
           return;
         }
 
         this.pending.delete(request.id);
         reject(error);
+      });
+    });
+  }
+
+  sendNotification(
+    notification: CodexAppServerJsonRpcNotification,
+  ): Promise<void> {
+    if (this.closedError) {
+      return Promise.reject(this.closedError);
+    }
+    if (!this.child.stdin?.writable) {
+      return Promise.reject(new Error("Codex app-server stdin is not writable"));
+    }
+
+    return new Promise((resolve, reject) => {
+      this.writeMessage(notification, (error?: Error | null) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
       });
     });
   }
@@ -295,6 +345,14 @@ class CodexAppServerStdioJsonRpcTransport
     return new Promise((resolve, reject) => {
       this.notificationWaiters.push({ predicate, resolve, reject });
     });
+  }
+
+  private writeMessage(
+    messageBody: CodexAppServerJsonRpcRequest | CodexAppServerJsonRpcNotification,
+    callback?: (error?: Error | null) => void,
+  ): void {
+    const body = JSON.stringify(messageBody);
+    this.child.stdin!.write(`${body}\n`, "utf8", callback);
   }
 
   close(): void {

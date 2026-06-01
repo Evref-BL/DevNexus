@@ -5,6 +5,7 @@ import {
   CodexAppServerJsonRpcError,
   initializeCodexAppServerCapabilityAdapter,
   summarizeCodexAppServerJsonRpcFailure,
+  type CodexAppServerJsonRpcNotification,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
   type CodexAppServerJsonRpcTransport,
@@ -12,6 +13,7 @@ import {
 
 class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];
+  readonly notifications: CodexAppServerJsonRpcNotification[] = [];
 
   constructor(
     private readonly handler: (
@@ -24,6 +26,10 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   ): Promise<CodexAppServerJsonRpcResponse> {
     this.requests.push(request);
     return this.handler(request);
+  }
+
+  sendNotification(notification: CodexAppServerJsonRpcNotification): void {
+    this.notifications.push(notification);
   }
 }
 
@@ -85,6 +91,8 @@ describe("Codex app-server capability adapter", () => {
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
     ]);
+    expect(transport.notifications.map((notification) => notification.method))
+      .toEqual(["initialized"]);
   });
 
   it("accepts thread/list as the read capability fallback", async () => {
@@ -108,6 +116,36 @@ describe("Codex app-server capability adapter", () => {
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
     ]);
+    expect(transport.notifications.map((notification) => notification.method))
+      .toEqual(["initialized"]);
+  });
+
+  it("does not apply the current protocol fallback to unrelated empty initialize results", async () => {
+    const transport = new MockCodexAppServerTransport((request) => ({
+      id: request.id,
+      result: {
+        serverInfo: {
+          name: "other-json-rpc-server",
+        },
+      },
+    }));
+    const client = new CodexAppServerJsonRpcClient({ transport });
+
+    await expect(
+      initializeCodexAppServerCapabilityAdapter({ client }),
+    ).rejects.toMatchObject({
+      name: "CodexAppServerCapabilityError",
+      methodSource: "none",
+      advertisedMethods: [],
+      effectiveMethods: [],
+      missingCapabilities: [
+        "thread/start",
+        "thread/fork",
+        "turn/start",
+        "turn/interrupt",
+        "thread/read or thread/list",
+      ],
+    } satisfies Partial<CodexAppServerCapabilityError>);
   });
 
   it("reports clear missing capability errors without assuming automation methods", async () => {
@@ -145,6 +183,8 @@ describe("Codex app-server capability adapter", () => {
       "initialize",
       "initialize",
     ]);
+    expect(transport.notifications.map((notification) => notification.method))
+      .toEqual(["initialized", "initialized", "initialized"]);
     expect(transport.requests.map((request) => request.method)).not.toContain(
       "automation/list",
     );

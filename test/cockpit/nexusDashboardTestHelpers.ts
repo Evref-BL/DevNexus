@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   defaultNexusAutomationConfig,
   nexusWorktreeLeaseKind,
+  type CodexAppServerJsonRpcNotification,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
   type CodexAppServerJsonRpcTransport,
@@ -472,6 +473,7 @@ export function hostWorkspace(
 
 export class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];
+  readonly notifications: CodexAppServerJsonRpcNotification[] = [];
   closed = false;
   closeError: Error | null = null;
 
@@ -498,6 +500,10 @@ export class MockCodexAppServerTransport implements CodexAppServerJsonRpcTranspo
         message: `Unsupported method ${request.method}`,
       },
     };
+  }
+
+  sendNotification(notification: CodexAppServerJsonRpcNotification): void {
+    this.notifications.push(notification);
   }
 
   close(): void {
