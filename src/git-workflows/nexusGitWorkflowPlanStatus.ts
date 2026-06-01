@@ -20,12 +20,39 @@ import {
 } from "../project/nexusProjectLifecycle.js";
 import { resolveNexusPublicationPolicy } from "../publication/nexusPublicationPolicy.js";
 import {
+  NexusForgePublicationError,
+  type NexusForgePullRequestResult,
+} from "../publication/nexusForgePublication.js";
+import {
+  inspectNexusPublicationPullRequestForBranch,
+} from "../publication/nexusPublicationOperations.js";
+import {
+  classifyNexusPublicationProviderEvidenceChecks,
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidenceInput,
+} from "../publication/nexusPublicationProviderEvidence.js";
+import {
+  NexusProviderCredentialBrokerError,
+  type NexusProviderCredentialCommandRunner,
+} from "../providers/nexusProviderCredentialBroker.js";
+import {
   readNexusGitWorkflowRunStore,
   summarizeNexusGitWorkflowRun,
   type NexusGitWorkflowRunOwner,
   type NexusGitWorkflowRunRecord,
   type NexusGitWorkflowRunSummary,
 } from "./nexusGitWorkflowRunState.js";
+import {
+  buildNexusGitWorkflowBranchFreshnessDecision,
+  type NexusGitWorkflowBranchFreshnessDecision,
+  type NexusGitWorkflowMergeQueueStatus,
+  type NexusGitWorkflowProviderBaseStatus,
+  type NexusGitWorkflowProviderMergeability,
+  type NexusGitWorkflowRequiredChecksStatus,
+  type NexusGitWorkflowValidationMode,
+} from "./nexusGitWorkflowBranchFreshness.js";
+import type { NexusGitWorkflowProviderReviewStatus } from "./nexusGitWorkflowAdvance.js";
 
 export type NexusGitWorkflowPlanStatusMode = "plan" | "status";
 export type NexusGitWorkflowEvidenceStatus = "present" | "missing" | "warning";
@@ -38,6 +65,7 @@ export interface NexusGitWorkflowPlanStatusOptions {
   branchName?: string | null;
   runId?: string | null;
   repositoryPath?: string | null;
+  providerEvidence?: NexusGitWorkflowProviderEvidenceAttachment | null;
   gitRunner?: GitRunner;
 }
 
@@ -90,6 +118,47 @@ export interface NexusGitWorkflowPlanStatusDecisionGraph {
   nextOwner: NexusGitWorkflowRunOwner;
 }
 
+export type NexusGitWorkflowProviderEvidenceStatus =
+  | "not_required"
+  | "attached"
+  | "missing_pull_request"
+  | "credential_error"
+  | "rate_limited"
+  | "provider_error"
+  | "insufficient_context";
+
+export interface NexusGitWorkflowProviderEvidenceAttachment {
+  requested: boolean;
+  status: NexusGitWorkflowProviderEvidenceStatus;
+  summary: string;
+  pullRequest: Pick<
+    NexusForgePullRequestResult,
+    "number" | "url" | "state" | "title"
+  > | null;
+  evidence: NexusPublicationProviderEvidenceInput | NexusPublicationProviderEvidence | null;
+}
+
+export interface NexusGitWorkflowProviderEvidenceFacts {
+  review: NexusGitWorkflowProviderReviewStatus;
+  requiredChecks: NexusGitWorkflowRequiredChecksStatus;
+  baseStatus: NexusGitWorkflowProviderBaseStatus;
+  mergeability: NexusGitWorkflowProviderMergeability;
+  mergeQueue: NexusGitWorkflowMergeQueueStatus;
+  validationMode: NexusGitWorkflowValidationMode;
+}
+
+export interface NexusGitWorkflowPlanStatusProviderEvidence
+  extends NexusGitWorkflowProviderEvidenceAttachment {
+  facts: NexusGitWorkflowProviderEvidenceFacts | null;
+}
+
+export interface CollectNexusGitWorkflowProviderEvidenceOptions
+  extends NexusGitWorkflowPlanStatusOptions {
+  baseEnv?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+  credentialCommandRunner?: NexusProviderCredentialCommandRunner;
+}
+
 export interface NexusGitWorkflowPlanStatusResult {
   mode: NexusGitWorkflowPlanStatusMode;
   mutates: false;
@@ -111,6 +180,8 @@ export interface NexusGitWorkflowPlanStatusResult {
   evidenceGaps: string[];
   blockers: string[];
   humanGates: NexusGitWorkflowGate[];
+  providerEvidence: NexusGitWorkflowPlanStatusProviderEvidence | null;
+  branchFreshness: NexusGitWorkflowBranchFreshnessDecision | null;
   decisionGraph: NexusGitWorkflowPlanStatusDecisionGraph | null;
   allowedNextCommands: NexusGitWorkflowAllowedCommand[];
 }
@@ -144,6 +215,81 @@ export function buildNexusGitWorkflowStatus(
   return buildNexusGitWorkflowPlanStatus("status", options);
 }
 
+export async function collectNexusGitWorkflowProviderEvidence(
+  options: CollectNexusGitWorkflowProviderEvidenceOptions,
+): Promise<NexusGitWorkflowProviderEvidenceAttachment> {
+  const context = resolveGitWorkflowContext(options);
+  const run = selectGitWorkflowRun(context, options);
+  const profileSelection = selectGitWorkflowProfile(
+    context.projectConfig,
+    options.profileId ?? run?.profileId ?? null,
+  );
+  const profile = profileSelection.profile;
+  if (!profile || profile.review.mode !== "review_branch_pr") {
+    return {
+      requested: true,
+      status: "not_required",
+      summary: "Selected Git workflow profile does not require provider pull request evidence.",
+      pullRequest: null,
+      evidence: null,
+    };
+  }
+
+  const targetBranch = resolveTargetBranch(context, profile, run);
+  const baseRef = run?.baseRef ?? defaultBaseRef(context, targetBranch);
+  const gitEvidence = collectGitEvidence({
+    repositoryPath: context.repositoryPath,
+    baseRef,
+    gitRunner: options.gitRunner ?? defaultGitRunner,
+  });
+  const branchName =
+    options.branchName ??
+    run?.branchName ??
+    run?.currentRef ??
+    gitEvidence.currentBranch;
+  if (!branchName || !targetBranch) {
+    return {
+      requested: true,
+      status: "insufficient_context",
+      summary:
+        "Provider evidence requires a branch name and target branch before a pull request can be located.",
+      pullRequest: null,
+      evidence: null,
+    };
+  }
+
+  try {
+    const result = await inspectNexusPublicationPullRequestForBranch({
+      projectRoot: context.projectRoot,
+      componentId: context.component.id,
+      head: branchName,
+      base: targetBranch,
+      baseEnv: options.baseEnv,
+      fetch: options.fetch,
+      credentialCommandRunner: options.credentialCommandRunner,
+    });
+    if (!result.pullRequest) {
+      return {
+        requested: true,
+        status: "missing_pull_request",
+        summary:
+          `No open provider pull request found for ${branchName} targeting ${targetBranch}.`,
+        pullRequest: null,
+        evidence: null,
+      };
+    }
+    return {
+      requested: true,
+      status: "attached",
+      summary: `Attached provider evidence from pull request #${result.pullRequest.number}.`,
+      pullRequest: summarizePullRequest(result.pullRequest),
+      evidence: result.evidence,
+    };
+  } catch (error) {
+    return providerEvidenceErrorAttachment(error);
+  }
+}
+
 function buildNexusGitWorkflowPlanStatus(
   mode: NexusGitWorkflowPlanStatusMode,
   options: NexusGitWorkflowPlanStatusOptions,
@@ -173,20 +319,37 @@ function buildNexusGitWorkflowPlanStatus(
     baseCommit: run?.baseCommit ?? gitEvidence.baseCommit,
     targetBranch,
   };
+  const providerStatus = buildProviderEvidenceStatus({
+    context,
+    profile,
+    run,
+    branchName,
+    targetBranch,
+    attachment: options.providerEvidence ?? null,
+  });
+  const branchFreshness = buildProviderBranchFreshness({
+    context,
+    profile,
+    run,
+    branchName,
+    targetBranch,
+    providerEvidence: providerStatus.providerEvidence,
+  });
   const evidence = [
     profileEvidence(profile),
     ...profileSelection.evidence,
     ...gitEvidence.evidence,
-    ...providerEvidence(profile),
+    ...providerStatus.evidence,
   ];
   const evidenceGaps = [
     ...profileSelection.gaps,
     ...gitEvidence.gaps,
-    ...providerEvidenceGaps(profile),
+    ...providerStatus.gaps,
   ];
   const blockers = [
     ...profileSelection.blockers,
     ...gitEvidence.blockers,
+    ...providerStatus.blockers,
     ...targetBlockers(targetBranch),
     ...(mode === "status" && !run ? ["No matching Git workflow run was recorded."] : []),
   ];
@@ -224,6 +387,8 @@ function buildNexusGitWorkflowPlanStatus(
       ...profile.gates.publication,
       ...profile.gates.cleanup,
     ]) : [],
+    providerEvidence: providerStatus.providerEvidence,
+    branchFreshness,
     decisionGraph,
     allowedNextCommands: allowedNextCommands({
       mode,
@@ -485,28 +650,413 @@ function profileEvidence(
   };
 }
 
-function providerEvidence(
-  profile: NexusGitWorkflowProfileConfig | null,
-): NexusGitWorkflowPlanStatusEvidence[] {
-  if (!profile || profile.review.mode !== "review_branch_pr") {
-    return [];
+function buildProviderEvidenceStatus(options: {
+  context: NexusGitWorkflowContext;
+  profile: NexusGitWorkflowProfileConfig | null;
+  run: NexusGitWorkflowRunRecord | null;
+  branchName: string | null;
+  targetBranch: string | null;
+  attachment: NexusGitWorkflowProviderEvidenceAttachment | null;
+}): {
+  providerEvidence: NexusGitWorkflowPlanStatusProviderEvidence | null;
+  evidence: NexusGitWorkflowPlanStatusEvidence[];
+  gaps: string[];
+  blockers: string[];
+} {
+  if (!options.profile || options.profile.review.mode !== "review_branch_pr") {
+    return {
+      providerEvidence: options.attachment
+        ? { ...options.attachment, facts: null }
+        : null,
+      evidence: [],
+      gaps: [],
+      blockers: [],
+    };
   }
-  return [
+  if (!options.attachment) {
+    return {
+      providerEvidence: null,
+      evidence: [
+        {
+          id: "provider-review",
+          status: "missing",
+          summary:
+            "Provider review evidence is not loaded by read-only plan/status without a pull request evidence input.",
+        },
+      ],
+      gaps: ["Provider review evidence has not been attached."],
+      blockers: [],
+    };
+  }
+  if (options.attachment.status !== "attached" || !options.attachment.evidence) {
+    const evidenceStatus: NexusGitWorkflowEvidenceStatus =
+      options.attachment.status === "missing_pull_request" ? "missing" : "warning";
+    return {
+      providerEvidence: {
+        ...options.attachment,
+        facts: null,
+      },
+      evidence: [
+        {
+          id: "provider-pull-request",
+          status: evidenceStatus,
+          summary: options.attachment.summary,
+        },
+        {
+          id: "provider-review",
+          status: "missing",
+          summary: "Provider review evidence is unavailable.",
+        },
+      ],
+      gaps: [options.attachment.summary],
+      blockers: providerEvidenceAttachmentBlockers(options.attachment),
+    };
+  }
+
+  const evidence = normalizeNexusPublicationProviderEvidence([
+    options.attachment.evidence,
+  ])[0]!;
+  const facts = providerEvidenceFacts({
+    context: options.context,
+    evidence,
+  });
+  const providerEvidence: NexusGitWorkflowPlanStatusProviderEvidence = {
+    ...options.attachment,
+    evidence,
+    facts,
+  };
+  const evidenceItems = providerEvidenceItems({
+    context: options.context,
+    attachment: options.attachment,
+    evidence,
+    facts,
+  });
+  return {
+    providerEvidence,
+    evidence: evidenceItems,
+    gaps: providerEvidenceGaps(evidenceItems),
+    blockers: providerEvidenceBlockers(facts),
+  };
+}
+
+function buildProviderBranchFreshness(options: {
+  context: NexusGitWorkflowContext;
+  profile: NexusGitWorkflowProfileConfig | null;
+  run: NexusGitWorkflowRunRecord | null;
+  branchName: string | null;
+  targetBranch: string | null;
+  providerEvidence: NexusGitWorkflowPlanStatusProviderEvidence | null;
+}): NexusGitWorkflowBranchFreshnessDecision | null {
+  const facts = options.providerEvidence?.facts ?? null;
+  if (!options.profile || !facts || !options.targetBranch) {
+    return null;
+  }
+
+  return buildNexusGitWorkflowBranchFreshnessDecision({
+    profile: options.profile,
+    headBranch: options.branchName ?? options.run?.branchName ?? null,
+    baseBranch: options.run?.baseRef ?? options.targetBranch,
+    pushRemote: options.profile.branchPublication.fallbackRemote ??
+      options.context.publication.remote ??
+      "origin",
+    publicBranch: true,
+    provider: {
+      baseStatus: facts.baseStatus,
+      mergeable: facts.mergeability,
+      validationMode: facts.validationMode,
+      requiredChecks: facts.requiredChecks,
+      mergeQueue: facts.mergeQueue,
+    },
+  });
+}
+
+function providerEvidenceFacts(options: {
+  context: NexusGitWorkflowContext;
+  evidence: NexusPublicationProviderEvidence;
+}): NexusGitWorkflowProviderEvidenceFacts {
+  const checkClassification = classifyNexusPublicationProviderEvidenceChecks({
+    evidence: options.evidence,
+    requiredChecks: options.context.publication.greenMain?.requiredChecks ?? [],
+  });
+  const mergeQueue = workflowMergeQueueStatus(options.evidence);
+  return {
+    review: workflowReviewStatus(options.evidence.reviewState),
+    requiredChecks: workflowRequiredChecksStatus(checkClassification.status),
+    baseStatus: workflowBaseStatus(options.evidence.baseStatus),
+    mergeability: workflowMergeability(options.evidence.mergeability),
+    mergeQueue,
+    validationMode:
+      mergeQueue === "available" || mergeQueue === "queued"
+        ? "merge_queue"
+        : "strict_checks",
+  };
+}
+
+function providerEvidenceItems(options: {
+  context: NexusGitWorkflowContext;
+  attachment: NexusGitWorkflowProviderEvidenceAttachment;
+  evidence: NexusPublicationProviderEvidence;
+  facts: NexusGitWorkflowProviderEvidenceFacts;
+}): NexusGitWorkflowPlanStatusEvidence[] {
+  const checkClassification = classifyNexusPublicationProviderEvidenceChecks({
+    evidence: options.evidence,
+    requiredChecks: options.context.publication.greenMain?.requiredChecks ?? [],
+  });
+  const items: NexusGitWorkflowPlanStatusEvidence[] = [
     {
-      id: "provider-review",
-      status: "missing",
-      summary:
-        "Provider review evidence is not loaded by read-only plan/status without a pull request evidence input.",
+      id: "provider-pull-request",
+      status: "present",
+      summary: options.attachment.summary,
+    },
+    providerReviewEvidence(options.facts.review),
+    {
+      id: "required-checks",
+      status: requiredChecksEvidenceStatus(options.facts.requiredChecks),
+      summary: requiredChecksEvidenceSummary(options.facts.requiredChecks),
+    },
+    {
+      id: "provider-base-status",
+      status: providerFactEvidenceStatus(options.facts.baseStatus),
+      summary: `Provider base status is ${options.facts.baseStatus}.`,
+    },
+    {
+      id: "provider-mergeability",
+      status: providerFactEvidenceStatus(options.facts.mergeability),
+      summary: `Provider mergeability is ${options.facts.mergeability}.`,
+    },
+    {
+      id: "merge-queue",
+      status: options.facts.mergeQueue === "unknown" ? "warning" : "present",
+      summary: `Provider merge queue status is ${options.facts.mergeQueue}.`,
     },
   ];
+  return items.map((item) =>
+    item.id === "required-checks" && options.facts.requiredChecks === "passed"
+      ? {
+          ...item,
+          summary: checkClassification.message,
+        }
+      : item
+  );
+}
+
+function providerReviewEvidence(
+  review: NexusGitWorkflowProviderEvidenceFacts["review"],
+): NexusGitWorkflowPlanStatusEvidence {
+  if (review === "approved") {
+    return {
+      id: "provider-review",
+      status: "present",
+      summary: "Provider review is approved.",
+    };
+  }
+  if (review === "changes_requested") {
+    return {
+      id: "provider-review",
+      status: "warning",
+      summary: "Provider review requested changes.",
+    };
+  }
+  return {
+    id: "provider-review",
+    status: "missing",
+    summary: `Provider review is ${review}.`,
+  };
 }
 
 function providerEvidenceGaps(
-  profile: NexusGitWorkflowProfileConfig | null,
+  evidence: NexusGitWorkflowPlanStatusEvidence[],
 ): string[] {
-  return profile?.review.mode === "review_branch_pr"
-    ? ["Provider review evidence has not been attached."]
+  return evidence
+    .filter((item) => item.status !== "present")
+    .map((item) => item.summary);
+}
+
+function providerEvidenceBlockers(
+  facts: NexusGitWorkflowProviderEvidenceFacts,
+): string[] {
+  const blockers: string[] = [];
+  if (facts.review === "changes_requested") {
+    blockers.push("Provider review requested changes.");
+  }
+  if (facts.requiredChecks === "failed") {
+    blockers.push("Required checks failed.");
+  }
+  if (facts.requiredChecks === "stale") {
+    blockers.push("Required checks are stale.");
+  }
+  return blockers;
+}
+
+function providerEvidenceAttachmentBlockers(
+  attachment: NexusGitWorkflowProviderEvidenceAttachment,
+): string[] {
+  return attachment.status === "credential_error" ||
+    attachment.status === "rate_limited" ||
+    attachment.status === "provider_error" ||
+    attachment.status === "insufficient_context"
+    ? [attachment.summary]
     : [];
+}
+
+function workflowReviewStatus(
+  reviewState: NexusPublicationProviderEvidence["reviewState"],
+): NexusGitWorkflowProviderEvidenceFacts["review"] {
+  if (reviewState === "approved") {
+    return "approved";
+  }
+  if (reviewState === "changes_requested" || reviewState === "rejected") {
+    return "changes_requested";
+  }
+  if (reviewState === "waiting_for_approval" || reviewState === "timed_out") {
+    return "pending";
+  }
+  return "unknown";
+}
+
+function workflowRequiredChecksStatus(
+  status: ReturnType<typeof classifyNexusPublicationProviderEvidenceChecks>["status"],
+): NexusGitWorkflowRequiredChecksStatus {
+  if (status === "success" || status === "not_required") {
+    return "passed";
+  }
+  if (status === "pending") {
+    return "pending";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "stale") {
+    return "stale";
+  }
+  if (status === "missing") {
+    return "missing";
+  }
+  return "unknown";
+}
+
+function workflowBaseStatus(
+  status: NexusPublicationProviderEvidence["baseStatus"],
+): NexusGitWorkflowProviderBaseStatus {
+  if (status === "current") {
+    return "up_to_date";
+  }
+  if (status === "behind" || status === "diverged") {
+    return status;
+  }
+  return "unknown";
+}
+
+function workflowMergeability(
+  mergeability: NexusPublicationProviderEvidence["mergeability"],
+): NexusGitWorkflowProviderMergeability {
+  if (mergeability === "mergeable") {
+    return "mergeable";
+  }
+  if (mergeability === "conflicting" || mergeability === "blocked") {
+    return "conflicting";
+  }
+  return "unknown";
+}
+
+function workflowMergeQueueStatus(
+  evidence: NexusPublicationProviderEvidence,
+): NexusGitWorkflowMergeQueueStatus {
+  const value = stringMetadata(evidence.metadata.mergeQueue) ??
+    stringMetadata(evidence.metadata.mergeQueueStatus) ??
+    stringMetadata(evidence.metadata.mergeableState);
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "queued" || normalized === "has_queue") {
+    return "queued";
+  }
+  if (normalized === "available" || normalized === "enabled") {
+    return "available";
+  }
+  if (normalized === "unavailable" || normalized === "disabled") {
+    return "unavailable";
+  }
+  return "unknown";
+}
+
+function requiredChecksEvidenceStatus(
+  status: NexusGitWorkflowRequiredChecksStatus,
+): NexusGitWorkflowEvidenceStatus {
+  if (status === "passed") {
+    return "present";
+  }
+  return status === "failed" || status === "stale" ? "warning" : "missing";
+}
+
+function requiredChecksEvidenceSummary(
+  status: NexusGitWorkflowRequiredChecksStatus,
+): string {
+  if (status === "passed") {
+    return "Required checks passed.";
+  }
+  if (status === "failed") {
+    return "Required checks failed.";
+  }
+  if (status === "stale") {
+    return "Required checks are stale.";
+  }
+  return `Required checks are ${status}.`;
+}
+
+function providerFactEvidenceStatus(value: string): NexusGitWorkflowEvidenceStatus {
+  return value === "unknown" ? "warning" : "present";
+}
+
+function summarizePullRequest(
+  pullRequest: NexusForgePullRequestResult,
+): NexusGitWorkflowProviderEvidenceAttachment["pullRequest"] {
+  return {
+    number: pullRequest.number,
+    url: pullRequest.url,
+    state: pullRequest.state,
+    title: pullRequest.title,
+  };
+}
+
+function providerEvidenceErrorAttachment(
+  error: unknown,
+): NexusGitWorkflowProviderEvidenceAttachment {
+  if (error instanceof NexusProviderCredentialBrokerError) {
+    return {
+      requested: true,
+      status: "credential_error",
+      summary: `Provider evidence credentials are unavailable: ${error.message}`,
+      pullRequest: null,
+      evidence: null,
+    };
+  }
+  if (error instanceof NexusForgePublicationError) {
+    const rateLimited = error.code === "provider_request_failed" &&
+      /rate limit/iu.test(error.message);
+    return {
+      requested: true,
+      status: rateLimited
+        ? "rate_limited"
+        : error.code === "missing_credential"
+          ? "credential_error"
+          : "provider_error",
+      summary: `Provider evidence collection failed: ${error.message}`,
+      pullRequest: null,
+      evidence: null,
+    };
+  }
+  return {
+    requested: true,
+    status: "provider_error",
+    summary: `Provider evidence collection failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+    pullRequest: null,
+    evidence: null,
+  };
+}
+
+function stringMetadata(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 function resolveTargetBranch(

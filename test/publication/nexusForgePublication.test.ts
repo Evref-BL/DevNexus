@@ -336,6 +336,50 @@ describe("nexus forge publication facade", () => {
     });
   });
 
+  it("finds an existing GitHub pull request through read-only REST lookup", async () => {
+    const calls: CapturedFetchCall[] = [];
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential(),
+      fetch: queuedFetch(calls, [
+        {
+          body: [
+            {
+              number: 31,
+              html_url: "https://github.com/Evref-BL/DevNexus/pull/31",
+              state: "open",
+              title: "Evidence status",
+            },
+          ],
+        },
+      ]),
+    });
+
+    await expect(
+      adapter.findPullRequest({
+        head: "codex/dev-nexus/383-provider-evidence-status",
+        base: "main",
+      }),
+    ).resolves.toMatchObject({
+      number: 31,
+      url: "https://github.com/Evref-BL/DevNexus/pull/31",
+      state: "open",
+      title: "Evidence status",
+      metadata: {
+        backend: "github_rest",
+        capability: "pull_request.lookup",
+      },
+    });
+
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`))
+      .toEqual(["GET /repos/Evref-BL/DevNexus/pulls"]);
+    const lookupUrl = new URL(calls[0]!.url);
+    expect(lookupUrl.searchParams.get("head"))
+      .toBe("Evref-BL:codex/dev-nexus/383-provider-evidence-status");
+    expect(lookupUrl.searchParams.get("base")).toBe("main");
+    expect(lookupUrl.searchParams.get("state")).toBe("open");
+  });
+
   it("maps GitHub check runs into publication provider evidence", async () => {
     const adapter = createNexusForgePublicationAdapter({
       repository: githubRepository(),

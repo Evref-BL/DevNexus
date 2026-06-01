@@ -5,6 +5,10 @@ import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { ProjectGitRunner } from "../project/nexusProjectLifecycle.js";
 import type { NexusProviderCredentialCommandRunner } from "../providers/nexusProviderCredentialBroker.js";
 import type { NexusPublicationGitPushRunner } from "../publication/nexusPublicationPolicy.js";
+import type {
+  CollectNexusGitWorkflowProviderEvidenceOptions,
+  NexusGitWorkflowProviderEvidenceAttachment,
+} from "../git-workflows/nexusGitWorkflowPlanStatus.js";
 import type { NexusProjectHostingProviderAdapter } from "../project/nexusProjectHosting.js";
 import type { NexusMcpRuntimeProcess } from "../project/nexusSetupAssistant.js";
 import type {
@@ -30,6 +34,9 @@ export interface DevNexusCliDependencies {
   fetch?: typeof fetch;
   credentialCommandRunner?: NexusProviderCredentialCommandRunner;
   publicationGitPushRunner?: NexusPublicationGitPushRunner;
+  gitWorkflowProviderEvidenceCollector?: (
+    options: CollectNexusGitWorkflowProviderEvidenceOptions,
+  ) => Promise<NexusGitWorkflowProviderEvidenceAttachment>;
   commandRunner?: NexusAutomationCommandRunner;
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;

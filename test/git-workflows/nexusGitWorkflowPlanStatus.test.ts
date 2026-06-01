@@ -218,6 +218,248 @@ describe("nexus Git workflow plan and status", () => {
       }),
     );
   });
+
+  it("attaches provider pull request evidence to status decisions", () => {
+    const projectRoot = makeTempDir("dev-nexus-git-workflow-provider-status-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      workItemId: "github-383",
+      branchName: "feat/git-workflows/provider-evidence",
+      currentRef: "feat/git-workflows/provider-evidence",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "provider",
+        id: "github",
+      },
+      nodes: [
+        {
+          id: "wait-for-review",
+          kind: "gate",
+          summary: "Waiting for provider review.",
+          recordedAt: "2026-05-25T10:05:00.000Z",
+        },
+      ],
+      now: "2026-05-25T10:00:00.000Z",
+    });
+
+    const status = buildNexusGitWorkflowStatus({
+      projectRoot,
+      componentId: "primary",
+      runId: "run-1",
+      repositoryPath: sourceRoot,
+      providerEvidence: {
+        requested: true,
+        status: "attached",
+        summary: "Attached provider evidence from pull request #12.",
+        pullRequest: {
+          number: 12,
+          url: "https://github.com/example/project/pull/12",
+          state: "open",
+          title: "Provider evidence",
+        },
+        evidence: {
+          provider: "github",
+          sourceKind: "pull_request",
+          reviewTarget: {
+            kind: "pull_request",
+            number: 12,
+            url: "https://github.com/example/project/pull/12",
+            title: "Provider evidence",
+          },
+          headBranch: "feat/git-workflows/provider-evidence",
+          headSha: "cccccccccccccccccccccccccccccccccccccccc",
+          targetBranch: "main",
+          reviewState: "approved",
+          checks: [
+            {
+              name: "Node 22 check",
+              status: "success",
+              conclusion: "success",
+            },
+          ],
+          mergeability: "mergeable",
+          baseStatus: "current",
+          metadata: {
+            mergeQueue: "queued",
+          },
+        },
+      },
+      gitRunner: readOnlyGitRunner({
+        currentBranch: "feat/git-workflows/provider-evidence",
+        currentCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        baseCommits: {
+          "origin/main": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        status: "## feat/git-workflows/provider-evidence\n",
+      }).runner,
+    });
+
+    expect(status.providerEvidence).toMatchObject({
+      requested: true,
+      status: "attached",
+      pullRequest: {
+        number: 12,
+      },
+      facts: {
+        review: "approved",
+        requiredChecks: "passed",
+        baseStatus: "up_to_date",
+        mergeability: "mergeable",
+        mergeQueue: "queued",
+      },
+    });
+    expect(status.branchFreshness).toMatchObject({
+      freshness: "fresh",
+      action: "none",
+    });
+    expect(status.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "provider-pull-request",
+          status: "present",
+        }),
+        expect.objectContaining({
+          id: "provider-review",
+          status: "present",
+        }),
+        expect.objectContaining({
+          id: "required-checks",
+          status: "present",
+        }),
+      ]),
+    );
+    expect(status.evidenceGaps).not.toContain(
+      "Provider review evidence has not been attached.",
+    );
+    expect(status.decisionGraph).toMatchObject({
+      allowedTransitions: expect.arrayContaining([
+        expect.objectContaining({
+          id: "checks-after-review",
+          missingEvidence: [],
+        }),
+      ]),
+      missingEvidence: [],
+    });
+  });
+
+  it("reports a missing provider pull request distinctly", () => {
+    const projectRoot = makeTempDir("dev-nexus-git-workflow-missing-pr-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("feature-delivery", "feature_branch"));
+
+    const status = buildNexusGitWorkflowStatus({
+      projectRoot,
+      componentId: "primary",
+      branchName: "feat/git-workflows/no-pr",
+      repositoryPath: sourceRoot,
+      providerEvidence: {
+        requested: true,
+        status: "missing_pull_request",
+        summary:
+          "No open provider pull request found for feat/git-workflows/no-pr targeting main.",
+        pullRequest: null,
+        evidence: null,
+      },
+      gitRunner: readOnlyGitRunner({
+        currentBranch: "feat/git-workflows/no-pr",
+        currentCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        baseCommits: {
+          "origin/main": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        status: "## feat/git-workflows/no-pr\n",
+      }).runner,
+    });
+
+    expect(status.providerEvidence).toMatchObject({
+      requested: true,
+      status: "missing_pull_request",
+      pullRequest: null,
+      facts: null,
+    });
+    expect(status.evidence).toContainEqual(
+      expect.objectContaining({
+        id: "provider-pull-request",
+        status: "missing",
+      }),
+    );
+    expect(status.evidenceGaps).toContain(
+      "No open provider pull request found for feat/git-workflows/no-pr targeting main.",
+    );
+  });
+
+  it("reports unknown provider states as distinct status facts", () => {
+    const projectRoot = makeTempDir("dev-nexus-git-workflow-unknown-provider-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("feature-delivery", "feature_branch"));
+
+    const status = buildNexusGitWorkflowStatus({
+      projectRoot,
+      componentId: "primary",
+      branchName: "feat/git-workflows/unknown-provider",
+      repositoryPath: sourceRoot,
+      providerEvidence: {
+        requested: true,
+        status: "attached",
+        summary: "Attached provider evidence from pull request #13.",
+        pullRequest: {
+          number: 13,
+          url: "https://github.com/example/project/pull/13",
+          state: "open",
+          title: "Unknown provider state",
+        },
+        evidence: {
+          provider: "github",
+          sourceKind: "pull_request",
+          headBranch: "feat/git-workflows/unknown-provider",
+          targetBranch: "main",
+          checks: [],
+        },
+      },
+      gitRunner: readOnlyGitRunner({
+        currentBranch: "feat/git-workflows/unknown-provider",
+        currentCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        baseCommits: {
+          "origin/main": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        status: "## feat/git-workflows/unknown-provider\n",
+      }).runner,
+    });
+
+    expect(status.providerEvidence).toMatchObject({
+      status: "attached",
+      facts: {
+        review: "unknown",
+        requiredChecks: "missing",
+        baseStatus: "unknown",
+        mergeability: "unknown",
+        mergeQueue: "unknown",
+      },
+    });
+    expect(status.evidenceGaps).toEqual(
+      expect.arrayContaining([
+        "Provider review is unknown.",
+        "Required checks are missing.",
+        "Provider base status is unknown.",
+        "Provider mergeability is unknown.",
+        "Provider merge queue status is unknown.",
+      ]),
+    );
+  });
 });
 
 function projectConfig(
@@ -256,6 +498,14 @@ function projectConfig(
         strategy: "green_main",
         remote: "origin",
         targetBranch: "main",
+        greenMain: {
+          integrationPreference: "pull_request",
+          integrationBranch: null,
+          directTargetPush: "blocked",
+          mergeAuthority: "handoff",
+          requiredChecks: ["Node 22 check"],
+          staleChecks: "block",
+        },
       },
       gitWorkflows: {
         activeProfileId: profileId,

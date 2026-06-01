@@ -7,6 +7,7 @@ import { main } from "../../src/cli.js";
 import {
   defaultNexusAutomationConfig,
   defaultNexusFeatureBranchDeliveryConfig,
+  inspectNexusPublicationPullRequestForBranch,
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   NexusReviewPolicyEnforcementError,
@@ -802,6 +803,126 @@ describe("publication operations", () => {
         "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
         "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
       ]);
+    expect(requests.every((request) =>
+      request.authorization === "Bearer installation-token"
+    )).toBe(true);
+  });
+
+  it("finds branch pull request evidence through App API credentials", async () => {
+    const { projectRoot } = createPublicationProject();
+    const requests: Array<{ url: string; method: string; authorization: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/pulls") && url.searchParams.has("head")) {
+        return new Response(
+          JSON.stringify([
+            {
+              number: 191,
+              html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+              state: "open",
+              title: "Attach provider evidence",
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Attach provider evidence",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "codex/dev-nexus/383-provider-evidence-status",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 22 check",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const result = await inspectNexusPublicationPullRequestForBranch({
+      projectRoot,
+      head: "codex/dev-nexus/383-provider-evidence-status",
+      base: "main",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.pullRequest).toMatchObject({
+      number: 191,
+      state: "open",
+      title: "Attach provider evidence",
+    });
+    expect(result.evidence).toMatchObject({
+      provider: "github",
+      sourceKind: "pull_request",
+      headBranch: "codex/dev-nexus/383-provider-evidence-status",
+      targetBranch: "main",
+      reviewState: "approved",
+      baseStatus: "current",
+      mergeability: "mergeable",
+      checks: [
+        {
+          name: "Node 22 check",
+          conclusion: "success",
+        },
+      ],
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls",
+        "GET /repos/Evref-BL/DevNexus/pulls/191",
+        "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
+        "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
+      ]);
+    const lookupUrl = new URL(requests[0]!.url);
+    expect(lookupUrl.searchParams.get("head"))
+      .toBe("Evref-BL:codex/dev-nexus/383-provider-evidence-status");
+    expect(lookupUrl.searchParams.get("base")).toBe("main");
     expect(requests.every((request) =>
       request.authorization === "Bearer installation-token"
     )).toBe(true);

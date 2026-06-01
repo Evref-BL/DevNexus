@@ -162,6 +162,155 @@ describe("git-workflow CLI", () => {
     expect(output.output()).toContain("Next owner: agent/codex");
   });
 
+  it("loads provider evidence for JSON status when requested", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-provider-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      workItemId: "github-383",
+      branchName: "feat/git-workflows/provider-evidence",
+      currentRef: "feat/git-workflows/provider-evidence",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "provider",
+        id: "github",
+      },
+      now: "2026-05-25T10:00:00.000Z",
+    });
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "status",
+        projectRoot,
+        "--component",
+        "primary",
+        "--run",
+        "run-1",
+        "--repository-path",
+        sourceRoot,
+        "--provider-evidence",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: readOnlyGitRunner("feat/git-workflows/provider-evidence"),
+        gitWorkflowProviderEvidenceCollector: async () => ({
+          requested: true,
+          status: "attached",
+          summary: "Attached provider evidence from pull request #12.",
+          pullRequest: {
+            number: 12,
+            url: "https://github.com/example/project/pull/12",
+            state: "open",
+            title: "Provider evidence",
+          },
+          evidence: {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 12,
+              url: "https://github.com/example/project/pull/12",
+              title: "Provider evidence",
+            },
+            headBranch: "feat/git-workflows/provider-evidence",
+            targetBranch: "main",
+            reviewState: "approved",
+            checks: [
+              {
+                name: "Node 22 check",
+                status: "success",
+                conclusion: "success",
+              },
+            ],
+            mergeability: "mergeable",
+            baseStatus: "current",
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(output.output());
+    expect(payload.result.providerEvidence).toMatchObject({
+      status: "attached",
+      pullRequest: {
+        number: 12,
+      },
+      facts: {
+        review: "approved",
+        requiredChecks: "passed",
+      },
+    });
+    expect(payload.result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "provider-review",
+          status: "present",
+        }),
+      ]),
+    );
+  });
+
+  it("reports provider evidence collection failures as status blockers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-provider-failed-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig("feature-delivery", "feature_branch"));
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "status",
+        projectRoot,
+        "--component",
+        "primary",
+        "--branch",
+        "feat/git-workflows/provider-evidence",
+        "--repository-path",
+        sourceRoot,
+        "--provider-evidence",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: readOnlyGitRunner("feat/git-workflows/provider-evidence"),
+        gitWorkflowProviderEvidenceCollector: async () => ({
+          requested: true,
+          status: "credential_error",
+          summary: "Provider evidence credentials are unavailable.",
+          pullRequest: null,
+          evidence: null,
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(output.output());
+    expect(payload.result.providerEvidence).toMatchObject({
+      status: "credential_error",
+      facts: null,
+    });
+    expect(payload.result.blockers).toContain(
+      "Provider evidence credentials are unavailable.",
+    );
+  });
+
   it("starts a workflow and reports the prepared worktree and run", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-start-");
     const sourceRoot = path.join(projectRoot, "source");
@@ -351,6 +500,14 @@ function projectConfig(
         strategy: "green_main",
         remote: "origin",
         targetBranch: "main",
+        greenMain: {
+          integrationPreference: "pull_request",
+          integrationBranch: null,
+          directTargetPush: "blocked",
+          mergeAuthority: "handoff",
+          requiredChecks: ["Node 22 check"],
+          staleChecks: "block",
+        },
       },
       gitWorkflows: {
         activeProfileId: profileId,
