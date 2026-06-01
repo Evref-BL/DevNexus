@@ -194,6 +194,7 @@ export function usage(): string {
     "  --installed-help-file <path>  help text to inspect; defaults to this CLI help",
     "  --installed-command <command> command to inspect with --help, such as dev-nexus",
     "  --expected-file <path>        documentation file to scan; repeatable",
+    "  --source-command-file <path>  source file declaring CLI usage commands; repeatable",
     "  --expected-command <command>  documented command to require; repeatable",
     "  --package-version <version>   installed package version to report",
     "  --json",
