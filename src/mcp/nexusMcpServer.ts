@@ -134,6 +134,7 @@ import {
   type NexusAutomationCurrentAgentAdoptionResultInput,
 } from "../automation/nexusAutomationCurrentAgentAdoption.js";
 import {
+  coordinationHandoffGuardMutationClass,
   createNexusCoordinationHandoff,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
@@ -852,7 +853,7 @@ const tools: McpTool[] = [
   },
   {
     name: "coordination_handoff",
-    description: "Record an advisory structured coordination handoff as a tracker-backed work-item comment.",
+    description: "Record an advisory structured coordination handoff. Provider comment handoffs are safe from component worktrees when the selected provider tracker opts in with communication.coordinationHandoffs=comment; local or silent handoffs require a workspace/meta worktree.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2162,7 +2163,15 @@ async function callCoordinationMcpTool(
     case "coordination_handoff":
       assertMcpMutationAllowed(args, context, {
         command: "coordination_handoff",
-        mutationClass: "coordination_record",
+        mutationClass: coordinationHandoffGuardMutationClass({
+          projectRoot: projectRootFromArgs(args),
+          componentId: optionalString(args, "componentId", "arguments"),
+          workItemId: requiredString(args, "workItemId", "arguments"),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+          trackerRole: optionalString(args, "trackerRole", "arguments"),
+          currentPath: optionalString(args, "currentPath", "arguments"),
+          gitRunner: context.gitRunner,
+        }),
         targetPath: optionalString(args, "currentPath", "arguments"),
         componentId: optionalString(args, "componentId", "arguments"),
       });

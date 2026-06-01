@@ -410,6 +410,13 @@ dev-nexus coordination handoff <workspace-root> local-1 --component core --statu
 dev-nexus coordination integrate <workspace-root> --component core --work-item local-1 --target-branch main --worktree <path>
 ```
 
+Provider comment handoffs can be recorded from a component worktree when the
+selected provider tracker explicitly sets
+`communication.coordinationHandoffs: "comment"`. Local handoffs and provider
+trackers left on the silent comment policy require a workspace/meta worktree,
+because the durable handoff is then local workspace state rather than a
+provider-native comment.
+
 `coordination integrate` builds a read-only plan from related handoff branches,
 recorded decisions, merge bases, merge-tree output, changed files, and
 range-diff output when useful. `--fetch` fetches the configured remote only

@@ -308,6 +308,10 @@ When an agent is assigned a canonical local item:
 - Write handoffs through `coordination handoff`; if a coordination tracker is
   configured, DevNexus resolves that role before falling back to the default
   tracker and applies the tracker communication policy.
+- Provider handoff comments with `communication.coordinationHandoffs: "comment"`
+  can be recorded from the owned component worktree. Local handoffs and silent
+  provider policies still require a workspace/meta worktree for the local
+  coordination record.
 - Include the tracker id in target-cycle records and handoffs when the selected
   item did not come from the default tracker.
 - Do not update a mirror as if it were canonical unless the assignment names

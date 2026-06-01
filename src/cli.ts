@@ -160,6 +160,7 @@ import {
   type NexusAutomationTargetReport,
 } from "./automation/nexusAutomationTargetReport.js";
 import {
+  coordinationHandoffGuardMutationClass,
   createNexusCoordinationHandoff,
   formatNexusCoordinationQualityDeltaSummary,
   getNexusCoordinationIntegrationPlan,
@@ -1785,7 +1786,15 @@ async function handleCoordinationCommand(
     assertCliMutationAllowed(dependencies, {
       projectRoot: path.resolve(parsed.projectRoot),
       command: "coordination handoff",
-      mutationClass: "coordination_record",
+      mutationClass: coordinationHandoffGuardMutationClass({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        workItemId: parsed.workItemId,
+        trackerId: parsed.trackerId,
+        trackerRole: parsed.trackerRole,
+        currentPath: parsed.currentPath,
+        gitRunner: dependencies.gitRunner,
+      }),
       targetPath: parsed.currentPath,
       componentId: parsed.componentId,
     });
