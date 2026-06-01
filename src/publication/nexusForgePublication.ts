@@ -17,6 +17,7 @@ import {
 
 export type NexusForgePublicationCapability =
   | "actor.verify"
+  | "pull_request.lookup"
   | "pull_request.upsert"
   | "pull_request.checks"
   | "pull_request.merge"
@@ -142,6 +143,10 @@ export interface NexusForgePublicationAdapter {
     body?: string | null;
     draft?: boolean;
   }): Promise<NexusForgePullRequestResult>;
+  findPullRequest(options: {
+    head: string;
+    base: string;
+  }): Promise<NexusForgePullRequestResult | null>;
   inspectPullRequestChecks(options: {
     number: number;
     requiredChecks?: string[];
@@ -319,6 +324,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
   readonly backend: NexusForgePublicationBackend;
   readonly capabilities: NexusForgePublicationCapability[] = [
     "actor.verify",
+    "pull_request.lookup",
     "pull_request.upsert",
     "pull_request.checks",
     "pull_request.merge",
@@ -389,6 +395,16 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     return this.backend === "github_rest"
       ? this.upsertPullRequestWithRest(options)
       : this.upsertPullRequestWithCli(options);
+  }
+
+  async findPullRequest(options: {
+    head: string;
+    base: string;
+  }): Promise<NexusForgePullRequestResult | null> {
+    this.assertCapability("pull_request.lookup");
+    return this.backend === "github_rest"
+      ? this.openPullRequestForHeadBaseWithRest(options, "pull_request.lookup")
+      : this.openPullRequestForHeadBaseWithCli(options, "pull_request.lookup");
   }
 
   async inspectPullRequestChecks(options: {
@@ -520,7 +536,10 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     draft?: boolean;
   }): Promise<NexusForgePullRequestResult> {
     const resolvedNumber = options.number ??
-      (await this.openPullRequestForHeadBaseWithRest(options))?.number ??
+      (await this.openPullRequestForHeadBaseWithRest(
+        options,
+        "pull_request.upsert",
+      ))?.number ??
       null;
     const operation = resolvedNumber ? "update" : "create";
     const body = pullRequestUpsertBody(options, operation);
@@ -547,7 +566,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
   }): NexusForgePullRequestResult {
     const existingPullRequest = options.number
       ? null
-      : this.openPullRequestForHeadBaseWithCli(options);
+      : this.openPullRequestForHeadBaseWithCli(options, "pull_request.upsert");
     const resolvedNumber = options.number ?? existingPullRequest?.number ?? null;
     const operation = resolvedNumber ? "update" : "create";
     const args = resolvedNumber
@@ -596,10 +615,13 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     };
   }
 
-  private async openPullRequestForHeadBaseWithRest(options: {
-    head: string;
-    base: string;
-  }): Promise<NexusForgePullRequestResult | null> {
+  private async openPullRequestForHeadBaseWithRest(
+    options: {
+      head: string;
+      base: string;
+    },
+    capability: NexusForgePublicationCapability,
+  ): Promise<NexusForgePullRequestResult | null> {
     const query = new URLSearchParams({
       head: githubPullRequestHeadFilter(this.repository.owner, options.head),
       base: options.base,
@@ -610,7 +632,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       `${this.repositoryApiPath()}/pulls?${query.toString()}`,
       {
         method: "GET",
-        capability: "pull_request.upsert",
+        capability,
       },
     );
     if (!Array.isArray(matches)) {
@@ -629,14 +651,17 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     }
     const match = matches[0];
     return match
-      ? pullRequestResult(match, this.metadata("pull_request.upsert"), "update")
+      ? pullRequestResult(match, this.metadata(capability), "update")
       : null;
   }
 
-  private openPullRequestForHeadBaseWithCli(options: {
-    head: string;
-    base: string;
-  }): NexusForgePullRequestResult | null {
+  private openPullRequestForHeadBaseWithCli(
+    options: {
+      head: string;
+      base: string;
+    },
+    capability: NexusForgePublicationCapability,
+  ): NexusForgePullRequestResult | null {
     const result = this.runGh(
       [
         "pr",
@@ -654,7 +679,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
         "--json",
         "number,url,state,title",
       ],
-      "pull_request.upsert",
+      capability,
     );
     const matches = parseJsonArray<Record<string, unknown>>(
       result.stdout,
@@ -668,7 +693,9 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       });
     }
     const match = matches[0];
-    return match ? pullRequestResultFromRecord(match, this.metadata("pull_request.upsert")) : null;
+    return match
+      ? pullRequestResultFromRecord(match, this.metadata(capability))
+      : null;
   }
 
   private async inspectPullRequestChecksWithRest(options: {
@@ -1018,6 +1045,14 @@ class UnsupportedForgePublicationAdapter implements NexusForgePublicationAdapter
       this.provider,
       this.backend,
       "pull_request.upsert",
+    );
+  }
+
+  async findPullRequest(): Promise<NexusForgePullRequestResult | null> {
+    throw unsupportedCapability(
+      this.provider,
+      this.backend,
+      "pull_request.lookup",
     );
   }
 

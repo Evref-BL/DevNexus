@@ -221,6 +221,17 @@ export interface NexusPublicationPullRequestEvidenceResult {
   metadata: NexusForgePullRequestChecksResult["metadata"];
 }
 
+export interface NexusPublicationPullRequestEvidenceForBranchResult {
+  projectRoot: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
+  repository: NexusGitHubRepositorySelection;
+  credential: NexusPublicationCredentialSummary;
+  pullRequest: NexusForgePullRequestResult | null;
+  evidence: NexusForgePullRequestChecksResult["evidence"] | null;
+  metadata: NexusForgePullRequestChecksResult["metadata"] | null;
+}
+
 export interface NexusPublicationOperationRuntimeOptions {
   baseEnv?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
@@ -281,6 +292,15 @@ export interface InspectNexusPublicationPullRequestForComponentOptions
   componentId?: string;
   projectRepository?: boolean;
   number: number;
+}
+
+export interface InspectNexusPublicationPullRequestForBranchOptions
+  extends NexusPublicationOperationRuntimeOptions {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  head: string;
+  base: string;
 }
 
 export function resolveNexusPublicationComponentContext(options: {
@@ -895,6 +915,43 @@ export async function inspectNexusPublicationPullRequestForComponent(
     },
     evidence: result.evidence,
     metadata: result.metadata,
+  };
+}
+
+export async function inspectNexusPublicationPullRequestForBranch(
+  options: InspectNexusPublicationPullRequestForBranchOptions,
+): Promise<NexusPublicationPullRequestEvidenceForBranchResult> {
+  const context = resolveNexusPublicationTargetContext(options);
+  const credential = await resolvePublicationCredential({
+    context,
+    purpose: "api",
+    requiredPermissions: { pull_requests: "read" },
+    runtime: options,
+  });
+  const adapter = createNexusForgePublicationAdapter({
+    repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
+    credential,
+    preferredBackend: "github_rest",
+    fetch: options.fetch,
+    baseEnv: options.baseEnv,
+  });
+  const pullRequest = await adapter.findPullRequest({
+    head: options.head,
+    base: options.base,
+  });
+  const result = pullRequest
+    ? await adapter.inspectPullRequestChecks({ number: pullRequest.number })
+    : null;
+
+  return {
+    projectRoot: context.projectRoot,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
+    repository: context.repository,
+    credential: summarizePublicationCredential(credential),
+    pullRequest,
+    evidence: result?.evidence ?? null,
+    metadata: result?.metadata ?? null,
   };
 }
 

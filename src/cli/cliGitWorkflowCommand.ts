@@ -17,6 +17,7 @@ import type {
 import {
   buildNexusGitWorkflowPlan,
   buildNexusGitWorkflowStatus,
+  collectNexusGitWorkflowProviderEvidence,
   type NexusGitWorkflowPlanStatusResult,
 } from "../git-workflows/nexusGitWorkflowPlanStatus.js";
 import {
@@ -46,6 +47,7 @@ export interface ParsedGitWorkflowCommand {
   leaseNotes: string[];
   provider: NexusGitWorkflowAdvanceProviderEvidence;
   authority: NexusGitWorkflowAdvanceAuthority;
+  providerEvidence?: boolean;
   json?: boolean;
 }
 
@@ -97,26 +99,33 @@ export async function handleGitWorkflowCommand(
     );
     return 0;
   }
+  const baseOptions = {
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    profileId: parsed.profileId,
+    workItemId: parsed.workItemId,
+    branchName: parsed.branchName,
+    runId: parsed.runId,
+    repositoryPath: parsed.repositoryPath,
+    gitRunner: dependencies.gitRunner,
+  };
+  const providerEvidence = parsed.providerEvidence
+    ? await (dependencies.gitWorkflowProviderEvidenceCollector ??
+        collectNexusGitWorkflowProviderEvidence)({
+          ...baseOptions,
+          baseEnv: dependencies.env ?? process.env,
+          fetch: dependencies.fetch,
+          credentialCommandRunner: dependencies.credentialCommandRunner,
+        })
+    : null;
   const result = parsed.command === "plan"
     ? buildNexusGitWorkflowPlan({
-        projectRoot: parsed.projectRoot,
-        componentId: parsed.componentId,
-        profileId: parsed.profileId,
-        workItemId: parsed.workItemId,
-        branchName: parsed.branchName,
-        runId: parsed.runId,
-        repositoryPath: parsed.repositoryPath,
-        gitRunner: dependencies.gitRunner,
+        ...baseOptions,
+        providerEvidence,
       })
     : buildNexusGitWorkflowStatus({
-        projectRoot: parsed.projectRoot,
-        componentId: parsed.componentId,
-        profileId: parsed.profileId,
-        workItemId: parsed.workItemId,
-        branchName: parsed.branchName,
-        runId: parsed.runId,
-        repositoryPath: parsed.repositoryPath,
-        gitRunner: dependencies.gitRunner,
+        ...baseOptions,
+        providerEvidence,
       });
   printGitWorkflowResult(result, parsed, dependencies.stdout ?? process.stdout);
   return 0;
@@ -222,6 +231,9 @@ export function parseGitWorkflowCommand(argv: string[]): ParsedGitWorkflowComman
       case "--publication":
         parsed.provider.publication = parsePublicationStatus(next(), arg);
         break;
+      case "--provider-evidence":
+        parsed.providerEvidence = true;
+        break;
       case "--allow-git-mutation":
         parsed.authority.gitMutation = true;
         break;
@@ -316,6 +328,18 @@ export function printGitWorkflowResult(
   );
   writeLine(stdout, `  Current branch: ${result.refs.currentBranch ?? "unknown"}`);
   writeLine(stdout, `  Next owner: ${formatOwner(result.nextOwner)}`);
+  if (result.providerEvidence) {
+    writeLine(
+      stdout,
+      `  Provider evidence: ${result.providerEvidence.status}${result.providerEvidence.pullRequest ? ` (#${result.providerEvidence.pullRequest.number})` : ""}`,
+    );
+  }
+  if (result.branchFreshness) {
+    writeLine(
+      stdout,
+      `  Branch freshness: ${result.branchFreshness.freshness} action=${result.branchFreshness.action}`,
+    );
+  }
   if (result.decisionGraph) {
     writeLine(
       stdout,
