@@ -441,13 +441,9 @@ function materializeWorkerSkillProjections(options: {
     nexusSkillSupportDirectoryName,
     nexusSkillsDirectoryName,
   );
-  if (!fs.existsSync(projectManagedSkillsRoot)) {
-    throw new NexusAutomationWorktreeSetupError(
-      `Workspace-managed skills root does not exist: ${projectManagedSkillsRoot}`,
-    );
-  }
-
-  const installedSkills = readProjectManagedSkills(projectManagedSkillsRoot);
+  const installedSkills = fs.existsSync(projectManagedSkillsRoot)
+    ? readProjectManagedSkills(projectManagedSkillsRoot)
+    : [];
   const selectedSkillIds = selectedProjectSkillIds(
     installedSkills.map((skill) => skill.id),
     options.skillsConfig,

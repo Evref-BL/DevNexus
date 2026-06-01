@@ -364,6 +364,56 @@ describe("shared checkout mutation guard", () => {
     });
   });
 
+  it.each([
+    { command: "work-item create", status: "merged" },
+    { command: "work-item update", status: "stale" },
+    { command: "work-item comment", status: "merged" },
+  ] as const)(
+    "keeps $command on the shared project checkout when a $status component project_root lease exists",
+    ({ command, status }) => {
+      const projectRoot = makeTempDir("dev-nexus-guard-project-");
+      saveProjectConfig(projectRoot, projectConfig());
+      createOrRefreshNexusWorktreeLease({
+        projectRoot,
+        componentId: "core",
+        worktreePath: projectRoot,
+        branchName: "codex/core/stale-project-root",
+        status,
+        gitFacts: {
+          repositoryPath: projectRoot,
+          headCommit: "abc123",
+          dirty: false,
+        },
+        now: "2026-06-01T10:00:00.000Z",
+      });
+      const gitRunner = fakeGitRunner(new Map([[canonical(projectRoot), projectRoot]]));
+
+      const decision = evaluateNexusSharedCheckoutMutation({
+        projectRoot,
+        mutationClass: "local_tracker",
+        command,
+        gitRunner,
+      });
+
+      expect(decision).toMatchObject({
+        ok: false,
+        classification: "shared_project_checkout",
+        componentId: null,
+        recoveryAction: {
+          kind: "prepare_workspace_meta_worktree",
+          mcpTool: {
+            name: "worktree_prepare",
+            arguments: {
+              projectRoot,
+              projectMeta: true,
+            },
+          },
+        },
+      });
+      expect(decision.reason).toContain("shared DevNexus workspace checkout");
+    },
+  );
+
   it("keeps unrecorded overlapping paths classified as component worktrees", () => {
     const projectRoot = makeTempDir("dev-nexus-guard-project-");
     const worktreePath = path.join(
