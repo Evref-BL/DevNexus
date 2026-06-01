@@ -699,11 +699,13 @@ interface MetaProjectHostingGuide {
 
 function metaProjectRemotePlan(
   projectConfig: NexusProjectConfig,
+  authProfiles: NexusHostingAuthProfileConfig[] = [],
 ): MetaProjectRemotePlan {
   if (projectConfig.hosting) {
     const remotes = expectedNexusProjectHostingRemotes({
       project: projectConfig,
       hosting: projectConfig.hosting,
+      authProfiles,
     });
     const humanRemote =
       remotes.find((remote) => remote.role === "human") ??
@@ -3385,7 +3387,15 @@ function githubMetaProjectReadinessChecks(
 ): NexusSetupCheckResult[] {
   const checks: NexusSetupCheckResult[] = [];
   const hosting = projectConfig.hosting;
-  const remotePlan = metaProjectRemotePlan(projectConfig);
+  const authProfiles = hosting
+    ? loadSetupHomeAuthProfiles(projectRoot, projectConfig)
+    : null;
+  const hostLocalAuthProfiles =
+    authProfiles?.ok ? authProfiles.authProfiles : [];
+  const remotePlan = metaProjectRemotePlan(
+    projectConfig,
+    hostLocalAuthProfiles,
+  );
 
   if (hosting || options.checkFallbackRemotes !== false) {
     checks.push(...metaRepositoryRemoteChecks({
@@ -3399,18 +3409,17 @@ function githubMetaProjectReadinessChecks(
 
   if (hosting) {
     checks.push(...hostingAuthProfileChecks(projectRoot, projectConfig));
-    const authProfiles = loadSetupHomeAuthProfiles(projectRoot, projectConfig);
     const hostingStatus = statusNexusProjectHostingLocal({
       project: {
         id: projectConfig.id,
         name: projectConfig.name,
       },
       hosting,
-      authProfiles: authProfiles.ok ? authProfiles.authProfiles : [],
+      authProfiles: hostLocalAuthProfiles,
       localRemotes: expectedNexusProjectHostingRemotes({
         project: projectConfig,
         hosting,
-        authProfiles: authProfiles.ok ? authProfiles.authProfiles : [],
+        authProfiles: hostLocalAuthProfiles,
       }).flatMap((remote) => {
         const url = gitRemoteUrl(projectRoot, remote.name);
         return url === null ? [] : [{ name: remote.name, url }];

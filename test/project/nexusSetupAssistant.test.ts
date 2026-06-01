@@ -683,6 +683,87 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("accepts workspace remotes that use host-local auth profile SSH aliases", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-auth-alias-");
+    const homeRoot = path.join(projectRoot, "home");
+    writeHome(homeRoot, [
+      {
+        id: "human-github",
+        provider: "github",
+        kind: "human",
+        account: "alice",
+        host: "github.com",
+      },
+      {
+        id: "bot-github",
+        provider: "github",
+        kind: "automation",
+        account: "example-bot",
+        host: "github.com",
+        sshHost: "github.com-example-bot",
+      },
+    ]);
+    writeProject(projectRoot, {
+      home: homeRoot,
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "mac-demo",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        authProfile: "human-github",
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "bot",
+            role: "automation",
+            protocol: "ssh",
+            authProfile: "bot-github",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+    initGitRepository(projectRoot);
+    childProcess.execFileSync(
+      "git",
+      ["remote", "add", "origin", "git@github.com:ExampleOrg/mac-demo.git"],
+      { cwd: projectRoot },
+    );
+    childProcess.execFileSync(
+      "git",
+      ["remote", "add", "bot", "git@github.com-example-bot:ExampleOrg/mac-demo.git"],
+      { cwd: projectRoot },
+    );
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "workspace-remote-origin",
+        status: "passed",
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "workspace-remote-bot",
+        status: "passed",
+      }),
+    );
+  });
+
   it("reports host-local GitHub App profile metadata without exposing key paths", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-github-app-check-");
     const homeRoot = path.join(projectRoot, "home");
