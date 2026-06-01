@@ -1043,6 +1043,77 @@ describe("nexus automation worktree setup", () => {
     expect(fs.existsSync(path.join(sourceRoot, ".dev-nexus"))).toBe(false);
   });
 
+  it("continues setup when workspace-managed skills are absent", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "codex-demo-project-local-21-run-1");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const ownership = {
+      componentId: "primary",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/demo-project/local-21/run-1",
+      baseRef: "main",
+      workItem: {
+        id: "local-21",
+        title: "Prepare without generated workspace skills",
+      },
+    };
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      skillsConfig: {
+        defaultCorePack: false,
+        items: [{ id: "tdd" }],
+        agentTargets: [{ agent: "codex" }],
+      },
+      gitRunner: fakeGitRunner(gitCalls),
+      context: {
+        project: {
+          id: "demo-project",
+          name: "Demo Project",
+          root: projectRoot,
+        },
+        ownership,
+      },
+    });
+
+    expect(result.skillProjections).toEqual([
+      {
+        agent: "codex",
+        projectManagedSkillsRoot: path.join(projectRoot, ".dev-nexus", "skills"),
+        skillsDirectory: path.join(worktreePath, ".agents", "skills"),
+        sourceControl: "support",
+        skills: [],
+      },
+    ]);
+    expect(JSON.parse(fs.readFileSync(result.context!.contextJsonPath, "utf8")))
+      .toMatchObject({
+        skills: {
+          projectManagedRoot: path.join(projectRoot, ".dev-nexus", "skills"),
+          agentNativeProjections: [
+            {
+              agent: "codex",
+              skillsDirectory: path.join(worktreePath, ".agents", "skills"),
+              sourceControl: "support",
+              skills: [],
+            },
+          ],
+        },
+      });
+  });
+
   it("rejects setup for a worktree outside the component worktrees root", () => {
     const sourceRoot = makeTempDir("dev-nexus-setup-source-");
     const componentWorktreesRoot = path.join(

@@ -602,6 +602,9 @@ function recordedWorktreeClassification(
       reason: `Target repository matches recorded workspace/meta worktree lease ${match.id}.`,
     };
   }
+  if (match.worktree.kind === "project_root") {
+    return null;
+  }
 
   return {
     classification: "generated_component_worktree",
