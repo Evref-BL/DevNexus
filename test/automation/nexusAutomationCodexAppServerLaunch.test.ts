@@ -337,6 +337,38 @@ describe("nexus automation Codex app-server launch", () => {
           resultFile: result.resultFile,
           failureSummary: null,
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            executorMode: "app_server",
+            status: "completed",
+            purpose: "coordinator",
+            runId: "app-server-run-1",
+            componentId: "primary",
+            workItemId: "local-1",
+            worktreeId: null,
+            cwd: sourceRoot,
+            profileId: "codex-app-server",
+            model: "gpt-5.5",
+            reasoning: "high",
+            sessionId: "thread-1",
+            turnId: "turn-1",
+            sourceSessionId: null,
+            sourceTurnId: null,
+            persistenceMode: "ephemeral",
+            sandbox: "workspace-write",
+            approvalPolicy: "never",
+            permissionProfile: "isolated",
+            terminalStatus: "not_observed",
+            resultContract: {
+              status: "valid",
+              file: result.resultFile,
+              resultStatus: "completed",
+              failureSummary: null,
+            },
+            failureSummary: null,
+          },
+        ],
       },
     });
     expect(result.preflight).toEqual(
@@ -412,6 +444,30 @@ describe("nexus automation Codex app-server launch", () => {
         contextFile: result.contextFile,
         resultFile: result.resultFile,
       },
+    });
+
+    expect(
+      readNexusAutomationRunLedger(
+        projectRoot,
+        appServerProjectConfig().automation!,
+      ).runs[0],
+    ).toMatchObject({
+      providerSessions: [
+        {
+          providerId: "codex-app-server",
+          executorMode: "app_server",
+          status: "completed",
+          componentId: "primary",
+          workItemId: "local-1",
+          sessionId: "thread-1",
+          turnId: "turn-1",
+          terminalStatus: "not_observed",
+          resultContract: {
+            status: "valid",
+            resultStatus: "completed",
+          },
+        },
+      ],
     });
   });
 
@@ -957,6 +1013,23 @@ describe("nexus automation Codex app-server launch", () => {
             "Agent result file was not written",
           ),
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            status: "failed",
+            sessionId: "thread-without-result",
+            turnId: "turn-without-result",
+            terminalStatus: "not_observed",
+            resultContract: {
+              status: "missing",
+              file: result.resultFile,
+              resultStatus: null,
+              failureSummary: expect.stringContaining(
+                "Agent result file was not written",
+              ),
+            },
+          },
+        ],
       },
     });
     expect(
@@ -977,6 +1050,17 @@ describe("nexus automation Codex app-server launch", () => {
           "Agent result file was not written",
         ),
       },
+      providerSessions: [
+        {
+          providerId: "codex-app-server",
+          status: "failed",
+          sessionId: "thread-without-result",
+          turnId: "turn-without-result",
+          resultContract: {
+            status: "missing",
+          },
+        },
+      ],
     });
   });
 
@@ -1033,6 +1117,19 @@ describe("nexus automation Codex app-server launch", () => {
           turnId: "turn-blocked",
           failureSummary: "approval missing",
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            status: "blocked",
+            sessionId: "thread-blocked",
+            turnId: "turn-blocked",
+            resultContract: {
+              status: "valid",
+              resultStatus: "blocked",
+              failureSummary: "approval missing",
+            },
+          },
+        ],
       },
     });
     expect(
@@ -1047,6 +1144,15 @@ describe("nexus automation Codex app-server launch", () => {
         status: "blocked",
         failureSummary: "approval missing",
       },
+      providerSessions: [
+        {
+          status: "blocked",
+          resultContract: {
+            status: "valid",
+            resultStatus: "blocked",
+          },
+        },
+      ],
     });
   });
 
@@ -1115,6 +1221,19 @@ describe("nexus automation Codex app-server launch", () => {
           turnId: "turn-notify",
           failureSummary: null,
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            status: "completed",
+            sessionId: "thread-notify",
+            turnId: "turn-notify",
+            terminalStatus: "observed",
+            resultContract: {
+              status: "valid",
+              resultStatus: "completed",
+            },
+          },
+        ],
       },
     });
   });
@@ -1173,6 +1292,20 @@ describe("nexus automation Codex app-server launch", () => {
           failureSummary:
             "Agent result file is invalid: agent result.status must be a non-empty string",
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            status: "failed",
+            sessionId: "thread-malformed",
+            turnId: "turn-malformed",
+            resultContract: {
+              status: "invalid",
+              resultStatus: null,
+              failureSummary:
+                "Agent result file is invalid: agent result.status must be a non-empty string",
+            },
+          },
+        ],
       },
     });
   });
@@ -1231,6 +1364,20 @@ describe("nexus automation Codex app-server launch", () => {
           failureSummary:
             "Codex app-server JSON-RPC method turn/start failed: permission denied",
         },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            status: "failed",
+            sessionId: "thread-before-failure",
+            turnId: null,
+            terminalStatus: "not_observed",
+            resultContract: {
+              status: "not_read",
+              resultStatus: null,
+              failureSummary: null,
+            },
+          },
+        ],
       },
     });
     expect(
@@ -1245,6 +1392,16 @@ describe("nexus automation Codex app-server launch", () => {
         "Codex app-server launch failed: Codex app-server JSON-RPC method turn/start failed: permission denied",
       error:
         "Codex app-server JSON-RPC method turn/start failed: permission denied",
+      providerSessions: [
+        {
+          providerId: "codex-app-server",
+          status: "failed",
+          sessionId: "thread-before-failure",
+          resultContract: {
+            status: "not_read",
+          },
+        },
+      ],
     });
   });
 });

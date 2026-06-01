@@ -128,6 +128,7 @@ import type {
 } from "./nexusAutomationRunOnce.js";
 import type {
   NexusAutomationCodexAppServerLaunchMetadata,
+  NexusAutomationProviderSessionRecord,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   createWorkTrackerProviderAsync,
@@ -282,6 +283,7 @@ export interface NexusAutomationAgentLaunchResult {
   workItems?: NexusAutomationAgentResultWorkItem[];
   error?: string | null;
   codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata;
+  providerSessions?: NexusAutomationProviderSessionRecord[];
 }
 
 export type {
@@ -945,6 +947,7 @@ export async function runNexusAutomationAgentLaunchOnce(
         ),
         error: agentResult.error ?? null,
         codexAppServer: agentResult.codexAppServer ?? null,
+        providerSessions: agentResult.providerSessions ?? [],
       },
     });
 
