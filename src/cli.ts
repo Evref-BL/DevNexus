@@ -781,6 +781,7 @@ interface ParsedAutomationAgentProfilesCommand {
 interface ParsedAutomationAppServerProbeCommand {
   projectRoot: string;
   profileId?: string;
+  goalStorageSmoke?: boolean;
   json?: boolean;
 }
 
@@ -2501,6 +2502,7 @@ async function handleAutomationCommand(
     const result = await probeCodexAppServerInitialize({
       projectRoot: parsed.projectRoot,
       profileId: parsed.profileId,
+      goalStorageSmoke: parsed.goalStorageSmoke ?? false,
     });
     printAutomationAppServerProbeResult(
       result,
@@ -6077,6 +6079,9 @@ function parseAutomationAppServerProbeCommand(
       case "--profile":
         parsed.profileId = next();
         break;
+      case "--goal-storage-smoke":
+        parsed.goalStorageSmoke = true;
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -9175,7 +9180,7 @@ function printAutomationAppServerProbeResult(
     );
     writeLine(
       stdout,
-      `  Codex Goals runtime: ${result.goalRuntime.status}${result.goalRuntime.method ? ` (${result.goalRuntime.method})` : ""}`,
+      `  Codex Goals runtime: ${result.goalRuntime.status}${result.goalRuntime.method ? ` (${result.goalRuntime.method})` : ""} check=${result.goalRuntime.check}`,
     );
     if (result.goalRuntime.summary) {
       writeLine(stdout, `    ${result.goalRuntime.summary}`);
