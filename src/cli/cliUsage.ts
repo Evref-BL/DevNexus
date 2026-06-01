@@ -743,6 +743,7 @@ export function usage(): string {
     "",
     "Options for automation app-server-probe:",
     "  --profile <id>            app-server profile id; defaults to coordinator profile",
+    "  --goal-storage-smoke      opt into a materialized Goal set/read/clear smoke; creates and archives a thread",
     "  --json",
     "",
     "Options for automation enqueue:",

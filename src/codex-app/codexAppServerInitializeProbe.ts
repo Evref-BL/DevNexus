@@ -38,6 +38,7 @@ export type CodexAppServerInitializeProbeStatus =
 
 export type CodexAppServerInitializeProbeBlockerKind =
   | "auth_failure"
+  | "goal_runtime_failure"
   | "missing_required_method"
   | "non_loopback_endpoint_blocked"
   | "profile_not_app_server"
@@ -54,10 +55,17 @@ export type CodexAppServerGoalRuntimeStatus =
   | "not_checked"
   | "failed";
 
+export type CodexAppServerGoalRuntimeCheckKind =
+  | "feature_gate"
+  | "storage_smoke"
+  | "not_checked";
+
 export interface CodexAppServerGoalRuntimeCheck {
   status: CodexAppServerGoalRuntimeStatus;
+  check: CodexAppServerGoalRuntimeCheckKind;
   method: string | null;
   summary: string | null;
+  threadId?: string | null;
 }
 
 export interface CodexAppServerCapabilityStatus {
@@ -94,6 +102,7 @@ export interface CodexAppServerInitializeProbeReport {
 export interface ProbeCodexAppServerInitializeOptions {
   projectRoot: string;
   profileId?: string;
+  goalStorageSmoke?: boolean;
   client?: CodexAppServerJsonRpcClient;
   clientFactory?: (
     input: ProbeCodexAppServerInitializeClientFactoryInput,
@@ -227,10 +236,19 @@ export async function probeCodexAppServerInitializeForProfile(
       client,
       capabilities: detectedCapabilities,
       goalPolicy,
+      goalStorageSmoke: options.goalStorageSmoke ?? false,
+      profile: options.profile,
+      projectRoot: options.projectRoot,
+    });
+    const goalRuntimeBlocker = goalRuntimeBlockerSummary({
+      goalRuntime,
+      goalStorageSmoke: options.goalStorageSmoke ?? false,
     });
 
     return {
-      status: missingRequired.length > 0 ? "blocked" : "ready",
+      status: missingRequired.length > 0 || goalRuntimeBlocker
+        ? "blocked"
+        : "ready",
       profileId: options.profile.id,
       transportMode: options.appServer.mode,
       endpointScope,
@@ -247,9 +265,10 @@ export async function probeCodexAppServerInitializeForProfile(
       optionalCapabilities: capabilities.filter((item) => !item.required),
       goalPolicy,
       goalRuntime,
-      blockerKind:
-        missingRequired.length > 0 ? "missing_required_method" : null,
-      blockerSummary,
+      blockerKind: missingRequired.length > 0
+        ? "missing_required_method"
+        : goalRuntimeBlocker ? "goal_runtime_failure" : null,
+      blockerSummary: blockerSummary ?? goalRuntimeBlocker,
       initializeResult,
     };
   } catch (error) {
@@ -531,6 +550,7 @@ function emptyBlockedProbeReport(options: {
     goalPolicy: options.goalPolicy ?? null,
     goalRuntime: {
       status: "not_checked",
+      check: "not_checked",
       method: null,
       summary: null,
     },
@@ -589,18 +609,27 @@ async function probeCodexAppServerGoalRuntime(options: {
   client: CodexAppServerJsonRpcClient;
   capabilities: ReturnType<typeof detectCodexAppServerCapabilities>;
   goalPolicy: NexusCodexGoalsPolicyDecision | null;
+  goalStorageSmoke: boolean;
+  profile: NexusAutomationAgentProfilePolicy;
+  projectRoot: string;
 }): Promise<CodexAppServerGoalRuntimeCheck> {
   if (!options.goalPolicy || options.goalPolicy.mode === "disabled") {
     return {
       status: "not_checked",
+      check: "not_checked",
       method: null,
       summary: "Codex Goals policy is disabled.",
     };
   }
 
+  if (options.goalStorageSmoke) {
+    return probeCodexAppServerGoalStorage(options);
+  }
+
   if (!options.capabilities.threadGoalGet.available) {
     return {
       status: "unsupported",
+      check: "feature_gate",
       method: null,
       summary: "thread/goal/get is not available in the app-server protocol.",
     };
@@ -613,6 +642,7 @@ async function probeCodexAppServerGoalRuntime(options: {
     });
     return {
       status: "enabled",
+      check: "feature_gate",
       method,
       summary: "thread/goal/get accepted a read-only probe request.",
     };
@@ -622,6 +652,7 @@ async function probeCodexAppServerGoalRuntime(options: {
       if (error.code === -32601) {
         return {
           status: "unsupported",
+          check: "feature_gate",
           method,
           summary: error.message,
         };
@@ -629,6 +660,7 @@ async function probeCodexAppServerGoalRuntime(options: {
       if (/goals? feature is disabled/.test(message)) {
         return {
           status: "disabled",
+          check: "feature_gate",
           method,
           summary: error.message,
         };
@@ -636,6 +668,7 @@ async function probeCodexAppServerGoalRuntime(options: {
       if (/thread not found/.test(message)) {
         return {
           status: "enabled",
+          check: "feature_gate",
           method,
           summary: "thread/goal/get reached thread lookup; Goals are enabled.",
         };
@@ -644,9 +677,227 @@ async function probeCodexAppServerGoalRuntime(options: {
 
     return {
       status: "failed",
+      check: "feature_gate",
       method,
       summary: errorMessage(error),
     };
+  }
+}
+
+async function probeCodexAppServerGoalStorage(options: {
+  client: CodexAppServerJsonRpcClient;
+  capabilities: ReturnType<typeof detectCodexAppServerCapabilities>;
+  profile: NexusAutomationAgentProfilePolicy;
+  projectRoot: string;
+}): Promise<CodexAppServerGoalRuntimeCheck> {
+  if (!options.capabilities.threadStart.available) {
+    return unsupportedGoalStorageSmoke(
+      "thread/start is required for the Goal storage smoke.",
+    );
+  }
+  if (!options.capabilities.threadGoalSet.available) {
+    return unsupportedGoalStorageSmoke(
+      "thread/goal/set is required for the Goal storage smoke.",
+    );
+  }
+  if (!options.capabilities.threadGoalGet.available) {
+    return unsupportedGoalStorageSmoke(
+      "thread/goal/get is required for the Goal storage smoke.",
+    );
+  }
+  if (!options.capabilities.threadGoalClear.available) {
+    return unsupportedGoalStorageSmoke(
+      "thread/goal/clear is required for the Goal storage smoke.",
+    );
+  }
+
+  let threadId: string | null = null;
+  let goalCleared = false;
+  let threadArchived = false;
+  const objective = `DevNexus app-server Goal storage smoke ${new Date().toISOString()}`;
+  try {
+    const threadStartResult = await options.client.request("thread/start", {
+      cwd: options.projectRoot,
+      ephemeral: false,
+      ...(options.profile.model ? { model: options.profile.model } : {}),
+    });
+    threadId = extractCodexAppServerThreadId(threadStartResult);
+    if (!threadId) {
+      return {
+        status: "failed",
+        check: "storage_smoke",
+        method: "thread/start",
+        summary:
+          `thread/start did not return a materialized thread id: ${JSON.stringify(threadStartResult)}`,
+      };
+    }
+
+    await options.client.request(options.capabilities.threadGoalSet.method, {
+      threadId,
+      objective,
+      tokenBudget: 1,
+    });
+    const getResult = await options.client.request(
+      options.capabilities.threadGoalGet.method,
+      { threadId },
+    );
+    const readObjective = extractCodexAppServerGoalObjective(getResult);
+    if (readObjective !== objective) {
+      return {
+        status: "failed",
+        check: "storage_smoke",
+        method: options.capabilities.threadGoalGet.method,
+        threadId,
+        summary:
+          `thread/goal/get returned ${JSON.stringify(readObjective)} instead of the storage smoke objective.`,
+      };
+    }
+
+    await options.client.request(options.capabilities.threadGoalClear.method, {
+      threadId,
+    });
+    goalCleared = true;
+    await archiveCodexAppServerProbeThread(options.client, threadId);
+    threadArchived = true;
+    return {
+      status: "enabled",
+      check: "storage_smoke",
+      method: options.capabilities.threadGoalSet.method,
+      threadId,
+      summary:
+        "Goal storage smoke set, read, cleared, and archived a materialized thread without starting a turn.",
+    };
+  } catch (error) {
+    const status = goalRuntimeStatusForError(error);
+    return {
+      status,
+      check: "storage_smoke",
+      method: goalStorageSmokeFailureMethod(error),
+      threadId,
+      summary: goalStorageSmokeFailureSummary(error),
+    };
+  } finally {
+    if (threadId) {
+      if (!goalCleared) {
+        await ignoreCodexAppServerCleanupError(
+          options.client.request(options.capabilities.threadGoalClear.method, {
+            threadId,
+          }),
+        );
+      }
+      if (!threadArchived) {
+        await ignoreCodexAppServerCleanupError(
+          archiveCodexAppServerProbeThread(options.client, threadId),
+        );
+      }
+    }
+  }
+}
+
+function unsupportedGoalStorageSmoke(
+  summary: string,
+): CodexAppServerGoalRuntimeCheck {
+  return {
+    status: "unsupported",
+    check: "storage_smoke",
+    method: null,
+    summary,
+  };
+}
+
+function goalRuntimeStatusForError(
+  error: unknown,
+): CodexAppServerGoalRuntimeStatus {
+  if (error instanceof CodexAppServerJsonRpcError) {
+    const message = error.message.toLowerCase();
+    if (error.code === -32601) {
+      return "unsupported";
+    }
+    if (/goals? feature is disabled/.test(message)) {
+      return "disabled";
+    }
+  }
+
+  return "failed";
+}
+
+function goalStorageSmokeFailureMethod(error: unknown): string | null {
+  return error instanceof CodexAppServerJsonRpcError ? error.method : null;
+}
+
+function goalStorageSmokeFailureSummary(error: unknown): string {
+  const message = errorMessage(error);
+  return /no such table:\s*thread_goals/iu.test(message)
+    ? `Goal storage smoke failed because the local Codex runtime queried a missing thread_goals table: ${message}`
+    : `Goal storage smoke failed: ${message}`;
+}
+
+function goalRuntimeBlockerSummary(options: {
+  goalRuntime: CodexAppServerGoalRuntimeCheck;
+  goalStorageSmoke: boolean;
+}): string | null {
+  if (!options.goalStorageSmoke) {
+    return null;
+  }
+  return options.goalRuntime.status === "enabled"
+    ? null
+    : options.goalRuntime.summary ??
+      `Codex Goals storage smoke reported ${options.goalRuntime.status}`;
+}
+
+function extractCodexAppServerThreadId(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.id === "string" && record.id.trim().length > 0) {
+    return record.id;
+  }
+  const thread = record.thread;
+  if (thread && typeof thread === "object" && !Array.isArray(thread)) {
+    const id = (thread as Record<string, unknown>).id;
+    if (typeof id === "string" && id.trim().length > 0) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function extractCodexAppServerGoalObjective(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const objective = record.objective;
+  if (typeof objective === "string") {
+    return objective;
+  }
+  const goal = record.goal;
+  if (goal && typeof goal === "object" && !Array.isArray(goal)) {
+    const goalObjective = (goal as Record<string, unknown>).objective;
+    if (typeof goalObjective === "string") {
+      return goalObjective;
+    }
+  }
+
+  return null;
+}
+
+async function archiveCodexAppServerProbeThread(
+  client: CodexAppServerJsonRpcClient,
+  threadId: string,
+): Promise<void> {
+  await client.request("thread/archive", { threadId });
+}
+
+async function ignoreCodexAppServerCleanupError(
+  promise: Promise<unknown>,
+): Promise<void> {
+  try {
+    await promise;
+  } catch {
+    // Probe cleanup is best effort; preserve the primary storage-smoke result.
   }
 }
 

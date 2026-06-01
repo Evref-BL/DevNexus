@@ -9,6 +9,7 @@ import {
 export const codexAppServerControlMethods = [
   "thread/start",
   "thread/fork",
+  "thread/archive",
   "turn/start",
   "turn/interrupt",
 ] as const;

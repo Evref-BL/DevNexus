@@ -175,6 +175,16 @@ function currentProtocolInitializeResult(
   };
 }
 
+function requestParams(
+  transport: MockCodexAppServerTransport,
+  method: string,
+): Record<string, unknown> {
+  const request = transport.requests.find((item) => item.method === method);
+  expect(request).toBeDefined();
+  expect(request!.params).toBeTypeOf("object");
+  return request!.params as Record<string, unknown>;
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -379,6 +389,237 @@ describe("Codex app-server initialize probe", () => {
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
       "thread/goal/get",
+    ]);
+  });
+
+  it("runs an opt-in Goal storage smoke without starting a turn", async () => {
+    const projectRoot = saveProbeProject();
+    let objective: string | null = null;
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: {
+            thread: {
+              id: "thread-storage-smoke",
+              ephemeral: false,
+            },
+          },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        const params = request.params as Record<string, unknown>;
+        objective = String(params.objective);
+        return {
+          id: request.id,
+          result: {
+            goal: {
+              objective,
+            },
+          },
+        };
+      }
+      if (request.method === "thread/goal/get") {
+        return {
+          id: request.id,
+          result: {
+            goal: {
+              objective,
+            },
+          },
+        };
+      }
+      if (request.method === "thread/goal/clear") {
+        return { id: request.id, result: { cleared: true } };
+      }
+      if (request.method === "thread/archive") {
+        return { id: request.id, result: { archived: true } };
+      }
+      return currentProtocolInitializeResult(request);
+    });
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+      goalStorageSmoke: true,
+    });
+
+    expect(report).toMatchObject({
+      status: "ready",
+      blockerKind: null,
+      blockerSummary: null,
+      goalRuntime: {
+        status: "enabled",
+        check: "storage_smoke",
+        method: "thread/goal/set",
+        threadId: "thread-storage-smoke",
+      },
+    });
+    expect(report.goalRuntime.summary).toContain("set, read, cleared");
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "thread/goal/get",
+      "thread/goal/clear",
+      "thread/archive",
+    ]);
+    expect(requestParams(transport, "thread/start")).toMatchObject({
+      cwd: projectRoot,
+      ephemeral: false,
+      model: "gpt-5.5",
+    });
+    expect(requestParams(transport, "thread/goal/set")).toMatchObject({
+      threadId: "thread-storage-smoke",
+      tokenBudget: 1,
+    });
+    expect(transport.requests.map((request) => request.method)).not.toContain(
+      "turn/start",
+    );
+  });
+
+  it("blocks the opt-in Goal storage smoke when Codex reports schema skew", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: {
+            thread: {
+              id: "thread-storage-skew",
+              ephemeral: false,
+            },
+          },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          error: {
+            code: -32000,
+            message:
+              "error returned from database: (code: 1) no such table: thread_goals",
+          },
+        };
+      }
+      if (request.method === "thread/goal/clear") {
+        return { id: request.id, result: { cleared: true } };
+      }
+      if (request.method === "thread/archive") {
+        return { id: request.id, result: { archived: true } };
+      }
+      return currentProtocolInitializeResult(request);
+    });
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+      goalStorageSmoke: true,
+    });
+
+    expect(report).toMatchObject({
+      status: "blocked",
+      blockerKind: "goal_runtime_failure",
+      goalRuntime: {
+        status: "failed",
+        check: "storage_smoke",
+        method: "thread/goal/set",
+        threadId: "thread-storage-skew",
+      },
+    });
+    expect(report.blockerSummary).toContain("missing thread_goals table");
+    expect(report.goalRuntime.summary).toContain("no such table: thread_goals");
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "thread/goal/clear",
+      "thread/archive",
+    ]);
+    expect(transport.requests.map((request) => request.method)).not.toContain(
+      "turn/start",
+    );
+  });
+
+  it("blocks the opt-in Goal storage smoke when Goals are feature-disabled", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: {
+            thread: {
+              id: "thread-goals-disabled",
+              ephemeral: false,
+            },
+          },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          error: {
+            code: -32600,
+            message: "goals feature is disabled",
+          },
+        };
+      }
+      if (request.method === "thread/goal/clear") {
+        return { id: request.id, result: { cleared: true } };
+      }
+      if (request.method === "thread/archive") {
+        return { id: request.id, result: { archived: true } };
+      }
+      return currentProtocolInitializeResult(request);
+    });
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+      goalStorageSmoke: true,
+    });
+
+    expect(report).toMatchObject({
+      status: "blocked",
+      blockerKind: "goal_runtime_failure",
+      goalRuntime: {
+        status: "disabled",
+        check: "storage_smoke",
+        method: "thread/goal/set",
+        threadId: "thread-goals-disabled",
+      },
+    });
+    expect(report.blockerSummary).toContain("goals feature is disabled");
+  });
+
+  it("blocks the opt-in Goal storage smoke when Goal mutation methods are unavailable", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = initializeTransport([
+      "thread/start",
+      "thread/fork",
+      "turn/start",
+      "turn/interrupt",
+      "thread/read",
+    ]);
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+      goalStorageSmoke: true,
+    });
+
+    expect(report).toMatchObject({
+      status: "blocked",
+      blockerKind: "goal_runtime_failure",
+      goalRuntime: {
+        status: "unsupported",
+        check: "storage_smoke",
+        method: null,
+      },
+    });
+    expect(report.blockerSummary).toContain("thread/goal/set is required");
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
     ]);
   });
 
