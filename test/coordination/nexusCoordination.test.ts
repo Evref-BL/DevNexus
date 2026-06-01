@@ -1849,7 +1849,7 @@ describe("nexus coordination", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps GitHub coordination handoffs silent by default", async () => {
+  it("keeps GitHub coordination handoffs silent when explicitly configured", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const sourceRoot = path.join(projectRoot, "source");
     const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-181");
@@ -1862,6 +1862,9 @@ describe("nexus coordination", () => {
         sourceRoot,
         worktreesRoot: "worktrees/dev-nexus",
         primaryStorePath,
+        coordinationCommunication: {
+          coordinationHandoffs: "silent",
+        },
       }),
     );
     const primaryItem = await createLocalWorkTrackerProvider({

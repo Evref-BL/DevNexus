@@ -200,9 +200,6 @@ function providerCommentCoordinationProjectConfig(options: {
             name: "GitHub Coordination",
             enabled: true,
             roles: ["coordination"],
-            communication: {
-              coordinationHandoffs: "comment",
-            },
             workTracking: {
               provider: "github",
               repository: {
@@ -6027,7 +6024,7 @@ describe("dev-nexus cli", () => {
           "handoff",
           projectRoot,
           primaryItem.id,
-          "--tracker-role",
+          "--tracker",
           "coordination",
           "--status",
           "ready",

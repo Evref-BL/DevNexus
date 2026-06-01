@@ -477,7 +477,7 @@ dev-nexus coordination integrate <workspace-root> --component core --work-item l
 ```
 
 Provider comment handoffs can be recorded from a component worktree when the
-selected provider tracker explicitly sets
+selected provider tracker has the `coordination` role or explicitly sets
 `communication.coordinationHandoffs: "comment"`. Local handoffs and provider
 trackers left on the silent comment policy require a workspace/meta worktree,
 because the durable handoff is then local workspace state rather than a

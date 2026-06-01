@@ -328,7 +328,8 @@ The first implementation is deliberately small:
    evidence, provider mutations, and blocked actions.
 3. Add evidence readback for local Git facts, current-session human
    authorization, provider review state, and provider CI/check state.
-4. Keep provider comments silent unless comment policy explicitly enables them.
+4. Keep provider comments silent unless the tracker has the `coordination` role
+   or comment policy explicitly enables them.
 
 Feature-finalization planning now includes the component review plan when a
 review policy is configured. Mutating publication commands enforce configured

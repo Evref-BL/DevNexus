@@ -159,18 +159,24 @@ export const defaultNexusProjectTrackerDiscoveryPolicy: NexusProjectTrackerDisco
 
 export function defaultNexusProjectTrackerCommunicationPolicy(
   provider: WorkTrackingProviderName | string,
+  roles: readonly NexusProjectWorkTrackerRole[] = [],
 ): NormalizedNexusProjectTrackerCommunicationPolicy {
   return {
-    coordinationHandoffs: provider === "local" ? "comment" : "silent",
+    coordinationHandoffs:
+      provider === "local" || roles.includes("coordination") ? "comment" : "silent",
   };
 }
 
 export function normalizeNexusProjectTrackerCommunicationPolicy(options: {
   provider: WorkTrackingProviderName | string;
+  roles?: readonly NexusProjectWorkTrackerRole[];
   project?: NexusProjectTrackerCommunicationPolicyConfig;
   tracker?: NexusProjectTrackerCommunicationPolicyConfig;
 }): NormalizedNexusProjectTrackerCommunicationPolicy {
-  const fallback = defaultNexusProjectTrackerCommunicationPolicy(options.provider);
+  const fallback = defaultNexusProjectTrackerCommunicationPolicy(
+    options.provider,
+    options.roles,
+  );
 
   return {
     coordinationHandoffs:

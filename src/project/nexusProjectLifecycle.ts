@@ -295,6 +295,7 @@ function resolveProjectWorkTracker(
     default: defaultTrackerId === tracker.id,
     communication: normalizeNexusProjectTrackerCommunicationPolicy({
       provider: tracker.workTracking.provider,
+      roles: tracker.roles,
       project: projectCommunication,
       tracker: tracker.communication,
     }),
