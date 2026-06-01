@@ -8,6 +8,7 @@ import {
   probeCodexAppServerInitialize,
   probeCodexAppServerInitializeForProfile,
   saveProjectConfig,
+  type CodexAppServerJsonRpcNotification,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
   type CodexAppServerJsonRpcTransport,
@@ -18,6 +19,7 @@ const tempDirs: string[] = [];
 
 class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];
+  readonly notifications: CodexAppServerJsonRpcNotification[] = [];
 
   constructor(
     private readonly handler: (
@@ -30,6 +32,10 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   ): Promise<CodexAppServerJsonRpcResponse> {
     this.requests.push(request);
     return this.handler(request);
+  }
+
+  sendNotification(notification: CodexAppServerJsonRpcNotification): void {
+    this.notifications.push(notification);
   }
 }
 
@@ -107,18 +113,66 @@ function saveProbeProject(config: NexusProjectConfig = appServerProjectConfig())
 function initializeTransport(
   methods: string[],
 ): MockCodexAppServerTransport {
-  return new MockCodexAppServerTransport((request) => ({
+  return new MockCodexAppServerTransport((request) => {
+    if (request.method === "thread/goal/get") {
+      return {
+        id: request.id,
+        error: {
+          code: -32600,
+          message: "thread not found: 00000000-0000-4000-8000-000000000001",
+        },
+      };
+    }
+    return {
+      id: request.id,
+      result: {
+        serverInfo: {
+          name: "codex-app-server",
+          version: "0.130.0",
+        },
+        capabilities: {
+          methods,
+        },
+      },
+    };
+  });
+}
+
+function currentProtocolInitializeTransport(): MockCodexAppServerTransport {
+  return new MockCodexAppServerTransport((request) => {
+    if (request.method === "thread/goal/get") {
+      return {
+        id: request.id,
+        error: {
+          code: -32600,
+          message: "thread not found: 00000000-0000-4000-8000-000000000001",
+        },
+      };
+    }
+    return {
+      id: request.id,
+      result: {
+        userAgent: "Codex Desktop/0.130.0 (Mac OS 26.5.0; arm64) dumb (dev-nexus; 1)",
+        codexHome: "/Users/example/.codex",
+        platformFamily: "unix",
+        platformOs: "macos",
+      },
+    };
+  });
+}
+
+function currentProtocolInitializeResult(
+  request: CodexAppServerJsonRpcRequest,
+): CodexAppServerJsonRpcResponse {
+  return {
     id: request.id,
     result: {
-      serverInfo: {
-        name: "codex-app-server",
-        version: "0.130.0",
-      },
-      capabilities: {
-        methods,
-      },
+      userAgent: "Codex Desktop/0.130.0 (Mac OS 26.5.0; arm64) dumb (dev-nexus; 1)",
+      codexHome: "/Users/example/.codex",
+      platformFamily: "unix",
+      platformOs: "macos",
     },
-  }));
+  };
 }
 
 afterEach(() => {
@@ -128,6 +182,72 @@ afterEach(() => {
 });
 
 describe("Codex app-server initialize probe", () => {
+  it("recognizes current Codex app-server protocol methods when initialize omits method advertisements", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = currentProtocolInitializeTransport();
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+    });
+
+    expect(report).toMatchObject({
+      status: "ready",
+      profileId: "codex-app-server",
+      transportMode: "spawn",
+      endpointScope: "loopback",
+      codexVersion: "0.130.0",
+      methodSource: "current_protocol_fallback",
+      advertisedMethods: [],
+      blockerKind: null,
+      blockerSummary: null,
+      goalRuntime: {
+        status: "enabled",
+        method: "thread/goal/get",
+      },
+    });
+    expect(report.effectiveMethods).toEqual(
+      expect.arrayContaining([
+        "thread/start",
+        "thread/fork",
+        "turn/start",
+        "turn/interrupt",
+        "thread/read",
+      ]),
+    );
+    expect(report.requiredCapabilities.every((item) => item.status === "supported"))
+      .toBe(true);
+    expect(report.optionalCapabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "thread_goal_set",
+          status: "supported",
+          method: "thread/goal/set",
+        }),
+        expect.objectContaining({
+          capability: "mcp_status",
+          status: "supported",
+          method: "mcpServerStatus/list",
+        }),
+      ]),
+    );
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/goal/get",
+    ]);
+    expect(transport.notifications.map((notification) => notification.method))
+      .toEqual(["initialized"]);
+    expect(transport.requests[0]!.params).toMatchObject({
+      clientInfo: {
+        name: "dev-nexus",
+        title: "DevNexus Codex app-server initialize probe",
+      },
+      capabilities: {
+        experimentalApi: true,
+      },
+    });
+  });
+
   it("reports an all-good initialize capability result without starting threads", async () => {
     const projectRoot = saveProbeProject();
     const transport = initializeTransport([
@@ -155,9 +275,15 @@ describe("Codex app-server initialize probe", () => {
       transportMode: "spawn",
       endpointScope: "loopback",
       codexVersion: "0.130.0",
+      methodSource: "initialize",
       blockerSummary: null,
+      goalRuntime: {
+        status: "enabled",
+        method: "thread/goal/get",
+      },
     });
     expect(report.advertisedMethods).toContain("thread/start");
+    expect(report.effectiveMethods).toContain("thread/start");
     expect(report.requiredCapabilities.every((item) => item.status === "supported"))
       .toBe(true);
     expect(report.optionalCapabilities).toEqual(
@@ -200,23 +326,17 @@ describe("Codex app-server initialize probe", () => {
     });
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
+      "thread/goal/get",
     ]);
+    expect(transport.notifications.map((notification) => notification.method))
+      .toEqual(["initialized"]);
     expect(transport.requests[0]!.params).toMatchObject({
       clientInfo: {
         name: "dev-nexus",
         title: "DevNexus Codex app-server initialize probe",
       },
-      clientCapabilities: {
-        probe: true,
-        durableThreads: false,
-        userPrompts: false,
-        automations: false,
-      },
-      devNexus: {
-        purpose: "diagnostic_probe",
-        projectId: "app-server-probe-project",
-        profileId: "codex-app-server",
-        persistence: "none",
+      capabilities: {
+        experimentalApi: true,
       },
     });
     expect(transport.requests.map((request) => request.method)).not.toContain(
@@ -225,6 +345,41 @@ describe("Codex app-server initialize probe", () => {
     expect(transport.requests.map((request) => request.method)).not.toContain(
       "turn/start",
     );
+  });
+
+  it("reports Goals as disabled when the runtime feature gate rejects the read probe", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "thread/goal/get") {
+        return {
+          id: request.id,
+          error: {
+            code: -32600,
+            message: "goals feature is disabled",
+          },
+        };
+      }
+      return currentProtocolInitializeResult(request);
+    });
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+    });
+
+    expect(report).toMatchObject({
+      status: "ready",
+      methodSource: "current_protocol_fallback",
+      goalRuntime: {
+        status: "disabled",
+        method: "thread/goal/get",
+      },
+    });
+    expect(report.goalRuntime.summary).toContain("goals feature is disabled");
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/goal/get",
+    ]);
   });
 
   it("reports absent thread goal methods as optional, not blockers", async () => {

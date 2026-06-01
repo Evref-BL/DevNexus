@@ -9144,6 +9144,16 @@ function printAutomationAppServerProbeResult(
     stdout,
     `  Advertised methods: ${result.advertisedMethods.length > 0 ? result.advertisedMethods.join(", ") : "none"}`,
   );
+  writeLine(
+    stdout,
+    `  Capability source: ${result.methodSource ?? "none"}`,
+  );
+  if (result.methodSource === "current_protocol_fallback") {
+    writeLine(
+      stdout,
+      `  Effective methods: ${result.effectiveMethods.join(", ")}`,
+    );
+  }
   writeLine(stdout, "  Required capabilities:");
   for (const capability of result.requiredCapabilities) {
     writeLine(
@@ -9163,6 +9173,13 @@ function printAutomationAppServerProbeResult(
       stdout,
       `  Codex Goals policy: ${result.goalPolicy.mode} ${result.goalPolicy.status}`,
     );
+    writeLine(
+      stdout,
+      `  Codex Goals runtime: ${result.goalRuntime.status}${result.goalRuntime.method ? ` (${result.goalRuntime.method})` : ""}`,
+    );
+    if (result.goalRuntime.summary) {
+      writeLine(stdout, `    ${result.goalRuntime.summary}`);
+    }
     for (const blocker of result.goalPolicy.blockers) {
       writeLine(stdout, `    Blocked: ${blocker.code} - ${blocker.summary}`);
     }

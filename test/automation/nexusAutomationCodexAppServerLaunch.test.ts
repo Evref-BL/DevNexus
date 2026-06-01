@@ -10,6 +10,7 @@ import {
   readNexusAutomationRunLedger,
   runNexusAutomationAgentLaunchOnce as runNexusAutomationAgentLaunchOnceBase,
   saveProjectConfig,
+  type CodexAppServerJsonRpcNotification,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
   type CodexAppServerJsonRpcTransport,
@@ -29,6 +30,7 @@ function runNexusAutomationAgentLaunchOnce(
 
 class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];
+  readonly notifications: CodexAppServerJsonRpcNotification[] = [];
 
   constructor(
     private readonly handler: (
@@ -41,6 +43,10 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   ): Promise<CodexAppServerJsonRpcResponse> {
     this.requests.push(request);
     return this.handler(request);
+  }
+
+  sendNotification(notification: CodexAppServerJsonRpcNotification): void {
+    this.notifications.push(notification);
   }
 }
 
@@ -198,6 +204,20 @@ function initializeResult(
   };
 }
 
+function currentProtocolInitializeResult(
+  request: CodexAppServerJsonRpcRequest,
+): CodexAppServerJsonRpcResponse {
+  return {
+    id: request.id,
+    result: {
+      userAgent: "Codex Desktop/0.130.0 (Mac OS 26.5.0; arm64) dumb (dev-nexus; 1)",
+      codexHome: "/Users/example/.codex",
+      platformFamily: "unix",
+      platformOs: "macos",
+    },
+  };
+}
+
 function requestParams(
   transport: MockCodexAppServerTransport,
   method: string,
@@ -252,12 +272,21 @@ describe("nexus automation Codex app-server launch", () => {
 
     const transport = new MockCodexAppServerTransport((request) => {
       if (request.method === "initialize") {
-        return initializeResult(request);
+        return currentProtocolInitializeResult(request);
       }
       if (request.method === "thread/start") {
         return {
           id: request.id,
           result: { threadId: "thread-1" },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          error: {
+            code: -32600,
+            message: "goals feature is disabled",
+          },
         };
       }
       if (request.method === "turn/start") {
@@ -321,8 +350,19 @@ describe("nexus automation Codex app-server launch", () => {
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
       "thread/start",
+      "thread/goal/set",
       "turn/start",
     ]);
+
+    expect(requestParams(transport, "initialize")).toMatchObject({
+      clientInfo: {
+        name: "dev-nexus",
+        title: "DevNexus automation app-server launcher",
+      },
+      capabilities: {
+        experimentalApi: true,
+      },
+    });
 
     const threadParams = requestParams(transport, "thread/start");
     expect(threadParams).toMatchObject({
@@ -360,7 +400,12 @@ describe("nexus automation Codex app-server launch", () => {
     const turnParams = requestParams(transport, "turn/start");
     expect(turnParams).toMatchObject({
       threadId: "thread-1",
-      input: "Handle local-1 using the DevNexus result contract.",
+      input: [
+        {
+          type: "text",
+          text: "Handle local-1 using the DevNexus result contract.",
+        },
+      ],
       cwd: sourceRoot,
       model: "gpt-5.5",
       devNexus: {

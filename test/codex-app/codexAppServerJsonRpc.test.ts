@@ -80,6 +80,20 @@ describe("Codex app-server JSON-RPC-lite transport", () => {
     await expect(result).resolves.toEqual({ methods: ["thread/start"] });
   });
 
+  it("writes client notifications without allocating a JSON-RPC id", async () => {
+    const { stdinText, transport } = makeSpawnedTransport();
+    const client = new CodexAppServerJsonRpcClient({ transport });
+
+    await client.notify("initialized", {});
+
+    expect(stdinText()).toBe(
+      `${JSON.stringify({
+        method: "initialized",
+        params: {},
+      })}\n`,
+    );
+  });
+
   it("reports malformed newline-delimited JSON as a transport failure", async () => {
     const { child, transport } = makeSpawnedTransport();
     const client = new CodexAppServerJsonRpcClient({ transport });
