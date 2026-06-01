@@ -569,7 +569,7 @@ export const devNexusMcpTools: McpTool[] = [
   },
   {
     name: "coordination_handoff",
-    description: "Record an advisory structured coordination handoff. Provider comment handoffs are safe from component worktrees when the selected provider tracker opts in with communication.coordinationHandoffs=comment; local or silent handoffs require a workspace/meta worktree.",
+    description: "Record an advisory structured coordination handoff. Provider comment handoffs are safe from component worktrees when the selected provider tracker opts in with communication.coordinationHandoffs=comment; local or silent handoffs require a workspace/meta currentPath. Pass repositoryPath separately when Git facts come from a component source worktree.",
     inputSchema: {
       type: "object",
       properties: {
@@ -577,6 +577,7 @@ export const devNexusMcpTools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         currentPath: { type: "string" },
+        repositoryPath: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
         trackerId: { type: "string" },

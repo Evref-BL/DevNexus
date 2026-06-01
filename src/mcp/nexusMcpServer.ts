@@ -895,9 +895,12 @@ async function callCoordinationMcpTool(
           trackerId: optionalString(args, "trackerId", "arguments"),
           trackerRole: optionalString(args, "trackerRole", "arguments"),
           currentPath: optionalString(args, "currentPath", "arguments"),
+          repositoryPath: optionalString(args, "repositoryPath", "arguments"),
           gitRunner: context.gitRunner,
         }),
-        targetPath: optionalString(args, "currentPath", "arguments"),
+        targetPath:
+          optionalString(args, "currentPath", "arguments") ??
+          optionalString(args, "repositoryPath", "arguments"),
         componentId: optionalString(args, "componentId", "arguments"),
       });
       return toolResult({
@@ -930,6 +933,7 @@ async function callCoordinationMcpTool(
           qualityDelta: args.qualityDelta,
           note: optionalNullableString(args, "note", "arguments"),
           currentPath: optionalString(args, "currentPath", "arguments"),
+          repositoryPath: optionalString(args, "repositoryPath", "arguments"),
           gitRunner: context.gitRunner,
           now: context.now,
         })),

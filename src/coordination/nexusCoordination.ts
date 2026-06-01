@@ -488,6 +488,7 @@ export interface NexusCoordinationStatusOptions {
   trackerId?: string;
   trackerRole?: string;
   currentPath?: string;
+  repositoryPath?: string;
   gitRunner?: GitRunner;
   now?: () => Date | string;
   maxHandoffAgeMs?: number;
@@ -570,6 +571,8 @@ interface ResolvedCoordinationContext {
   workItemId?: string;
   currentPath: string;
   currentPathExplicit: boolean;
+  repositoryPath: string | null;
+  repositoryPathExplicit: boolean;
   componentSelectionExplicit: boolean;
 }
 
@@ -887,7 +890,7 @@ export async function createNexusCoordinationHandoff(
     workItemId: logicalItemId,
     branchName: git.branch,
     baseRef: git.baseRef,
-    worktreePath: git.repositoryPath ?? context.currentPath,
+    worktreePath: git.repositoryPath ?? context.repositoryPath ?? context.currentPath,
     writeScope: options.changedAreas,
     status,
     notes: coordinationLeaseNotes(options),
@@ -1212,7 +1215,13 @@ function resolveCoordinationContext(
   );
   const projectConfig = loadProjectConfig(projectRoot);
   const currentPathExplicit = options.currentPath !== undefined;
-  const currentPath = path.resolve(options.currentPath ?? process.cwd());
+  const repositoryPathExplicit = options.repositoryPath !== undefined;
+  const repositoryPath = repositoryPathExplicit
+    ? path.resolve(options.repositoryPath!)
+    : null;
+  const currentPath = path.resolve(
+    options.currentPath ?? repositoryPath ?? process.cwd(),
+  );
   const workItemRoute = options.workItemId
     ? resolveComponentWorkItemRoute({
         projectRoot,
@@ -1241,6 +1250,8 @@ function resolveCoordinationContext(
     ...(workItemRoute ? { workItemId: workItemRoute.itemId } : {}),
     currentPath,
     currentPathExplicit,
+    repositoryPath,
+    repositoryPathExplicit,
     componentSelectionExplicit:
       optionalTrimmedString(options.componentId) !== undefined ||
       workItemRoute?.qualified === true,
@@ -1701,6 +1712,13 @@ function getCoordinationGitStatus(
 function coordinationRepositoryCandidates(
   context: ResolvedCoordinationContext,
 ): string[] {
+  if (context.repositoryPathExplicit && context.repositoryPath) {
+    return Array.from(new Set([
+      context.repositoryPath,
+      context.currentPath,
+      context.component.sourceRoot,
+    ]));
+  }
   if (!context.currentPathExplicit && context.componentSelectionExplicit) {
     return [context.component.sourceRoot];
   }

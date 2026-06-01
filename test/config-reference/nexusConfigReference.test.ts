@@ -9,6 +9,8 @@ import {
 
 const parserSourceFiles = [
   "src/project/nexusProjectConfig.ts",
+  "src/project/nexusProjectHostingConfig.ts",
+  "src/project/nexusProjectWorkTrackingConfig.ts",
   "src/project/nexusHomeConfig.ts",
   "src/automation/nexusAutomationConfig.ts",
 ] as const;
