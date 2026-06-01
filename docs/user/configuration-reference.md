@@ -67,6 +67,7 @@ dev-nexus config reference --scope workspace --json
 | `authProfiles[]` | array&lt;object&gt; |  | no |  | Host-local provider credential profiles used by workspaces. | [Providers, auth, and hosting](providers-auth-hosting.md) |
 | `authProfiles[].githubApp` | object |  | no |  | GitHub App installation or user-to-server authentication settings. | [Providers, auth, and hosting](providers-auth-hosting.md) |
 | `claimAuthorityProfiles[]` | array&lt;object&gt; |  | no |  | Host-local shared claim backends such as PostgreSQL connection profiles. | [PostgreSQL claim authority](postgresql-claim-authority.md) |
+| `remoteExecution.commandProfiles[]` | array&lt;object&gt; |  | no |  | Host-local commands that remote execution runner profiles may invoke by id. | [Agent workflows](agent-workflows.md) |
 | `hostOverlays[]` | array&lt;object&gt; |  | no |  | Per-host overlays for SSH, Tailscale, runner, and repository paths. | [Agent workflows](agent-workflows.md), [Providers, auth, and hosting](providers-auth-hosting.md) |
 
 ## Parser Field Index
@@ -81,39 +82,40 @@ The index is field-name based because the parsers also contain nested and provid
 `artifactRetention`, `assignees`, `authProfile`, `authProfiles`, `authority`, `automation`, `backend`, `backoff`
 `baseDelayMs`, `behind`, `board`, `boardId`, `body`, `branch`, `branchNaming`, `branchPublication`
 `branchStrategy`, `branches`, `candidatePrefix`, `capabilities`, `capabilityTags`, `checkCommand`, `ciTiers`, `claimAuthorityProfiles`
-`cleanup`, `clientId`, `command`, `commandArgs`, `commandEnvironment`, `commandPaths`, `commandProfileRefs`, `coAuthors`
-`commentPolicy`, `communication`, `componentId`, `componentRoots`, `components`, `componentsRoot`, `configFormat`, `configPath`
-`configSchema`, `conflictWinner`, `connectionProfileId`, `connectionString`, `connectionStringEnv`, `coordinationHandoffs`, `coordinatorProfileId`, `credentialIdentity`
-`credentialKind`, `cycleLedgerPath`, `decisionGraph`, `defaultBranch`, `defaultBranchStrategy`, `defaultCorePack`, `defaultIntentPrefix`, `defaultToolsApprovalMode`
-`defaultWorkTrackerId`, `dependencyLinks`, `description`, `directExternalSelection`, `directTargetPush`, `directory`, `displayName`, `diverged`
-`driver`, `dryRun`, `eligibleWorkMode`, `email`, `enabled`, `endpoint`, `environment`, `environmentKeys`
-`ephemeralThreadDefault`, `excludeLabels`, `excludedTools`, `executor`, `executorMode`, `exposure`, `extensions`, `failureLimit`
-`fallbackRemote`, `featureBranchDelivery`, `featureBranchPattern`, `finalLimit`, `finalPullRequest`, `finalPullRequestCreation`, `fingerprints`, `flow`
-`focusedCommands`, `from`, `fullCommands`, `gates`, `gateway`, `gitIdentity`, `gitUserEmail`, `gitUserName`
-`gitWorkflows`, `githubApp`, `githubCliConfigDir`, `greenMain`, `handle`, `handles`, `heartbeatIntervalMs`, `home`
-`host`, `hostId`, `hostLocalSafetyHints`, `hostOverlays`, `hosting`, `hosts`, `id`, `identityRef`
-`importRequiredFirst`, `includedServers`, `includedTools`, `installCommand`, `installationAccount`, `integrationBranch`, `integrationPreference`, `integrationPrefix`
-`intelligence`, `intendedUse`, `intervalMs`, `invitationPolicy`, `issueType`, `itemId`, `itemKey`, `itemNumber`
-`items`, `kind`, `labels`, `leaseDurationMs`, `ledger`, `license`, `limit`, `limits`
-`localPolicy`, `lock`, `manualActor`, `manualInstructions`, `manualRemote`, `materialization`, `maxConcurrentSubagents`, `maxCycles`
-`maxDelayMs`, `maxWorkItems`, `mcp`, `mcpExposure`, `mergeAuthority`, `milestones`, `missingCredentialBehavior`, `mode`
-`model`, `mutationClass`, `name`, `nameTemplate`, `namespace`, `nextOwner`, `nodeId`, `nodes`
-`notes`, `number`, `objective`, `outputByteLimit`, `outputLineLimit`, `owner`, `ownerKind`, `packageKind`
-`packageName`, `packagePublish`, `path`, `paths`, `platformTags`, `plugins`, `policyGateIds`, `port`
-`postgres`, `privateKeyPath`, `profile`, `profiles`, `projectId`, `projectKey`, `projectRoot`, `projects`
-`projectsRoot`, `promotion`, `protocol`, `provenance`, `provider`, `providerFilters`, `providerIdentity`, `providerMutationAuthProfile`
-`providerQuery`, `providerWrites`, `provisioning`, `publicRewrite`, `publication`, `purposes`, `push`, `pushUrl`
-`queryLimit`, `reason`, `reasoning`, `relationships`, `relaunch`, `release`, `releasePublish`, `releaseTrain`
-`remote`, `remoteUrl`, `remotes`, `repo`, `repositories`, `repository`, `repositoryId`, `repositoryName`
-`repositoryOwner`, `repositoryScopes`, `repositoryUrl`, `requirePassing`, `required`, `requiredCapabilities`, `requiredChecks`, `requiredEvidence`
-`requiredPermission`, `requiredProviderPermissions`, `resumeInputs`, `retention`, `review`, `reviewBranchPattern`, `role`, `roleBindings`
-`roles`, `runFullVerification`, `runnerProfiles`, `safety`, `scannedRoles`, `schedule`, `schema`, `scope`
-`search`, `selector`, `serverName`, `setup`, `setupInstructions`, `setupNotes`, `shell`, `skillId`
-`skills`, `slug`, `source`, `sourceComponentId`, `sourceControl`, `sourceRoot`, `sshHost`, `sshHostAlias`
-`sshUser`, `staleAfterMs`, `staleChecks`, `staleClaimPolicy`, `start`, `startNodeId`, `statePath`, `statusFieldId`
-`statusOptions`, `statuses`, `stopWhenNoEligibleWork`, `storePath`, `strategy`, `summary`, `surfaces`, `tailscaleAddress`
-`target`, `targetAgents`, `targetBranch`, `targetComponents`, `template`, `timeoutMs`, `title`, `to`
-`tokenRefreshBufferSeconds`, `tools`, `trackerDiscovery`, `trackerId`, `trackerLimits`, `transitions`, `transport`, `trigger`
-`trustSemantics`, `ttlDays`, `unknownActorFallbackRole`, `unscopedName`, `update`, `url`, `valueHint`, `variable`
-`variant`, `verification`, `version`, `versionPlanning`, `versionPolicy`, `visibility`, `whileEligible`, `workItemClaims`
-`workTrackerCommunication`, `workTrackers`, `workTracking`, `workspaceRoots`, `workspacesRoot`, `worktreesRoot`, `wrongBase`
+`cleanup`, `clientId`, `command`, `commandArgs`, `commandEnvironment`, `commandPaths`, `commandProfileRefs`, `commandProfiles`
+`coAuthors`, `commentPolicy`, `communication`, `componentId`, `componentRoots`, `components`, `componentsRoot`, `configFormat`
+`configPath`, `configSchema`, `conflictWinner`, `connectionProfileId`, `connectionString`, `connectionStringEnv`, `coordinationHandoffs`, `coordinatorProfileId`
+`credentialIdentity`, `credentialKind`, `cycleLedgerPath`, `decisionGraph`, `defaultBranch`, `defaultBranchStrategy`, `defaultCorePack`, `defaultIntentPrefix`
+`defaultToolsApprovalMode`, `defaultWorkTrackerId`, `dependencyLinks`, `description`, `directExternalSelection`, `directTargetPush`, `directory`, `displayName`
+`diverged`, `driver`, `dryRun`, `eligibleWorkMode`, `email`, `enabled`, `endpoint`, `environment`
+`environmentKeys`, `ephemeralThreadDefault`, `excludeLabels`, `excludedTools`, `executor`, `executorMode`, `exposure`, `extensions`
+`failureLimit`, `fallbackRemote`, `featureBranchDelivery`, `featureBranchPattern`, `finalLimit`, `finalPullRequest`, `finalPullRequestCreation`, `fingerprints`
+`flow`, `focusedCommands`, `from`, `fullCommands`, `gates`, `gateway`, `gitIdentity`, `gitUserEmail`
+`gitUserName`, `gitWorkflows`, `githubApp`, `githubCliConfigDir`, `greenMain`, `handle`, `handles`, `heartbeatIntervalMs`
+`home`, `host`, `hostId`, `hostLocalSafetyHints`, `hostOverlays`, `hosting`, `hosts`, `id`
+`identityRef`, `importRequiredFirst`, `includedServers`, `includedTools`, `installCommand`, `installationAccount`, `integrationBranch`, `integrationPreference`
+`integrationPrefix`, `intelligence`, `intendedUse`, `intervalMs`, `invitationPolicy`, `issueType`, `itemId`, `itemKey`
+`itemNumber`, `items`, `kind`, `labels`, `leaseDurationMs`, `ledger`, `license`, `limit`
+`limits`, `localPolicy`, `lock`, `manualActor`, `manualInstructions`, `manualRemote`, `materialization`, `maxConcurrentSubagents`
+`maxCycles`, `maxDelayMs`, `maxWorkItems`, `mcp`, `mcpExposure`, `mergeAuthority`, `milestones`, `missingCredentialBehavior`
+`mode`, `model`, `mutationClass`, `name`, `nameTemplate`, `namespace`, `nextOwner`, `nodeId`
+`nodes`, `notes`, `number`, `objective`, `outputByteLimit`, `outputLineLimit`, `owner`, `ownerKind`
+`packageKind`, `packageName`, `packagePublish`, `path`, `paths`, `platformTags`, `plugins`, `policyGateIds`
+`port`, `postgres`, `privateKeyPath`, `profile`, `profiles`, `projectId`, `projectKey`, `projectRoot`
+`projects`, `projectsRoot`, `promotion`, `protocol`, `provenance`, `provider`, `providerFilters`, `providerIdentity`
+`providerMutationAuthProfile`, `providerQuery`, `providerWrites`, `provisioning`, `publicRewrite`, `publication`, `purposes`, `push`
+`pushUrl`, `queryLimit`, `reason`, `reasoning`, `relationships`, `relaunch`, `release`, `releasePublish`
+`releaseTrain`, `remote`, `remoteExecution`, `remoteUrl`, `remotes`, `repo`, `repositories`, `repository`
+`repositoryId`, `repositoryName`, `repositoryOwner`, `repositoryScopes`, `repositoryUrl`, `requirePassing`, `required`, `requiredCapabilities`
+`requiredChecks`, `requiredEvidence`, `requiredPermission`, `requiredProviderPermissions`, `resumeInputs`, `retention`, `review`, `reviewBranchPattern`
+`role`, `roleBindings`, `roles`, `runFullVerification`, `runnerProfiles`, `safety`, `scannedRoles`, `schedule`
+`schema`, `scope`, `search`, `selector`, `serverName`, `setup`, `setupInstructions`, `setupNotes`
+`shell`, `skillId`, `skills`, `slug`, `source`, `sourceComponentId`, `sourceControl`, `sourceRoot`
+`sshHost`, `sshHostAlias`, `sshUser`, `staleAfterMs`, `staleChecks`, `staleClaimPolicy`, `start`, `startNodeId`
+`statePath`, `statusFieldId`, `statusOptions`, `statuses`, `stopWhenNoEligibleWork`, `storePath`, `strategy`, `summary`
+`surfaces`, `tailscaleAddress`, `target`, `targetAgents`, `targetBranch`, `targetComponents`, `template`, `timeoutMs`
+`title`, `to`, `tokenRefreshBufferSeconds`, `tools`, `trackerDiscovery`, `trackerId`, `trackerLimits`, `transitions`
+`transport`, `trigger`, `trustSemantics`, `ttlDays`, `unknownActorFallbackRole`, `unscopedName`, `update`, `url`
+`valueHint`, `variable`, `variant`, `verification`, `version`, `versionPlanning`, `versionPolicy`, `visibility`
+`whileEligible`, `workItemClaims`, `workTrackerCommunication`, `workTrackers`, `workTracking`, `workspaceRoots`, `workspacesRoot`, `worktreesRoot`
+`wrongBase`

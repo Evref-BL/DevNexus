@@ -105,6 +105,7 @@ export * from "./publication/nexusReviewPolicyEnforcement.js";
 export * from "./publication/nexusReleaseTrainReadiness.js";
 export * from "./operations/nexusQuickFix.js";
 export * from "./remote-execution/nexusRemoteExecution.js";
+export * from "./remote-execution/nexusSshRemoteExecution.js";
 export * from "./project/nexusProjectScaffold.js";
 export * from "./project/nexusProjectSetupAuthInventory.js";
 export * from "./project/nexusProjectSetupHostingHandoff.js";
