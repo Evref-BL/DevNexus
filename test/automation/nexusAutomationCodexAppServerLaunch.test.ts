@@ -442,6 +442,15 @@ describe("nexus automation Codex app-server launch", () => {
             setStatus: "set",
             readStatus: "unsupported",
             threadId: "thread-goal",
+            policy: {
+              mode: "goal_projection",
+              status: "warning",
+              blockers: [],
+              warnings: [
+                expect.objectContaining({ code: "approval_policy_never" }),
+                expect.objectContaining({ code: "token_budget_omitted" }),
+              ],
+            },
           },
         },
       },
@@ -466,6 +475,70 @@ describe("nexus automation Codex app-server launch", () => {
     expect(objective).toContain("App-server launch task");
     expect(objective).toContain("Stop and report blocked");
     expect(objective).not.toContain("\\n");
+  });
+
+  it("blocks Goal-driven continuation when the profile would double-drive unsafe AFK work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-goal-policy-block-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const projectConfig = appServerProjectConfig();
+    projectConfig.automation = {
+      ...projectConfig.automation!,
+      agent: {
+        ...projectConfig.automation!.agent,
+        relaunch: {
+          whileEligible: true,
+        },
+        profiles: projectConfig.automation!.agent.profiles.map((profile) => ({
+          ...profile,
+          safety: {
+            profile: "host-authorized",
+            allowHostMutation: true,
+            allowDependencyInstall: true,
+            allowLiveServices: true,
+          },
+          args: [
+            "-c",
+            "approval_policy=never",
+            "--sandbox",
+            "danger-full-access",
+          ],
+        })),
+      },
+    };
+    saveProjectConfig(projectRoot, projectConfig);
+    await createReadyWork(projectRoot);
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-goal-policy-block-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        goal: {
+          mode: "goal_continuation",
+        },
+        clientFactory: () => {
+          throw new Error("policy should block before starting Codex app-server");
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      launch: {
+        error: expect.stringContaining("Codex Goals automation policy blocked"),
+        codexAppServer: {
+          status: "failed",
+          threadId: null,
+          turnId: null,
+          goal: null,
+        },
+      },
+    });
+    expect(result.launch?.error).toContain("double_driving");
+    expect(result.launch?.error).toContain("token_budget_required");
   });
 
   it("reads Codex Goal lifecycle facts after the worker turn completes", async () => {

@@ -196,6 +196,9 @@ export interface NexusAutomationTargetReportCodexGoalSummary {
   timeUsedSeconds: number | null;
   setStatus: string;
   readStatus: string;
+  policyStatus: string | null;
+  policyWarningCount: number;
+  policyBlockerCount: number;
   summary: string;
 }
 
@@ -775,6 +778,9 @@ function summarizeCodexGoal(options: {
     timeUsedSeconds: goal.timeUsedSeconds,
     setStatus: goal.setStatus,
     readStatus: goal.readStatus,
+    policyStatus: goal.policy?.status ?? null,
+    policyWarningCount: goal.policy?.warnings.length ?? 0,
+    policyBlockerCount: goal.policy?.blockers.length ?? 0,
     summary: codexGoalSummaryText(goal),
   };
 }
@@ -789,11 +795,16 @@ function codexGoalSummaryText(
       `Codex Goal ${status} for thread ${thread}`,
       codexGoalTokenSummary(goal),
       goal.timeUsedSeconds === null ? null : `time ${goal.timeUsedSeconds}s`,
+      codexGoalPolicySummary(goal),
     ].filter((part): part is string => !!part).join("; ") + ".";
   }
 
   const failure = goal.failureSummary ? `: ${goal.failureSummary}` : "";
-  return `Codex Goal set=${goal.setStatus} read=${goal.readStatus}${failure}.`;
+  const policy = codexGoalPolicySummary(goal);
+  return [
+    `Codex Goal set=${goal.setStatus} read=${goal.readStatus}${failure}`,
+    policy,
+  ].filter((part): part is string => !!part).join("; ") + ".";
 }
 
 function codexGoalTokenSummary(
@@ -810,6 +821,26 @@ function codexGoalTokenSummary(
   }
 
   return `token budget ${goal.tokenBudget}`;
+}
+
+function codexGoalPolicySummary(
+  goal: NonNullable<NexusAutomationCodexAppServerLaunchMetadata["goal"]>,
+): string | null {
+  if (!goal.policy) {
+    return null;
+  }
+  const details = [
+    goal.policy.warnings.length > 0
+      ? `${goal.policy.warnings.length} warnings`
+      : null,
+    goal.policy.blockers.length > 0
+      ? `${goal.policy.blockers.length} blockers`
+      : null,
+  ].filter((part): part is string => !!part).join(", ");
+
+  return details
+    ? `policy ${goal.policy.status} (${details})`
+    : `policy ${goal.policy.status}`;
 }
 
 function summarizeActiveBlockers(options: {

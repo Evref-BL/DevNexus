@@ -1,3 +1,5 @@
+import type { NexusCodexGoalsPolicyDecision } from "./nexusCodexGoalsPolicy.js";
+
 export type NexusAutomationCodexAppServerLaunchStatus =
   | "started"
   | "completed"
@@ -25,6 +27,7 @@ export interface NexusAutomationCodexAppServerGoalMetadata {
   tokensUsed: number | null;
   timeUsedSeconds: number | null;
   failureSummary: string | null;
+  policy: NexusCodexGoalsPolicyDecision | null;
 }
 
 export interface NexusAutomationCodexAppServerLaunchMetadata {

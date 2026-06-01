@@ -21,6 +21,10 @@ import {
   type NexusAutomationAgentProfilePolicy,
 } from "../automation/nexusAutomationAgentProfile.js";
 import {
+  evaluateNexusCodexGoalsAutomationProfilePolicy,
+  type NexusCodexGoalsPolicyDecision,
+} from "../automation/nexusCodexGoalsPolicy.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "../project/nexusProjectConfig.js";
@@ -63,6 +67,7 @@ export interface CodexAppServerInitializeProbeReport {
   capabilities: CodexAppServerCapabilityStatus[];
   requiredCapabilities: CodexAppServerCapabilityStatus[];
   optionalCapabilities: CodexAppServerCapabilityStatus[];
+  goalPolicy: NexusCodexGoalsPolicyDecision | null;
   blockerKind: CodexAppServerInitializeProbeBlockerKind | null;
   blockerSummary: string | null;
   initializeResult: unknown;
@@ -133,6 +138,13 @@ export async function probeCodexAppServerInitializeForProfile(
   },
 ): Promise<CodexAppServerInitializeProbeReport> {
   const endpointScope = codexAppServerEndpointScope(options.appServer.endpoint);
+  const goalPolicy = evaluateNexusCodexGoalsAutomationProfilePolicy({
+    projectConfig: options.projectConfig,
+    automationConfig: options.projectConfig.automation!,
+    profile: options.profile,
+    mode: "goal_projection",
+    tokenBudget: null,
+  });
   if (
     endpointScope === "non_loopback" &&
     !options.appServer.localPolicy.allowNonLoopbackEndpoint
@@ -144,6 +156,7 @@ export async function probeCodexAppServerInitializeForProfile(
       blockerKind: "non_loopback_endpoint_blocked",
       blockerSummary:
         "Codex app-server endpoint is non-loopback; host-local policy must explicitly allow it before probing",
+      goalPolicy,
     });
   }
 
@@ -216,6 +229,7 @@ export async function probeCodexAppServerInitializeForProfile(
       capabilities,
       requiredCapabilities: capabilities.filter((item) => item.required),
       optionalCapabilities: capabilities.filter((item) => !item.required),
+      goalPolicy,
       blockerKind:
         missingRequired.length > 0 ? "missing_required_method" : null,
       blockerSummary,
@@ -227,6 +241,7 @@ export async function probeCodexAppServerInitializeForProfile(
       profileId: options.profile.id,
       transportMode: options.appServer.mode,
       endpointScope,
+      goalPolicy,
     });
   } finally {
     if (closeClient) {
@@ -418,6 +433,7 @@ function failureProbeReport(options: {
   profileId: string;
   transportMode: NexusAutomationCodexAppServerConfig["mode"];
   endpointScope: "loopback" | "non_loopback";
+  goalPolicy?: NexusCodexGoalsPolicyDecision | null;
 }): CodexAppServerInitializeProbeReport {
   let blockerKind: CodexAppServerInitializeProbeBlockerKind = "unknown_failure";
   if (options.error instanceof CodexAppServerCapabilityError) {
@@ -444,6 +460,7 @@ function failureProbeReport(options: {
     endpointScope: options.endpointScope,
     blockerKind,
     blockerSummary: errorMessage(options.error),
+    goalPolicy: options.goalPolicy ?? null,
   });
 }
 
@@ -453,6 +470,7 @@ function emptyBlockedProbeReport(options: {
   endpointScope: "loopback" | "non_loopback";
   blockerKind: CodexAppServerInitializeProbeBlockerKind;
   blockerSummary: string;
+  goalPolicy?: NexusCodexGoalsPolicyDecision | null;
 }): CodexAppServerInitializeProbeReport {
   return {
     status: "blocked",
@@ -468,6 +486,7 @@ function emptyBlockedProbeReport(options: {
     capabilities: capabilityStatuses([]),
     requiredCapabilities: capabilityStatuses([]).filter((item) => item.required),
     optionalCapabilities: capabilityStatuses([]).filter((item) => !item.required),
+    goalPolicy: options.goalPolicy ?? null,
     blockerKind: options.blockerKind,
     blockerSummary: options.blockerSummary,
     initializeResult: null,

@@ -19,6 +19,9 @@ import {
   defaultNexusAutomationConfig,
 } from "../../src/automation/nexusAutomationConfig.js";
 import {
+  evaluateNexusCodexGoalsAutomationPolicy,
+} from "../../src/automation/nexusCodexGoalsPolicy.js";
+import {
   saveProjectConfig,
   type NexusProjectConfig,
 } from "../../src/project/nexusProjectConfig.js";
@@ -458,6 +461,18 @@ describe("nexus automation target report", () => {
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const config = projectConfig();
     saveProjectConfig(projectRoot, config);
+    const policy = evaluateNexusCodexGoalsAutomationPolicy({
+      mode: "goal_projection",
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      permissionProfile: "isolated",
+      allowHostMutation: false,
+      allowDependencyInstall: false,
+      allowLiveServices: false,
+      tokenBudget: null,
+      devNexusRelaunchWhileEligible: false,
+      mcpDefaultToolsApprovalMode: "approve",
+    });
 
     appendNexusAutomationRunRecord({
       projectRoot,
@@ -501,6 +516,7 @@ describe("nexus automation target report", () => {
             tokensUsed: 100,
             timeUsedSeconds: 11,
             failureSummary: null,
+            policy,
           },
         },
       },
@@ -525,8 +541,11 @@ describe("nexus automation target report", () => {
         timeUsedSeconds: 11,
         setStatus: "set",
         readStatus: "read",
+        policyStatus: "warning",
+        policyWarningCount: 2,
+        policyBlockerCount: 0,
         summary:
-          "Codex Goal budgetLimited for thread thread-goal-report; tokens 100/100; time 11s.",
+          "Codex Goal budgetLimited for thread thread-goal-report; tokens 100/100; time 11s; policy warning (2 warnings).",
       },
     ]);
     expect(report.componentProgress[0]?.codexGoals).toMatchObject([
