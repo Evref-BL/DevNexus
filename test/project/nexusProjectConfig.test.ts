@@ -2346,6 +2346,33 @@ describe("workspace config", () => {
         {
           id: "direct",
           branchStrategy: "direct",
+          decisionGraph: {
+            id: "builtin:direct",
+            source: "builtin",
+            template: "direct",
+            startNodeId: "observe",
+            nodes: expect.arrayContaining([
+              expect.objectContaining({
+                id: "observe",
+                kind: "observation",
+              }),
+              expect.objectContaining({
+                id: "complete",
+                kind: "terminal",
+              }),
+            ]),
+            transitions: expect.arrayContaining([
+              expect.objectContaining({
+                id: "prepare-worktree",
+                from: "observe",
+                requiredEvidence: expect.arrayContaining([
+                  "selected-profile",
+                  "base-ref",
+                ]),
+                authority: expect.arrayContaining(["git_mutation"]),
+              }),
+            ]),
+          },
           update: {
             behind: "none",
             diverged: "merge",
@@ -2357,6 +2384,20 @@ describe("workspace config", () => {
           id: "feature",
           branchStrategy: "feature_branch",
           targetBranch: "main",
+          decisionGraph: {
+            id: "builtin:feature_branch",
+            template: "feature_branch",
+            transitions: expect.arrayContaining([
+              expect.objectContaining({
+                id: "checks-after-review",
+                requiredEvidence: expect.arrayContaining(["provider-review"]),
+                nextOwner: {
+                  kind: "provider",
+                  id: null,
+                },
+              }),
+            ]),
+          },
           branchPublication: {
             strategy: "push_remote_then_fallback",
             fallbackRemote: "fork",
@@ -2377,6 +2418,10 @@ describe("workspace config", () => {
         {
           id: "release",
           branchStrategy: "release_maintenance",
+          decisionGraph: {
+            id: "builtin:release_maintenance",
+            template: "release_maintenance",
+          },
           release: {
             branches: ["release/1.x", "release/2.x"],
             flow: "oldest_to_newest",
@@ -2385,6 +2430,10 @@ describe("workspace config", () => {
         {
           id: "environment",
           branchStrategy: "environment_branch",
+          decisionGraph: {
+            id: "builtin:environment_branch",
+            template: "environment_branch",
+          },
           environment: {
             branch: "staging",
             promotion: "pull_request",
@@ -2435,6 +2484,10 @@ describe("workspace config", () => {
           id: "legacy-feature-branch-delivery",
           source: "legacy_feature_branch_delivery",
           branchStrategy: "hybrid",
+          decisionGraph: {
+            id: "builtin:hybrid",
+            template: "hybrid",
+          },
           targetBranch: "main",
           activeFeatureId: "codex-goals",
           allowedBranchStrategies: ["direct", "stacked", "hybrid"],
@@ -2768,6 +2821,123 @@ describe("workspace config", () => {
         },
       }),
     ).toThrow(/throwaway_rehearsal profiles cannot create a final pull request/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "git-workflow-project",
+        name: "Git Workflow Project",
+        automation: {
+          gitWorkflows: {
+            profiles: [
+              {
+                id: "broken-graph",
+                branchStrategy: "direct",
+                decisionGraph: {
+                  id: "custom-broken",
+                  startNodeId: "observe",
+                  nodes: [
+                    {
+                      id: "observe",
+                      kind: "observation",
+                      summary: "Observe local facts.",
+                    },
+                  ],
+                  transitions: [
+                    {
+                      id: "missing-target",
+                      from: "observe",
+                      to: "done",
+                      summary: "Move to missing node.",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/decisionGraph.transitions.*unknown node/);
+  });
+
+  it("accepts custom Git workflow decision graphs", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "git-workflow-project",
+      name: "Git Workflow Project",
+      automation: {
+        gitWorkflows: {
+          profiles: [
+            {
+              id: "custom",
+              branchStrategy: "direct",
+              decisionGraph: {
+                id: "custom-linear",
+                startNodeId: "observe",
+                nodes: [
+                  {
+                    id: "observe",
+                    kind: "observation",
+                    summary: "Observe branch and provider facts.",
+                  },
+                  {
+                    id: "publish",
+                    kind: "gate",
+                    summary: "Publish after explicit approval.",
+                  },
+                  {
+                    id: "done",
+                    kind: "terminal",
+                    summary: "Published.",
+                  },
+                ],
+                transitions: [
+                  {
+                    id: "approve-publication",
+                    from: "observe",
+                    to: "publish",
+                    summary: "Wait for explicit publication approval.",
+                    requiredEvidence: ["provider-review", "required-checks"],
+                    authority: ["human_approval", "final_publication"],
+                    dryRun: true,
+                    providerWrites: ["merge_pull_request"],
+                    resumeInputs: ["--provider-review approved"],
+                    nextOwner: {
+                      kind: "human",
+                      id: "maintainer",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(config.automation?.gitWorkflows.profiles[0]?.decisionGraph)
+      .toMatchObject({
+        id: "custom-linear",
+        source: "configured",
+        template: null,
+        startNodeId: "observe",
+        transitions: [
+          {
+            id: "approve-publication",
+            from: "observe",
+            to: "publish",
+            requiredEvidence: ["provider-review", "required-checks"],
+            authority: ["human_approval", "final_publication"],
+            dryRun: true,
+            providerWrites: ["merge_pull_request"],
+            resumeInputs: ["--provider-review approved"],
+            nextOwner: {
+              kind: "human",
+              id: "maintainer",
+            },
+          },
+        ],
+      });
   });
 
   it("accepts publication identity and remote guardrails", () => {

@@ -316,6 +316,23 @@ export function printGitWorkflowResult(
   );
   writeLine(stdout, `  Current branch: ${result.refs.currentBranch ?? "unknown"}`);
   writeLine(stdout, `  Next owner: ${formatOwner(result.nextOwner)}`);
+  if (result.decisionGraph) {
+    writeLine(
+      stdout,
+      `  Decision graph: ${result.decisionGraph.id} node=${result.decisionGraph.currentNode?.id ?? "unknown"}`,
+    );
+    writeLine(stdout, "  Graph transitions:");
+    if (result.decisionGraph.allowedTransitions.length === 0) {
+      writeLine(stdout, "    none");
+    } else {
+      for (const transition of result.decisionGraph.allowedTransitions) {
+        const missing = transition.missingEvidence.length > 0
+          ? `missing ${transition.missingEvidence.join(", ")}`
+          : "ready";
+        writeLine(stdout, `    ${transition.id}: ${missing}`);
+      }
+    }
+  }
   writeLine(stdout, "  Evidence gaps:");
   if (result.evidenceGaps.length === 0) {
     writeLine(stdout, "    none");

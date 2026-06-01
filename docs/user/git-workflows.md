@@ -341,6 +341,9 @@ merge, evidence, package, and release mechanics.
             "wrongBase": "recreate",
             "publicRewrite": "with_human_approval"
           },
+          "decisionGraph": {
+            "template": "hybrid"
+          },
           "gates": {
             "publication": [
               "human_approval",
@@ -368,7 +371,14 @@ DevNexus projects it as `legacy-feature-branch-delivery`. New
 workspaces should prefer `automation.gitWorkflows`; release trains should stay
 focused on batching, candidate branches, CI tiers, and final publication.
 
-A workflow run object should then be a directed graph:
+Each profile now carries a decision graph. If `decisionGraph` is omitted,
+DevNexus selects the built-in template that matches `branchStrategy`; a profile
+can also select a built-in template explicitly with `"decisionGraph": "hybrid"`
+or `"decisionGraph": { "template": "hybrid" }`. Teams that need a different
+workflow can define a custom graph inline with `id`, `startNodeId`, typed
+`nodes`, and `transitions`.
+
+A decision graph is a directed graph:
 
 - states are typed nodes;
 - transitions have conditions and required evidence;
@@ -376,9 +386,10 @@ A workflow run object should then be a directed graph:
 - handoff transitions declare the next owner and resume inputs;
 - terminal transitions declare cleanup, archive, or publication results.
 
-The graph can then express several team workflows without changing agent
-behavior. Agents ask DevNexus for the current state and next allowed actions;
-humans decide at gates; DevNexus resumes when evidence arrives.
+`git-workflow plan` and `git-workflow status` report the selected graph, current
+node, allowed graph transitions, missing transition evidence, and the graph's
+next owner. Existing `advance` behavior still runs through the compatible
+hardcoded path while graph-driven execution is introduced incrementally.
 
 ## References
 
