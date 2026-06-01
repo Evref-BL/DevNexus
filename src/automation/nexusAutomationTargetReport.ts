@@ -8,6 +8,13 @@ import {
 import type {
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunch.js";
+import type {
+  NexusAutomationProviderResultContractResultStatus,
+  NexusAutomationProviderResultContractStatus,
+  NexusAutomationProviderSessionRecord,
+  NexusAutomationProviderSessionStatus,
+  NexusAutomationProviderTerminalStatus,
+} from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -165,6 +172,7 @@ export interface NexusAutomationTargetReportExecutionRunSummary {
   summary: string | null;
   error: string | null;
   codexAppServer: NexusAutomationCodexAppServerLaunchMetadata | null;
+  providerSessions?: NexusAutomationProviderSessionRecord[];
 }
 
 export interface NexusAutomationTargetReportVerificationSummary
@@ -202,12 +210,55 @@ export interface NexusAutomationTargetReportCodexGoalSummary {
   summary: string;
 }
 
+export interface NexusAutomationTargetReportProviderSessionRecord {
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  workItemTitle: string | null;
+  providerId: string;
+  executorMode: string | null;
+  status: NexusAutomationProviderSessionStatus;
+  purpose: string | null;
+  profileId: string | null;
+  model: string | null;
+  reasoning: string | null;
+  sessionId: string | null;
+  turnId: string | null;
+  sourceSessionId: string | null;
+  sourceTurnId: string | null;
+  worktreeId: string | null;
+  cwd: string | null;
+  persistenceMode: string | null;
+  sandbox: string | null;
+  approvalPolicy: string | null;
+  permissionProfile: string | null;
+  terminalStatus: NexusAutomationProviderTerminalStatus;
+  resultContractStatus: NexusAutomationProviderResultContractStatus;
+  resultContractResultStatus: NexusAutomationProviderResultContractResultStatus | null;
+  resultContractFile: string | null;
+  failureSummary: string | null;
+  summary: string;
+}
+
+export interface NexusAutomationTargetReportProviderSessionSummary {
+  sessionCount: number;
+  completedSessionCount: number;
+  blockedSessionCount: number;
+  failedSessionCount: number;
+  interruptedSessionCount: number;
+  missingResultContractCount: number;
+  invalidResultContractCount: number;
+  recentSessions: NexusAutomationTargetReportProviderSessionRecord[];
+  failures: NexusAutomationTargetReportProviderSessionRecord[];
+}
+
 export interface NexusAutomationTargetReportExecutionSummary {
   runCount: number;
   commitIds: string[];
   verification: NexusAutomationTargetReportVerificationSummary[];
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
   codexGoals: NexusAutomationTargetReportCodexGoalSummary[];
+  providerSessions: NexusAutomationTargetReportProviderSessionSummary;
   runs: NexusAutomationTargetReportExecutionRunSummary[];
 }
 
@@ -709,6 +760,9 @@ function summarizeExecution(
       summary: run.summary,
       error: run.error,
       codexAppServer: run.codexAppServer,
+      ...(run.providerSessions?.length
+        ? { providerSessions: run.providerSessions }
+        : {}),
     } satisfies NexusAutomationTargetReportExecutionRunSummary;
   });
   const runById = new Map(runs.map((run) => [run.runId, run]));
@@ -756,8 +810,111 @@ function summarizeExecution(
     verification,
     publicationDecisions,
     codexGoals,
+    providerSessions: summarizeProviderSessions(ledger.runs, runById),
     runs,
   };
+}
+
+function summarizeProviderSessions(
+  runs: NexusAutomationRunRecord[],
+  runById: Map<string, NexusAutomationTargetReportExecutionRunSummary>,
+): NexusAutomationTargetReportProviderSessionSummary {
+  const records = runs.flatMap((run) => {
+    const runSummary = runById.get(run.id);
+    return (run.providerSessions ?? []).map((session) =>
+      summarizeProviderSession({
+        session,
+        run,
+        workItemTitle: runSummary?.workItemTitle ?? null,
+      })
+    );
+  });
+
+  return {
+    sessionCount: records.length,
+    completedSessionCount: records.filter((record) =>
+      record.status === "completed"
+    ).length,
+    blockedSessionCount: records.filter((record) =>
+      record.status === "blocked"
+    ).length,
+    failedSessionCount: records.filter((record) => record.status === "failed")
+      .length,
+    interruptedSessionCount: records.filter((record) =>
+      record.status === "interrupted"
+    ).length,
+    missingResultContractCount: records.filter((record) =>
+      record.resultContractStatus === "missing"
+    ).length,
+    invalidResultContractCount: records.filter((record) =>
+      record.resultContractStatus === "invalid"
+    ).length,
+    recentSessions: [...records].reverse().slice(0, 10),
+    failures: records.filter(isProviderSessionFailure).reverse().slice(0, 10),
+  };
+}
+
+function summarizeProviderSession(options: {
+  session: NexusAutomationProviderSessionRecord;
+  run: NexusAutomationRunRecord;
+  workItemTitle: string | null;
+}): NexusAutomationTargetReportProviderSessionRecord {
+  const { session, run } = options;
+  return {
+    runId: run.id,
+    componentId: session.componentId ?? run.componentId,
+    workItemId: session.workItemId ?? run.workItemId,
+    workItemTitle: options.workItemTitle,
+    providerId: session.providerId,
+    executorMode: session.executorMode,
+    status: session.status,
+    purpose: session.purpose,
+    profileId: session.profileId,
+    model: session.model,
+    reasoning: session.reasoning,
+    sessionId: session.sessionId,
+    turnId: session.turnId,
+    sourceSessionId: session.sourceSessionId,
+    sourceTurnId: session.sourceTurnId,
+    worktreeId: session.worktreeId,
+    cwd: session.cwd,
+    persistenceMode: session.persistenceMode,
+    sandbox: session.sandbox,
+    approvalPolicy: session.approvalPolicy,
+    permissionProfile: session.permissionProfile,
+    terminalStatus: session.terminalStatus,
+    resultContractStatus: session.resultContract.status,
+    resultContractResultStatus: session.resultContract.resultStatus,
+    resultContractFile: session.resultContract.file,
+    failureSummary:
+      session.failureSummary ?? session.resultContract.failureSummary,
+    summary: providerSessionSummaryText(session),
+  };
+}
+
+function isProviderSessionFailure(
+  record: NexusAutomationTargetReportProviderSessionRecord,
+): boolean {
+  return record.status === "failed" ||
+    record.status === "blocked" ||
+    record.status === "interrupted" ||
+    record.resultContractStatus === "missing" ||
+    record.resultContractStatus === "invalid";
+}
+
+function providerSessionSummaryText(
+  session: NexusAutomationProviderSessionRecord,
+): string {
+  const turn = session.turnId ?? "unknown";
+  const parts = [
+    `${session.providerId} turn ${turn} ${session.status}`,
+    session.resultContract.status === "not_read"
+      ? null
+      : `result contract ${session.resultContract.status}`,
+    session.terminalStatus === "observed" ? "terminal event observed" : null,
+  ].filter((part): part is string => Boolean(part));
+
+  return `${parts.join("; ")}.`;
 }
 
 function summarizeCodexGoal(options: {

@@ -17,6 +17,12 @@ import type {
   NexusAutomationCodexAppServerGoalMetadata,
   NexusAutomationCodexAppServerGoalOperationStatus,
   NexusAutomationCodexAppServerLaunchMetadata,
+  NexusAutomationProviderResultContractMetadata,
+  NexusAutomationProviderResultContractResultStatus,
+  NexusAutomationProviderResultContractStatus,
+  NexusAutomationProviderSessionRecord,
+  NexusAutomationProviderSessionStatus,
+  NexusAutomationProviderTerminalStatus,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import { normalizeNexusCodexGoalsPolicyDecision } from "./nexusCodexGoalsPolicy.js";
 
@@ -46,6 +52,7 @@ export interface NexusAutomationRunRecord {
   publicationDecision: WorktreePublicationDecision | null;
   error: string | null;
   codexAppServer: NexusAutomationCodexAppServerLaunchMetadata | null;
+  providerSessions?: NexusAutomationProviderSessionRecord[];
   nextRunNotBefore: string | null;
 }
 
@@ -68,6 +75,7 @@ export interface NexusAutomationRunRecordInput {
   publicationDecision?: WorktreePublicationDecision | null;
   error?: string | null;
   codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata | null;
+  providerSessions?: NexusAutomationProviderSessionRecord[] | null;
   nextRunNotBefore?: string | null;
 }
 
@@ -539,6 +547,7 @@ function normalizeRunRecordInput(
     publicationDecision: input.publicationDecision ?? null,
     error: input.error ?? null,
     codexAppServer: input.codexAppServer ?? null,
+    providerSessions: input.providerSessions ?? null,
     nextRunNotBefore: input.nextRunNotBefore ?? null,
   });
 }
@@ -549,17 +558,32 @@ function normalizeRunRecord(value: unknown): NexusAutomationRunRecord {
   }
 
   const record = value as Record<string, unknown>;
+  const id = requiredNonEmptyString(record.id, "automation run.id");
+  const componentId = optionalNullableString(record.componentId) ?? null;
+  const workItemId = optionalNullableString(record.workItemId) ?? null;
+  const worktreePath = optionalNullableString(record.worktreePath) ?? null;
+  const codexAppServer = normalizeCodexAppServerLaunchMetadata(
+    record.codexAppServer,
+  );
+  const providerSessions = normalizeProviderSessions(record.providerSessions, {
+    runId: id,
+    componentId,
+    workItemId,
+    worktreeId: worktreeIdFromPath(worktreePath),
+    codexAppServer,
+  });
+
   return {
     id: requiredNonEmptyString(record.id, "automation run.id"),
     projectId: requiredNonEmptyString(record.projectId, "automation run.projectId"),
-    componentId: optionalNullableString(record.componentId) ?? null,
+    componentId,
     status: normalizeRunStatus(record.status, "automation run.status"),
     startedAt: requiredIsoString(record.startedAt, "automation run.startedAt"),
     finishedAt: optionalIsoString(record.finishedAt, "automation run.finishedAt"),
-    workItemId: optionalNullableString(record.workItemId) ?? null,
+    workItemId,
     workItemTitle: optionalNullableString(record.workItemTitle) ?? null,
     sourceRoot: optionalNullableString(record.sourceRoot) ?? null,
-    worktreePath: optionalNullableString(record.worktreePath) ?? null,
+    worktreePath,
     branchName: optionalNullableString(record.branchName) ?? null,
     baseRef: optionalNullableString(record.baseRef) ?? null,
     commitIds: normalizeStringArray(record.commitIds, "automation run.commitIds"),
@@ -567,7 +591,8 @@ function normalizeRunRecord(value: unknown): NexusAutomationRunRecord {
     verification: normalizeVerificationRecords(record.verification),
     publicationDecision: normalizePublicationDecision(record.publicationDecision),
     error: optionalNullableString(record.error) ?? null,
-    codexAppServer: normalizeCodexAppServerLaunchMetadata(record.codexAppServer),
+    codexAppServer,
+    ...(providerSessions.length > 0 ? { providerSessions } : {}),
     nextRunNotBefore: optionalIsoString(
       record.nextRunNotBefore,
       "automation run.nextRunNotBefore",
@@ -680,6 +705,234 @@ function normalizeCodexAppServerGoalMetadata(
   };
 }
 
+function normalizeProviderSessions(
+  value: unknown,
+  context: {
+    runId: string;
+    componentId: string | null;
+    workItemId: string | null;
+    worktreeId: string | null;
+    codexAppServer: NexusAutomationCodexAppServerLaunchMetadata | null;
+  },
+): NexusAutomationProviderSessionRecord[] {
+  const sessions: NexusAutomationProviderSessionRecord[] = [];
+  if (value !== undefined && value !== null) {
+    if (!Array.isArray(value)) {
+      throw new NexusAutomationError(
+        "automation run.providerSessions must be an array",
+      );
+    }
+    sessions.push(
+      ...value.map((item, index) =>
+        normalizeProviderSessionRecord(
+          item,
+          `automation run.providerSessions[${index}]`,
+          context,
+        )
+      ),
+    );
+  }
+
+  if (context.codexAppServer) {
+    sessions.push(
+      providerSessionFromCodexAppServer({
+        ...context,
+        codexAppServer: context.codexAppServer,
+      }),
+    );
+  }
+
+  return uniqueProviderSessions(sessions);
+}
+
+function normalizeProviderSessionRecord(
+  value: unknown,
+  name: string,
+  context: {
+    runId: string;
+    componentId: string | null;
+    workItemId: string | null;
+    worktreeId: string | null;
+  },
+): NexusAutomationProviderSessionRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusAutomationError(`${name} must be an object`);
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    providerId: requiredNonEmptyString(record.providerId, `${name}.providerId`),
+    executorMode: optionalNullableString(record.executorMode) ?? null,
+    status: normalizeProviderSessionStatus(record.status, `${name}.status`),
+    purpose: optionalNullableString(record.purpose) ?? null,
+    runId: optionalNullableString(record.runId) ?? context.runId,
+    componentId: optionalNullableString(record.componentId) ?? context.componentId,
+    workItemId: optionalNullableString(record.workItemId) ?? context.workItemId,
+    worktreeId: optionalNullableString(record.worktreeId) ?? context.worktreeId,
+    cwd: optionalNullableString(record.cwd) ?? null,
+    profileId: optionalNullableString(record.profileId) ?? null,
+    model: optionalNullableString(record.model) ?? null,
+    reasoning: optionalNullableString(record.reasoning) ?? null,
+    sessionId: optionalNullableString(record.sessionId) ?? null,
+    turnId: optionalNullableString(record.turnId) ?? null,
+    sourceSessionId: optionalNullableString(record.sourceSessionId) ?? null,
+    sourceTurnId: optionalNullableString(record.sourceTurnId) ?? null,
+    persistenceMode: optionalNullableString(record.persistenceMode) ?? null,
+    sandbox: optionalNullableString(record.sandbox) ?? null,
+    approvalPolicy: optionalNullableString(record.approvalPolicy) ?? null,
+    permissionProfile: optionalNullableString(record.permissionProfile) ?? null,
+    terminalStatus: normalizeProviderTerminalStatus(
+      record.terminalStatus ?? "not_observed",
+      `${name}.terminalStatus`,
+    ),
+    resultContract: normalizeProviderResultContractMetadata(
+      record.resultContract,
+      `${name}.resultContract`,
+    ),
+    failureSummary: optionalNullableString(record.failureSummary) ?? null,
+  };
+}
+
+function providerSessionFromCodexAppServer(options: {
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  worktreeId: string | null;
+  codexAppServer: NexusAutomationCodexAppServerLaunchMetadata;
+}): NexusAutomationProviderSessionRecord {
+  const appServer = options.codexAppServer;
+  return {
+    providerId: appServer.provider,
+    executorMode: null,
+    status: appServer.status,
+    purpose: null,
+    runId: options.runId,
+    componentId: options.componentId,
+    workItemId: options.workItemId,
+    worktreeId: options.worktreeId,
+    cwd: appServer.cwd,
+    profileId: appServer.profileId,
+    model: appServer.model,
+    reasoning: appServer.reasoning,
+    sessionId: appServer.threadId,
+    turnId: appServer.turnId,
+    sourceSessionId: appServer.sourceThreadId,
+    sourceTurnId: appServer.sourceTurnId,
+    persistenceMode: appServer.threadPersistence,
+    sandbox: null,
+    approvalPolicy: null,
+    permissionProfile: null,
+    terminalStatus: "not_observed",
+    resultContract: providerResultContractFromCodexAppServer(appServer),
+    failureSummary: appServer.failureSummary,
+  };
+}
+
+function providerResultContractFromCodexAppServer(
+  appServer: NexusAutomationCodexAppServerLaunchMetadata,
+): NexusAutomationProviderResultContractMetadata {
+  if (appServer.status === "completed" || appServer.status === "blocked") {
+    return {
+      status: "valid",
+      file: appServer.resultFile,
+      resultStatus: appServer.status,
+      failureSummary: appServer.failureSummary,
+    };
+  }
+
+  const failure = appServer.failureSummary ?? "";
+  if (failure.includes("Agent result file was not written")) {
+    return {
+      status: "missing",
+      file: appServer.resultFile,
+      resultStatus: null,
+      failureSummary: appServer.failureSummary,
+    };
+  }
+  if (failure.includes("Agent result file is invalid")) {
+    return {
+      status: "invalid",
+      file: appServer.resultFile,
+      resultStatus: null,
+      failureSummary: appServer.failureSummary,
+    };
+  }
+
+  return {
+    status: "not_read",
+    file: appServer.resultFile,
+    resultStatus: null,
+    failureSummary: null,
+  };
+}
+
+function normalizeProviderResultContractMetadata(
+  value: unknown,
+  name: string,
+): NexusAutomationProviderResultContractMetadata {
+  if (value === undefined || value === null) {
+    return {
+      status: "not_read",
+      file: null,
+      resultStatus: null,
+      failureSummary: null,
+    };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusAutomationError(`${name} must be an object`);
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    status: normalizeProviderResultContractStatus(
+      record.status,
+      `${name}.status`,
+    ),
+    file: optionalNullableString(record.file) ?? null,
+    resultStatus:
+      record.resultStatus === undefined || record.resultStatus === null
+        ? null
+        : normalizeProviderResultContractResultStatus(
+            record.resultStatus,
+            `${name}.resultStatus`,
+          ),
+    failureSummary: optionalNullableString(record.failureSummary) ?? null,
+  };
+}
+
+function uniqueProviderSessions(
+  sessions: NexusAutomationProviderSessionRecord[],
+): NexusAutomationProviderSessionRecord[] {
+  const unique = new Map<string, NexusAutomationProviderSessionRecord>();
+  for (const session of sessions) {
+    const key = providerSessionKey(session);
+    if (!unique.has(key)) {
+      unique.set(key, session);
+    }
+  }
+
+  return [...unique.values()];
+}
+
+function providerSessionKey(
+  session: NexusAutomationProviderSessionRecord,
+): string {
+  return [
+    session.providerId,
+    session.runId,
+    session.sessionId ?? "",
+    session.turnId ?? "",
+  ].join("\0");
+}
+
+function worktreeIdFromPath(worktreePath: string | null): string | null {
+  if (!worktreePath) {
+    return null;
+  }
+
+  return path.basename(worktreePath);
+}
+
 function normalizeVerificationRecords(
   value: unknown,
 ): WorktreeVerificationRecord[] {
@@ -772,6 +1025,73 @@ function normalizeCodexAppServerThreadPersistence(
   }
 
   throw new NexusAutomationError(`${name} must be ephemeral or durable`);
+}
+
+function normalizeProviderSessionStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationProviderSessionStatus {
+  if (
+    value === "started" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "blocked" ||
+    value === "interrupted"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be started, completed, failed, blocked, or interrupted`,
+  );
+}
+
+function normalizeProviderTerminalStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationProviderTerminalStatus {
+  if (
+    value === "not_observed" ||
+    value === "observed" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be not_observed, observed, or failed`,
+  );
+}
+
+function normalizeProviderResultContractStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationProviderResultContractStatus {
+  if (
+    value === "not_read" ||
+    value === "valid" ||
+    value === "missing" ||
+    value === "invalid"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be not_read, valid, missing, or invalid`,
+  );
+}
+
+function normalizeProviderResultContractResultStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationProviderResultContractResultStatus {
+  if (value === "completed" || value === "failed" || value === "blocked") {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be completed, failed, or blocked`,
+  );
 }
 
 function normalizeCodexAppServerGoalOperationStatus(

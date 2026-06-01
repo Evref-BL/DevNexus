@@ -6,6 +6,62 @@ export type NexusAutomationCodexAppServerLaunchStatus =
   | "failed"
   | "blocked";
 
+export type NexusAutomationProviderSessionStatus =
+  | "started"
+  | "completed"
+  | "failed"
+  | "blocked"
+  | "interrupted";
+
+export type NexusAutomationProviderTerminalStatus =
+  | "not_observed"
+  | "observed"
+  | "failed";
+
+export type NexusAutomationProviderResultContractStatus =
+  | "not_read"
+  | "valid"
+  | "missing"
+  | "invalid";
+
+export type NexusAutomationProviderResultContractResultStatus =
+  | "completed"
+  | "failed"
+  | "blocked";
+
+export interface NexusAutomationProviderResultContractMetadata {
+  status: NexusAutomationProviderResultContractStatus;
+  file: string | null;
+  resultStatus: NexusAutomationProviderResultContractResultStatus | null;
+  failureSummary: string | null;
+}
+
+export interface NexusAutomationProviderSessionRecord {
+  providerId: string;
+  executorMode: string | null;
+  status: NexusAutomationProviderSessionStatus;
+  purpose: string | null;
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  worktreeId: string | null;
+  cwd: string | null;
+  profileId: string | null;
+  model: string | null;
+  reasoning: string | null;
+  sessionId: string | null;
+  turnId: string | null;
+  sourceSessionId: string | null;
+  sourceTurnId: string | null;
+  persistenceMode: string | null;
+  sandbox: string | null;
+  approvalPolicy: string | null;
+  permissionProfile: string | null;
+  terminalStatus: NexusAutomationProviderTerminalStatus;
+  resultContract: NexusAutomationProviderResultContractMetadata;
+  failureSummary: string | null;
+}
+
 export type NexusAutomationCodexAppServerGoalOperationStatus =
   | "not_requested"
   | "unsupported"

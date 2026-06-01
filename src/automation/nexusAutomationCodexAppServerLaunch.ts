@@ -12,6 +12,7 @@ import {
 } from "../codex-app/codexAppServerJsonRpc.js";
 import type {
   NexusAutomationAgentLaunchInput,
+  NexusAutomationAgentResultFileReadResult,
   NexusAutomationAgentLaunchResult,
   NexusAutomationAgentLaunchStatus,
   NexusAutomationAgentLauncher,
@@ -19,6 +20,9 @@ import type {
 } from "./nexusAutomationAgentLaunch.js";
 import type {
   NexusAutomationCodexAppServerGoalMetadata,
+  NexusAutomationProviderResultContractMetadata,
+  NexusAutomationProviderSessionRecord,
+  NexusAutomationProviderTerminalStatus,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   evaluateNexusCodexGoalsAutomationPolicy,
@@ -118,11 +122,14 @@ export function createNexusAutomationCodexAppServerLauncher(
     input: NexusAutomationAgentLaunchInput,
   ): Promise<NexusAutomationAgentLaunchResult> => {
     let profile: NexusAutomationAgentProfilePolicy | null = null;
+    let policy: CodexLaunchPolicy | null = null;
     let cwd = "";
     let ephemeral = true;
     let threadId: string | null = null;
     let turnId: string | null = null;
     let goal: NexusAutomationCodexAppServerGoalMetadata | null = null;
+    let terminalStatus: NexusAutomationProviderTerminalStatus = "not_observed";
+    let resultContract = notReadResultContract(null);
     const fork = options.fork ?? null;
     const action = fork ? "thread_fork" : "thread_start";
 
@@ -130,7 +137,7 @@ export function createNexusAutomationCodexAppServerLauncher(
       profile = resolveCodexAppServerProfile(input, options.profileId);
       cwd = resolveLaunchCwd(input, options.cwd);
       ephemeral = resolveThreadEphemeral(profile, options.threadPersistence);
-      const policy = codexLaunchPolicy(input.projectConfig, profile);
+      policy = codexLaunchPolicy(input.projectConfig, profile);
       const goalProjection = resolveCodexThreadGoalProjection(options.goal);
       const goalPolicy = evaluateNexusCodexGoalsAutomationPolicy({
         mode: goalProjection.mode,
@@ -217,14 +224,19 @@ export function createNexusAutomationCodexAppServerLauncher(
           "turn.id",
         ], "turn id");
 
-        await waitForCodexAppServerTurnCompletionNotification({
-          client: adapter.client,
-          threadId,
-          turnId,
-          timeoutMs:
-            options.turnCompletionNotificationTimeoutMs ??
-            defaultTurnCompletionNotificationTimeoutMs,
-        });
+        try {
+          terminalStatus = await waitForCodexAppServerTurnCompletionNotification({
+            client: adapter.client,
+            threadId,
+            turnId,
+            timeoutMs:
+              options.turnCompletionNotificationTimeoutMs ??
+              defaultTurnCompletionNotificationTimeoutMs,
+          });
+        } catch (error) {
+          terminalStatus = "failed";
+          throw error;
+        }
         goal = await maybeReadCodexThreadGoal({
           adapter,
           threadId,
@@ -232,24 +244,36 @@ export function createNexusAutomationCodexAppServerLauncher(
         });
 
         const reported = readNexusAutomationAgentResultFile(input.resultFile);
+        resultContract = resultContractFromReadResult(reported, input.resultFile);
         if (reported.status !== "loaded") {
+          const metadata = codexAppServerMetadata({
+            status: "failed",
+            action,
+            input,
+            profile,
+            fork,
+            threadId,
+            turnId,
+            ephemeral,
+            cwd,
+            failureSummary: reported.error,
+            goal,
+          });
           return {
             status: "failed",
             summary: reported.summary,
             error: reported.error,
-            codexAppServer: codexAppServerMetadata({
-              status: "failed",
-              action,
-              input,
-              profile,
-              fork,
-              threadId,
-              turnId,
-              ephemeral,
-              cwd,
-              failureSummary: reported.error,
-              goal,
-            }),
+            codexAppServer: metadata,
+            providerSessions: [
+              codexAppServerProviderSession({
+                metadata,
+                input,
+                profile,
+                policy,
+                terminalStatus,
+                resultContract,
+              }),
+            ],
           };
         }
 
@@ -259,6 +283,25 @@ export function createNexusAutomationCodexAppServerLauncher(
           status === "completed"
             ? null
             : reported.result?.error ?? summary;
+        resultContract = {
+          status: "valid",
+          file: input.resultFile,
+          resultStatus: status,
+          failureSummary: resultFailureSummary,
+        };
+        const metadata = codexAppServerMetadata({
+          status,
+          action,
+          input,
+          profile,
+          fork,
+          threadId,
+          turnId,
+          ephemeral,
+          cwd,
+          failureSummary: resultFailureSummary,
+          goal,
+        });
         return {
           status,
           summary,
@@ -266,19 +309,17 @@ export function createNexusAutomationCodexAppServerLauncher(
           verification: reported.result?.verification ?? [],
           publicationDecision: reported.result?.publicationDecision,
           error: reported.result?.error ?? null,
-          codexAppServer: codexAppServerMetadata({
-            status,
-            action,
-            input,
-            profile,
-            fork,
-            threadId,
-            turnId,
-            ephemeral,
-            cwd,
-            failureSummary: resultFailureSummary,
-            goal,
-          }),
+          codexAppServer: metadata,
+          providerSessions: [
+            codexAppServerProviderSession({
+              metadata,
+              input,
+              profile,
+              policy,
+              terminalStatus,
+              resultContract,
+            }),
+          ],
         };
       } finally {
         if (closeClient) {
@@ -287,25 +328,38 @@ export function createNexusAutomationCodexAppServerLauncher(
       }
     } catch (error) {
       const failureSummary = summarizeCodexAppServerJsonRpcFailure(error);
+      const metadata = profile
+        ? codexAppServerMetadata({
+            status: "failed",
+            action,
+            input,
+            profile,
+            fork,
+            threadId,
+            turnId,
+            ephemeral,
+            cwd: cwd || input.projectRoot,
+            failureSummary,
+            goal,
+          })
+        : null;
       return {
         status: "failed",
         summary: `Codex app-server launch failed: ${failureSummary}`,
         error: failureSummary,
-        ...(profile
+        ...(metadata
           ? {
-              codexAppServer: codexAppServerMetadata({
-                status: "failed",
-                action,
-                input,
-                profile,
-                fork,
-                threadId,
-                turnId,
-                ephemeral,
-                cwd: cwd || input.projectRoot,
-                failureSummary,
-                goal,
-              }),
+              codexAppServer: metadata,
+              providerSessions: [
+                codexAppServerProviderSession({
+                  metadata,
+                  input,
+                  profile: profile!,
+                  policy,
+                  terminalStatus,
+                  resultContract,
+                }),
+              ],
             }
           : {}),
       };
@@ -318,9 +372,9 @@ async function waitForCodexAppServerTurnCompletionNotification(options: {
   threadId: string;
   turnId: string;
   timeoutMs: number;
-}): Promise<void> {
+}): Promise<NexusAutomationProviderTerminalStatus> {
   if (!options.client.supportsNotifications()) {
-    return;
+    return "not_observed";
   }
 
   const notification = options.client.waitForNotification((candidate) =>
@@ -331,7 +385,7 @@ async function waitForCodexAppServerTurnCompletionNotification(options: {
   );
   if (options.timeoutMs <= 0) {
     await notification;
-    return;
+    return "observed";
   }
 
   let timeout: NodeJS.Timeout | null = null;
@@ -355,6 +409,7 @@ async function waitForCodexAppServerTurnCompletionNotification(options: {
       clearTimeout(timeout);
     }
   }
+  return "observed";
 }
 
 function isTerminalCodexAppServerTurnNotification(
@@ -1035,6 +1090,77 @@ function codexAppServerMetadata(options: {
     resultFile: options.input.resultFile,
     failureSummary: options.failureSummary,
     goal: options.goal,
+  };
+}
+
+function codexAppServerProviderSession(options: {
+  metadata: NexusAutomationCodexAppServerLaunchMetadata;
+  input: NexusAutomationAgentLaunchInput;
+  profile: NexusAutomationAgentProfilePolicy;
+  policy: CodexLaunchPolicy | null;
+  terminalStatus: NexusAutomationProviderTerminalStatus;
+  resultContract: NexusAutomationProviderResultContractMetadata;
+}): NexusAutomationProviderSessionRecord {
+  return {
+    providerId: options.metadata.provider,
+    executorMode: options.profile.executorMode ?? null,
+    status: options.metadata.status,
+    purpose: options.profile.intendedUse ?? null,
+    runId: options.input.runId,
+    componentId: options.input.workItemClaim?.componentId ?? null,
+    workItemId: options.input.workItemClaim?.workItemId ?? null,
+    worktreeId: null,
+    cwd: options.metadata.cwd,
+    profileId: options.metadata.profileId,
+    model: options.metadata.model,
+    reasoning: options.metadata.reasoning,
+    sessionId: options.metadata.threadId,
+    turnId: options.metadata.turnId,
+    sourceSessionId: options.metadata.sourceThreadId,
+    sourceTurnId: options.metadata.sourceTurnId,
+    persistenceMode: options.metadata.threadPersistence,
+    sandbox: options.policy?.sandbox ?? null,
+    approvalPolicy: options.policy?.approvalPolicy ?? null,
+    permissionProfile: options.policy?.permissionProfile ?? null,
+    terminalStatus: options.terminalStatus,
+    resultContract: options.resultContract,
+    failureSummary: options.metadata.failureSummary,
+  };
+}
+
+function resultContractFromReadResult(
+  reported: NexusAutomationAgentResultFileReadResult,
+  resultFile: string,
+): NexusAutomationProviderResultContractMetadata {
+  if (reported.status === "loaded") {
+    const resultStatus = reported.result?.status ?? "completed";
+    return {
+      status: "valid",
+      file: resultFile,
+      resultStatus,
+      failureSummary:
+        resultStatus === "completed"
+          ? null
+          : reported.result?.error ?? reported.result?.summary ?? null,
+    };
+  }
+
+  return {
+    status: reported.status === "missing" ? "missing" : "invalid",
+    file: resultFile,
+    resultStatus: null,
+    failureSummary: reported.error,
+  };
+}
+
+function notReadResultContract(
+  resultFile: string | null,
+): NexusAutomationProviderResultContractMetadata {
+  return {
+    status: "not_read",
+    file: resultFile,
+    resultStatus: null,
+    failureSummary: null,
   };
 }
 

@@ -556,6 +556,187 @@ describe("nexus automation target report", () => {
     ]);
   });
 
+  it("summarizes provider sessions and result-contract failures without double-counting legacy app-server metadata", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-provider-sessions-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const completedResultFile = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "agent-launches",
+      "run-provider-completed",
+      "result.json",
+    );
+    const missingResultFile = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "agent-launches",
+      "run-provider-missing",
+      "result.json",
+    );
+
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "run-provider-completed",
+        projectId: "report-demo",
+        componentId: "primary",
+        status: "completed",
+        workItemId: "local-1",
+        workItemTitle: "Complete through app-server",
+        worktreePath: path.join(projectRoot, "worktrees", "wt-completed"),
+        summary: "App-server turn completed.",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-provider-completed",
+          profileId: "codex-app-server",
+          threadId: "thread-completed",
+          turnId: "turn-completed",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: path.join(projectRoot, "source"),
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: completedResultFile,
+          failureSummary: null,
+          goal: null,
+        },
+        providerSessions: [
+          {
+            providerId: "codex-app-server",
+            executorMode: "app_server",
+            status: "completed",
+            purpose: "coordinator",
+            runId: "run-provider-completed",
+            componentId: "primary",
+            workItemId: "local-1",
+            worktreeId: "wt-completed",
+            cwd: path.join(projectRoot, "source"),
+            profileId: "codex-app-server",
+            model: "gpt-5.5",
+            reasoning: "high",
+            sessionId: "thread-completed",
+            turnId: "turn-completed",
+            sourceSessionId: null,
+            sourceTurnId: null,
+            persistenceMode: "ephemeral",
+            sandbox: "workspace-write",
+            approvalPolicy: "never",
+            permissionProfile: "isolated",
+            terminalStatus: "observed",
+            resultContract: {
+              status: "valid",
+              file: completedResultFile,
+              resultStatus: "completed",
+              failureSummary: null,
+            },
+            failureSummary: null,
+          },
+        ],
+      },
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:05:00.000Z",
+      record: {
+        id: "run-provider-missing",
+        projectId: "report-demo",
+        componentId: "primary",
+        status: "failed",
+        workItemId: "local-2",
+        workItemTitle: "Miss the result contract",
+        worktreePath: path.join(projectRoot, "worktrees", "wt-missing"),
+        summary: "Agent result file was not written.",
+        error: "Agent result file was not written.",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "failed",
+          action: "thread_start",
+          runId: "run-provider-missing",
+          profileId: "codex-app-server",
+          threadId: "thread-missing",
+          turnId: "turn-missing",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: path.join(projectRoot, "source"),
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: missingResultFile,
+          failureSummary: "Agent result file was not written.",
+          goal: null,
+        },
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:10:00.000Z",
+    });
+
+    expect(report.executionSummary.providerSessions).toMatchObject({
+      sessionCount: 2,
+      completedSessionCount: 1,
+      blockedSessionCount: 0,
+      failedSessionCount: 1,
+      missingResultContractCount: 1,
+      invalidResultContractCount: 0,
+      recentSessions: [
+        {
+          runId: "run-provider-missing",
+          componentId: "primary",
+          workItemId: "local-2",
+          workItemTitle: "Miss the result contract",
+          providerId: "codex-app-server",
+          executorMode: null,
+          status: "failed",
+          profileId: "codex-app-server",
+          sessionId: "thread-missing",
+          turnId: "turn-missing",
+          worktreeId: "wt-missing",
+          terminalStatus: "not_observed",
+          resultContractStatus: "missing",
+          failureSummary: "Agent result file was not written.",
+        },
+        {
+          runId: "run-provider-completed",
+          componentId: "primary",
+          workItemId: "local-1",
+          workItemTitle: "Complete through app-server",
+          providerId: "codex-app-server",
+          executorMode: "app_server",
+          status: "completed",
+          profileId: "codex-app-server",
+          sessionId: "thread-completed",
+          turnId: "turn-completed",
+          worktreeId: "wt-completed",
+          terminalStatus: "observed",
+          resultContractStatus: "valid",
+          resultContractResultStatus: "completed",
+        },
+      ],
+      failures: [
+        {
+          runId: "run-provider-missing",
+          sessionId: "thread-missing",
+          turnId: "turn-missing",
+          resultContractStatus: "missing",
+          summary:
+            "codex-app-server turn turn-missing failed; result contract missing.",
+        },
+      ],
+    });
+  });
+
   it("omits version planning from target reports when no version config exists", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
