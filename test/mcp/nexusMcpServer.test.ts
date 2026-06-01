@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   callDevNexusMcpTool,
   createOrRefreshNexusWorktreeLease,
@@ -150,6 +150,123 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
     },
     ...overrides,
   };
+}
+
+function providerCommentCoordinationProjectConfig(options: {
+  sourceRoot: string;
+  worktreesRoot: string;
+  primaryStorePath: string;
+}): NexusProjectConfig {
+  return projectConfig({
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    components: [
+      {
+        id: "primary",
+        name: "MCP Demo",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:mcp/demo.git",
+        defaultBranch: "main",
+        sourceRoot: options.sourceRoot,
+        worktreesRoot: options.worktreesRoot,
+        defaultWorkTrackerId: "primary",
+        workTrackers: [
+          {
+            id: "primary",
+            name: "Primary",
+            enabled: true,
+            roles: ["primary"],
+            workTracking: {
+              provider: "local",
+              storePath: options.primaryStorePath,
+            },
+          },
+          {
+            id: "coordination",
+            name: "GitHub Coordination",
+            enabled: true,
+            roles: ["coordination"],
+            communication: {
+              coordinationHandoffs: "comment",
+            },
+            workTracking: {
+              provider: "github",
+              repository: {
+                owner: "example",
+                name: "demo",
+              },
+            },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  });
+}
+
+function writeMcpTrackerLink(options: {
+  projectRoot: string;
+  projectId: string;
+  componentId: string;
+  logicalItemId: string;
+  trackerId: string;
+  trackerName: string;
+  provider: string;
+  itemId: string;
+  itemNumber: number;
+  repositoryOwner: string;
+  repositoryName: string;
+  timestamp: string;
+}): void {
+  const filePath = path.join(options.projectRoot, ".dev-nexus", "work-item-links.json");
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(
+    filePath,
+    `${JSON.stringify(
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: options.timestamp,
+        records: [
+          {
+            projectId: options.projectId,
+            componentId: options.componentId,
+            logicalItemId: options.logicalItemId,
+            createdAt: options.timestamp,
+            updatedAt: options.timestamp,
+            references: [
+              {
+                trackerId: options.trackerId,
+                trackerName: options.trackerName,
+                provider: options.provider,
+                host: null,
+                repositoryId: null,
+                repositoryOwner: options.repositoryOwner,
+                repositoryName: options.repositoryName,
+                projectId: null,
+                boardId: null,
+                itemId: options.itemId,
+                itemNumber: options.itemNumber,
+                itemKey: null,
+                nodeId: null,
+                webUrl: null,
+                firstObservedAt: options.timestamp,
+                lastObservedAt: options.timestamp,
+              },
+            ],
+            audit: [],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 }
 
 function featureProjectConfig(): NexusProjectConfig {
@@ -471,6 +588,8 @@ function githubIssueResponse(options: {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2346,6 +2465,119 @@ describe("DevNexus MCP server", () => {
     expect(payload.guard.saferNextAction).toContain(
       "coordination_record requires a workspace/meta worktree",
     );
+  });
+
+  it("allows provider-comment coordination handoffs from component worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const componentWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "primary",
+      "component-provider-handoff",
+    );
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(componentWorktree, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      providerCommentCoordinationProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/primary",
+        primaryStorePath,
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate provider handoff from MCP",
+      status: "in_progress",
+    });
+    writeMcpTrackerLink({
+      projectRoot,
+      projectId: "mcp-demo",
+      componentId: "primary",
+      logicalItemId: primaryItem.id,
+      trackerId: "coordination",
+      trackerName: "GitHub Coordination",
+      provider: "github",
+      itemId: "398",
+      itemNumber: 398,
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      timestamp: "2026-05-20T09:05:00.000Z",
+    });
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      calls.push({
+        url: String(input),
+        method: init.method,
+      });
+      return new Response(
+        JSON.stringify({
+          id: 9003,
+          node_id: "IC_provider_component_handoff_mcp",
+          body: JSON.parse(String(init.body)).body,
+          user: { login: "devnexus-automation[bot]" },
+          created_at: "2026-05-20T10:00:00.000Z",
+          updated_at: "2026-05-20T10:00:00.000Z",
+          html_url: "https://github.com/example/demo/issues/398#issuecomment-9003",
+        }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+    vi.stubEnv("GITHUB_TOKEN", "coordination-test-token");
+
+    const result = await callDevNexusMcpTool(
+      "coordination_handoff",
+      {
+        projectRoot,
+        workItemId: primaryItem.id,
+        trackerRole: "coordination",
+        status: "ready",
+        changedAreas: ["src/nexusMcpServer.ts"],
+        verificationSummary: "focused tests passed",
+        currentPath: componentWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(componentWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(payload).toMatchObject({
+      ok: true,
+      record: {
+        status: "ready",
+        workItemId: primaryItem.id,
+        coordinationTargetRef: {
+          trackerId: "coordination",
+          provider: "github",
+          itemId: "398",
+        },
+      },
+      comment: {
+        id: "github-comment-9003",
+        trackerRef: {
+          trackerId: "coordination",
+        },
+      },
+    });
+    expect(calls).toEqual([
+      {
+        url: "https://api.github.com/repos/example/demo/issues/398/comments",
+        method: "POST",
+      },
+    ]);
   });
 
   it("lists provider-compatible tool input schemas", () => {

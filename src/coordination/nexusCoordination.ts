@@ -31,6 +31,7 @@ import {
   type NexusWorktreeLeaseRecord,
   type NexusWorktreeLeaseSummary,
 } from "../worktrees/nexusWorktreeLease.js";
+import type { NexusCheckoutMutationClass } from "../worktrees/nexusSharedCheckoutGuard.js";
 import {
   prepareNexusManualWorktree,
   summarizeNexusManualWorktreeResult,
@@ -928,6 +929,26 @@ export async function createNexusCoordinationHandoff(
     authority,
     blockedMutation: null,
   };
+}
+
+export function coordinationHandoffGuardMutationClass(
+  options: NexusCoordinationStatusOptions,
+): NexusCheckoutMutationClass {
+  const context = resolveCoordinationContext(options);
+  const coordinationTracker = resolveCoordinationTracker(context, {
+    trackerId: options.trackerId,
+    trackerRole: options.trackerRole,
+    preferredRoles: ["coordination"],
+  });
+
+  if (
+    coordinationTracker.tracker.workTracking.provider !== "local" &&
+    coordinationTracker.tracker.communication.coordinationHandoffs === "comment"
+  ) {
+    return "provider_tracker";
+  }
+
+  return "coordination_record";
 }
 
 export async function getNexusCoordinationIntegrationPlan(

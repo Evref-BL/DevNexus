@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { main, usage } from "../../src/cli.js";
 import {
   createOrRefreshNexusWorktreeLease,
@@ -160,6 +160,123 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
     },
     ...overrides,
   };
+}
+
+function providerCommentCoordinationProjectConfig(options: {
+  sourceRoot: string;
+  worktreesRoot: string;
+  primaryStorePath: string;
+}): NexusProjectConfig {
+  return projectConfig({
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    components: [
+      {
+        id: "primary",
+        name: "Primary",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/primary.git",
+        defaultBranch: "main",
+        sourceRoot: options.sourceRoot,
+        worktreesRoot: options.worktreesRoot,
+        defaultWorkTrackerId: "primary",
+        workTrackers: [
+          {
+            id: "primary",
+            name: "Primary",
+            enabled: true,
+            roles: ["primary"],
+            workTracking: {
+              provider: "local",
+              storePath: options.primaryStorePath,
+            },
+          },
+          {
+            id: "coordination",
+            name: "GitHub Coordination",
+            enabled: true,
+            roles: ["coordination"],
+            communication: {
+              coordinationHandoffs: "comment",
+            },
+            workTracking: {
+              provider: "github",
+              repository: {
+                owner: "example",
+                name: "demo",
+              },
+            },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  });
+}
+
+function writeCliTrackerLink(options: {
+  projectRoot: string;
+  projectId: string;
+  componentId: string;
+  logicalItemId: string;
+  trackerId: string;
+  trackerName: string;
+  provider: string;
+  itemId: string;
+  itemNumber: number;
+  repositoryOwner: string;
+  repositoryName: string;
+  timestamp: string;
+}): void {
+  const filePath = path.join(options.projectRoot, ".dev-nexus", "work-item-links.json");
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(
+    filePath,
+    `${JSON.stringify(
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: options.timestamp,
+        records: [
+          {
+            projectId: options.projectId,
+            componentId: options.componentId,
+            logicalItemId: options.logicalItemId,
+            createdAt: options.timestamp,
+            updatedAt: options.timestamp,
+            references: [
+              {
+                trackerId: options.trackerId,
+                trackerName: options.trackerName,
+                provider: options.provider,
+                host: null,
+                repositoryId: null,
+                repositoryOwner: options.repositoryOwner,
+                repositoryName: options.repositoryName,
+                projectId: null,
+                boardId: null,
+                itemId: options.itemId,
+                itemNumber: options.itemNumber,
+                itemKey: null,
+                nodeId: null,
+                webUrl: null,
+                firstObservedAt: options.timestamp,
+                lastObservedAt: options.timestamp,
+              },
+            ],
+            audit: [],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 }
 
 function releaseTrainLease(options: {
@@ -478,6 +595,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 afterEach(() => {
   process.chdir(originalCwd);
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -836,6 +955,20 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--branch <branch>");
     expect(output.output()).toContain("--title <text>");
     expect(output.output()).not.toContain("Options for publication pull-request merge:");
+  });
+
+  it("prints coordination handoff help with component-worktree policy", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["coordination", "handoff", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Options for coordination handoff:");
+    expect(output.output()).toContain(
+      "Provider comment handoffs can be recorded from component worktrees",
+    );
+    expect(output.output()).toContain("workspace/meta worktree");
   });
 
   it("prints help for every documented command path", async () => {
@@ -5606,6 +5739,123 @@ describe("dev-nexus cli", () => {
         },
       },
     });
+  });
+
+  it("allows provider-comment coordination handoffs from component worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-119");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      providerCommentCoordinationProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/primary",
+        primaryStorePath,
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate guarded provider handoff",
+      status: "in_progress",
+    });
+    writeCliTrackerLink({
+      projectRoot,
+      projectId: "demo-project",
+      componentId: "primary",
+      logicalItemId: primaryItem.id,
+      trackerId: "coordination",
+      trackerName: "GitHub Coordination",
+      provider: "github",
+      itemId: "398",
+      itemNumber: 398,
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      timestamp: "2026-05-20T09:05:00.000Z",
+    });
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      calls.push({
+        url: String(input),
+        method: init.method,
+      });
+      return new Response(
+        JSON.stringify({
+          id: 9002,
+          node_id: "IC_provider_component_handoff",
+          body: JSON.parse(String(init.body)).body,
+          user: { login: "devnexus-automation[bot]" },
+          created_at: "2026-05-20T10:00:00.000Z",
+          updated_at: "2026-05-20T10:00:00.000Z",
+          html_url: "https://github.com/example/demo/issues/398#issuecomment-9002",
+        }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+    vi.stubEnv("GITHUB_TOKEN", "coordination-test-token");
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "coordination",
+          "handoff",
+          projectRoot,
+          primaryItem.id,
+          "--tracker-role",
+          "coordination",
+          "--status",
+          "ready",
+          "--changed-area",
+          "src/cli.ts",
+          "--verification",
+          "focused tests passed",
+          "--worktree",
+          worktreePath,
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          gitRunner: fakeCoordinationIntegrationGitRunner(worktreePath),
+          sharedCheckoutGuard: "enforce",
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      record: {
+        status: "ready",
+        workItemId: primaryItem.id,
+        coordinationTargetRef: {
+          trackerId: "coordination",
+          provider: "github",
+          itemId: "398",
+        },
+      },
+      comment: {
+        id: "github-comment-9002",
+        trackerRef: {
+          trackerId: "coordination",
+        },
+      },
+    });
+    expect(calls).toEqual([
+      {
+        url: "https://api.github.com/repos/example/demo/issues/398/comments",
+        method: "POST",
+      },
+    ]);
   });
 
   it("prints coordination integration plans through the CLI", async () => {
