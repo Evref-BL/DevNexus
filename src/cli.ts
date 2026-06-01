@@ -9772,6 +9772,10 @@ function cliErrorPayload(error: unknown): {
   ok: false;
   error: { code: string; message: string };
 } | Record<string, unknown> {
+  const payload = errorPayload(error);
+  if (payload) {
+    return payload;
+  }
   const message = error instanceof Error ? error.message : String(error);
   try {
     const parsed = JSON.parse(message) as unknown;
@@ -9794,6 +9798,23 @@ function cliErrorPayload(error: unknown): {
       message,
     },
   };
+}
+
+function errorPayload(error: unknown): Record<string, unknown> | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+  const payload = (error as { payload?: unknown }).payload;
+  if (
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    (payload as { ok?: unknown }).ok === false
+  ) {
+    return payload as Record<string, unknown>;
+  }
+
+  return null;
 }
 
 function projectSetupApplyNextActions(

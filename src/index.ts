@@ -72,6 +72,7 @@ export * from "./mcp/nexusMcpExposurePolicy.js";
 export * from "./mcp/nexusMcpJsonRpcTransport.js";
 export * from "./mcp/nexusMcpSchemaCompatibility.js";
 export * from "./worktrees/nexusManualWorktree.js";
+export * from "./worktrees/nexusWorkspaceMetadataFreshness.js";
 export * from "./work-items/nexusNodePostgresClaimSqlClient.js";
 export * from "./runtime/nexusNpmRuntime.js";
 export * from "./runtime/nexusPathResolver.js";

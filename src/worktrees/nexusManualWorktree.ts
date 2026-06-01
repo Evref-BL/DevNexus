@@ -27,6 +27,10 @@ import {
   type NexusWorktreeLeaseRecord,
 } from "./nexusWorktreeLease.js";
 import {
+  assertNexusWorkspaceMetadataFreshness,
+  type NexusWorkspaceMetadataFreshnessReport,
+} from "./nexusWorkspaceMetadataFreshness.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -94,6 +98,7 @@ export interface PrepareNexusManualWorktreeResult {
   projectRoot: string;
   projectId: string;
   projectName: string;
+  workspaceMetadataFreshness: NexusWorkspaceMetadataFreshnessReport;
   component: ResolvedNexusProjectComponent | null;
   worktree: PrepareGitWorktreeResult;
   lease: NexusWorktreeLeaseRecord;
@@ -115,6 +120,7 @@ export interface NexusPreparedWorktreeSummary {
     id: string;
     name: string;
   };
+  workspaceMetadataFreshness: NexusWorkspaceMetadataFreshnessReport;
   component: {
     id: string;
     name: string;
@@ -276,6 +282,10 @@ export function prepareNexusManualWorktree(
   const projectRoot = path.resolve(
     requiredNonEmptyString(options.projectRoot, "projectRoot"),
   );
+  const workspaceMetadataFreshness = assertNexusWorkspaceMetadataFreshness({
+    projectRoot,
+    ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
+  });
   const projectConfig = loadProjectConfig(projectRoot);
   const projectMeta = options.projectMeta === true;
   if (projectMeta && options.componentId) {
@@ -464,6 +474,7 @@ export function prepareNexusManualWorktree(
     projectRoot,
     projectId: projectConfig.id,
     projectName: projectConfig.name,
+    workspaceMetadataFreshness,
     component: target.component,
     worktree,
     lease,
@@ -512,6 +523,7 @@ export function summarizeNexusManualWorktreeResult(
       id: result.projectId,
       name: result.projectName,
     },
+    workspaceMetadataFreshness: result.workspaceMetadataFreshness,
     component: result.component
       ? {
           id: result.component.id,
