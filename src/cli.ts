@@ -96,6 +96,10 @@ import {
   type NexusAutomationWorkItemClaimAuthorityStatus,
 } from "./automation/nexusAutomationStatus.js";
 import {
+  compactNexusTargetState,
+  type NexusTargetStateCompactionResult,
+} from "./automation/nexusTargetStateCompaction.js";
+import {
   summarizeAutomationStatus,
   summarizeCoordinationStatus,
   summarizeProjectStatus,
@@ -822,6 +826,12 @@ interface ParsedAutomationTargetReportCommand {
   projectRoot: string;
   json?: boolean;
   detail?: CliOutputDetail;
+}
+
+interface ParsedAutomationTargetStateCompactCommand {
+  projectRoot: string;
+  apply?: boolean;
+  json?: boolean;
 }
 
 interface ParsedCoordinationStatusCommand {
@@ -2547,6 +2557,27 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "target-state") {
+    const parsed = parseAutomationTargetStateCompactCommand(argv);
+    if (parsed.apply) {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "automation target-state compact",
+        mutationClass: "target_state",
+      });
+    }
+    const result = compactNexusTargetState({
+      projectRoot: parsed.projectRoot,
+      apply: parsed.apply,
+    });
+    printAutomationTargetStateCompactResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "current-agent") {
     return handleAutomationCurrentAgentCommand(argv, dependencies);
   }
@@ -2644,7 +2675,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, eligible-work, agent-profiles, app-server-probe, enqueue, heartbeat, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
+      "automation requires status, eligible-work, agent-profiles, app-server-probe, enqueue, heartbeat, target-cycle, target-report, target-state, run-once, schedule, coordinator-loop, or current-agent",
     );
   }
 
@@ -5744,6 +5775,34 @@ function parseAutomationTargetReportCommand(
   return parsed;
 }
 
+function parseAutomationTargetStateCompactCommand(
+  argv: string[],
+): ParsedAutomationTargetStateCompactCommand {
+  const [, , command, projectRoot, ...rest] = argv;
+  if (command !== "compact") {
+    throw new Error("automation target-state requires compact");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation target-state compact requires a workspace root");
+  }
+
+  const parsed: ParsedAutomationTargetStateCompactCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--apply":
+        parsed.apply = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation target-state compact option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationRunOnceCommand(
   argv: string[],
 ): ParsedAutomationRunOnceCommand {
@@ -8368,6 +8427,32 @@ function printAutomationTargetReportResult(
   }
   if (result.blockers.length > 0) {
     writeLine(stdout, `  Blockers: ${result.blockers.length}`);
+  }
+}
+
+function printAutomationTargetStateCompactResult(
+  result: NexusTargetStateCompactionResult,
+  parsed: ParsedAutomationTargetStateCompactCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus target-state compaction.");
+  writeLine(stdout, `  State path: ${result.statePath}`);
+  writeLine(stdout, `  Mode: ${result.apply ? "apply" : "preview"}`);
+  writeLine(stdout, `  Changed: ${result.changed ? "yes" : "no"}`);
+  writeLine(stdout, `  Preserved sections: ${result.preservedSections.length}`);
+  writeLine(stdout, `  Removed sections: ${result.removedSections.length}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  if (!result.apply && result.changed) {
+    writeLine(stdout, "  Rerun with --apply to write the compacted target state.");
   }
 }
 

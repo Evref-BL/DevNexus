@@ -46,6 +46,14 @@ describe("quick-fix planning", () => {
       name: "codex/core/quick-fix-mode",
       worktreeName: "codex-core-quick-fix-mode",
     });
+    expect(plan.workflowMode).toMatchObject({
+      id: "quick_fix",
+      skippedByDefault: expect.arrayContaining([
+        "target-cycle record",
+        "target-state rewrite",
+        "workspace metadata pull request",
+      ]),
+    });
     expect(plan.publication).toMatchObject({
       strategy: "green_main",
       remote: "bot",

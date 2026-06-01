@@ -85,6 +85,12 @@ import {
   type ResolvedNexusProjectComponent,
 } from "../project/nexusProjectLifecycle.js";
 import {
+  getNexusWorkflowModeChecklist,
+  listNexusWorkflowModeChecklists,
+  type NexusWorkflowModeChecklist,
+  type NexusWorkflowModeId,
+} from "./nexusWorkflowModeChecklist.js";
+import {
   preflightNexusAutomationRunOnce,
   type NexusAutomationPreflightCheck,
   type NexusAutomationProviderContext,
@@ -209,6 +215,11 @@ export interface NexusAutomationStatus {
   currentActors: NexusCurrentActorResolution[];
   authority: NexusAuthorityProjectSummary;
   workItemClaimAuthority: NexusAutomationWorkItemClaimAuthorityStatus;
+  workflowMode: {
+    active: NexusWorkflowModeId;
+    checklist: NexusWorkflowModeChecklist;
+    available: NexusWorkflowModeChecklist[];
+  };
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkMode: NexusEligibleWorkMode;
@@ -1121,6 +1132,7 @@ type AutomationStatusInput = Omit<
   | "targetCycles"
   | "authority"
   | "workItemClaimAuthority"
+  | "workflowMode"
 > &
   Partial<
     Pick<
@@ -1140,6 +1152,7 @@ type AutomationStatusInput = Omit<
       | "targetCycles"
       | "authority"
       | "workItemClaimAuthority"
+      | "workflowMode"
     >
   >;
 
@@ -1210,6 +1223,12 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
       summarizeNexusAutomationWorkItemClaimAuthorityStatus(
         result.automationConfig,
       ),
+    workflowMode:
+      result.workflowMode ?? {
+        active: "heartbeat",
+        checklist: getNexusWorkflowModeChecklist("heartbeat"),
+        available: listNexusWorkflowModeChecklists(),
+      },
     components,
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
     eligibleWorkMode: result.eligibleWorkMode ?? "default",

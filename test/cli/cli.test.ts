@@ -6133,8 +6133,77 @@ describe("dev-nexus cli", () => {
           },
         ],
       },
+      workflowMode: {
+        active: "heartbeat",
+        checklist: {
+          id: "heartbeat",
+        },
+      },
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
+  it("previews and applies target-state compaction", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const targetStatePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "automation",
+      "target-state.md",
+    );
+    fs.mkdirSync(path.dirname(targetStatePath), { recursive: true });
+    fs.writeFileSync(
+      targetStatePath,
+      [
+        "# Demo Target State",
+        "",
+        "Current target: demo.",
+        "",
+        "## Active Blockers",
+        "",
+        "- None.",
+        "",
+        "## Completed Cycles",
+        "",
+        "- Old cycle.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const previewOutput = captureOutput();
+
+    await main(["automation", "target-state", "compact", projectRoot, "--json"], {
+      stdout: previewOutput.writer,
+    });
+
+    expect(JSON.parse(previewOutput.output())).toMatchObject({
+      ok: true,
+      result: {
+        apply: false,
+        changed: true,
+        removedSections: [{ title: "Completed Cycles" }],
+      },
+    });
+    expect(fs.readFileSync(targetStatePath, "utf8")).toContain("Completed Cycles");
+
+    const applyOutput = captureOutput();
+    await main(
+      ["automation", "target-state", "compact", projectRoot, "--apply", "--json"],
+      {
+        stdout: applyOutput.writer,
+      },
+    );
+
+    expect(JSON.parse(applyOutput.output())).toMatchObject({
+      ok: true,
+      result: {
+        apply: true,
+        changed: true,
+      },
+    });
+    expect(fs.readFileSync(targetStatePath, "utf8")).not.toContain("Completed Cycles");
   });
 
   it("prepares a Codex heartbeat automation recipe", async () => {
