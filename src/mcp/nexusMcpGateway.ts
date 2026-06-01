@@ -9,11 +9,13 @@ import {
   type JsonRpcRequest,
 } from "./nexusMcpJsonRpcTransport.js";
 import {
-  listDevNexusMcpTools,
   devNexusMcpProtocolVersion,
   type DevNexusMcpToolResult,
-  type McpTool,
 } from "./nexusMcpServer.js";
+import {
+  listDevNexusMcpTools,
+  type McpTool,
+} from "./nexusMcpToolCatalog.js";
 import {
   defaultNexusMcpServerName,
   resolveNexusProjectAgentMcpTargets,
