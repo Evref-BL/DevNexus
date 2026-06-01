@@ -3,7 +3,7 @@ import {
   defaultNexusMcpServerName,
   resolveNexusProjectAgentMcpTargets,
 } from "../agents/nexusAgentMcpConfig.js";
-import { listDevNexusMcpTools } from "./nexusMcpServer.js";
+import { listDevNexusMcpTools } from "./nexusMcpToolCatalog.js";
 import {
   resolveNexusMcpExposure,
   type NexusMcpExposureSource,
