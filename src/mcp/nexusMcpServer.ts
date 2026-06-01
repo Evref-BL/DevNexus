@@ -4635,6 +4635,11 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
     omittedCurrentActorCount: omittedCount(status.currentActors),
     authority: summarizeAuthorityProject(status.authority),
     workItemClaimAuthority: status.workItemClaimAuthority,
+    workflowMode: {
+      active: status.workflowMode.active,
+      checklist: status.workflowMode.checklist,
+      availableModeCount: status.workflowMode.available.length,
+    },
     selectorQuery: status.selectorQuery,
     candidateCount: status.candidateCount,
     eligibleWorkMode: status.eligibleWorkMode,

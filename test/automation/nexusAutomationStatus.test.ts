@@ -370,6 +370,13 @@ describe("nexus automation status", () => {
         coordinatorProfileId: "codex-deep",
         maxConcurrentSubagents: 2,
       },
+      workflowMode: {
+        active: "heartbeat",
+        checklist: {
+          id: "heartbeat",
+          requiredArtifacts: expect.arrayContaining(["target-cycle facts"]),
+        },
+      },
       selectedWorkItem: null,
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);

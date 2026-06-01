@@ -92,6 +92,66 @@ These JSON commands are compact by default. Use `--full --json` only when you
 need raw workspace config, full ledgers, target-state markdown, or complete
 handoff details for diagnostics.
 
+## Workflow Modes
+
+Automation status exposes the active workflow mode checklist. The default
+automation mode is `heartbeat`: it keeps target-cycle facts, target-state,
+batch selection, work-item comments, and coordination reporting in scope.
+
+Quick manual fixes use `quick_fix`: keep identity, isolated source worktree,
+focused verification, publication handoff, and provider issue closure, but skip
+target-cycle records, target-state rewrites, workspace metadata PRs, lease-only
+metadata changes, and sync execution unless durable project state changed.
+Cleanup, investigation, and release modes have their own required and skipped
+artifacts in the checklist.
+
+Use target-state for active state only: current objective, current decisions,
+active blockers, next direction, boundaries, and exceptional recent changes.
+Completed cycle narration should be generated from target cycles, issues, pull
+requests, run records, and reports. Preview or apply compaction with:
+
+```bash
+dev-nexus automation target-state compact <workspace-root> --json
+dev-nexus automation target-state compact <workspace-root> --apply
+```
+
+## Conservative Live-Action Defaults
+
+The conservative provider policy is:
+
+- Use GitHub Issues as the first shared coordination provider.
+- Do not write GitHub Projects v2 in the first rollout.
+- Post only high-signal GitHub issue or pull-request comments automatically:
+  blockers, ready-for-review handoffs, PR links, merge/update handoffs, and
+  explicit human-requested coordination updates.
+- Keep GitLab, Jira, and review-thread posting draft-only until configured.
+- Keep provider credentials in host-local profiles or named host-local secret
+  providers; never store secrets in shared project state.
+- Do not mirror titles, bodies, assignees, milestones, or broad labels during
+  the first multi-tracker rollout. Start with comments and status labels on a
+  direct GitHub issue selection or a manual allowlist.
+
+The conservative runner policy is:
+
+- Use project-level logical host ids and host-local private connection config.
+- Use Tailscale only for private SSH or MCP transport, not as coordination
+  storage.
+- Start with push-based SSH over Tailscale and a read-only host/setup status
+  profile such as `dev-nexus host check`.
+- Do not run package installs, services, Docker, live Pharo images, cleanup,
+  source mutation, or publication through a remote runner until a matching
+  approved profile exists.
+
+The conservative authority policy is:
+
+- Projects define role grants explicitly; DevNexus may ship recommended role
+  names.
+- Bot self-approval is disabled by default.
+- Approval and merge/publish authority require separate actors unless the
+  project explicitly opts out.
+- Temporary elevation must be target-scoped, time-limited, reasoned, and
+  auditable.
+
 ## DevNexus Cockpit
 
 The cockpit commands expose a local cockpit for humans and for GUI hosts that

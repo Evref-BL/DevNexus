@@ -27,6 +27,10 @@ import {
   resolveNexusGitHubRepository,
   selectNexusGitHubPrimaryTracker,
 } from "../publication/nexusForgeRepositoryResolver.js";
+import {
+  getNexusWorkflowModeChecklist,
+  type NexusWorkflowModeChecklist,
+} from "../automation/nexusWorkflowModeChecklist.js";
 
 export interface NexusQuickFixPlanOptions {
   projectRoot: string;
@@ -72,6 +76,7 @@ export interface NexusQuickFixPlan {
     name: string;
     worktreeName: string;
   };
+  workflowMode: NexusWorkflowModeChecklist;
   publication: {
     strategy: NexusAutomationPublicationConfig["strategy"];
     remote: string | null;
@@ -249,6 +254,7 @@ export function buildNexusQuickFixPlan(
       name: branchName,
       worktreeName,
     },
+    workflowMode: getNexusWorkflowModeChecklist("quick_fix"),
     publication: {
       strategy: publication.strategy,
       remote: publication.remote ?? null,
