@@ -2734,6 +2734,7 @@ describe("dev-nexus cli", () => {
         '    "Usage:",',
         '    "  dev-nexus remote-execution request create <workspace-root> [options]",',
         '    "  dev-nexus remote-execution run <workspace-root> <request-id> [options]",',
+        '    `  dev-nexus ${commandPath} [options]`,',
         '  ].join("\\n");',
         "}",
       ].join("\n"),
