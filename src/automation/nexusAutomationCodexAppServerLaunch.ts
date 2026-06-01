@@ -20,6 +20,12 @@ import type {
   NexusAutomationCodexAppServerGoalMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import {
+  evaluateNexusCodexGoalsAutomationPolicy,
+  formatNexusCodexGoalsPolicyBlockers,
+  type NexusCodexGoalsAutomationMode,
+  type NexusCodexGoalsPolicyDecision,
+} from "./nexusCodexGoalsPolicy.js";
+import {
   readNexusAutomationAgentResultFile,
 } from "./nexusAutomationAgentLaunch.js";
 import {
@@ -40,6 +46,7 @@ export interface NexusAutomationCodexAppServerForkOptions {
 
 export interface NexusAutomationCodexAppServerGoalOptions {
   enabled?: boolean;
+  mode?: Exclude<NexusCodexGoalsAutomationMode, "disabled">;
   tokenBudget?: number | null;
 }
 
@@ -88,6 +95,12 @@ interface CodexLaunchPolicy {
   mcpDefaultToolsApprovalMode: string | null;
 }
 
+interface ResolvedCodexThreadGoalProjection {
+  enabled: boolean;
+  mode: NexusCodexGoalsAutomationMode;
+  tokenBudget?: number | null;
+}
+
 const defaultTurnCompletionNotificationTimeoutMs = 120_000;
 
 export class NexusAutomationCodexAppServerLaunchError extends Error {
@@ -117,6 +130,25 @@ export function createNexusAutomationCodexAppServerLauncher(
       cwd = resolveLaunchCwd(input, options.cwd);
       ephemeral = resolveThreadEphemeral(profile, options.threadPersistence);
       const policy = codexLaunchPolicy(input.projectConfig, profile);
+      const goalProjection = resolveCodexThreadGoalProjection(options.goal);
+      const goalPolicy = evaluateNexusCodexGoalsAutomationPolicy({
+        mode: goalProjection.mode,
+        approvalPolicy: policy.approvalPolicy,
+        sandbox: policy.sandbox,
+        permissionProfile: policy.permissionProfile,
+        allowHostMutation: profile.safety.allowHostMutation,
+        allowDependencyInstall: profile.safety.allowDependencyInstall,
+        allowLiveServices: profile.safety.allowLiveServices,
+        tokenBudget: goalProjection.tokenBudget ?? null,
+        devNexusRelaunchWhileEligible:
+          input.automationConfig.agent.relaunch.whileEligible,
+        mcpDefaultToolsApprovalMode: policy.mcpDefaultToolsApprovalMode,
+      });
+      if (goalPolicy.status === "blocked") {
+        throw new NexusAutomationCodexAppServerLaunchError(
+          `Codex Goals automation policy blocked ${goalPolicy.mode}: ${formatNexusCodexGoalsPolicyBlockers(goalPolicy)}`,
+        );
+      }
       const { adapter, closeClient } = await resolveCodexAppServerAdapter({
         input,
         profile,
@@ -162,7 +194,8 @@ export function createNexusAutomationCodexAppServerLauncher(
           adapter,
           input,
           threadId,
-          goalOptions: options.goal,
+          projection: goalProjection,
+          policy: goalPolicy,
         });
         const turnResult = await adapter.client.request(
           "turn/start",
@@ -575,17 +608,18 @@ async function maybeSetCodexThreadGoal(options: {
   adapter: CodexAppServerCapabilityAdapter;
   input: NexusAutomationAgentLaunchInput;
   threadId: string;
-  goalOptions: CreateNexusAutomationCodexAppServerLauncherOptions["goal"];
+  projection: ResolvedCodexThreadGoalProjection;
+  policy: NexusCodexGoalsPolicyDecision;
 }): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
-  const projection = resolveCodexThreadGoalProjection(options.goalOptions);
-  if (!projection.enabled) {
+  if (!options.projection.enabled) {
     return null;
   }
 
   const metadata = initialCodexThreadGoalMetadata({
     adapter: options.adapter,
     threadId: options.threadId,
-    tokenBudget: projection.tokenBudget,
+    tokenBudget: options.projection.tokenBudget,
+    policy: options.policy,
   });
   if (!options.adapter.capabilities.threadGoalSet.available) {
     return metadata;
@@ -597,7 +631,7 @@ async function maybeSetCodexThreadGoal(options: {
       codexThreadGoalSetParams({
         input: options.input,
         threadId: options.threadId,
-        tokenBudget: projection.tokenBudget,
+        tokenBudget: options.projection.tokenBudget,
       }),
     );
     return {
@@ -653,6 +687,7 @@ function initialCodexThreadGoalMetadata(options: {
   adapter: CodexAppServerCapabilityAdapter;
   threadId: string;
   tokenBudget?: number | null;
+  policy: NexusCodexGoalsPolicyDecision;
 }): NexusAutomationCodexAppServerGoalMetadata {
   const getMethodAvailable = options.adapter.capabilities.threadGoalGet.available;
   return {
@@ -670,6 +705,7 @@ function initialCodexThreadGoalMetadata(options: {
     tokensUsed: null,
     timeUsedSeconds: null,
     failureSummary: null,
+    policy: options.policy,
   };
 }
 
@@ -762,17 +798,18 @@ function codexThreadGoalWorkScope(
 
 function resolveCodexThreadGoalProjection(
   options: CreateNexusAutomationCodexAppServerLauncherOptions["goal"],
-): { enabled: boolean; tokenBudget?: number | null } {
+): ResolvedCodexThreadGoalProjection {
   if (options === false || options?.enabled === false) {
-    return { enabled: false };
+    return { enabled: false, mode: "disabled" };
   }
 
   const tokenBudget = normalizeCodexThreadGoalTokenBudget(
     options?.tokenBudget,
   );
+  const mode = options?.mode ?? "goal_projection";
   return tokenBudget === undefined
-    ? { enabled: true }
-    : { enabled: true, tokenBudget };
+    ? { enabled: true, mode }
+    : { enabled: true, mode, tokenBudget };
 }
 
 function normalizeCodexThreadGoalTokenBudget(

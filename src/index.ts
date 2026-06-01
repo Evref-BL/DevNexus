@@ -19,6 +19,7 @@ export * from "./authority/nexusAuthorityProviderSignals.js";
 export * from "./automation/nexusAutomationAgentLaunch.js";
 export * from "./automation/nexusAutomationAgentLaunchMetadata.js";
 export * from "./automation/nexusAutomationCodexAppServerLaunch.js";
+export * from "./automation/nexusCodexGoalsPolicy.js";
 export * from "./automation/nexusAutomationAgentProfile.js";
 export * from "./automation/nexusAutomationAgentSurface.js";
 export * from "./automation/nexusAutomationCommandExecutor.js";

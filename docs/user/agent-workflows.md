@@ -92,6 +92,54 @@ These JSON commands are compact by default. Use `--full --json` only when you
 need raw workspace config, full ledgers, target-state markdown, or complete
 handoff details for diagnostics.
 
+## Codex App-Server Goals
+
+DevNexus can use native Codex Goals when it launches Codex through an
+app-server profile. Goals add thread-level objective and lifecycle state; they
+do not grant authority by themselves.
+
+DevNexus policy separates two modes:
+
+- `goal_projection`: DevNexus sets `thread/goal/set` after thread creation so
+  Codex can see the target objective, result-file contract, evidence
+  expectation, and stop conditions. DevNexus still owns work-item selection,
+  worktree ownership, verification, authority, and publication gates.
+- `goal_continuation`: Codex Goal lifecycle drives later continuation. This
+  mode must be selected explicitly and cannot run at the same time as
+  `automation.agent.relaunch.whileEligible`; only one loop should drive the
+  same work.
+
+The policy result is `allowed`, `warning`, or `blocked`. Goal projection is
+allowed with warnings for AFK-sensitive choices such as `approval_policy=never`,
+missing token budgets, broad sandbox authority, dependency installs, or live
+service permissions. Goal-driven continuation is stricter: it is blocked when
+it has no token budget, when DevNexus relaunch would also continue the work, or
+when `approval_policy=never` is combined with broad authority, dependency
+installs, live services, or MCP tools that skip approval.
+
+The named human-in-the-loop states are:
+
+- `approval_required`
+- `budget_limited`
+- `paused`
+- `blocked`
+- `external_provider_review`
+- `publication_review`
+
+Use the app-server probe to inspect the policy for a configured profile:
+
+```bash
+dev-nexus automation app-server-probe <workspace-root> --profile <profile-id> --json
+```
+
+The probe reports `goalPolicy` next to capability support. The text output also
+prints Codex Goals policy warnings and blockers. Treat those warnings as setup
+review material before enabling Goals by default in dogfood profiles.
+
+Codex Goals never override DevNexus gates. A Goal marked complete is not enough
+to mark a DevNexus run complete without the result-file contract, evidence, and
+the configured work-item, verification, authority, and publication checks.
+
 ## Workflow Modes
 
 Automation status exposes the active workflow mode checklist. The default

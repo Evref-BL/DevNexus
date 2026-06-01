@@ -9158,6 +9158,18 @@ function printAutomationAppServerProbeResult(
       `    ${capability.capability}: ${capability.status}${capability.method ? ` (${capability.method})` : ""}`,
     );
   }
+  if (result.goalPolicy) {
+    writeLine(
+      stdout,
+      `  Codex Goals policy: ${result.goalPolicy.mode} ${result.goalPolicy.status}`,
+    );
+    for (const blocker of result.goalPolicy.blockers) {
+      writeLine(stdout, `    Blocked: ${blocker.code} - ${blocker.summary}`);
+    }
+    for (const warning of result.goalPolicy.warnings) {
+      writeLine(stdout, `    Warning: ${warning.code} - ${warning.summary}`);
+    }
+  }
   if (result.blockerSummary) {
     writeLine(
       stdout,

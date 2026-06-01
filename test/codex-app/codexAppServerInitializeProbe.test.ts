@@ -189,6 +189,15 @@ describe("Codex app-server initialize probe", () => {
         }),
       ]),
     );
+    expect(report.goalPolicy).toMatchObject({
+      mode: "goal_projection",
+      status: "warning",
+      blockers: [],
+      warnings: [
+        expect.objectContaining({ code: "approval_policy_unspecified" }),
+        expect.objectContaining({ code: "token_budget_omitted" }),
+      ],
+    });
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
     ]);

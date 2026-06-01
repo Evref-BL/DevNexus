@@ -18,6 +18,7 @@ import type {
   NexusAutomationCodexAppServerGoalOperationStatus,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
+import { normalizeNexusCodexGoalsPolicyDecision } from "./nexusCodexGoalsPolicy.js";
 
 export type NexusAutomationRunStatus =
   | "started"
@@ -675,6 +676,7 @@ function normalizeCodexAppServerGoalMetadata(
     tokensUsed: optionalNullableNumber(record.tokensUsed),
     timeUsedSeconds: optionalNullableNumber(record.timeUsedSeconds),
     failureSummary: optionalNullableString(record.failureSummary) ?? null,
+    policy: normalizeNexusCodexGoalsPolicyDecision(record.policy),
   };
 }
 
