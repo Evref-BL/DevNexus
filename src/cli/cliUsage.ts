@@ -335,6 +335,7 @@ export function usage(): string {
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
     "  --json",
+    "  Preflight checks workspace metadata freshness against its upstream and blocks stale policy/identity context.",
     "  Prepared worker context includes the configured Git identity.",
     "  If automation.publication.gitIdentity.coAuthors[] is configured,",
     "  the briefing lists every exact Co-authored-by trailer to include.",

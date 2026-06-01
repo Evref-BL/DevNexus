@@ -84,6 +84,81 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
   };
 }
 
+function workspaceFreshnessGitRunner(options: {
+  projectRoot: string;
+  ahead: number;
+  behind: number;
+  metadataStatus?: string;
+  fetchExitCode?: number;
+  calls: Array<{ args: string[]; cwd?: string }>;
+}): GitRunner {
+  const baseGitRunner = fakeGitRunner(options.calls);
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    const joined = argsArray.join(" ");
+
+    if (cwd === options.projectRoot) {
+      if (joined === "rev-parse --show-toplevel") {
+        options.calls.push({ args: argsArray, cwd });
+        return {
+          args: argsArray,
+          stdout: `${options.projectRoot}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "symbolic-ref --short HEAD") {
+        options.calls.push({ args: argsArray, cwd });
+        return { args: argsArray, stdout: "main\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}") {
+        options.calls.push({ args: argsArray, cwd });
+        return {
+          args: argsArray,
+          stdout: "origin/main\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "fetch --prune origin refs/heads/main:refs/remotes/origin/main") {
+        options.calls.push({ args: argsArray, cwd });
+        return {
+          args: argsArray,
+          stdout: "",
+          stderr:
+            options.fetchExitCode && options.fetchExitCode !== 0
+              ? "fatal: fetch failed"
+              : "",
+          exitCode: options.fetchExitCode ?? 0,
+        };
+      }
+      if (joined === "rev-list --left-right --count HEAD...@{upstream}") {
+        options.calls.push({ args: argsArray, cwd });
+        return {
+          args: argsArray,
+          stdout: `${options.ahead}\t${options.behind}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        joined ===
+        "status --porcelain=v1 -- dev-nexus.project.json .dev-nexus .agents AGENTS.md CONTEXT.md PLAN.md"
+      ) {
+        options.calls.push({ args: argsArray, cwd });
+        return {
+          args: argsArray,
+          stdout: options.metadataStatus ?? "",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+    }
+
+    return baseGitRunner(args, cwd);
+  };
+}
+
 function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjectConfig {
   return {
     version: 1,
@@ -180,6 +255,102 @@ afterEach(() => {
 });
 
 describe("nexus manual worktree worker target preparation", () => {
+  it("blocks worktree preparation when workspace metadata is behind upstream", () => {
+    const { projectRoot, calls } = prepareProject();
+    const gitRunner = workspaceFreshnessGitRunner({
+      projectRoot,
+      ahead: 0,
+      behind: 1,
+      calls,
+    });
+
+    expect(() =>
+      prepareNexusManualWorktree({
+        projectRoot,
+        componentId: "primary",
+        topic: "stale metadata",
+        branchName: "codex/primary/stale-metadata",
+        worktreeName: "stale-metadata",
+        gitRunner,
+      }),
+    ).toThrow(/Workspace metadata checkout is behind origin\/main/u);
+    expect(calls.some((call) => call.args[0] === "worktree")).toBe(false);
+  });
+
+  it("reports dirty workspace metadata paths when blocking stale preparation", () => {
+    const { projectRoot, calls } = prepareProject();
+    const gitRunner = workspaceFreshnessGitRunner({
+      projectRoot,
+      ahead: 0,
+      behind: 2,
+      metadataStatus:
+        " M dev-nexus.project.json\n?? .dev-nexus/automation/target-state.md\n",
+      calls,
+    });
+
+    try {
+      prepareNexusManualWorktree({
+        projectRoot,
+        componentId: "primary",
+        topic: "dirty stale metadata",
+        branchName: "codex/primary/dirty-stale-metadata",
+        worktreeName: "dirty-stale-metadata",
+        gitRunner,
+      });
+      throw new Error("expected stale workspace metadata to block");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain(
+        "Workspace metadata checkout is behind origin/main",
+      );
+      expect((error as { payload?: unknown }).payload).toMatchObject({
+        ok: false,
+        error: {
+          code: "stale_workspace_metadata",
+        },
+        workspaceMetadataFreshness: {
+          status: "behind",
+          ahead: 0,
+          behind: 2,
+          changedMetadataPaths: [
+            "dev-nexus.project.json",
+            ".dev-nexus/automation/target-state.md",
+          ],
+        },
+      });
+    }
+    expect(calls.some((call) => call.args[0] === "worktree")).toBe(false);
+  });
+
+  it("records current workspace metadata freshness on prepared worktrees", () => {
+    const { projectRoot, calls } = prepareProject();
+    const gitRunner = workspaceFreshnessGitRunner({
+      projectRoot,
+      ahead: 0,
+      behind: 0,
+      calls,
+    });
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "current metadata",
+      branchName: "codex/primary/current-metadata",
+      worktreeName: "current-metadata",
+      gitRunner,
+    });
+
+    expect(result.workspaceMetadataFreshness).toMatchObject({
+      status: "current",
+      branch: "main",
+      upstream: "origin/main",
+      ahead: 0,
+      behind: 0,
+      changedMetadataPaths: [],
+    });
+    expect(fs.existsSync(result.worktree.worktreePath)).toBe(true);
+  });
+
   it("defaults a single active provider into worker context and skill projections", () => {
     const { projectRoot, calls } = prepareProject({
       agentTargets: {

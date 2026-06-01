@@ -410,6 +410,44 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
   };
 }
 
+function staleWorkspaceMetadataGitRunner(options: {
+  projectRoot: string;
+  calls: Array<{ args: string[]; cwd?: string }>;
+}): GitRunner {
+  const baseGitRunner = fakeGitRunner(options.calls);
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    const joined = argsArray.join(" ");
+
+    if (cwd === options.projectRoot) {
+      options.calls.push({ args: argsArray, cwd });
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${options.projectRoot}\n`);
+      }
+      if (
+        joined ===
+        "status --porcelain=v1 -- dev-nexus.project.json .dev-nexus .agents AGENTS.md CONTEXT.md PLAN.md"
+      ) {
+        return ok(argsArray, " M dev-nexus.project.json\n");
+      }
+      if (joined === "symbolic-ref --short HEAD") {
+        return ok(argsArray, "main\n");
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}") {
+        return ok(argsArray, "origin/main\n");
+      }
+      if (joined === "fetch --prune origin refs/heads/main:refs/remotes/origin/main") {
+        return ok(argsArray, "");
+      }
+      if (joined === "rev-list --left-right --count HEAD...@{upstream}") {
+        return ok(argsArray, "0\t1\n");
+      }
+    }
+
+    return baseGitRunner(args, cwd);
+  };
+}
+
 function cleanDashboardGitRunner(): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
     const argsArray = [...args];
@@ -1023,6 +1061,7 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("Usage:");
     expect(output.output()).toContain("dev-nexus worktree prepare <workspace-root> [options]");
+    expect(output.output()).toContain("workspace metadata freshness");
     expect(output.output()).toContain("configured Git identity");
     expect(output.output()).toContain("gitIdentity.coAuthors[]");
     expect(output.output()).toContain("Co-authored-by");
@@ -3202,6 +3241,40 @@ describe("dev-nexus cli", () => {
 
     const payload = JSON.parse(output.output());
     expect(payload.worktree.branchName).toBe("codex/primary/guard-bootstrap");
+  });
+
+  it("prints structured JSON when stale workspace metadata blocks worktree preparation", async () => {
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await expect(
+      main(["worktree", "prepare", projectRoot, "--topic", "stale metadata", "--json"], {
+        stdout: output.writer,
+        gitRunner: staleWorkspaceMetadataGitRunner({ projectRoot, calls }),
+        sharedCheckoutGuard: "enforce",
+      }),
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        code: "stale_workspace_metadata",
+      },
+      workspaceMetadataFreshness: {
+        status: "behind",
+        branch: "main",
+        upstream: "origin/main",
+        ahead: 0,
+        behind: 1,
+        changedMetadataPaths: ["dev-nexus.project.json"],
+      },
+    });
+    expect(
+      calls.some((call) => call.args[0] === "worktree" && call.args[1] === "add"),
+    ).toBe(false);
   });
 
   it("blocks worktree preparation when an agent-launch authority claim is stale", async () => {

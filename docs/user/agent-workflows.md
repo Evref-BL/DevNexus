@@ -266,6 +266,13 @@ Prepare a component-scoped worktree when implementation should be isolated:
 dev-nexus worktree prepare <workspace-root> --component core --work-item local-1
 ```
 
+Before it creates the worktree or worker briefing, `worktree prepare` checks the
+workspace metadata checkout against its upstream. If that checkout is behind or
+diverged, the command stops with branch, upstream, ahead/behind counts, changed
+metadata paths when available, and a fast-forward next action. This keeps stale
+policy, Git identity, routing, setup, and authority context out of new worker
+branches.
+
 For a single provider-native issue, keep the default workflow provider-neutral:
 select the canonical work item, prepare an isolated worktree, run the component
 verification, then record the provider request and check facts through the

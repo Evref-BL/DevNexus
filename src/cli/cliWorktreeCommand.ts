@@ -249,6 +249,13 @@ function printWorktreePrepareResult(
   writeLine(stdout, `  Worktree: ${result.worktree.worktreePath}`);
   writeLine(stdout, `  Branch: ${result.worktree.branchName}`);
   writeLine(stdout, `  Lease: ${result.lease.id}`);
+  writeLine(
+    stdout,
+    `  Workspace metadata: ${result.workspaceMetadataFreshness.status}`,
+  );
+  for (const warning of result.workspaceMetadataFreshness.warnings) {
+    writeLine(stdout, `  Workspace metadata warning: ${warning}`);
+  }
   if (result.worktree.baseRef) {
     writeLine(
       stdout,
