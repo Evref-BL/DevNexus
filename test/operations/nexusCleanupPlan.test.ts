@@ -317,6 +317,99 @@ describe("nexus cleanup plan", () => {
     });
   });
 
+  it("includes safe project-meta worktrees by default for workspace-wide cleanup", () => {
+    const fixture = initCleanupFixture();
+    const metaWorktree = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "cleanup-demo",
+      "metadata-merged",
+    );
+    const metaBranch = "codex/cleanup-demo/metadata-merged";
+    fs.mkdirSync(metaWorktree, { recursive: true });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      gitRunner: cleanupGitRunner(fixture, {
+        projectMetaWorktrees: [
+          { path: metaWorktree, branch: metaBranch, head: "metaMerged123" },
+        ],
+        projectBranches: [metaBranch],
+        mergedRefs: [metaBranch],
+        upstreams: {
+          [metaBranch]: `origin/${metaBranch}`,
+        },
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(plan.scope.includeProjectMeta).toBe(true);
+    expect(plan.targets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scope: "component", componentId: "primary" }),
+      expect.objectContaining({ scope: "project_meta", componentId: null }),
+    ]));
+    expect(plan.candidates.find((candidate) =>
+      candidate.scope === "project_meta" &&
+      candidate.kind === "worktree" &&
+      candidate.branch === metaBranch,
+    )).toMatchObject({
+      id: "project_meta:project:worktree:metadata-merged",
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["merged", "safe"]),
+      git: {
+        repositoryPath: metaWorktree,
+        targetBranch: "main",
+      },
+    });
+
+    const componentScopedPlan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      gitRunner: cleanupGitRunner(fixture, {
+        projectMetaWorktrees: [
+          { path: metaWorktree, branch: metaBranch, head: "metaMerged123" },
+        ],
+        projectBranches: [metaBranch],
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(componentScopedPlan.scope.includeProjectMeta).toBe(false);
+    expect(componentScopedPlan.candidates.some((candidate) =>
+      candidate.scope === "project_meta",
+    )).toBe(false);
+  });
+
+  it("does not treat workspace grouping directories as project-meta worktree candidates", () => {
+    const fixture = initCleanupFixture();
+    const projectMetaGroup = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "cleanup-demo",
+    );
+    const unrelatedGroup = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "dev-nexus",
+    );
+    fs.mkdirSync(projectMetaGroup, { recursive: true });
+    fs.mkdirSync(unrelatedGroup, { recursive: true });
+
+    const plan = buildNexusCleanupPlan({
+      projectRoot: fixture.projectRoot,
+      includeProjectMeta: true,
+      gitRunner: cleanupGitRunner(fixture),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    const metaWorktreePaths = plan.candidates
+      .filter((candidate) => candidate.scope === "project_meta")
+      .map((candidate) => candidate.worktreePath);
+    expect(metaWorktreePaths).not.toContain(fixture.worktreesRoot);
+    expect(metaWorktreePaths).not.toContain(projectMetaGroup);
+    expect(metaWorktreePaths).not.toContain(unrelatedGroup);
+  });
+
   it("blocks unpushed commits, missing upstreams, and unknown target branches", () => {
     const fixture = initCleanupFixture();
     const plan = buildNexusCleanupPlan({
@@ -784,10 +877,12 @@ function createWorkflowRun(
 }
 
 function cleanupGitRunner(
-  fixture: { sourceRoot: string },
+  fixture: { projectRoot?: string; sourceRoot: string },
   options: {
     branches?: string[];
+    projectBranches?: string[];
     worktrees?: Array<{ path: string; branch: string | null; head: string }>;
+    projectMetaWorktrees?: Array<{ path: string; branch: string | null; head: string }>;
     statuses?: Record<string, string>;
     targetExists?: boolean;
     mergedRefs?: string[];
@@ -803,19 +898,32 @@ function cleanupGitRunner(
     for (const branch of options.branches ?? []) {
       branchHeads.set(branch, `${safeHead(branch)}123`);
     }
+    for (const branch of options.projectBranches ?? []) {
+      branchHeads.set(branch, `${safeHead(branch)}123`);
+    }
     for (const worktree of options.worktrees ?? []) {
+      if (worktree.branch) {
+        branchHeads.set(worktree.branch, worktree.head);
+      }
+    }
+    for (const worktree of options.projectMetaWorktrees ?? []) {
       if (worktree.branch) {
         branchHeads.set(worktree.branch, worktree.head);
       }
     }
 
     if (joined === "worktree list --porcelain") {
+      const useProjectRepo = isProjectRepositoryCwd(fixture, cwd);
+      const root = useProjectRepo ? fixture.projectRoot! : fixture.sourceRoot;
+      const worktrees = useProjectRepo
+        ? options.projectMetaWorktrees ?? []
+        : options.worktrees ?? [];
       return gitResult(argsArray, [
-        `worktree ${fixture.sourceRoot}`,
+        `worktree ${root}`,
         "HEAD target123",
         "branch refs/heads/main",
         "",
-        ...(options.worktrees ?? []).flatMap((worktree) => [
+        ...worktrees.flatMap((worktree) => [
           `worktree ${worktree.path}`,
           `HEAD ${worktree.head}`,
           ...(worktree.branch ? [`branch refs/heads/${worktree.branch}`] : []),
@@ -824,18 +932,44 @@ function cleanupGitRunner(
       ].join("\n"));
     }
     if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
-      return gitResult(argsArray, (options.branches ?? []).join("\n"));
+      return gitResult(
+        argsArray,
+        (isProjectRepositoryCwd(fixture, cwd)
+          ? options.projectBranches ?? []
+          : options.branches ?? []
+        ).join("\n"),
+      );
     }
     if (joined === "rev-parse --verify main" || joined === "rev-parse --verify missing-main") {
       return options.targetExists === false
         ? gitResult(argsArray, "", 1)
         : gitResult(argsArray, "target123\n");
     }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--show-toplevel") {
+      const allWorktrees = [
+        ...(options.worktrees ?? []),
+        ...(options.projectMetaWorktrees ?? []),
+      ];
+      const worktree = allWorktrees.find((entry) => samePath(entry.path, cwd ?? ""));
+      if (worktree) {
+        return gitResult(argsArray, `${worktree.path}\n`);
+      }
+      if (samePath(fixture.sourceRoot, cwd ?? "")) {
+        return gitResult(argsArray, `${fixture.sourceRoot}\n`);
+      }
+      if (fixture.projectRoot && pathContainsOrSame(fixture.projectRoot, cwd ?? "")) {
+        return gitResult(argsArray, `${fixture.projectRoot}\n`);
+      }
+      return gitResult(argsArray, "", 1);
+    }
     if (argsArray[0] === "rev-parse" && argsArray[1] === "--is-inside-work-tree") {
       return gitResult(argsArray, "true\n");
     }
     if (argsArray[0] === "symbolic-ref" && argsArray[1] === "--short") {
-      const worktree = (options.worktrees ?? []).find((entry) => entry.path === cwd);
+      const worktree = [
+        ...(options.worktrees ?? []),
+        ...(options.projectMetaWorktrees ?? []),
+      ].find((entry) => samePath(entry.path, cwd ?? ""));
       return worktree?.branch
         ? gitResult(argsArray, `${worktree.branch}\n`)
         : gitResult(argsArray, "", 1);
@@ -872,6 +1006,31 @@ function cleanupGitRunner(
 
     return gitResult(argsArray, "", 0);
   };
+}
+
+function isProjectRepositoryCwd(
+  fixture: { projectRoot?: string; sourceRoot: string },
+  cwd: string | undefined,
+): boolean {
+  return Boolean(fixture.projectRoot && samePath(fixture.projectRoot, cwd ?? ""));
+}
+
+function samePath(left: string, right: string): boolean {
+  return canonicalPath(left) === canonicalPath(right);
+}
+
+function pathContainsOrSame(root: string, target: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative === "" || (
+    relative.length > 0 &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function canonicalPath(value: string): string {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 function safeHead(branch: string): string {

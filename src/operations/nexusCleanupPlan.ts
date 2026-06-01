@@ -196,11 +196,12 @@ export function buildNexusCleanupPlan(
   const now = currentTimestamp(options.now);
   const staleAfterMs =
     options.staleAfterMs ?? defaultNexusWorktreeLeaseStaleAfterMs;
+  const includeProjectMeta = defaultIncludeProjectMeta(options);
   const scopes = cleanupScopes({
     projectRoot,
     projectConfig,
     componentId: options.componentId,
-    includeProjectMeta: options.includeProjectMeta,
+    includeProjectMeta,
     targetBranch: options.targetBranch,
   });
   const leaseStore = readNexusWorktreeLeaseStore(projectRoot);
@@ -259,7 +260,7 @@ export function buildNexusCleanupPlan(
     },
     scope: {
       componentId: options.componentId ?? null,
-      includeProjectMeta: options.includeProjectMeta ?? false,
+      includeProjectMeta,
     },
     targets,
     candidates: uniqueCandidates,
@@ -284,7 +285,7 @@ function cleanupScopes(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   componentId?: string | null;
-  includeProjectMeta?: boolean;
+  includeProjectMeta: boolean;
   targetBranch?: string | null;
 }): CleanupScope[] {
   const components = resolveProjectComponents(options.projectRoot, options.projectConfig);
@@ -323,6 +324,14 @@ function cleanupScopes(options: {
   }
 
   return scopes;
+}
+
+function defaultIncludeProjectMeta(options: BuildNexusCleanupPlanOptions): boolean {
+  return options.includeProjectMeta ?? !hasComponentFilter(options.componentId);
+}
+
+function hasComponentFilter(componentId: string | null | undefined): boolean {
+  return typeof componentId === "string" && componentId.trim().length > 0;
 }
 
 function targetFacts(
@@ -1090,11 +1099,12 @@ function cleanupBranches(scope: CleanupScope, gitRunner: GitRunner): string[] {
 }
 
 function isGitWorktree(worktreePath: string, gitRunner: GitRunner): boolean {
-  return gitExitCode(
+  const topLevel = gitOutput(
     gitRunner,
-    ["rev-parse", "--is-inside-work-tree"],
+    ["rev-parse", "--show-toplevel"],
     worktreePath,
-  ) === 0;
+  );
+  return Boolean(topLevel && canonicalPath(topLevel) === canonicalPath(worktreePath));
 }
 
 function currentBranch(worktreePath: string, gitRunner: GitRunner): string | null {
