@@ -577,6 +577,23 @@ function fakeCoordinationIntegrationGitRunner(
   };
 }
 
+function fakeCoordinationIntegrationGitRunnerForRepositories(
+  repositoriesByPath: Record<string, string>,
+): GitRunner {
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    const repositoryPath =
+      repositoriesByPath[path.resolve(cwd ?? "")] ?? Object.values(repositoriesByPath)[0]!;
+    if (argsArray.join(" ") === "rev-parse --show-toplevel") {
+      return repositoriesByPath[path.resolve(cwd ?? "")]
+        ? ok(argsArray, `${repositoryPath}\n`)
+        : { args: argsArray, stdout: "", stderr: "not a git repo", exitCode: 1 };
+    }
+
+    return fakeCoordinationIntegrationGitRunner(repositoryPath)(args, cwd);
+  };
+}
+
 function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
   return {
     args,
@@ -1006,6 +1023,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain(
       "Provider comment handoffs can be recorded from component worktrees",
     );
+    expect(output.output()).toContain("--coordination-worktree <path>");
     expect(output.output()).toContain("workspace/meta worktree");
   });
 
@@ -5810,6 +5828,74 @@ describe("dev-nexus cli", () => {
         recoveryAction: {
           kind: "prepare_workspace_meta_worktree",
         },
+      },
+    });
+  });
+
+  it("records local coordination handoffs from a meta worktree with source Git facts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-119");
+    const metaWorktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "demo-project",
+      "handoff-meta",
+    );
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    fs.mkdirSync(metaWorktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate guarded handoff",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner = fakeCoordinationIntegrationGitRunnerForRepositories({
+      [sourceRoot]: sourceRoot,
+      [worktreePath]: worktreePath,
+      [metaWorktreePath]: metaWorktreePath,
+    });
+
+    await expect(
+      main(
+        [
+          "coordination",
+          "handoff",
+          projectRoot,
+          "local-1",
+          "--status",
+          "ready",
+          "--changed-area",
+          "src/cli.ts",
+          "--worktree",
+          worktreePath,
+          "--coordination-worktree",
+          metaWorktreePath,
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          gitRunner,
+          sharedCheckoutGuard: "enforce",
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      record: {
+        repositoryPath: worktreePath,
+        branch: "codex/shared-coordination",
+        status: "ready",
+      },
+      comment: {
+        id: "local-comment-1",
       },
     });
   });

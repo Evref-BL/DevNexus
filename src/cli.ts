@@ -877,6 +877,7 @@ interface ParsedCoordinationHandoffCommand {
   qualityDeltaSourcePath?: string | null;
   note?: string | null;
   currentPath?: string;
+  repositoryPath?: string;
   json?: boolean;
 }
 
@@ -1793,9 +1794,10 @@ async function handleCoordinationCommand(
         trackerId: parsed.trackerId,
         trackerRole: parsed.trackerRole,
         currentPath: parsed.currentPath,
+        repositoryPath: parsed.repositoryPath,
         gitRunner: dependencies.gitRunner,
       }),
-      targetPath: parsed.currentPath,
+      targetPath: parsed.currentPath ?? parsed.repositoryPath,
       componentId: parsed.componentId,
     });
     const result = await createNexusCoordinationHandoff({
@@ -1815,6 +1817,7 @@ async function handleCoordinationCommand(
       qualityDeltaSourcePath: parsed.qualityDeltaSourcePath,
       note: parsed.note,
       currentPath: parsed.currentPath,
+      repositoryPath: parsed.repositoryPath,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -4311,6 +4314,9 @@ function parseCoordinationHandoffCommand(
         parsed.note = next();
         break;
       case "--worktree":
+        parsed.repositoryPath = next();
+        break;
+      case "--coordination-worktree":
         parsed.currentPath = next();
         break;
       case "--json":
