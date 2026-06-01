@@ -2,11 +2,18 @@ import {
   defaultNexusAutomationConfig,
   type NexusGitWorkflowGate,
   type NexusGitWorkflowProfileConfig,
+  type NexusGitWorkflowUpdateAction,
 } from "../automation/nexusAutomationConfig.js";
+import { shellQuoteArgument } from "../automation/nexusAutomationAgentProfile.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "../project/nexusProjectConfig.js";
+import {
+  defaultGitRunner,
+  type GitCommandResult,
+  type GitRunner,
+} from "../worktrees/gitWorktreeService.js";
 import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
@@ -23,6 +30,7 @@ import {
   summarizeNexusGitWorkflowRun,
   updateNexusGitWorkflowRun,
   type NexusGitWorkflowRunEvidenceInput,
+  type NexusGitWorkflowRunNodeInput,
   type NexusGitWorkflowRunOwner,
   type NexusGitWorkflowRunRecord,
   type NexusGitWorkflowRunStatus,
@@ -79,6 +87,9 @@ export interface AdvanceNexusGitWorkflowRunOptions {
   provider?: NexusGitWorkflowAdvanceProviderEvidence | null;
   git?: NexusGitWorkflowBranchFreshnessGitEvidence | null;
   authority?: NexusGitWorkflowAdvanceAuthority | null;
+  executeBranchUpdate?: boolean | null;
+  dryRun?: boolean | null;
+  gitRunner?: GitRunner;
   now?: Date | string | (() => Date | string);
 }
 
@@ -93,8 +104,47 @@ export interface NexusGitWorkflowAdvanceDecision {
   providerActions: string[];
 }
 
+export type NexusGitWorkflowBranchUpdateExecutionStatus =
+  | "planned"
+  | "executed"
+  | "blocked"
+  | "failed"
+  | "not_applicable";
+
+export type NexusGitWorkflowBranchUpdateVerificationRequirement =
+  | "required_checks"
+  | null;
+
+export interface NexusGitWorkflowBranchUpdateForceWithLeaseEvidence {
+  required: boolean;
+  approved: boolean;
+  expectedCommit: string | null;
+}
+
+export interface NexusGitWorkflowBranchUpdateExecutionResult {
+  requested: boolean;
+  dryRun: boolean;
+  status: NexusGitWorkflowBranchUpdateExecutionStatus;
+  action: NexusGitWorkflowUpdateAction;
+  branch: string | null;
+  baseRef: string;
+  pushRemote: string;
+  beforeCommit: string | null;
+  baseCommit: string | null;
+  afterCommit: string | null;
+  expectedRemoteCommit: string | null;
+  forceWithLease: NexusGitWorkflowBranchUpdateForceWithLeaseEvidence;
+  verificationRequired: NexusGitWorkflowBranchUpdateVerificationRequirement;
+  commands: string[];
+  blockers: string[];
+  summary: string;
+  git: {
+    commands: GitCommandResult[];
+  };
+}
+
 export interface NexusGitWorkflowAdvanceResult {
-  mutates: true;
+  mutates: boolean;
   project: {
     id: string;
     name: string;
@@ -112,6 +162,7 @@ export interface NexusGitWorkflowAdvanceResult {
   runBefore: NexusGitWorkflowRunSummary;
   runAfter: NexusGitWorkflowRunSummary;
   branchFreshness: NexusGitWorkflowBranchFreshnessDecision | null;
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null;
   decision: NexusGitWorkflowAdvanceDecision;
 }
 
@@ -140,31 +191,43 @@ export function advanceNexusGitWorkflowRun(
     authority,
     branchFreshness,
   });
-  const updated = updateNexusGitWorkflowRun({
-    projectRoot: context.repositoryPath,
-    id: context.run.id,
-    status: decision.status,
-    terminalOutcome: decision.status === "completed" ? "completed" : null,
-    owner: decision.nextOwner,
-    evidence,
-    allowedTransitions: allowedTransitionsForDecision(decision),
-    nodes: [
-      {
-        id: decision.action,
-        kind: decision.action === "complete"
-          ? "terminal"
-          : decision.action === "block"
-            ? "gate"
-            : "handoff",
-        summary: decisionSummary(decision),
-        recordedAt: timestamp,
-      },
-    ],
-    now: timestamp,
-  });
+  const branchUpdate = options.executeBranchUpdate
+    ? executeBranchUpdate({
+        branchFreshness,
+        authority,
+        repositoryPath: context.repositoryPath,
+        dryRun: options.dryRun === true,
+        gitRunner: options.gitRunner ?? defaultGitRunner,
+      })
+    : null;
+  const effectiveDecision = applyBranchUpdateResult(decision, branchUpdate);
+  const mutates = options.dryRun !== true;
+  const updated = mutates
+    ? updateNexusGitWorkflowRun({
+        projectRoot: context.repositoryPath,
+        id: context.run.id,
+        status: effectiveDecision.status,
+        terminalOutcome: effectiveDecision.status === "completed" ? "completed" : null,
+        owner: effectiveDecision.nextOwner,
+        evidence: [
+          ...evidence,
+          ...providerActionEvidence(effectiveDecision.providerActions, timestamp),
+          ...branchUpdateEvidence(branchUpdate, timestamp),
+          ...verificationRequiredEvidence(branchUpdate, timestamp),
+        ],
+        allowedTransitions: allowedTransitionsForDecision(
+          effectiveDecision,
+          branchUpdate,
+        ),
+        nodes: [
+          nodeForDecision(effectiveDecision, branchUpdate, timestamp),
+        ],
+        now: timestamp,
+      })
+    : context.run;
 
   return {
-    mutates: true,
+    mutates,
     project: {
       id: context.projectConfig.id,
       name: context.projectConfig.name,
@@ -182,7 +245,8 @@ export function advanceNexusGitWorkflowRun(
     runBefore,
     runAfter: summarizeNexusGitWorkflowRun(updated),
     branchFreshness,
-    decision,
+    branchUpdate,
+    decision: effectiveDecision,
   };
 }
 
@@ -416,6 +480,20 @@ function branchUpdateDecision(options: {
   freshness: NexusGitWorkflowBranchFreshnessDecision;
   authority: NexusGitWorkflowAdvanceAuthority;
 }): NexusGitWorkflowAdvanceDecision {
+  if (options.freshness.action === "wait") {
+    return {
+      action: "handoff",
+      status: "waiting",
+      nextOwner: { kind: "agent", id: null },
+      reasons: [...options.reasons, ...options.freshness.reasons],
+      blockers: [],
+      humanGates: [],
+      commands: [],
+      providerActions: options.freshness.providerAction
+        ? [options.freshness.providerAction]
+        : [],
+    };
+  }
   const blockers: string[] = [];
   const humanGates: NexusGitWorkflowAdvanceHumanGate[] = [];
   if (!options.authority.gitMutation) {
@@ -449,6 +527,364 @@ function branchUpdateDecision(options: {
     providerActions: options.freshness.providerAction
       ? [options.freshness.providerAction]
       : [],
+  };
+}
+
+function executeBranchUpdate(options: {
+  branchFreshness: NexusGitWorkflowBranchFreshnessDecision;
+  authority: NexusGitWorkflowAdvanceAuthority;
+  repositoryPath: string;
+  dryRun: boolean;
+  gitRunner: GitRunner;
+}): NexusGitWorkflowBranchUpdateExecutionResult {
+  const freshness = options.branchFreshness;
+  const action = freshness.action;
+  const gitCommands: GitCommandResult[] = [];
+  const blocked = (summary: string): NexusGitWorkflowBranchUpdateExecutionResult => ({
+    requested: true,
+    dryRun: options.dryRun,
+    status: "blocked",
+    action,
+    branch: freshness.headBranch,
+    baseRef: freshness.baseBranch,
+    pushRemote: freshness.pushRemote,
+    beforeCommit: null,
+    baseCommit: null,
+    afterCommit: null,
+    expectedRemoteCommit: null,
+    forceWithLease: {
+      required: freshness.forceWithLeaseRequired,
+      approved: options.authority.forceWithLease === true,
+      expectedCommit: null,
+    },
+    verificationRequired: null,
+    commands: [],
+    blockers: [summary],
+    summary,
+    git: {
+      commands: gitCommands,
+    },
+  });
+
+  if (action === "none" || action === "wait") {
+    return {
+      requested: true,
+      dryRun: options.dryRun,
+      status: "not_applicable",
+      action,
+      branch: freshness.headBranch,
+      baseRef: freshness.baseBranch,
+      pushRemote: freshness.pushRemote,
+      beforeCommit: null,
+      baseCommit: null,
+      afterCommit: null,
+      expectedRemoteCommit: null,
+      forceWithLease: {
+        required: false,
+        approved: options.authority.forceWithLease === true,
+        expectedCommit: null,
+      },
+      verificationRequired: null,
+      commands: [],
+      blockers: [],
+      summary: `Branch update action ${action} does not require Git execution.`,
+      git: {
+        commands: gitCommands,
+      },
+    };
+  }
+  if (action === "block") {
+    return blocked("Branch freshness decision blocked branch update execution.");
+  }
+  if (!freshness.headBranch) {
+    return blocked("Branch update execution requires a head branch.");
+  }
+  if (!options.authority.gitMutation) {
+    return blocked(`Branch update requires Git mutation authority: ${action}.`);
+  }
+  if (freshness.forceWithLeaseRequired && !options.authority.forceWithLease) {
+    return blocked(
+      `Branch update requires force-with-lease approval before ${action}.`,
+    );
+  }
+  if (!isExecutableBranchUpdateAction(action)) {
+    return blocked(
+      `Branch update action ${action} requires manual orchestration before DevNexus can execute it.`,
+    );
+  }
+
+  const beforeCommit = readCommit({
+    gitRunner: options.gitRunner,
+    commands: gitCommands,
+    repositoryPath: options.repositoryPath,
+    ref: freshness.headBranch,
+  });
+  const baseCommit = readCommit({
+    gitRunner: options.gitRunner,
+    commands: gitCommands,
+    repositoryPath: options.repositoryPath,
+    ref: freshness.baseBranch,
+  });
+  const forceWithLease = {
+    required: freshness.forceWithLeaseRequired,
+    approved: options.authority.forceWithLease === true,
+    expectedCommit: freshness.forceWithLeaseRequired ? beforeCommit : null,
+  };
+  const commandArgs = branchUpdateCommandArgs({
+    action,
+    branch: freshness.headBranch,
+    baseRef: freshness.baseBranch,
+    pushRemote: freshness.pushRemote,
+    expectedCommit: forceWithLease.expectedCommit,
+  });
+  const commands = commandArgs.map(commandString);
+  if (options.dryRun) {
+    return {
+      requested: true,
+      dryRun: true,
+      status: "planned",
+      action,
+      branch: freshness.headBranch,
+      baseRef: freshness.baseBranch,
+      pushRemote: freshness.pushRemote,
+      beforeCommit,
+      baseCommit,
+      afterCommit: null,
+      expectedRemoteCommit: forceWithLease.expectedCommit,
+      forceWithLease,
+      verificationRequired: "required_checks",
+      commands,
+      blockers: [],
+      summary:
+        `Dry-run planned ${action} update for ${freshness.headBranch}.`,
+      git: {
+        commands: gitCommands,
+      },
+    };
+  }
+
+  const mutationCommands = commandArgs.slice(0, -1);
+  const pushCommand = commandArgs.at(-1)!;
+  for (const args of mutationCommands) {
+    const result = runGit({
+      gitRunner: options.gitRunner,
+      commands: gitCommands,
+      repositoryPath: options.repositoryPath,
+      args,
+    });
+    if (result.exitCode !== 0) {
+      return {
+        requested: true,
+        dryRun: false,
+        status: "failed",
+        action,
+        branch: freshness.headBranch,
+        baseRef: freshness.baseBranch,
+        pushRemote: freshness.pushRemote,
+        beforeCommit,
+        baseCommit,
+        afterCommit: null,
+        expectedRemoteCommit: forceWithLease.expectedCommit,
+        forceWithLease,
+        verificationRequired: null,
+        commands,
+        blockers: [
+          `Branch update command failed: ${commandString(args)}`,
+        ],
+        summary:
+          `Branch update ${action} failed for ${freshness.headBranch}.`,
+        git: {
+          commands: gitCommands,
+        },
+      };
+    }
+  }
+  const afterCommit = readHeadCommit({
+    gitRunner: options.gitRunner,
+    commands: gitCommands,
+    repositoryPath: options.repositoryPath,
+  });
+  const pushResult = runGit({
+    gitRunner: options.gitRunner,
+    commands: gitCommands,
+    repositoryPath: options.repositoryPath,
+    args: pushCommand,
+  });
+  if (pushResult.exitCode !== 0) {
+    return {
+      requested: true,
+      dryRun: false,
+      status: "failed",
+      action,
+      branch: freshness.headBranch,
+      baseRef: freshness.baseBranch,
+      pushRemote: freshness.pushRemote,
+      beforeCommit,
+      baseCommit,
+      afterCommit,
+      expectedRemoteCommit: forceWithLease.expectedCommit,
+      forceWithLease,
+      verificationRequired: null,
+      commands,
+      blockers: [
+        `Branch update command failed: ${commandString(pushCommand)}`,
+      ],
+      summary:
+        `Branch update ${action} failed while pushing ${freshness.headBranch}.`,
+      git: {
+        commands: gitCommands,
+      },
+    };
+  }
+  return {
+    requested: true,
+    dryRun: false,
+    status: "executed",
+    action,
+    branch: freshness.headBranch,
+    baseRef: freshness.baseBranch,
+    pushRemote: freshness.pushRemote,
+    beforeCommit,
+    baseCommit,
+    afterCommit,
+    expectedRemoteCommit: forceWithLease.expectedCommit,
+    forceWithLease,
+    verificationRequired: "required_checks",
+    commands,
+    blockers: [],
+    summary:
+      `Branch update ${action} updated ${freshness.headBranch}` +
+      `${beforeCommit || afterCommit ? ` from ${beforeCommit ?? "unknown"} to ${afterCommit ?? "unknown"}` : ""}.`,
+    git: {
+      commands: gitCommands,
+    },
+  };
+}
+
+function isExecutableBranchUpdateAction(
+  action: NexusGitWorkflowUpdateAction,
+): action is "merge" | "rebase" | "cherry_pick" {
+  return action === "merge" || action === "rebase" || action === "cherry_pick";
+}
+
+function branchUpdateCommandArgs(options: {
+  action: "merge" | "rebase" | "cherry_pick";
+  branch: string;
+  baseRef: string;
+  pushRemote: string;
+  expectedCommit: string | null;
+}): string[][] {
+  const pushArgs = options.action === "rebase"
+    ? [
+        "push",
+        options.expectedCommit
+          ? `--force-with-lease=refs/heads/${options.branch}:${options.expectedCommit}`
+          : "--force-with-lease",
+        options.pushRemote,
+        options.branch,
+      ]
+    : ["push", options.pushRemote, options.branch];
+  return [
+    ["checkout", options.branch],
+    branchMutationArgs(options.action, options.baseRef),
+    pushArgs,
+  ];
+}
+
+function branchMutationArgs(
+  action: "merge" | "rebase" | "cherry_pick",
+  baseRef: string,
+): string[] {
+  if (action === "merge") {
+    return ["merge", "--no-ff", baseRef];
+  }
+  if (action === "rebase") {
+    return ["rebase", baseRef];
+  }
+  return ["cherry-pick", baseRef];
+}
+
+function readCommit(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  repositoryPath: string;
+  ref: string;
+}): string | null {
+  const result = runGit({
+    gitRunner: options.gitRunner,
+    commands: options.commands,
+    repositoryPath: options.repositoryPath,
+    args: ["rev-parse", "--verify", "--quiet", `${options.ref}^{commit}`],
+  });
+  return result.exitCode === 0 ? result.stdout.trim() || null : null;
+}
+
+function readHeadCommit(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  repositoryPath: string;
+}): string | null {
+  const result = runGit({
+    gitRunner: options.gitRunner,
+    commands: options.commands,
+    repositoryPath: options.repositoryPath,
+    args: ["rev-parse", "HEAD"],
+  });
+  return result.exitCode === 0 ? result.stdout.trim() || null : null;
+}
+
+function runGit(options: {
+  gitRunner: GitRunner;
+  commands: GitCommandResult[];
+  repositoryPath: string;
+  args: string[];
+}): GitCommandResult {
+  const result = options.gitRunner(options.args, options.repositoryPath);
+  options.commands.push(result);
+  return result;
+}
+
+function commandString(args: string[]): string {
+  return `git ${args.map(shellQuoteArgument).join(" ")}`;
+}
+
+function applyBranchUpdateResult(
+  decision: NexusGitWorkflowAdvanceDecision,
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null,
+): NexusGitWorkflowAdvanceDecision {
+  if (!branchUpdate || branchUpdate.status === "planned") {
+    return decision;
+  }
+  if (branchUpdate.status === "executed") {
+    return {
+      ...decision,
+      status: "waiting",
+      nextOwner: { kind: "ci", id: null },
+      reasons: [
+        ...decision.reasons,
+        branchUpdate.summary,
+        "Required checks must pass after the branch update before publication.",
+      ],
+      blockers: [],
+      humanGates: [],
+      commands: branchUpdate.commands,
+    };
+  }
+  if (branchUpdate.status === "not_applicable") {
+    return decision;
+  }
+  return {
+    ...decision,
+    action: "block",
+    status: "blocked",
+    nextOwner: { kind: "agent", id: null },
+    blockers: uniqueStrings([
+      ...decision.blockers,
+      ...branchUpdate.blockers,
+    ]),
+    commands: branchUpdate.commands.length > 0
+      ? branchUpdate.commands
+      : decision.commands,
   };
 }
 
@@ -524,6 +960,56 @@ function providerEvidence(
   return evidence;
 }
 
+function branchUpdateEvidence(
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null,
+  timestamp: string,
+): NexusGitWorkflowRunEvidenceInput[] {
+  if (
+    !branchUpdate ||
+    branchUpdate.status === "planned" ||
+    branchUpdate.status === "not_applicable"
+  ) {
+    return [];
+  }
+  return [
+    {
+      id: "branch-update",
+      kind: "branch_update",
+      summary: branchUpdate.summary,
+      observedAt: timestamp,
+    },
+  ];
+}
+
+function verificationRequiredEvidence(
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null,
+  timestamp: string,
+): NexusGitWorkflowRunEvidenceInput[] {
+  if (branchUpdate?.verificationRequired !== "required_checks") {
+    return [];
+  }
+  return [
+    {
+      id: "verification-required",
+      kind: "verification_required",
+      summary: "Required checks must pass after the branch update before publication.",
+      observedAt: timestamp,
+    },
+  ];
+}
+
+function providerActionEvidence(
+  providerActions: string[],
+  timestamp: string,
+): NexusGitWorkflowRunEvidenceInput[] {
+  return providerActions.map((action) => ({
+    id: `provider-action:${action}`,
+    kind: "provider_action",
+    summary: `Provider action required: ${action}.`,
+    observedAt: timestamp,
+  }));
+}
+
 function checksSummary(
   status: NonNullable<NexusGitWorkflowAdvanceProviderEvidence["requiredChecks"]>,
 ): string {
@@ -534,9 +1020,20 @@ function checksSummary(
 
 function allowedTransitionsForDecision(
   decision: NexusGitWorkflowAdvanceDecision,
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null = null,
 ): NexusGitWorkflowRunTransitionInput[] {
   if (decision.status === "completed") {
     return [];
+  }
+  if (branchUpdate?.status === "executed") {
+    return [
+      {
+        id: "advance-after-required-checks",
+        to: decision.status,
+        summary: "Advance again after required checks pass on the updated branch.",
+        requiresApproval: false,
+      },
+    ];
   }
   if (decision.action === "block") {
     return [
@@ -556,6 +1053,39 @@ function allowedTransitionsForDecision(
       requiresApproval: decision.humanGates.length > 0,
     },
   ];
+}
+
+function nodeForDecision(
+  decision: NexusGitWorkflowAdvanceDecision,
+  branchUpdate: NexusGitWorkflowBranchUpdateExecutionResult | null,
+  timestamp: string,
+): NexusGitWorkflowRunNodeInput {
+  if (branchUpdate?.status === "executed") {
+    return {
+      id: `branch-update-${branchUpdate.action}`,
+      kind: "action",
+      summary: branchUpdate.summary,
+      recordedAt: timestamp,
+    };
+  }
+  if (branchUpdate?.status === "failed" || branchUpdate?.status === "blocked") {
+    return {
+      id: `branch-update-${branchUpdate.status}`,
+      kind: "gate",
+      summary: branchUpdate.blockers[0] ?? branchUpdate.summary,
+      recordedAt: timestamp,
+    };
+  }
+  return {
+    id: decision.action,
+    kind: decision.action === "complete"
+      ? "terminal"
+      : decision.action === "block"
+        ? "gate"
+        : "handoff",
+    summary: decisionSummary(decision),
+    recordedAt: timestamp,
+  };
 }
 
 function decisionSummary(decision: NexusGitWorkflowAdvanceDecision): string {

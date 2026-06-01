@@ -10,6 +10,8 @@ import {
   saveProjectConfig,
   updateNexusGitWorkflowRun,
   type NexusProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
 } from "../../src/index.js";
 
 const tempDirs: string[] = [];
@@ -239,6 +241,246 @@ describe("nexus Git workflow advance", () => {
     });
   });
 
+  it("executes approved merge branch updates and records resulting evidence", () => {
+    const fixture = initAdvanceFixture();
+    createRun(fixture.sourceRoot, {
+      status: "waiting",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+    });
+    const git = branchUpdateGitRunner({
+      branch: "feat/git-workflows/change",
+      beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      baseRef: "origin/main",
+      baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+    });
+
+    const result = advanceNexusGitWorkflowRun({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      repositoryPath: fixture.sourceRoot,
+      runId: "run-1",
+      executeBranchUpdate: true,
+      authority: {
+        gitMutation: true,
+      },
+      provider: {
+        review: "approved",
+        requiredChecks: "passed",
+        baseStatus: "behind",
+        mergeable: "mergeable",
+        validationMode: "strict_checks",
+      },
+      gitRunner: git.runner,
+      now: "2026-05-25T12:12:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      mutates: true,
+      branchUpdate: {
+        status: "executed",
+        action: "merge",
+        branch: "feat/git-workflows/change",
+        baseRef: "origin/main",
+        beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        verificationRequired: "required_checks",
+      },
+      decision: {
+        action: "advance",
+        status: "waiting",
+        nextOwner: {
+          kind: "ci",
+          id: null,
+        },
+        blockers: [],
+      },
+      runAfter: {
+        status: "waiting",
+        nextOwner: {
+          kind: "ci",
+          id: null,
+        },
+      },
+    });
+    expect(git.commands.map((command) => command.args)).toEqual([
+      ["rev-parse", "--verify", "--quiet", "feat/git-workflows/change^{commit}"],
+      ["rev-parse", "--verify", "--quiet", "origin/main^{commit}"],
+      ["checkout", "feat/git-workflows/change"],
+      ["merge", "--no-ff", "origin/main"],
+      ["rev-parse", "HEAD"],
+      ["push", "origin", "feat/git-workflows/change"],
+    ]);
+    expect(readNexusGitWorkflowRunStore(fixture.sourceRoot).runs[0])
+      .toMatchObject({
+        status: "waiting",
+        owner: {
+          kind: "ci",
+          id: null,
+        },
+        evidence: expect.arrayContaining([
+          expect.objectContaining({
+            id: "branch-update",
+            kind: "branch_update",
+            summary: expect.stringContaining(
+              "merge updated feat/git-workflows/change",
+            ),
+          }),
+          expect.objectContaining({
+            id: "verification-required",
+            kind: "verification_required",
+            summary: "Required checks must pass after the branch update before publication.",
+          }),
+        ]),
+        allowedTransitions: [
+          expect.objectContaining({
+            summary: "Advance again after required checks pass on the updated branch.",
+          }),
+        ],
+      });
+  });
+
+  it("does not execute requested branch updates without Git mutation authority", () => {
+    const fixture = initAdvanceFixture();
+    createRun(fixture.sourceRoot, {
+      status: "waiting",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+    });
+    const git = branchUpdateGitRunner({
+      branch: "feat/git-workflows/change",
+      beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      baseRef: "origin/main",
+      baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+    });
+
+    const result = advanceNexusGitWorkflowRun({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      repositoryPath: fixture.sourceRoot,
+      runId: "run-1",
+      executeBranchUpdate: true,
+      provider: {
+        review: "approved",
+        requiredChecks: "passed",
+        baseStatus: "behind",
+        mergeable: "mergeable",
+        validationMode: "strict_checks",
+      },
+      gitRunner: git.runner,
+      now: "2026-05-25T12:13:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      branchUpdate: {
+        status: "blocked",
+        blockers: ["Branch update requires Git mutation authority: merge."],
+      },
+      decision: {
+        action: "block",
+        status: "blocked",
+        nextOwner: {
+          kind: "agent",
+          id: null,
+        },
+      },
+    });
+    expect(git.commands).toEqual([]);
+  });
+
+  it("dry-runs approved rebase updates with expected force-with-lease evidence", () => {
+    const fixture = initAdvanceFixture({
+      update: {
+        diverged: "rebase",
+        publicRewrite: "with_human_approval",
+      },
+    });
+    createRun(fixture.sourceRoot, {
+      status: "waiting",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+    });
+    const git = branchUpdateGitRunner({
+      branch: "feat/git-workflows/change",
+      beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      baseRef: "origin/main",
+      baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+    });
+
+    const result = advanceNexusGitWorkflowRun({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
+      repositoryPath: fixture.sourceRoot,
+      runId: "run-1",
+      executeBranchUpdate: true,
+      dryRun: true,
+      authority: {
+        gitMutation: true,
+        forceWithLease: true,
+      },
+      provider: {
+        review: "approved",
+        requiredChecks: "passed",
+        baseStatus: "diverged",
+        mergeable: "mergeable",
+        validationMode: "strict_checks",
+      },
+      gitRunner: git.runner,
+      now: "2026-05-25T12:16:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      mutates: false,
+      branchUpdate: {
+        status: "planned",
+        dryRun: true,
+        action: "rebase",
+        beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedRemoteCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        afterCommit: null,
+        forceWithLease: {
+          required: true,
+          approved: true,
+          expectedCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        },
+        commands: [
+          "git checkout feat/git-workflows/change",
+          "git rebase origin/main",
+          "git push --force-with-lease=refs/heads/feat/git-workflows/change:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb origin feat/git-workflows/change",
+        ],
+      },
+      runAfter: {
+        status: "waiting",
+        nextOwner: {
+          kind: "agent",
+          id: "codex",
+        },
+      },
+    });
+    expect(git.commands.map((command) => command.args)).toEqual([
+      ["rev-parse", "--verify", "--quiet", "feat/git-workflows/change^{commit}"],
+      ["rev-parse", "--verify", "--quiet", "origin/main^{commit}"],
+    ]);
+    expect(readNexusGitWorkflowRunStore(fixture.sourceRoot).runs[0])
+      .toMatchObject({
+        status: "waiting",
+        owner: {
+          kind: "agent",
+          id: "codex",
+        },
+        evidence: [],
+      });
+  });
+
   it("hands off provider actions when provider-write authority is missing", () => {
     const fixture = initAdvanceFixture({ branchStrategy: "direct" });
     createRun(fixture.sourceRoot, {
@@ -379,6 +621,59 @@ function createRun(
       now: "2026-05-25T11:30:00.000Z",
     });
   }
+}
+
+function branchUpdateGitRunner(options: {
+  branch: string;
+  beforeCommit: string;
+  baseRef: string;
+  baseCommit: string;
+  afterCommit: string;
+}): { runner: GitRunner; commands: GitCommandResult[] } {
+  const commands: GitCommandResult[] = [];
+  const runner: GitRunner = (args) => {
+    const command = [...args];
+    commands.push(success(command, gitOutput(command, options)));
+    return commands.at(-1)!;
+  };
+  return { runner, commands };
+}
+
+function gitOutput(
+  args: string[],
+  options: {
+    branch: string;
+    beforeCommit: string;
+    baseRef: string;
+    baseCommit: string;
+    afterCommit: string;
+  },
+): string {
+  if (
+    args.join(" ") ===
+    `rev-parse --verify --quiet ${options.branch}^{commit}`
+  ) {
+    return `${options.beforeCommit}\n`;
+  }
+  if (
+    args.join(" ") ===
+    `rev-parse --verify --quiet ${options.baseRef}^{commit}`
+  ) {
+    return `${options.baseCommit}\n`;
+  }
+  if (args.join(" ") === "rev-parse HEAD") {
+    return `${options.afterCommit}\n`;
+  }
+  return "";
+}
+
+function success(args: string[], stdout: string): GitCommandResult {
+  return {
+    args,
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
 }
 
 function projectConfig(

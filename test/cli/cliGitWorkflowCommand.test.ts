@@ -462,6 +462,120 @@ describe("git-workflow CLI", () => {
       },
     });
   });
+
+  it("executes branch updates through advance when explicitly requested", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-git-workflow-update-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig("feature-delivery", "feature_branch", {
+        activeFeatureId: "git-workflows",
+        update: {
+          behind: "merge",
+          diverged: "block",
+          wrongBase: "recreate",
+          publicRewrite: "with_human_approval",
+        },
+      }),
+    );
+    createNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      projectId: "demo-project",
+      componentId: "primary",
+      profileId: "feature-delivery",
+      branchStrategy: "feature_branch",
+      workItemId: "github-384",
+      branchName: "feat/git-workflows/update",
+      currentRef: "feat/git-workflows/update",
+      baseRef: "origin/main",
+      targetBranch: "main",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+      now: "2026-05-25T10:00:00.000Z",
+    });
+    updateNexusGitWorkflowRun({
+      projectRoot: sourceRoot,
+      id: "run-1",
+      status: "waiting",
+      owner: {
+        kind: "agent",
+        id: "codex",
+      },
+      now: "2026-05-25T10:05:00.000Z",
+    });
+    const output = captureOutput();
+    const git = branchUpdateGitRunner({
+      branch: "feat/git-workflows/update",
+      beforeCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      baseRef: "origin/main",
+      baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+    });
+
+    const exitCode = await main(
+      [
+        "git-workflow",
+        "advance",
+        projectRoot,
+        "--component",
+        "primary",
+        "--run",
+        "run-1",
+        "--repository-path",
+        sourceRoot,
+        "--provider-review",
+        "approved",
+        "--required-checks",
+        "passed",
+        "--base-status",
+        "behind",
+        "--mergeable",
+        "mergeable",
+        "--validation-mode",
+        "strict_checks",
+        "--allow-git-mutation",
+        "--execute-branch-update",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: git.runner,
+        now: fixedClock("2026-05-25T10:20:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      result: {
+        branchUpdate: {
+          status: "executed",
+          action: "merge",
+          branch: "feat/git-workflows/update",
+          afterCommit: "cccccccccccccccccccccccccccccccccccccccc",
+        },
+        decision: {
+          status: "waiting",
+          nextOwner: {
+            kind: "ci",
+            id: null,
+          },
+        },
+      },
+    });
+    expect(git.commands.map((command) => command.args)).toEqual([
+      ["rev-parse", "--verify", "--quiet", "feat/git-workflows/update^{commit}"],
+      ["rev-parse", "--verify", "--quiet", "origin/main^{commit}"],
+      ["checkout", "feat/git-workflows/update"],
+      ["merge", "--no-ff", "origin/main"],
+      ["rev-parse", "HEAD"],
+      ["push", "origin", "feat/git-workflows/update"],
+    ]);
+  });
 });
 
 function projectConfig(
@@ -599,6 +713,51 @@ function success(args: string[], stdout: string): GitCommandResult {
     stderr: "",
     exitCode: 0,
   };
+}
+
+function branchUpdateGitRunner(options: {
+  branch: string;
+  beforeCommit: string;
+  baseRef: string;
+  baseCommit: string;
+  afterCommit: string;
+}): { runner: GitRunner; commands: GitCommandResult[] } {
+  const commands: GitCommandResult[] = [];
+  const runner: GitRunner = (args) => {
+    const command = [...args];
+    const result = success(command, branchUpdateGitOutput(command, options));
+    commands.push(result);
+    return result;
+  };
+  return { runner, commands };
+}
+
+function branchUpdateGitOutput(
+  args: string[],
+  options: {
+    branch: string;
+    beforeCommit: string;
+    baseRef: string;
+    baseCommit: string;
+    afterCommit: string;
+  },
+): string {
+  if (
+    args.join(" ") ===
+    `rev-parse --verify --quiet ${options.branch}^{commit}`
+  ) {
+    return `${options.beforeCommit}\n`;
+  }
+  if (
+    args.join(" ") ===
+    `rev-parse --verify --quiet ${options.baseRef}^{commit}`
+  ) {
+    return `${options.baseCommit}\n`;
+  }
+  if (args.join(" ") === "rev-parse HEAD") {
+    return `${options.afterCommit}\n`;
+  }
+  return "";
 }
 
 function fixedClock(value: string): () => string {
