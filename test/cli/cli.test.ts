@@ -2713,6 +2713,62 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("reports installed CLI and source command surface skew", async () => {
+    const tempDir = makeTempDir("dev-nexus-cli-source-skew-");
+    const olderHelpPath = path.join(tempDir, "older-help.txt");
+    fs.writeFileSync(
+      olderHelpPath,
+      [
+        "Usage:",
+        "  dev-nexus remote-execution request create <workspace-root> [options]",
+        "  dev-nexus remote-execution result get <workspace-root> <request-id> [options]",
+      ].join("\n"),
+      "utf8",
+    );
+    const sourceUsagePath = path.join(tempDir, "cliUsage.ts");
+    fs.writeFileSync(
+      sourceUsagePath,
+      [
+        "export function usage(): string {",
+        "  return [",
+        '    "Usage:",',
+        '    "  dev-nexus remote-execution request create <workspace-root> [options]",',
+        '    "  dev-nexus remote-execution run <workspace-root> <request-id> [options]",',
+        '  ].join("\\n");',
+        "}",
+      ].join("\n"),
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "diagnostics",
+          "cli-version-skew",
+          "--installed-help-file",
+          olderHelpPath,
+          "--source-command-file",
+          sourceUsagePath,
+          "--json",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(1);
+
+    const parsed = JSON.parse(output.output());
+    expect(parsed).toMatchObject({
+      ok: false,
+      diagnostic: {
+        status: "skew_detected",
+        missingSourceCommands: ["dev-nexus remote-execution run"],
+        remediation: {
+          action: "rebuild_from_source",
+        },
+      },
+    });
+  });
+
   it("prints a human CLI skew remediation when installed help misses documented commands", async () => {
     const tempDir = makeTempDir("dev-nexus-cli-skew-human-");
     const olderHelpPath = path.join(tempDir, "older-help.txt");

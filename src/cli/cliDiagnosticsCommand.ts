@@ -31,6 +31,7 @@ interface ParsedDiagnosticsCliVersionSkewCommand {
   installedHelpFile?: string;
   installedCommand?: string;
   expectedFiles: string[];
+  sourceCommandFiles: string[];
   expectedCommands: string[];
   packageVersion?: string | null;
   json?: boolean;
@@ -43,17 +44,16 @@ export async function handleDiagnosticsCommand(
   const command = argv[1];
   if (command === "cli-version-skew") {
     const parsed = parseDiagnosticsCliVersionSkewCommand(argv);
+    const expected = resolveExpectedCliVersionSkewCommands(parsed);
     const diagnostic = buildNexusCliVersionSkewDiagnostic({
       installedHelpText: resolveDiagnosticsInstalledHelpText(parsed, dependencies),
-      expectedCommands: resolveExpectedCliVersionSkewCommands(parsed),
+      expectedCommands: expected.documentedCommands,
+      sourceCommands: expected.sourceCommands,
       installedPackageVersion:
         parsed.packageVersion === undefined
           ? readCurrentPackageVersion()
           : parsed.packageVersion,
-      expectedSource:
-        parsed.expectedCommands.length > 0
-          ? "explicit expected commands"
-          : parsed.expectedFiles.join(", "),
+      expectedSource: expected.sourceDescription,
     });
     printDiagnosticsCliVersionSkewResult(
       diagnostic,
@@ -71,6 +71,7 @@ function parseDiagnosticsCliVersionSkewCommand(
 ): ParsedDiagnosticsCliVersionSkewCommand {
   const parsed: ParsedDiagnosticsCliVersionSkewCommand = {
     expectedFiles: [],
+    sourceCommandFiles: [],
     expectedCommands: [],
   };
   const rest = argv.slice(2);
@@ -94,6 +95,9 @@ function parseDiagnosticsCliVersionSkewCommand(
       case "--expected-file":
         parsed.expectedFiles.push(next());
         break;
+      case "--source-command-file":
+        parsed.sourceCommandFiles.push(next());
+        break;
       case "--expected-command":
         parsed.expectedCommands.push(next());
         break;
@@ -108,8 +112,13 @@ function parseDiagnosticsCliVersionSkewCommand(
     }
   }
 
-  if (parsed.expectedFiles.length === 0 && parsed.expectedCommands.length === 0) {
+  if (
+    parsed.expectedFiles.length === 0 &&
+    parsed.expectedCommands.length === 0 &&
+    parsed.sourceCommandFiles.length === 0
+  ) {
     parsed.expectedFiles = defaultCliVersionSkewExpectedFiles();
+    parsed.sourceCommandFiles = defaultCliVersionSkewSourceCommandFiles();
   }
 
   return parsed;
@@ -165,18 +174,43 @@ function printDiagnosticsCliVersionSkewResult(
   } else {
     writeLine(stdout, "  Missing documented commands: none");
   }
+  if (diagnostic.missingSourceCommands.length > 0) {
+    writeLine(stdout, "  Missing source-declared commands:");
+    for (const command of diagnostic.missingSourceCommands) {
+      writeLine(stdout, `    ${command}`);
+    }
+  } else {
+    writeLine(stdout, "  Missing source-declared commands: none");
+  }
   writeLine(stdout, `  Remediation: ${diagnostic.remediation.summary}`);
 }
 
 function resolveExpectedCliVersionSkewCommands(
   parsed: ParsedDiagnosticsCliVersionSkewCommand,
-): string[] {
-  return [
+): {
+  documentedCommands: string[];
+  sourceCommands: string[];
+  sourceDescription: string | null;
+} {
+  const documentedCommands = [
     ...parsed.expectedCommands,
     ...parsed.expectedFiles.flatMap((filePath) =>
       parseDevNexusCommandLines(fs.readFileSync(filePath, "utf8")),
     ),
   ];
+  const sourceCommands = parsed.sourceCommandFiles.flatMap((filePath) =>
+    parseDevNexusCommandLines(fs.readFileSync(filePath, "utf8")),
+  );
+  const sources = [
+    ...(parsed.expectedCommands.length > 0 ? ["explicit expected commands"] : []),
+    ...parsed.expectedFiles,
+    ...parsed.sourceCommandFiles,
+  ];
+  return {
+    documentedCommands,
+    sourceCommands,
+    sourceDescription: sources.length > 0 ? sources.join(", ") : null,
+  };
 }
 
 function defaultCliVersionSkewExpectedFiles(): string[] {
@@ -185,4 +219,11 @@ function defaultCliVersionSkewExpectedFiles(): string[] {
     path.join(root, "README.md"),
     path.join(root, "docs", "user", "getting-started.md"),
   ].filter((filePath) => fs.existsSync(filePath));
+}
+
+function defaultCliVersionSkewSourceCommandFiles(): string[] {
+  const root = packageRootPath();
+  return [path.join(root, "src", "cli", "cliUsage.ts")].filter((filePath) =>
+    fs.existsSync(filePath),
+  );
 }
