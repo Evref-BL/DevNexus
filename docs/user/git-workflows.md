@@ -103,6 +103,11 @@ dev-nexus publication feature-finalization <workspace-root> --component api --ev
 dev-nexus coordination cleanup-plan <workspace-root> --component api
 ```
 
+Workspace-wide cleanup planning also scans workspace/meta worktrees and
+branches. Pass `--component <id>` to scope cleanup to one component; add
+`--include-workspace-meta` with `--component` when a single cleanup decision
+should compare that component and the workspace metadata repository together.
+
 Use dry-run options where available before mutating a provider.
 
 ## Read-Only Plan And Status

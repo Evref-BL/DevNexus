@@ -90,6 +90,68 @@ describe("nexus cleanup execution", () => {
       });
   });
 
+  it("removes a safe generated workspace-meta worktree by default", () => {
+    const fixture = initCleanupFixture();
+    const worktreePath = path.join(
+      fixture.projectRoot,
+      "worktrees",
+      "cleanup-demo",
+      "metadata-merged",
+    );
+    const branchName = "codex/cleanup-demo/metadata-merged";
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      projectMeta: true,
+      branchName,
+      worktreePath,
+      status: "merged",
+      now: () => "2026-05-18T09:00:00.000Z",
+      gitFacts: { headCommit: "metadataMerged123", dirty: false, pushed: true },
+    });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = executeNexusCleanup({
+      projectRoot: fixture.projectRoot,
+      candidateId: "project_meta:project:worktree:metadata-merged",
+      gitRunner: cleanupGitRunner(fixture, calls, {
+        projectBranches: [branchName],
+        projectMetaWorktrees: [
+          { path: worktreePath, branch: branchName, head: "metadataMerged123" },
+        ],
+        mergedRefs: [branchName],
+        upstreams: {
+          [branchName]: `origin/${branchName}`,
+        },
+      }),
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      mutatesSource: true,
+      candidate: {
+        id: "project_meta:project:worktree:metadata-merged",
+        scope: "project_meta",
+        safeToDelete: true,
+      },
+      actions: {
+        removedWorktree: worktreePath,
+        deletedBranch: branchName,
+        updatedLeaseIds: [lease.id],
+      },
+    });
+    expect(cleanupCommands(calls)).toEqual([
+      { cwd: fixture.projectRoot, args: ["worktree", "remove", worktreePath] },
+      { cwd: fixture.projectRoot, args: ["branch", "-d", branchName] },
+    ]);
+    expect(readNexusWorktreeLeaseStore(fixture.projectRoot).leases[0])
+      .toMatchObject({
+        id: lease.id,
+        status: "merged",
+        updatedAt: "2026-05-18T10:00:00.000Z",
+      });
+  });
+
   it("finalizes a safe lease-only candidate when the branch is already absent", () => {
     const fixture = initCleanupFixture();
     const lease = createOrRefreshNexusWorktreeLease({
@@ -618,11 +680,13 @@ function initCleanupFixture() {
 }
 
 function cleanupGitRunner(
-  fixture: { sourceRoot: string },
+  fixture: { projectRoot?: string; sourceRoot: string },
   calls: Array<{ args: string[]; cwd?: string }>,
   options: {
     branches?: string[];
-    worktrees?: Array<{ path: string; branch: string; head: string }>;
+    projectBranches?: string[];
+    worktrees?: Array<{ path: string; branch: string | null; head: string }>;
+    projectMetaWorktrees?: Array<{ path: string; branch: string | null; head: string }>;
     statuses?: Record<string, string>;
     targetExists?: boolean;
     mergedRefs?: string[];
@@ -639,38 +703,79 @@ function cleanupGitRunner(
     for (const branch of options.branches ?? []) {
       branchHeads.set(branch, `${safeHead(branch)}123`);
     }
+    for (const branch of options.projectBranches ?? []) {
+      branchHeads.set(branch, `${safeHead(branch)}123`);
+    }
     for (const worktree of options.worktrees ?? []) {
-      branchHeads.set(worktree.branch, worktree.head);
+      if (worktree.branch) {
+        branchHeads.set(worktree.branch, worktree.head);
+      }
+    }
+    for (const worktree of options.projectMetaWorktrees ?? []) {
+      if (worktree.branch) {
+        branchHeads.set(worktree.branch, worktree.head);
+      }
     }
 
     if (joined === "worktree list --porcelain") {
+      const useProjectRepo = isProjectRepositoryCwd(fixture, cwd);
+      const root = useProjectRepo ? fixture.projectRoot! : fixture.sourceRoot;
+      const worktrees = useProjectRepo
+        ? options.projectMetaWorktrees ?? []
+        : options.worktrees ?? [];
       return gitResult(argsArray, [
-        `worktree ${fixture.sourceRoot}`,
+        `worktree ${root}`,
         "HEAD target123",
         "branch refs/heads/main",
         "",
-        ...(options.worktrees ?? []).flatMap((worktree) => [
+        ...worktrees.flatMap((worktree) => [
           `worktree ${worktree.path}`,
           `HEAD ${worktree.head}`,
-          `branch refs/heads/${worktree.branch}`,
+          ...(worktree.branch ? [`branch refs/heads/${worktree.branch}`] : []),
           "",
         ]),
       ].join("\n"));
     }
     if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
-      return gitResult(argsArray, (options.branches ?? []).join("\n"));
+      return gitResult(
+        argsArray,
+        (isProjectRepositoryCwd(fixture, cwd)
+          ? options.projectBranches ?? []
+          : options.branches ?? []
+        ).join("\n"),
+      );
     }
     if (joined === "rev-parse --verify main") {
       return options.targetExists === false
         ? gitResult(argsArray, "", 1)
         : gitResult(argsArray, "target123\n");
     }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--show-toplevel") {
+      const allWorktrees = [
+        ...(options.worktrees ?? []),
+        ...(options.projectMetaWorktrees ?? []),
+      ];
+      const worktree = allWorktrees.find((entry) => samePath(entry.path, cwd ?? ""));
+      if (worktree) {
+        return gitResult(argsArray, `${worktree.path}\n`);
+      }
+      if (samePath(fixture.sourceRoot, cwd ?? "")) {
+        return gitResult(argsArray, `${fixture.sourceRoot}\n`);
+      }
+      if (fixture.projectRoot && pathContainsOrSame(fixture.projectRoot, cwd ?? "")) {
+        return gitResult(argsArray, `${fixture.projectRoot}\n`);
+      }
+      return gitResult(argsArray, "", 1);
+    }
     if (argsArray[0] === "rev-parse" && argsArray[1] === "--is-inside-work-tree") {
       return gitResult(argsArray, "true\n");
     }
     if (argsArray[0] === "symbolic-ref" && argsArray[1] === "--short") {
-      const worktree = (options.worktrees ?? []).find((entry) => entry.path === cwd);
-      return worktree
+      const worktree = [
+        ...(options.worktrees ?? []),
+        ...(options.projectMetaWorktrees ?? []),
+      ].find((entry) => samePath(entry.path, cwd ?? ""));
+      return worktree?.branch
         ? gitResult(argsArray, `${worktree.branch}\n`)
         : gitResult(argsArray, "", 1);
     }
@@ -715,6 +820,31 @@ function cleanupCommands(
     args[0] === "branch" ||
     (args[0] === "worktree" && args[1] === "remove"),
   );
+}
+
+function isProjectRepositoryCwd(
+  fixture: { projectRoot?: string; sourceRoot: string },
+  cwd: string | undefined,
+): boolean {
+  return Boolean(fixture.projectRoot && samePath(fixture.projectRoot, cwd ?? ""));
+}
+
+function samePath(left: string, right: string): boolean {
+  return canonicalPath(left) === canonicalPath(right);
+}
+
+function pathContainsOrSame(root: string, target: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative === "" || (
+    relative.length > 0 &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function canonicalPath(value: string): string {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 function safeHead(branch: string): string {
