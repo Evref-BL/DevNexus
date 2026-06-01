@@ -42,12 +42,22 @@ export interface NexusClaimAuthorityProfileConfig {
   schema: string | null;
 }
 
+export interface NexusHomeRemoteExecutionCommandProfileConfig {
+  id: string;
+  command: string;
+}
+
+export interface NexusHomeRemoteExecutionConfig {
+  commandProfiles: NexusHomeRemoteExecutionCommandProfileConfig[];
+}
+
 export interface NexusHomeConfigBase {
   version: 1;
   paths: NexusHomePathsConfig;
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
   claimAuthorityProfiles?: NexusClaimAuthorityProfileConfig[];
+  remoteExecution?: NexusHomeRemoteExecutionConfig;
   hostOverlays?: NexusHomeHostOverlayConfig[];
   projects: NexusProjectReference[];
 }
@@ -58,6 +68,7 @@ export interface CreateDefaultNexusHomeConfigBaseOptions {
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
   claimAuthorityProfiles?: NexusClaimAuthorityProfileConfig[];
+  remoteExecution?: NexusHomeRemoteExecutionConfig;
   hostOverlays?: NexusHomeHostOverlayConfig[];
 }
 
@@ -522,6 +533,52 @@ function validateClaimAuthorityProfiles(
   return profiles;
 }
 
+function validateHomeRemoteExecutionCommandProfile(
+  value: unknown,
+  index: number,
+): NexusHomeRemoteExecutionCommandProfileConfig {
+  const pathName = `remoteExecution.commandProfiles[${index}]`;
+  const record = assertRecord(value, pathName);
+  return {
+    id: requiredString(record, "id", pathName),
+    command: requiredString(record, "command", pathName),
+  };
+}
+
+function validateHomeRemoteExecutionConfig(
+  value: unknown,
+): NexusHomeRemoteExecutionConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = assertRecord(value, "remoteExecution");
+  const commandProfilesInput = record.commandProfiles;
+  const commandProfiles =
+    commandProfilesInput === undefined
+      ? []
+      : (() => {
+          if (!Array.isArray(commandProfilesInput)) {
+            throw new NexusConfigError(
+              "remoteExecution.commandProfiles must be an array",
+            );
+          }
+          return commandProfilesInput.map((item, index) =>
+            validateHomeRemoteExecutionCommandProfile(item, index),
+          );
+        })();
+  const ids = new Set<string>();
+  for (const profile of commandProfiles) {
+    if (ids.has(profile.id)) {
+      throw new NexusConfigError(
+        `Remote execution command profile id is duplicated: ${profile.id}`,
+      );
+    }
+    ids.add(profile.id);
+  }
+
+  return { commandProfiles };
+}
+
 function validateHomeHostTransport(
   value: unknown,
   overlayPathName: string,
@@ -723,6 +780,11 @@ export function createDefaultNexusHomeConfigBase(
       options.claimAuthorityProfiles,
     );
   }
+  if (options.remoteExecution) {
+    config.remoteExecution = validateHomeRemoteExecutionConfig(
+      options.remoteExecution,
+    );
+  }
   if (options.hostOverlays) {
     config.hostOverlays = validateHomeHostOverlays(options.hostOverlays);
   }
@@ -745,6 +807,9 @@ export function validateNexusHomeConfigBase(
   const claimAuthorityProfiles = validateClaimAuthorityProfiles(
     record.claimAuthorityProfiles,
   );
+  const remoteExecution = validateHomeRemoteExecutionConfig(
+    record.remoteExecution,
+  );
   const hostOverlays = validateHomeHostOverlays(record.hostOverlays);
   const config: NexusHomeConfigBase = {
     version: 1,
@@ -763,6 +828,9 @@ export function validateNexusHomeConfigBase(
   }
   if (claimAuthorityProfiles) {
     config.claimAuthorityProfiles = claimAuthorityProfiles;
+  }
+  if (remoteExecution) {
+    config.remoteExecution = remoteExecution;
   }
   if (hostOverlays) {
     config.hostOverlays = hostOverlays;

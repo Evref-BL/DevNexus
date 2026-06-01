@@ -22,6 +22,11 @@ import {
   planNexusSshExecution,
   type NexusSshExecutionPlan,
 } from "../remote-execution/nexusSshExecutionPlan.js";
+import {
+  runNexusSshRemoteExecution,
+  type NexusSshRemoteExecutionTransport,
+  type RunNexusSshRemoteExecutionResult,
+} from "../remote-execution/nexusSshRemoteExecution.js";
 import type { NexusRunnerMutationClass } from "../remote-execution/nexusRunnerProfile.js";
 
 export interface ParsedRemoteExecutionRequestCreateCommand {
@@ -75,6 +80,13 @@ interface ParsedRemoteExecutionSshPlanCommand {
   json?: boolean;
 }
 
+interface ParsedRemoteExecutionRunCommand {
+  projectRoot: string;
+  requestId: string;
+  homePath?: string;
+  json?: boolean;
+}
+
 export interface RemoteExecutionMutationGuardOptions {
   projectRoot: string;
   command: string;
@@ -85,6 +97,7 @@ export interface RemoteExecutionMutationGuardOptions {
 interface RemoteExecutionCliDependencies {
   stdout?: TextWriter;
   now?: () => Date | string;
+  remoteExecutionTransport?: NexusSshRemoteExecutionTransport;
   assertMutationAllowed: (options: RemoteExecutionMutationGuardOptions) => void;
   coordinationAttachmentRefs: (
     parsed: ParsedRemoteExecutionRequestCreateCommand,
@@ -179,8 +192,26 @@ export async function handleRemoteExecutionCommand(
     return 0;
   }
 
+  if (scope === "run") {
+    const parsed = parseRemoteExecutionRunCommand(argv);
+    dependencies.assertMutationAllowed({
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "remote-execution run",
+      mutationClass: "coordination_record",
+    });
+    const run = await runNexusSshRemoteExecution({
+      projectRoot: parsed.projectRoot,
+      requestId: parsed.requestId,
+      homePath: parsed.homePath,
+      transport: dependencies.remoteExecutionTransport,
+      now: dependencies.now,
+    });
+    printRemoteExecutionRunResult(run, parsed, stdout);
+    return 0;
+  }
+
   throw new Error(
-    "remote-execution requires request create, result record, result get, or ssh-plan",
+    "remote-execution requires request create, result record, result get, ssh-plan, or run",
   );
 }
 
@@ -452,6 +483,47 @@ function parseRemoteExecutionSshPlanCommand(
   return parsed;
 }
 
+function parseRemoteExecutionRunCommand(
+  argv: string[],
+): ParsedRemoteExecutionRunCommand {
+  const [, , projectRoot, requestId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("remote-execution run requires a workspace root");
+  }
+  if (!requestId || requestId.startsWith("--")) {
+    throw new Error("remote-execution run requires a request id");
+  }
+
+  const parsed: ParsedRemoteExecutionRunCommand = {
+    projectRoot,
+    requestId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown remote-execution run option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function printRemoteExecutionRequestCreateResult(
   request: NexusRemoteExecutionRequestRecord,
   parsed: ParsedRemoteExecutionRequestCreateCommand,
@@ -534,6 +606,26 @@ function printRemoteExecutionSshPlanResult(
   );
   for (const blocker of plan.blockers) {
     writeLine(stdout, `  Blocker: ${blocker}`);
+  }
+}
+
+function printRemoteExecutionRunResult(
+  run: RunNexusSshRemoteExecutionResult,
+  parsed: ParsedRemoteExecutionRunCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, localOnly: true, plan: run.plan, result: run.result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus remote execution run recorded: ${run.result.status}.`);
+  writeLine(stdout, `  Request: ${run.result.requestId}`);
+  writeLine(stdout, `  Host: ${run.result.hostId}`);
+  writeLine(stdout, `  Verification: ${run.result.verificationOutcome}`);
+  if (run.result.blockerSafetyReason) {
+    writeLine(stdout, `  Blocker: ${run.result.blockerSafetyReason}`);
   }
 }
 

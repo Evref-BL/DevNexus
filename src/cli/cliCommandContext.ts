@@ -1,6 +1,7 @@
 import process from "node:process";
 import type { TextWriter } from "./cliSupport.js";
 import type { NexusAutomationCommandRunner } from "../automation/nexusAutomationCommandExecutor.js";
+import type { NexusSshRemoteExecutionTransport } from "../remote-execution/nexusSshRemoteExecution.js";
 import type { GitRunner } from "../worktrees/gitWorktreeService.js";
 import type { ProjectGitRunner } from "../project/nexusProjectLifecycle.js";
 import type { NexusProviderCredentialCommandRunner } from "../providers/nexusProviderCredentialBroker.js";
@@ -38,6 +39,7 @@ export interface DevNexusCliDependencies {
     options: CollectNexusGitWorkflowProviderEvidenceOptions,
   ) => Promise<NexusGitWorkflowProviderEvidenceAttachment>;
   commandRunner?: NexusAutomationCommandRunner;
+  remoteExecutionTransport?: NexusSshRemoteExecutionTransport;
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
@@ -121,6 +123,7 @@ function hasInjectedCliDependency(dependencies: DevNexusCliDependencies): boolea
     dependencies.stdout ||
       dependencies.stderr ||
       dependencies.commandRunner ||
+      dependencies.remoteExecutionTransport ||
       dependencies.gitRunner ||
       dependencies.projectGitRunner ||
       dependencies.hostingProvider ||

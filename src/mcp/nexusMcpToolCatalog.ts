@@ -839,6 +839,20 @@ export const devNexusMcpTools: McpTool[] = [
     },
   },
   {
+    name: "remote_execution_run",
+    description: "Run a recorded verification-only SSH remote execution request through an approved home command profile and record the result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        requestId: { type: "string" },
+        homePath: { type: "string" },
+      },
+      required: ["projectRoot", "requestId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "work_item_create",
     description: "Create a work item through the configured DevNexus work tracker.",
     inputSchema: {

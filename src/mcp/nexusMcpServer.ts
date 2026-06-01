@@ -162,6 +162,10 @@ import {
   planNexusSshExecution,
 } from "../remote-execution/nexusSshExecutionPlan.js";
 import {
+  runNexusSshRemoteExecution,
+  type NexusSshRemoteExecutionTransport,
+} from "../remote-execution/nexusSshRemoteExecution.js";
+import {
   checkNexusHostCapabilities,
   type NexusHostCheckMode,
   type NexusHostCheckMockFacts,
@@ -247,6 +251,7 @@ export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
   commandRunner?: NexusAutomationCommandRunner;
+  remoteExecutionTransport?: NexusSshRemoteExecutionTransport;
   publicationFetch?: typeof fetch;
   publicationCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
   publicationGitPushRunner?: NexusPublicationGitPushRunner;
@@ -1187,6 +1192,20 @@ async function callHostAndRemoteExecutionMcpTool(
           requestId: requiredString(args, "requestId", "arguments"),
           homePath: optionalString(args, "homePath", "arguments"),
         }),
+      });
+    case "remote_execution_run":
+      assertMcpMutationAllowed(args, context, {
+        command: "remote_execution_run",
+        mutationClass: "coordination_record",
+      });
+      return toolResult({
+        ...(await runNexusSshRemoteExecution({
+          projectRoot: projectRootFromArgs(args),
+          requestId: requiredString(args, "requestId", "arguments"),
+          homePath: optionalString(args, "homePath", "arguments"),
+          transport: context.remoteExecutionTransport,
+          now: context.now,
+        })),
       });
     default:
       return undefined;

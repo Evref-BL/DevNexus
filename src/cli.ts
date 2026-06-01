@@ -1048,6 +1048,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
     handleRemoteExecutionCommand(argv, {
       stdout: dependencies.stdout,
       now: dependencies.now,
+      remoteExecutionTransport: dependencies.remoteExecutionTransport,
       assertMutationAllowed: (options) =>
         assertCliMutationAllowed(dependencies, options),
       coordinationAttachmentRefs: remoteExecutionCoordinationAttachmentRefs,

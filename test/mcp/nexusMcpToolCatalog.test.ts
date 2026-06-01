@@ -48,6 +48,7 @@ describe("DevNexus MCP tool catalog", () => {
       "remote_execution_result_record",
       "remote_execution_result_get",
       "remote_execution_ssh_plan",
+      "remote_execution_run",
       "work_item_create",
       "work_item_discovery_status",
       "work_item_claim_next",

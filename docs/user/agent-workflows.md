@@ -186,9 +186,20 @@ The conservative runner policy is:
   storage.
 - Start with push-based SSH over Tailscale and a read-only host/setup status
   profile such as `dev-nexus host check`.
+- Keep command text host-local. Shared `runnerProfiles[].commandProfileRefs`
+  authorize command profile ids, while `dev-nexus.home.json`
+  `remoteExecution.commandProfiles[]` defines the actual argv expression for a
+  specific host.
 - Do not run package installs, services, Docker, live Pharo images, cleanup,
   source mutation, or publication through a remote runner until a matching
   approved profile exists.
+
+After a request exists and `remote-execution ssh-plan` reports `ready`, run the
+approved command profile and record the result:
+
+```bash
+dev-nexus remote-execution run <workspace-root> <request-id> --home <home-path> --json
+```
 
 The conservative authority policy is:
 
