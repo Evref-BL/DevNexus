@@ -776,7 +776,10 @@ export async function getNexusAutomationStatus(
         eligibleWorkMode: eligibleWork.mode,
         eligibleWorkItems,
         importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
-        eligibleWorkWarnings: eligibleWork.warnings,
+        eligibleWorkWarnings: uniqueStrings([
+          ...eligibleWork.warnings,
+          ...discoveryStatus.warnings,
+        ]),
         eligibleWorkBlockers: eligibleWork.blockers,
         externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
           components,
@@ -813,7 +816,10 @@ export async function getNexusAutomationStatus(
       eligibleWorkMode: eligibleWork.mode,
       eligibleWorkItems,
       importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
-      eligibleWorkWarnings: eligibleWork.warnings,
+      eligibleWorkWarnings: uniqueStrings([
+        ...eligibleWork.warnings,
+        ...discoveryStatus.warnings,
+      ]),
       eligibleWorkBlockers: eligibleWork.blockers,
       externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
         components,
@@ -1237,6 +1243,19 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     eligibleWorkBlockers: result.eligibleWorkBlockers ?? [],
     externalIssueVisibility: result.externalIssueVisibility ?? null,
   };
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
 }
 
 function statusEligibleWorkProviderFactory(options: {

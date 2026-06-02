@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { defaultNexusHomePath } from "../project/nexusHomeConfig.js";
 import { resolveNexusProjectPath } from "../runtime/nexusPathResolver.js";
@@ -21,8 +22,17 @@ import {
 } from "../project/nexusProjectLifecycle.js";
 import type {
   WorkTrackerCapabilityReport,
+  WorkItem,
+  WorkStatus,
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
+import {
+  loadLocalWorkTrackingStore,
+  resolveLocalWorkTrackingStorePath,
+} from "./workTrackingLocalProvider.js";
+import {
+  openWorkStatuses,
+} from "./workTrackingQuery.js";
 import {
   loadNexusPublicationAuthProfiles,
   publicationCommandEnvironment,
@@ -63,6 +73,39 @@ export interface NexusWorkItemDiscoveryTrackerSelection {
   reasons: string[];
 }
 
+export type NexusWorkItemDiscoveryIgnoredWorkStatus =
+  | "readable"
+  | "not_checked"
+  | "not_readable";
+
+export interface NexusWorkItemDiscoveryIgnoredWorkExample {
+  id: string;
+  title: string;
+  status: WorkStatus;
+  linkedCanonical: boolean;
+  canonicalReference: NexusWorkItemDiscoveryCanonicalReference | null;
+}
+
+export interface NexusWorkItemDiscoveryCanonicalReference {
+  trackerId: string;
+  itemId: string;
+  itemNumber?: number | null;
+  itemKey?: string | null;
+  webUrl?: string | null;
+}
+
+export interface NexusWorkItemDiscoveryIgnoredWork {
+  status: NexusWorkItemDiscoveryIgnoredWorkStatus;
+  message: string;
+  openStatuses: WorkStatus[];
+  openCount: number | null;
+  linkedCanonicalCount: number | null;
+  unlinkedCount: number | null;
+  exampleLimit: number;
+  examples: NexusWorkItemDiscoveryIgnoredWorkExample[];
+  suggestedCommand: string[] | null;
+}
+
 export interface GetNexusWorkItemDiscoveryStatusOptions {
   projectRoot: string;
   homePath?: string;
@@ -89,6 +132,7 @@ export interface NexusWorkItemDiscoveryTrackerStatus {
     status: NexusWorkItemDiscoveryReadableStatus;
     message: string;
   };
+  ignoredWork: NexusWorkItemDiscoveryIgnoredWork | null;
 }
 
 export interface NexusWorkItemDiscoveryComponentStatus {
@@ -118,6 +162,25 @@ export interface NexusWorkItemDiscoveryStatus {
   warnings: string[];
   blockers: string[];
   summary: string;
+}
+
+interface DiscoveryLinkRecordsResult {
+  records: DiscoveryLinkRecord[];
+  warnings: string[];
+}
+
+interface DiscoveryLinkReference {
+  trackerId: string;
+  itemId: string;
+  itemNumber?: number | null;
+  itemKey?: string | null;
+  webUrl?: string | null;
+}
+
+interface DiscoveryLinkRecord {
+  projectId: string;
+  componentId: string;
+  references: DiscoveryLinkReference[];
 }
 
 export function getNexusWorkItemDiscoveryStatus(
@@ -167,10 +230,23 @@ export function getNexusWorkItemDiscoveryStatus(
       authProfiles,
       credentialBroker,
     });
+  const linkRecords = loadDiscoveryLinkRecords({
+    projectRoot,
+    projectId: projectConfig.id,
+  });
   const componentStatuses = components.map((component) =>
-    componentDiscoveryStatus(component, credentialResolver),
+    componentDiscoveryStatus({
+      projectRoot,
+      component,
+      credentialResolver,
+      linkRecords: linkRecords.records,
+      now: options.now,
+    }),
   );
-  const warnings = componentStatuses.flatMap((component) => component.warnings);
+  const warnings = [
+    ...linkRecords.warnings,
+    ...componentStatuses.flatMap((component) => component.warnings),
+  ];
   const blockers = componentStatuses.flatMap((component) => component.blockers);
 
   return {
@@ -186,6 +262,64 @@ export function getNexusWorkItemDiscoveryStatus(
       blockers.length > 0
         ? `Tracker discovery status has ${blockers.length} blocker(s)`
         : `Tracker discovery status reported ${warnings.length} warning(s)`,
+  };
+}
+
+function loadDiscoveryLinkRecords(options: {
+  projectRoot: string;
+  projectId: string;
+}): DiscoveryLinkRecordsResult {
+  const storePath = path.join(options.projectRoot, ".dev-nexus", "work-item-links.json");
+  if (!fs.existsSync(storePath)) {
+    return {
+      records: [],
+      warnings: [],
+    };
+  }
+
+  try {
+    return {
+      records: discoveryLinkRecordsFromJson(
+        JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/u, "")),
+      ).filter((record) => record.projectId === options.projectId),
+      warnings: [],
+    };
+  } catch (error) {
+    return {
+      records: [],
+      warnings: [
+        `Work item tracker links could not be read for ignored-work diagnostics: ${errorMessage(error)}`,
+      ],
+    };
+  }
+}
+
+function discoveryLinkRecordsFromJson(value: unknown): DiscoveryLinkRecord[] {
+  if (!isRecord(value) || !Array.isArray(value.records)) {
+    throw new Error("work-item link store must contain a records array");
+  }
+
+  return value.records
+    .filter(isRecord)
+    .map((record) => ({
+      projectId: optionalString(record.projectId) ?? "",
+      componentId: optionalString(record.componentId) ?? "",
+      references: Array.isArray(record.references)
+        ? record.references.filter(isRecord).map(discoveryLinkReferenceFromRecord)
+        : [],
+    }))
+    .filter((record) => record.projectId.length > 0 && record.componentId.length > 0);
+}
+
+function discoveryLinkReferenceFromRecord(
+  value: Record<string, unknown>,
+): DiscoveryLinkReference {
+  return {
+    trackerId: optionalString(value.trackerId) ?? "",
+    itemId: optionalString(value.itemId) ?? "",
+    itemNumber: optionalNumber(value.itemNumber),
+    itemKey: optionalString(value.itemKey),
+    webUrl: optionalString(value.webUrl),
   };
 }
 
@@ -222,10 +356,14 @@ function resolveDiscoveryHomePath(options: {
   return defaultNexusHomePath();
 }
 
-function componentDiscoveryStatus(
-  component: ResolvedNexusProjectComponent,
-  credentialResolver: NexusWorkItemDiscoveryCredentialResolver,
-): NexusWorkItemDiscoveryComponentStatus {
+function componentDiscoveryStatus(options: {
+  projectRoot: string;
+  component: ResolvedNexusProjectComponent;
+  credentialResolver: NexusWorkItemDiscoveryCredentialResolver;
+  linkRecords: DiscoveryLinkRecord[];
+  now?: Date | string | (() => Date | string);
+}): NexusWorkItemDiscoveryComponentStatus {
+  const { component } = options;
   const defaultTracker =
     component.defaultTrackerId === null
       ? null
@@ -233,14 +371,24 @@ function componentDiscoveryStatus(
           (tracker) => tracker.id === component.defaultTrackerId,
         ) ?? null;
   const trackers = component.workTrackers.map((tracker) =>
-    trackerDiscoveryStatus(component, tracker, credentialResolver),
+    trackerDiscoveryStatus({
+      projectRoot: options.projectRoot,
+      component,
+      tracker,
+      credentialResolver: options.credentialResolver,
+      linkRecords: options.linkRecords,
+      now: options.now,
+    }),
   );
+  const ignoredWorkWarnings = trackers.flatMap((tracker) =>
+    ignoredWorkWarning(component, tracker));
   const warnings = trackers
     .filter((tracker) => tracker.selectedForDiscovery && tracker.readable.status === "skipped")
     .map(
       (tracker) =>
         `Component ${component.id} tracker ${tracker.id} skipped: ${tracker.readable.message}`,
-    );
+    )
+    .concat(ignoredWorkWarnings);
   const blockers = trackers
     .filter((tracker) => tracker.selectedForDiscovery && tracker.readable.status === "blocked")
     .map(
@@ -270,38 +418,272 @@ function componentDiscoveryStatus(
   };
 }
 
-function trackerDiscoveryStatus(
-  component: ResolvedNexusProjectComponent,
-  tracker: ResolvedNexusProjectWorkTracker,
-  credentialResolver: NexusWorkItemDiscoveryCredentialResolver,
-): NexusWorkItemDiscoveryTrackerStatus {
-  const discoverySelection = trackerDiscoverySelection(component, tracker);
-  const credentials = credentialResolver({
-    componentId: component.id,
-    trackerId: tracker.id,
-    provider: tracker.provider,
-    workTracking: tracker.workTracking,
+function trackerDiscoveryStatus(options: {
+  projectRoot: string;
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  credentialResolver: NexusWorkItemDiscoveryCredentialResolver;
+  linkRecords: DiscoveryLinkRecord[];
+  now?: Date | string | (() => Date | string);
+}): NexusWorkItemDiscoveryTrackerStatus {
+  const discoverySelection = trackerDiscoverySelection(
+    options.component,
+    options.tracker,
+  );
+  const credentials = options.credentialResolver({
+    componentId: options.component.id,
+    trackerId: options.tracker.id,
+    provider: options.tracker.provider,
+    workTracking: options.tracker.workTracking,
   });
   const readable = trackerReadableStatus({
-    tracker,
+    tracker: options.tracker,
     selectedForDiscovery: discoverySelection.selected,
-    policy: component.trackerDiscovery,
+    policy: options.component.trackerDiscovery,
     credentials,
+  });
+  const ignoredWork = ignoredTrackerWork({
+    ...options,
+    selectedForDiscovery: discoverySelection.selected,
+    readable,
   });
 
   return {
-    id: tracker.id,
-    name: tracker.name,
-    provider: tracker.provider,
-    enabled: tracker.enabled,
-    default: tracker.default,
-    roles: [...tracker.roles],
+    id: options.tracker.id,
+    name: options.tracker.name,
+    provider: options.tracker.provider,
+    enabled: options.tracker.enabled,
+    default: options.tracker.default,
+    roles: [...options.tracker.roles],
     selectedForDiscovery: discoverySelection.selected,
     discoveryReasons: discoverySelection.reasons,
-    capabilityReport: tracker.workTrackingCapabilityReport,
+    capabilityReport: options.tracker.workTrackingCapabilityReport,
     credentials,
     readable,
+    ignoredWork,
   };
+}
+
+function ignoredTrackerWork(options: {
+  projectRoot: string;
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  selectedForDiscovery: boolean;
+  readable: NexusWorkItemDiscoveryTrackerStatus["readable"];
+  linkRecords: DiscoveryLinkRecord[];
+  now?: Date | string | (() => Date | string);
+}): NexusWorkItemDiscoveryIgnoredWork | null {
+  if (options.selectedForDiscovery || !options.tracker.enabled) {
+    return null;
+  }
+
+  const suggestedCommand = manualMigrationCommand(options.component, options.tracker);
+  if (options.readable.status !== "readable") {
+    return {
+      status: "not_readable",
+      message: options.readable.message,
+      openStatuses: [...openWorkStatuses],
+      openCount: null,
+      linkedCanonicalCount: null,
+      unlinkedCount: null,
+      exampleLimit: 0,
+      examples: [],
+      suggestedCommand,
+    };
+  }
+
+  if (options.tracker.workTracking.provider !== "local") {
+    return {
+      status: "not_checked",
+      message:
+        "Ignored non-local tracker work is not counted by this synchronous status command; run the suggested manual plan command for provider-backed details.",
+      openStatuses: [...openWorkStatuses],
+      openCount: null,
+      linkedCanonicalCount: null,
+      unlinkedCount: null,
+      exampleLimit: 0,
+      examples: [],
+      suggestedCommand,
+    };
+  }
+
+  try {
+    const storePath = resolveLocalWorkTrackingStorePath(
+      options.projectRoot,
+      options.tracker.workTracking,
+    );
+    const store = loadLocalWorkTrackingStore(
+      storePath,
+      currentIso(options.now),
+      "work-item discovery-status ignored-work",
+    );
+    const openItems = store.items.filter((item) =>
+      openWorkStatuses.includes(item.status));
+    const examples = openItems.slice(0, 5).map((item) =>
+      ignoredWorkExample({
+        item,
+        component: options.component,
+        tracker: options.tracker,
+        linkRecords: options.linkRecords,
+      }),
+    );
+    const linkedCanonicalCount = openItems.filter((item) =>
+      Boolean(canonicalReferenceForItem({
+        item,
+        component: options.component,
+        tracker: options.tracker,
+        linkRecords: options.linkRecords,
+      })),
+    ).length;
+
+    return {
+      status: "readable",
+      message: openItems.length === 0
+        ? "Ignored local tracker has no open work items."
+        : "Ignored local tracker contains open work items that normal discovery will not select.",
+      openStatuses: [...openWorkStatuses],
+      openCount: openItems.length,
+      linkedCanonicalCount,
+      unlinkedCount: openItems.length - linkedCanonicalCount,
+      exampleLimit: 5,
+      examples,
+      suggestedCommand,
+    };
+  } catch (error) {
+    return {
+      status: "not_readable",
+      message: errorMessage(error),
+      openStatuses: [...openWorkStatuses],
+      openCount: null,
+      linkedCanonicalCount: null,
+      unlinkedCount: null,
+      exampleLimit: 0,
+      examples: [],
+      suggestedCommand,
+    };
+  }
+}
+
+function ignoredWorkExample(options: {
+  item: WorkItem;
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  linkRecords: DiscoveryLinkRecord[];
+}): NexusWorkItemDiscoveryIgnoredWorkExample {
+  const canonicalReference = canonicalReferenceForItem(options);
+  return {
+    id: options.item.id,
+    title: options.item.title,
+    status: options.item.status,
+    linkedCanonical: Boolean(canonicalReference),
+    canonicalReference: canonicalReference
+      ? {
+          trackerId: canonicalReference.trackerId,
+          itemId: canonicalReference.itemId,
+          itemNumber: canonicalReference.itemNumber,
+          itemKey: canonicalReference.itemKey,
+          webUrl: canonicalReference.webUrl,
+        }
+      : null,
+  };
+}
+
+function canonicalReferenceForItem(options: {
+  item: WorkItem;
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  linkRecords: DiscoveryLinkRecord[];
+}): DiscoveryLinkReference | null {
+  const defaultTrackerId = options.component.defaultTrackerId;
+  if (!defaultTrackerId || defaultTrackerId === options.tracker.id) {
+    return null;
+  }
+  const record = options.linkRecords.find((candidate) =>
+    candidate.componentId === options.component.id &&
+    candidate.references.some((reference) =>
+      reference.trackerId === options.tracker.id &&
+      referenceMatchesWorkItem(reference, options.item)
+    ));
+  return record?.references.find((reference) =>
+    reference.trackerId === defaultTrackerId) ?? null;
+}
+
+function referenceMatchesWorkItem(
+  reference: DiscoveryLinkReference,
+  item: WorkItem,
+): boolean {
+  const itemReference = item.externalRef;
+  return (
+    reference.itemId === item.id ||
+    (itemReference?.itemId !== undefined &&
+      reference.itemId === itemReference.itemId) ||
+    (itemReference?.itemNumber !== undefined &&
+      reference.itemNumber === itemReference.itemNumber) ||
+    (itemReference?.itemKey !== undefined &&
+      reference.itemKey === itemReference.itemKey)
+  );
+}
+
+function manualMigrationCommand(
+  component: ResolvedNexusProjectComponent,
+  tracker: ResolvedNexusProjectWorkTracker,
+): string[] | null {
+  const targetTracker = component.defaultTrackerId
+    ? component.workTrackers.find((candidate) =>
+        candidate.id === component.defaultTrackerId)
+    : null;
+  if (!targetTracker || targetTracker.id === tracker.id) {
+    return null;
+  }
+
+  const command = tracker.workTracking.provider === "local" &&
+    targetTracker.workTracking.provider !== "local"
+    ? "sync-plan"
+    : targetTracker.workTracking.provider === "local" &&
+        tracker.workTracking.provider !== "local"
+      ? "import-plan"
+      : "sync-plan";
+
+  return [
+    "dev-nexus",
+    "work-item",
+    command,
+    "<workspace-root>",
+    "--component",
+    component.id,
+    "--source-tracker",
+    tracker.id,
+    "--target-tracker",
+    targetTracker.id,
+    ...openStatusCommandArgs(command),
+  ];
+}
+
+function openStatusCommandArgs(command: "sync-plan" | "import-plan"): string[] {
+  if (command === "sync-plan") {
+    return ["--open"];
+  }
+
+  return openWorkStatuses.flatMap((status) => ["--status", status]);
+}
+
+function ignoredWorkWarning(
+  component: ResolvedNexusProjectComponent,
+  tracker: NexusWorkItemDiscoveryTrackerStatus,
+): string[] {
+  const ignoredWork = tracker.ignoredWork;
+  if (!ignoredWork || ignoredWork.openCount === null || ignoredWork.openCount === 0) {
+    return [];
+  }
+  const command = ignoredWork.suggestedCommand?.join(" ") ?? null;
+  return [
+    [
+      `Component ${component.id} tracker ${tracker.id} ignored: ${ignoredWork.openCount} open item(s) are not selected for discovery.`,
+      `linkedCanonical=${ignoredWork.linkedCanonicalCount ?? 0}`,
+      `unlinked=${ignoredWork.unlinkedCount ?? 0}.`,
+      command ? `Review manually with: ${command}` : null,
+    ].filter((part): part is string => part !== null).join(" "),
+  ];
 }
 
 function trackerDiscoverySelection(
@@ -556,6 +938,32 @@ function providerEnvironmentCredentialAvailable(
 
 function nonEmpty(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function currentIso(
+  now: Date | string | (() => Date | string) | undefined,
+): string {
+  const value = typeof now === "function" ? now() : now;
+  if (typeof value === "string") {
+    return value;
+  }
+  return (value ?? new Date()).toISOString();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {

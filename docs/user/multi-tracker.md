@@ -266,6 +266,11 @@ items have either been linked to the external provider, closed locally, or
 intentionally left local. Record the decision in the workspace handoff or target
 state so agents know which tracker is canonical.
 
+Tracker cutover does not run sync automatically. If a configured local archive
+tracker is no longer selected for discovery but still contains open items,
+`dev-nexus work-item discovery-status` reports a bounded count, linked/unlinked
+examples, and a manual `sync-plan` or `import-plan` command to review.
+
 ## Safety Notes
 
 - Dry-run first. `sync-plan` is the normal review step before any execution.
