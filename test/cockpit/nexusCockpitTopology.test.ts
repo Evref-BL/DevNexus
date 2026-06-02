@@ -29,6 +29,7 @@ describe("nexus cockpit topology", () => {
     const serverModuleNames = [
       "nexusDashboardHost.ts",
       "nexusDashboardLocalOpen.ts",
+      "nexusDashboardServerHttp.ts",
       "nexusDashboardWorktreeModel.ts",
       "nexusDashboardThreadModel.ts",
       "nexusDashboardPluginModel.ts",
@@ -63,6 +64,23 @@ describe("nexus cockpit topology", () => {
     expect(routeFile).not.toContain("function dashboardLocalOpenCommand(");
     expect(routeFile).not.toContain("function fallbackLocalAppIconSvg(");
     expect(fs.existsSync(fileURLToPath(adapterUrl))).toBe(true);
+  });
+
+  it("keeps cockpit HTTP helpers outside the route file", () => {
+    const routeFile = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardServer.ts", import.meta.url)),
+      "utf8",
+    );
+    const helperUrl = new URL(
+      "../../src/cockpit/server/nexusDashboardServerHttp.ts",
+      import.meta.url,
+    );
+
+    expect(routeFile).not.toContain("function readJsonBody(");
+    expect(routeFile).not.toContain("function requireDashboardMutationRequest(");
+    expect(routeFile).not.toContain("function sendJson(");
+    expect(routeFile).not.toContain("function listen(");
+    expect(fs.existsSync(fileURLToPath(helperUrl))).toBe(true);
   });
 
   it("keeps history layout internals in DevNexus event-model terms", () => {
