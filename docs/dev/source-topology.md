@@ -50,7 +50,13 @@ implementation lives under `src/cockpit`:
   registry, cache policy, data contracts, server assets, and chat bridge.
   Keep `nexusDashboard.ts` as a public orchestration facade; host snapshots,
   worktree/thread/plugin/tracked-work summaries, event timelines, and weave
-  models belong in focused sibling modules.
+  models belong in focused sibling modules. Keep `nexusDashboardServer.ts` as
+  the HTTP wiring facade; request validation belongs in
+  `nexusDashboardServerHttp.ts`, workspace selection in
+  `nexusDashboardServerWorkspace.ts`, local app opening in
+  `nexusDashboardLocalOpen.ts`, browser assets in
+  `nexusDashboardServerAssets.ts`, and Codex/thread mutation routes in
+  `nexusDashboardServerChatRoutes.ts`.
 
 The legacy `src/dashboard/` folder is reserved for compatibility facades that
 re-export the cockpit server modules under old dashboard-named import paths.

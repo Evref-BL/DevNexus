@@ -83,6 +83,28 @@ describe("nexus cockpit topology", () => {
     expect(fs.existsSync(fileURLToPath(helperUrl))).toBe(true);
   });
 
+  it("keeps cockpit chat and workspace route helpers outside the server facade", () => {
+    const routeFile = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardServer.ts", import.meta.url)),
+      "utf8",
+    );
+    const chatRoutesUrl = new URL(
+      "../../src/cockpit/server/nexusDashboardServerChatRoutes.ts",
+      import.meta.url,
+    );
+    const workspaceUrl = new URL(
+      "../../src/cockpit/server/nexusDashboardServerWorkspace.ts",
+      import.meta.url,
+    );
+
+    expect(routeFile).not.toContain("async function routeCodexThreadStart(");
+    expect(routeFile).not.toContain("async function routeDashboardThreadAction(");
+    expect(routeFile).not.toContain("async function resolveDashboardThreadActionContext(");
+    expect(routeFile).not.toContain("function workspaceSelectionFromHostIndex(");
+    expect(fs.existsSync(fileURLToPath(chatRoutesUrl))).toBe(true);
+    expect(fs.existsSync(fileURLToPath(workspaceUrl))).toBe(true);
+  });
+
   it("keeps cockpit client chrome helpers outside the browser entrypoint", () => {
     const entrypoint = fs.readFileSync(
       fileURLToPath(new URL("../../src/cockpit/client/nexusCockpitClient.ts", import.meta.url)),
