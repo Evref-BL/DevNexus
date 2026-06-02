@@ -56,7 +56,9 @@ implementation lives under `src/cockpit`:
   `nexusDashboardServerWorkspace.ts`, local app opening in
   `nexusDashboardLocalOpen.ts`, browser assets in
   `nexusDashboardServerAssets.ts`, and Codex/thread mutation routes in
-  `nexusDashboardServerChatRoutes.ts`.
+  `nexusDashboardServerChatRoutes.ts`. Stable embedding-route contracts belong
+  in `nexusDashboardEmbeddingContractTypes.ts`; `nexusDashboardTypes.ts`
+  remains the compatibility barrel for snapshot-facing type imports.
 
 The legacy `src/dashboard/` folder is reserved for compatibility facades that
 re-export the cockpit server modules under old dashboard-named import paths.

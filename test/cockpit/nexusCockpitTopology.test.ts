@@ -51,6 +51,21 @@ describe("nexus cockpit topology", () => {
     }
   });
 
+  it("keeps stable cockpit embedding contracts outside snapshot model types", () => {
+    const typesFile = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardTypes.ts", import.meta.url)),
+      "utf8",
+    );
+    const contractUrl = new URL(
+      "../../src/cockpit/server/nexusDashboardEmbeddingContractTypes.ts",
+      import.meta.url,
+    );
+
+    expect(typesFile).not.toContain("interface NexusDashboardEmbeddingContract {");
+    expect(typesFile).toContain("NexusDashboardEmbeddingContract");
+    expect(fs.existsSync(fileURLToPath(contractUrl))).toBe(true);
+  });
+
   it("keeps local cockpit resource adapters outside the route file", () => {
     const routeFile = fs.readFileSync(
       fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardServer.ts", import.meta.url)),
