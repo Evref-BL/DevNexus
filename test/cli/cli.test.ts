@@ -13,11 +13,14 @@ import {
   loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
+  defaultWorkItemTrackerLinkStorePath,
   NexusMemoryWorkItemClaimAuthority,
   nexusWorktreeLeaseKind,
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
+  saveLocalWorkTrackingStore,
   saveProjectConfig,
+  saveWorkItemTrackerLinkStore,
   shellQuoteArgument,
   startNexusDashboardServer,
   writeNexusWorktreeLeaseStore,
@@ -7217,6 +7220,119 @@ describe("dev-nexus cli", () => {
       ],
     });
     expect(payload.projectConfig).toBeUndefined();
+  });
+
+  it("prints ignored local tracker work with manual sync guidance", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const now = "2026-06-02T15:00:00.000Z";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "archive",
+                name: "Archive",
+                enabled: true,
+                roles: ["archive"],
+                workTracking: {
+                  provider: "local",
+                  storePath: "archive.json",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["primary", "eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "allowed",
+              importRequiredFirst: false,
+              providerFilters: ["local", "github"],
+              queryLimit: 10,
+              conflictWinner: "scanned_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    saveLocalWorkTrackingStore(
+      path.join(projectRoot, "archive.json"),
+      {
+        version: 1,
+        nextNumber: 2,
+        nextCommentNumber: 1,
+        updatedAt: now,
+        items: [
+          {
+            id: "local-1",
+            title: "Port manually",
+            description: null,
+            status: "ready",
+            provider: "local",
+            labels: [],
+            assignees: [],
+            milestone: null,
+            createdAt: now,
+            updatedAt: now,
+            closedAt: null,
+            webUrl: null,
+            externalRef: {
+              provider: "local",
+              itemId: "local-1",
+              itemNumber: 1,
+            },
+          },
+        ],
+        comments: {
+          "local-1": [],
+        },
+      },
+    );
+    saveWorkItemTrackerLinkStore(
+      defaultWorkItemTrackerLinkStorePath(projectRoot),
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: now,
+        records: [],
+      },
+    );
+    const output = captureOutput();
+
+    await main(["work-item", "discovery-status", projectRoot], {
+      stdout: output.writer,
+    });
+
+    expect(output.output()).toContain("archive [local]");
+    expect(output.output()).toContain("Ignored open work: 1 (readable)");
+    expect(output.output()).toContain("Linked canonical: 0; unlinked: 1");
+    expect(output.output()).toContain(
+      "Review manually: dev-nexus work-item sync-plan <workspace-root> --component primary --source-tracker archive --target-tracker github --open",
+    );
+    expect(output.output()).toContain("- local-1 [ready] Port manually unlinked");
   });
 
   it("prints concise agent profile policy", async () => {

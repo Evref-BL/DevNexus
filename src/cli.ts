@@ -7853,6 +7853,36 @@ function printWorkItemDiscoveryStatusResult(
         stdout,
         `    ${tracker.id} [${tracker.provider}] roles=${tracker.roles.join(",")} selected=${String(tracker.selectedForDiscovery)} readable=${tracker.readable.status}`,
       );
+      if (tracker.ignoredWork) {
+        const count = tracker.ignoredWork.openCount === null
+          ? "unknown"
+          : String(tracker.ignoredWork.openCount);
+        writeLine(
+          stdout,
+          `      Ignored open work: ${count} (${tracker.ignoredWork.status})`,
+        );
+        if (tracker.ignoredWork.linkedCanonicalCount !== null) {
+          writeLine(
+            stdout,
+            `      Linked canonical: ${tracker.ignoredWork.linkedCanonicalCount}; unlinked: ${tracker.ignoredWork.unlinkedCount ?? 0}`,
+          );
+        }
+        if (tracker.ignoredWork.suggestedCommand) {
+          writeLine(
+            stdout,
+            `      Review manually: ${tracker.ignoredWork.suggestedCommand.join(" ")}`,
+          );
+        }
+        for (const example of tracker.ignoredWork.examples) {
+          const linked = example.linkedCanonical
+            ? ` linked=${example.canonicalReference?.trackerId ?? "canonical"}:${example.canonicalReference?.itemId ?? "unknown"}`
+            : " unlinked";
+          writeLine(
+            stdout,
+            `      - ${example.id} [${example.status}] ${example.title}${linked}`,
+          );
+        }
+      }
     }
   }
   for (const warning of result.warnings) {

@@ -4,8 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
+  defaultWorkItemTrackerLinkStorePath,
   getNexusWorkItemDiscoveryStatus,
   saveProjectConfig,
+  saveLocalWorkTrackingStore,
+  saveWorkItemTrackerLinkStore,
   type NexusProjectConfig,
 } from "../../src/index.js";
 
@@ -497,6 +500,224 @@ describe("work item discovery status", () => {
           selectedForDiscovery: false,
         },
       ],
+    });
+  });
+
+  it("reports open work in ignored local archive trackers with manual sync guidance", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    const archivePath = path.join(projectRoot, "archive.json");
+    const now = "2026-06-02T15:00:00.000Z";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig([
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/core.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "github",
+          workTrackers: [
+            {
+              id: "archive",
+              name: "Archive",
+              enabled: true,
+              roles: ["archive"],
+              workTracking: { provider: "local", storePath: "archive.json" },
+            },
+            {
+              id: "github",
+              name: "GitHub",
+              enabled: true,
+              roles: ["primary", "eligible_source"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "demo",
+                },
+              },
+            },
+          ],
+          trackerDiscovery: {
+            scannedRoles: ["primary", "eligible_source"],
+            directExternalSelection: "allowed",
+            importRequiredFirst: false,
+            providerFilters: ["local", "github"],
+            queryLimit: 25,
+            conflictWinner: "scanned_tracker",
+            missingCredentialBehavior: "skip",
+          },
+          relationships: [],
+        },
+      ]),
+    );
+    saveLocalWorkTrackingStore(
+      archivePath,
+      {
+        version: 1,
+        nextNumber: 4,
+        nextCommentNumber: 1,
+        updatedAt: now,
+        items: [
+          {
+            id: "local-1",
+            title: "Port this issue",
+            description: "Needs a provider copy.",
+            status: "ready",
+            provider: "local",
+            labels: [],
+            assignees: [],
+            milestone: null,
+            createdAt: now,
+            updatedAt: now,
+            closedAt: null,
+            webUrl: null,
+            externalRef: {
+              provider: "local",
+              itemId: "local-1",
+              itemNumber: 1,
+            },
+          },
+          {
+            id: "local-2",
+            title: "Already linked",
+            description: null,
+            status: "blocked",
+            provider: "local",
+            labels: [],
+            assignees: [],
+            milestone: null,
+            createdAt: now,
+            updatedAt: now,
+            closedAt: null,
+            webUrl: null,
+            externalRef: {
+              provider: "local",
+              itemId: "local-2",
+              itemNumber: 2,
+            },
+          },
+          {
+            id: "local-3",
+            title: "Closed archive item",
+            description: null,
+            status: "done",
+            provider: "local",
+            labels: [],
+            assignees: [],
+            milestone: null,
+            createdAt: now,
+            updatedAt: now,
+            closedAt: now,
+            webUrl: null,
+            externalRef: {
+              provider: "local",
+              itemId: "local-3",
+              itemNumber: 3,
+            },
+          },
+        ],
+        comments: {
+          "local-1": [],
+          "local-2": [],
+          "local-3": [],
+        },
+      },
+    );
+    saveWorkItemTrackerLinkStore(
+      defaultWorkItemTrackerLinkStorePath(projectRoot),
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: now,
+        records: [
+          {
+            projectId: "discovery-demo",
+            componentId: "core",
+            logicalItemId: "local-2",
+            createdAt: now,
+            updatedAt: now,
+            references: [
+              {
+                trackerId: "archive",
+                trackerName: "Archive",
+                provider: "local",
+                itemId: "local-2",
+                itemNumber: 2,
+                firstObservedAt: now,
+                lastObservedAt: now,
+              },
+              {
+                trackerId: "github",
+                trackerName: "GitHub",
+                provider: "github",
+                host: "github.com",
+                repositoryOwner: "example",
+                repositoryName: "demo",
+                itemId: "42",
+                itemNumber: 42,
+                webUrl: "https://github.com/example/demo/issues/42",
+                firstObservedAt: now,
+                lastObservedAt: now,
+              },
+            ],
+            audit: [],
+          },
+        ],
+      },
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      env: { GH_CONFIG_DIR: "/tmp/gh" },
+    });
+
+    expect(result.warnings).toEqual([
+      expect.stringContaining("archive ignored"),
+    ]);
+    expect(result.components[0]!.configuredTrackers[0]).toMatchObject({
+      id: "archive",
+      selectedForDiscovery: false,
+      ignoredWork: {
+        status: "readable",
+        openCount: 2,
+        linkedCanonicalCount: 1,
+        unlinkedCount: 1,
+        suggestedCommand: [
+          "dev-nexus",
+          "work-item",
+          "sync-plan",
+          "<workspace-root>",
+          "--component",
+          "core",
+          "--source-tracker",
+          "archive",
+          "--target-tracker",
+          "github",
+          "--open",
+        ],
+        examples: [
+          {
+            id: "local-1",
+            title: "Port this issue",
+            status: "ready",
+            linkedCanonical: false,
+          },
+          {
+            id: "local-2",
+            title: "Already linked",
+            status: "blocked",
+            linkedCanonical: true,
+            canonicalReference: {
+              trackerId: "github",
+              itemId: "42",
+            },
+          },
+        ],
+      },
     });
   });
 });
