@@ -48,6 +48,9 @@ implementation lives under `src/cockpit`:
   rendering.
 - `src/cockpit/server/`: snapshot/model builders, local HTTP routes, server
   registry, cache policy, data contracts, server assets, and chat bridge.
+  Keep `nexusDashboard.ts` as a public orchestration facade; host snapshots,
+  worktree/thread/plugin/tracked-work summaries, event timelines, and weave
+  models belong in focused sibling modules.
 
 The legacy `src/dashboard/` folder is reserved for compatibility facades that
 re-export the cockpit server modules under old dashboard-named import paths.

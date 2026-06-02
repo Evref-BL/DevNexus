@@ -21,6 +21,34 @@ describe("nexus cockpit topology", () => {
     expect(legacyServerStarter).toBe(canonicalServerStarter);
   });
 
+  it("keeps cockpit snapshot orchestration split from server model builders", () => {
+    const facade = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/server/nexusDashboard.ts", import.meta.url)),
+      "utf8",
+    );
+    const serverModuleNames = [
+      "nexusDashboardHost.ts",
+      "nexusDashboardWorktreeModel.ts",
+      "nexusDashboardThreadModel.ts",
+      "nexusDashboardPluginModel.ts",
+      "nexusDashboardTrackedWorkModel.ts",
+      "nexusDashboardEvents.ts",
+      "nexusDashboardWeaveModel.ts",
+    ];
+
+    expect(facade).not.toContain("function summarizeThreads(");
+    expect(facade).not.toContain("function summarizePlugins(");
+    expect(facade).not.toContain("function summarizeTrackedWork(");
+    expect(facade).not.toContain("function buildNexusDashboardHostSnapshot(");
+    for (const moduleName of serverModuleNames) {
+      const moduleUrl = new URL(
+        `../../src/cockpit/server/${moduleName}`,
+        import.meta.url,
+      );
+      expect(fs.existsSync(fileURLToPath(moduleUrl))).toBe(true);
+    }
+  });
+
   it("keeps history layout internals in DevNexus event-model terms", () => {
     const source = fs.readFileSync(
       fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardHistoryLayout.ts", import.meta.url)),
