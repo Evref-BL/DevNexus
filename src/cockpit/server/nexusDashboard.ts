@@ -288,7 +288,6 @@ export async function buildNexusDashboardSnapshot(
     weave,
   };
 }
-
 export async function buildNexusDashboardWorkspaceShell(
   options: BuildNexusDashboardSnapshotOptions,
 ): Promise<NexusDashboardSnapshot> {
@@ -507,4 +506,3 @@ export async function buildNexusDashboardWorkspaceSection(
     },
   };
 }
-
