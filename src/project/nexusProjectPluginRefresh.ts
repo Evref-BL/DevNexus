@@ -120,6 +120,12 @@ interface PluginMcpServerProjection {
   capabilityIds: string[];
 }
 
+interface RawProjectPluginConfigWritePlan {
+  configPath: string;
+  content: string;
+  changed: boolean;
+}
+
 export async function refreshNexusProjectPlugin(
   options: RefreshNexusProjectPluginOptions,
 ): Promise<RefreshNexusProjectPluginResult> {
@@ -144,6 +150,11 @@ export async function refreshNexusProjectPlugin(
   const nextConfig = upsertProjectPlugin(projectConfig, nextPlugin);
   const nextRawConfig = upsertRawProjectPlugin(rawProjectConfig, nextPlugin);
   validateProjectConfig(nextRawConfig);
+  const configWritePlan = planRawProjectPluginConfigWrite(
+    projectRoot,
+    nextRawConfig,
+    nextPlugin,
+  );
   const projectedSkillCapabilities = projectedSkillCapabilitiesForPlugin(nextPlugin);
   const projectedSkillDefinitions = skillDefinitionsForProjectedCapabilities(
     loaded.skillDefinitions,
@@ -157,13 +168,13 @@ export async function refreshNexusProjectPlugin(
   const mcpTargets = filteredMcpAgentTargets(nextConfig, options.targetAgents ?? []);
 
   const dryRun = options.dryRun === true;
-  const projectConfigPath = saveProjectConfigPath(projectRoot);
+  const projectConfigPath = configWritePlan.configPath;
   let skillProjectionResult: RefreshNexusProjectSkillsResult | null = null;
   const mcpProjectionResults: MaterializeNexusProjectAgentMcpConfigResult[] = [];
   const skippedMcpServers: NexusProjectPluginRefreshSkippedMcpServer[] = [];
 
   if (!dryRun) {
-    writeRawProjectPluginConfig(projectRoot, nextRawConfig, nextPlugin);
+    writeRawProjectPluginConfig(configWritePlan);
     if (nextPlugin.enabled !== false && projectedSkillDefinitions.length > 0) {
       skillProjectionResult = refreshNexusProjectSkills({
         projectRoot,
@@ -274,9 +285,7 @@ export async function refreshNexusProjectPlugin(
   }
 
   const created = previousPlugin === null;
-  const changed =
-    previousPlugin === null ||
-    JSON.stringify(previousPlugin) !== JSON.stringify(nextPlugin);
+  const changed = configWritePlan.changed;
 
   return {
     projectRoot,
@@ -301,7 +310,7 @@ export async function refreshNexusProjectPlugin(
       projectedSkillCount: projectedSkillCapabilities.length,
       mcpServerCount: mcpProjectionPlan.length,
     },
-    configWritten: !dryRun,
+    configWritten: !dryRun && configWritePlan.changed,
     skillProjection: {
       requiredSkillIds: projectedSkillCapabilities.map(
         (capability) => capability.skillId,
@@ -694,20 +703,30 @@ function readRawProjectConfig(projectRoot: string): Record<string, unknown> {
   return parsed;
 }
 
-function writeRawProjectPluginConfig(
+function planRawProjectPluginConfigWrite(
   projectRoot: string,
   config: Record<string, unknown>,
   plugin: NexusProjectPluginConfig,
-): string {
+): RawProjectPluginConfigWritePlan {
   const configPath = saveProjectConfigPath(projectRoot);
   const existing = fs.readFileSync(configPath, "utf8");
   const targeted = replacePluginConfigInJsonText(existing, plugin);
-  fs.writeFileSync(
+  const content = targeted ?? `${JSON.stringify(config, null, 2)}\n`;
+  return {
     configPath,
-    targeted ?? `${JSON.stringify(config, null, 2)}\n`,
-    "utf8",
-  );
-  return configPath;
+    content,
+    changed: existing !== content,
+  };
+}
+
+function writeRawProjectPluginConfig(
+  plan: RawProjectPluginConfigWritePlan,
+): void {
+  if (!plan.changed) {
+    return;
+  }
+
+  fs.writeFileSync(plan.configPath, plan.content, "utf8");
 }
 
 function upsertRawProjectPlugin(

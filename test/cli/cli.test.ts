@@ -1550,6 +1550,33 @@ describe("dev-nexus cli", () => {
     expect(codexConfig).toContain("[mcp_servers.demo_ts]");
     expect(codexConfig).toContain('command = "node"');
     expect(codexConfig).toContain('args = ["demo-server.js"]');
+
+    const configAfterFirstRefresh = fs.readFileSync(
+      path.join(projectRoot, "dev-nexus.project.json"),
+      "utf8",
+    );
+    const repeatOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "workspace",
+          "plugin",
+          "refresh",
+          projectRoot,
+          "--from",
+          pluginRoot,
+          "--json",
+        ],
+        { stdout: repeatOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    const repeatPayload = JSON.parse(repeatOutput.output());
+    expect(repeatPayload.plugin.changed).toBe(false);
+    expect(repeatPayload.configWritten).toBe(false);
+    expect(
+      fs.readFileSync(path.join(projectRoot, "dev-nexus.project.json"), "utf8"),
+    ).toBe(configAfterFirstRefresh);
   });
 
   it("does not directly materialize hidden or gateway-routed plugin MCP servers", async () => {
