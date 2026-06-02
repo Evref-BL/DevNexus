@@ -83,6 +83,30 @@ describe("nexus cockpit topology", () => {
     expect(fs.existsSync(fileURLToPath(helperUrl))).toBe(true);
   });
 
+  it("keeps cockpit client chrome helpers outside the browser entrypoint", () => {
+    const entrypoint = fs.readFileSync(
+      fileURLToPath(new URL("../../src/cockpit/client/nexusCockpitClient.ts", import.meta.url)),
+      "utf8",
+    );
+    const clientModuleNames = [
+      "nexusCockpitHostViews.ts",
+      "nexusCockpitRenderState.ts",
+      "nexusCockpitTheme.ts",
+    ];
+
+    expect(entrypoint).not.toContain("function renderHostDashboard(");
+    expect(entrypoint).not.toContain("function renderProjectHeaderActions(");
+    expect(entrypoint).not.toContain("function dashboardRenderSignature(");
+    expect(entrypoint).not.toContain("function renderThemeToggle(");
+    for (const moduleName of clientModuleNames) {
+      const moduleUrl = new URL(
+        `../../src/cockpit/client/${moduleName}`,
+        import.meta.url,
+      );
+      expect(fs.existsSync(fileURLToPath(moduleUrl))).toBe(true);
+    }
+  });
+
   it("keeps history layout internals in DevNexus event-model terms", () => {
     const source = fs.readFileSync(
       fileURLToPath(new URL("../../src/cockpit/server/nexusDashboardHistoryLayout.ts", import.meta.url)),
