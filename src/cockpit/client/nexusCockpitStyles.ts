@@ -96,7 +96,13 @@ button, input, select { font: inherit; }
 .dn-config-facts dt, .dn-config-editor span { color: var(--dn-label); font-size: 0.68rem; font-weight: 900; text-transform: uppercase; }
 .dn-config-facts dd { margin: 0; overflow: hidden; color: var(--dn-strong); font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .dn-config-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.dn-config-editor input { min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--dn-border-muted); border-radius: 7px; color: var(--dn-muted); background: var(--dn-bg); }
+.dn-config-editor .wide { grid-column: 1 / -1; }
+.dn-config-editor input, .dn-config-editor select { min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--dn-border-muted); border-radius: 7px; color: var(--dn-strong); background: var(--dn-bg); font: inherit; font-weight: 760; }
+.dn-config-editor input:disabled, .dn-config-editor select:disabled { color: var(--dn-muted); cursor: not-allowed; opacity: 0.72; }
+.dn-config-confirm { grid-template-columns: auto minmax(0, 1fr) !important; align-items: center; }
+.dn-config-confirm input { width: 16px; height: 16px; padding: 0; }
+.dn-config-confirm span { text-transform: none; font-size: 0.78rem; color: var(--dn-muted); }
+.dn-config-preview { min-height: 42px; padding: 10px; border: 1px solid var(--dn-border-muted); border-radius: 8px; color: var(--dn-muted); background: var(--dn-surface-muted); font-size: 0.8rem; font-weight: 760; }
 .dn-config-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .dn-config-actions .dn-action.danger { --dn-action-accent: var(--dn-danger); }
 .dn-config-actions span { color: var(--dn-muted); font-size: 0.74rem; font-weight: 760; }

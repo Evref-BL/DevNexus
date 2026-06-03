@@ -553,7 +553,11 @@ describe("nexus dashboard client", () => {  it("renders graph node popovers as s
     expect(rendered).toContain('data-cockpit-config-window hidden aria-hidden="true"');
     expect(rendered).toContain('role="dialog"');
     expect(rendered).toContain('id="cockpit-config-window-title"');
-    expect(rendered).toContain("Component configuration edits need a guarded project config action.");
+    expect(rendered).toContain("Preview component configuration changes before writing the project config.");
+    expect(rendered).toContain('data-config-window-preview');
+    expect(rendered).toContain('data-config-window-apply disabled');
+    expect(rendered).toContain('data-config-window-input-id');
+    expect(rendered).toContain('data-config-window-remove-confirm');
     expect(rendered).toContain("Save changes");
     expect(rendered).toContain("Remove component");
   });
