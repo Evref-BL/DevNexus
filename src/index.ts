@@ -84,6 +84,7 @@ export * from "./providers/nexusProviderHttpClient.js";
 export * from "./git/nexusGitHubAppUserAuth.js";
 export * from "./project/nexusProjectComponentAdd.js";
 export * from "./project/nexusProjectComponentTopology.js";
+export * from "./project/nexusProjectConfigMutation.js";
 export * from "./project/nexusProjectHosting.js";
 export * from "./project/nexusProjectHostingIntegrationFixture.js";
 export * from "./project/nexusProjectPluginRefresh.js";
