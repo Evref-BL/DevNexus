@@ -13,6 +13,8 @@ GET /api/snapshot
 GET /api/weave
 GET /api/events
 GET /api/diagnostics
+POST /api/cockpit/project-config/preview
+POST /api/cockpit/project-config/apply
 GET /assets/dev-nexus-cockpit.js
 ```
 
@@ -68,6 +70,8 @@ archive/forget actions have explicit local action contracts:
 ```text
 POST /api/codex/thread
 POST /api/cockpit/thread-action
+POST /api/cockpit/project-config/preview
+POST /api/cockpit/project-config/apply
 ```
 
 `/api/cockpit/thread-action` records a local cockpit decision only. It hides
@@ -83,6 +87,14 @@ Workspace `plugins.records[]` includes configured plugins and curated catalogue
 entries. A catalogue entry has `state: "available"`, `source: "catalogue"`,
 `sourcePath: null`, `packageName`, `repositoryUrl`, `configExportName`,
 `installCommand`, and a `refreshCommand` suitable for copying into a shell.
+
+Project configuration writes are not raw JSON edits. The cockpit can preview
+and apply typed component configuration intents through the project-config
+routes. Preview returns validation, topology diagnostics, blocked reasons, and
+a freshness token. Apply requires that token and rejects stale, blocked, or
+unsupported writes before touching the project config file. Component removal
+removes the configuration record only; it does not delete source checkouts,
+worktrees, provider records, or secrets.
 
 Workspace `gitWorkflows` is a compact, read-only summary. It contains profile
 counts, the active profile id, run counts by broad state, configured profile

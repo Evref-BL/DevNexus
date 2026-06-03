@@ -90,14 +90,16 @@ collapsed or lower on the page.
 
 ## Configuration And Settings Direction
 
-The default cockpit should show configuration-derived state, not become the
-configuration editor. Main panels stay read-only and operational: they explain
-which policy is active, which runs are waiting, and what needs a human next.
+The default cockpit should show configuration-derived state, while Settings
+owns configuration edits. Main panels stay read-only and operational: they
+explain which policy is active, which runs are waiting, and what needs a human
+next.
 
-A future Settings surface should own edits to project configuration. Each
-setting needs a human-readable label, current value, source, validation state,
-permission boundary, pending diff, and explicit apply path. Settings changes
-should not be hidden behind status cards.
+Settings edits need a human-readable label, current value, source, validation
+state, permission boundary, pending diff, and explicit apply path. Settings
+changes should not be hidden behind status cards. Component configuration is the
+first read-write Settings path: it uses typed preview/apply intents and refuses
+stale or blocked writes before updating the project config file.
 
 Git workflows are the first good fit for this split. The workspace cockpit can
 show configured profiles and recorded runs now. Editing `automation.gitWorkflows`
