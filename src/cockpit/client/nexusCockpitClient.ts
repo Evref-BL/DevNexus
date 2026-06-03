@@ -218,7 +218,7 @@ export function mountDevNexusDashboard(root, options = {}) {
     root.innerHTML = markup;
     bindThemeControls(root, setThemeMode);
     bindSelectionControls(root, setSelectedId, setGitHistoryFilter);
-    bindCockpitConfigWindow(root);
+    bindCockpitConfigWindow(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));
     bindHostSignalControls(root, setHostFocus);
     bindGitHistoryColumnResizers(root);
     gitHistoryInteractions.refresh();
@@ -431,7 +431,7 @@ function renderComponentRail(snapshot, selectedId, gitHistoryFilter = '') {
     const selected = activeHistoryComponentId ? component.id === activeHistoryComponentId : id === selectedId;
     return `<div class="dn-component-rail-row ${selected ? 'selected' : ''}"><button class="dn-rail-item ${selected ? 'selected' : ''}" type="button" data-select-id="${escapeHtml(id)}" data-git-history-filter="${escapeHtml(`component:${component.id}`)}" data-scroll-target="project-git-history" aria-pressed="${selected ? 'true' : 'false'}"><span class="dn-dot tone-${escapeAttribute(tone)}"></span><span title="${escapeHtml(component.name)}">${escapeHtml(component.name)}</span><em title="${escapeHtml(branch)}">${escapeHtml(compactBranchName(branch))}</em></button><button class="dn-rail-icon-button" type="button" data-cockpit-config-action="edit-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Save changes')} aria-label="${escapeHtml(`Edit ${component.name} configuration`)}" title="${escapeHtml(`Edit ${component.name} configuration`)}">${gearIcon()}</button><button class="dn-rail-icon-button danger" type="button" data-cockpit-config-action="remove-component" ${cockpitComponentConfigAttributes(component, snapshot, 'Remove component')} aria-label="${escapeHtml(`Remove ${component.name}`)}" title="${escapeHtml(`Remove ${component.name}`)}">${trashIcon()}</button></div>`;
   }).join('') : '<p>No components loaded.</p>';
-  return `<section class="dn-rail-section" id="components-panel"><div class="dn-rail-heading-row"><span class="dn-rail-heading">Components</span><button class="dn-rail-icon-button primary" type="button" data-cockpit-config-action="add-component" data-config-kind="Project configuration" data-config-title="Add component" data-config-summary="Register a new DevNexus component in this workspace." data-config-action-label="Create component" data-config-name="New component" data-config-role="component" data-config-tracker="not configured" data-config-branch="not configured" data-config-path="${escapeHtml(snapshot.project?.root ?? '')}" aria-label="Add component" title="Add component">${plusIcon()}</button></div><div class="dn-rail-list">${body}${more}</div></section>`;
+  return `<section class="dn-rail-section" id="components-panel"><div class="dn-rail-heading-row"><span class="dn-rail-heading">Components</span><button class="dn-rail-icon-button primary" type="button" data-cockpit-config-action="add-component" data-config-component-id="" data-config-kind="Project configuration" data-config-title="Add component" data-config-summary="Register an existing DevNexus component in this workspace." data-config-action-label="Create component" data-config-name="" data-config-role="dependency" data-config-repo-kind="git" data-config-remote-url="" data-config-tracker="not configured" data-config-branch="main" data-config-path="" aria-label="Add component" title="Add component">${plusIcon()}</button></div><div class="dn-rail-list">${body}${more}</div></section>`;
 }
 
 function cockpitActiveHistoryComponentId(snapshot, gitHistoryFilter = '') {
@@ -447,12 +447,15 @@ function cockpitComponentConfigAttributes(component, snapshot, actionLabel) {
   const git = component.git ?? {};
   const state = git.dirty ? 'dirty' : component.sourceRootExists ? 'clean' : 'missing';
   const attrs = {
+    'data-config-component-id': component.id ?? '',
     'data-config-kind': 'Component configuration',
     'data-config-title': component.name ?? component.id ?? 'Component',
     'data-config-summary': 'Manage component registration, source root, tracker, and branch defaults.',
     'data-config-action-label': actionLabel,
     'data-config-name': component.name ?? component.id ?? 'Component',
     'data-config-role': component.role ?? 'component',
+    'data-config-repo-kind': component.kind ?? 'git',
+    'data-config-remote-url': component.remoteUrl ?? '',
     'data-config-tracker': component.defaultTrackerId ?? 'none',
     'data-config-branch': git.branch ?? 'missing branch',
     'data-config-path': component.sourceRoot ?? component.root ?? snapshot.project?.root ?? '',
@@ -462,7 +465,77 @@ function cockpitComponentConfigAttributes(component, snapshot, actionLabel) {
 }
 
 function renderCockpitConfigWindow(snapshot) {
-  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Component configuration edits need a guarded project config action.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections"><button type="button" class="selected">Components</button><button type="button" disabled title="Workflow settings will use this window pattern.">Workflows</button><button type="button" disabled title="Extension settings will use this window pattern.">Extensions</button></nav><section class="dn-config-pane"><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component name</span><input type="text" data-config-window-input-name disabled /></label><label><span>Source root</span><input type="text" data-config-window-input-path disabled /></label></div><div class="dn-config-actions"><button class="dn-action" type="button" disabled data-config-window-primary>Save changes</button><button class="dn-action danger" type="button" disabled>Remove component</button><span>Component configuration edits need a guarded project config action.</span></div></section></div></div></section>`;
+  const settings = snapshot.settings ?? { categories: [] };
+  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Preview component configuration changes before writing the project config.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections">${renderSettingsCategoryNav(settings)}</nav>${renderSettingsCategoryPanes(settings, snapshot)}</div></div></section>`;
+}
+
+function renderSettingsCategoryNav(settings) {
+  const categories = settings?.categories?.length ? settings.categories : fallbackSettingsCategories();
+  return categories.map((category, index) => {
+    const selected = index === 0 ? ' selected' : '';
+    return `<button type="button" class="${selected}" data-config-category-tab="${escapeHtml(category.id)}" data-config-kind="${escapeHtml(settingsCategoryKind(category))}" data-config-title="${escapeHtml(category.label)}" data-config-summary="${escapeHtml(category.summary)}"><span>${escapeHtml(category.label)}</span><em class="dn-config-state state-${escapeAttribute(category.mutationState)}">${escapeHtml(settingsCategoryStatusText(category))}</em></button>`;
+  }).join('');
+}
+
+function renderSettingsCategoryPanes(settings, snapshot) {
+  const categories = settings?.categories?.length ? settings.categories : fallbackSettingsCategories();
+  return categories.map((category, index) => {
+    const selected = index === 0 ? ' selected' : '';
+    if (category.id === 'components') {
+      return `<section class="dn-config-pane${selected}" data-config-category-pane="components"><div class="dn-config-category-summary">${renderSettingsCategorySummary(category)}</div><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component id</span><input type="text" data-config-window-input-id autocomplete="off" /></label><label><span>Component name</span><input type="text" data-config-window-input-name autocomplete="off" /></label><label><span>Role</span><select data-config-window-input-role><option value="primary">primary</option><option value="extension">extension</option><option value="addon">addon</option><option value="dependency">dependency</option><option value="optional">optional</option></select></label><label><span>Repository kind</span><select data-config-window-input-kind><option value="git">git</option><option value="local">local</option></select></label><label><span>Source root</span><input type="text" data-config-window-input-path autocomplete="off" /></label><label><span>Default branch</span><input type="text" data-config-window-input-branch autocomplete="off" /></label><label class="wide"><span>Remote URL</span><input type="text" data-config-window-input-remote autocomplete="off" /></label><label class="wide dn-config-confirm" data-config-window-remove-confirm-wrap hidden><input type="checkbox" data-config-window-remove-confirm /> <span>Remove the component record from project configuration. Source files stay untouched.</span></label></div><div class="dn-config-preview" data-config-window-preview-output aria-live="polite">No preview yet.</div><div class="dn-config-actions"><button class="dn-action" type="button" data-config-window-preview>Preview changes</button><button class="dn-action" type="button" data-config-window-apply disabled>Save changes</button><span data-config-window-status>Preview required before apply.</span></div></section>`;
+    }
+    return `<section class="dn-config-pane dn-config-readonly-pane${selected}" data-config-category-pane="${escapeHtml(category.id)}"><div class="dn-config-category-summary">${renderSettingsCategorySummary(category)}</div><div class="dn-config-item-list">${(category.items ?? []).map(renderSettingsItem).join('')}</div></section>`;
+  }).join('');
+}
+
+function renderSettingsCategorySummary(category) {
+  return `<div><span class="dn-eyebrow">${escapeHtml(category.primaryScope ?? 'settings')}</span><strong>${escapeHtml(settingsCategoryStatusText(category))}</strong><p>${escapeHtml(category.summary ?? '')}</p></div><div class="dn-config-category-counts"><span>${escapeHtml(countLabel(category.itemCount ?? 0, 'setting'))}</span><span>${escapeHtml(countLabel(category.blockedCount ?? 0, 'blocked item'))}</span></div>`;
+}
+
+function renderSettingsItem(item) {
+  return `<article class="dn-config-item state-${escapeAttribute(item.mutationState)}"><div><strong>${escapeHtml(item.label)}</strong><p>${escapeHtml(item.detail)}</p>${item.blocker ? `<em>${escapeHtml(item.blocker)}</em>` : ''}</div><dl><div><dt>Scope</dt><dd>${escapeHtml(settingsScopeLabel(item.scope))}</dd></div><div><dt>Source</dt><dd title="${escapeHtml(item.source ?? 'not configured')}">${escapeHtml(item.source ?? 'not configured')}</dd></div><div><dt>Effective</dt><dd>${escapeHtml(item.effectiveValue ?? 'not configured')}</dd></div><div><dt>Status</dt><dd>${escapeHtml(settingsMutationLabel(item.mutationState))}</dd></div></dl></article>`;
+}
+
+function fallbackSettingsCategories() {
+  return [{
+    id: 'components',
+    label: 'Components',
+    summary: 'Component configuration is available after the workspace snapshot loads.',
+    primaryScope: 'project',
+    mutationState: 'editable',
+    itemCount: 0,
+    editableCount: 0,
+    blockedCount: 0,
+    readOnlyCount: 0,
+    secretCount: 0,
+    items: [],
+  }];
+}
+
+function settingsCategoryKind(category) {
+  return category.id === 'components' ? 'Component configuration' : 'Settings';
+}
+
+function settingsCategoryStatusText(category) {
+  if ((category.blockedCount ?? 0) > 0) return `${category.blockedCount} blocked`;
+  if ((category.editableCount ?? 0) > 0) return 'Editable';
+  if ((category.secretCount ?? 0) > 0) return 'Redacted';
+  return settingsMutationLabel(category.mutationState);
+}
+
+function settingsMutationLabel(state) {
+  if (state === 'editable') return 'Editable';
+  if (state === 'preview-only') return 'Preview only';
+  if (state === 'blocked') return 'Blocked';
+  return 'Read only';
+}
+
+function settingsScopeLabel(scope) {
+  if (scope === 'built-in') return 'Built-in';
+  if (scope === 'host-local') return 'Host local';
+  if (scope === 'auth-profile') return 'Auth profile';
+  if (scope === 'secret-store') return 'Secret store';
+  return String(scope ?? 'settings').replace(/^\w/u, (letter) => letter.toUpperCase());
 }
 
 function renderWorkflowRail(snapshot) {
@@ -502,9 +575,15 @@ function safeHistoryRows(snapshot) {
 }
 
 function renderSettingsRail(snapshot) {
-  const plugins = snapshot.plugins ?? {};
-  const count = [countLabel(plugins.enabledCount ?? 0, 'enabled plugin'), plugins.capabilityCount ? countLabel(plugins.capabilityCount, 'capability', 'capabilities') : null].filter(Boolean).join(' · ');
-  return `<section class="dn-rail-section" id="plugins-panel"><span class="dn-rail-heading">Settings</span><p>Extensions, local tools, and cockpit options.</p><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
+  const settings = snapshot.settings ?? {};
+  const categories = settings.categories ?? [];
+  const count = [
+    countLabel(settings.totalCategoryCount ?? categories.length, 'category', 'categories'),
+    settings.blockedCategoryCount ? countLabel(settings.blockedCategoryCount, 'blocked category', 'blocked categories') : null,
+    settings.redactedSecretCount ? `${settings.redactedSecretCount} redacted` : null,
+  ].filter(Boolean).join(' · ');
+  const buttons = categories.slice(0, 5).map((category) => `<button class="dn-rail-settings-row" type="button" data-cockpit-config-action="settings-category" data-config-category-id="${escapeHtml(category.id)}" data-config-kind="${escapeHtml(settingsCategoryKind(category))}" data-config-title="${escapeHtml(category.label)}" data-config-summary="${escapeHtml(category.summary)}"><span>${escapeHtml(category.label)}</span><em class="state-${escapeAttribute(category.mutationState)}">${escapeHtml(settingsCategoryStatusText(category))}</em></button>`).join('');
+  return `<section class="dn-rail-section" id="settings-panel"><span class="dn-rail-heading">Settings</span><p>Project, host-local, provider, and cockpit configuration.</p><div class="dn-rail-settings-list">${buttons}</div><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
 }
 
 function renderCockpitOperationsPanel(snapshot, panels) {
@@ -513,12 +592,16 @@ function renderCockpitOperationsPanel(snapshot, panels) {
   return `<details class="dn-ops-panel" id="cockpit-ops-panel" data-panel-state="closed" data-ops-pending-count="${escapeHtml(String(metrics.pendingDecisions))}"><summary aria-label="${escapeHtml(`Open operations panel, ${pendingLabel}`)}"><span class="dn-ops-icon">${signalIcon('worktrees')}</span><span class="dn-ops-summary-copy"><strong>Operations</strong><em>${escapeHtml(pendingLabel)}</em></span><span class="dn-ops-badge">${escapeHtml(String(metrics.pendingDecisions))}</span></summary><div class="dn-ops-panel-body">${panels.threadInbox}${panels.trackedWork}${panels.activity}${panels.blockers}</div></details>`;
 }
 
-function bindCockpitConfigWindow(container) {
+function bindCockpitConfigWindow(container, baseUrl = '', actionToken = '', workspaceId = '', onMutation = null) {
   const overlay = container.querySelector('[data-cockpit-config-window]');
   if (!overlay) return;
+  let activeAction = '';
+  let activeComponentId = '';
+  let activeProposal = null;
   const close = () => {
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
+    activeProposal = null;
   };
   const setText = (selector, value) => {
     const element = overlay.querySelector(selector);
@@ -528,30 +611,207 @@ function bindCockpitConfigWindow(container) {
     const element = overlay.querySelector(selector);
     if (element) element.value = String(value ?? '');
   };
+  const setChecked = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.checked = Boolean(value);
+  };
+  const setHidden = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.hidden = Boolean(value);
+  };
+  const setDisabled = (selector, value) => {
+    const element = overlay.querySelector(selector);
+    if (element) element.disabled = Boolean(value);
+  };
+  const setCategory = (categoryId = 'components', updateHeader = false) => {
+    const id = categoryId || 'components';
+    let selectedTab = null;
+    overlay.querySelectorAll('[data-config-category-tab]').forEach((tab) => {
+      const selected = tab.getAttribute('data-config-category-tab') === id;
+      tab.classList.toggle('selected', selected);
+      if (selected) selectedTab = tab;
+    });
+    overlay.querySelectorAll('[data-config-category-pane]').forEach((pane) => {
+      pane.classList.toggle('selected', pane.getAttribute('data-config-category-pane') === id);
+    });
+    if (updateHeader && selectedTab) {
+      setText('[data-config-window-kind]', selectedTab.getAttribute('data-config-kind') ?? 'Settings');
+      setText('[data-config-window-title]', selectedTab.getAttribute('data-config-title') ?? 'Settings');
+      setText('[data-config-window-summary]', selectedTab.getAttribute('data-config-summary') ?? 'Inspect configuration scope, source, and mutation status.');
+    }
+  };
   const open = (button) => {
     const action = button.getAttribute('data-cockpit-config-action') ?? '';
+    activeAction = action;
+    activeComponentId = button.getAttribute('data-config-component-id') ?? '';
+    activeProposal = null;
+    if (action === 'settings-category') {
+      setCategory(button.getAttribute('data-config-category-id') ?? 'components', true);
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      overlay.querySelector('.dn-config-nav button.selected')?.focus?.();
+      return;
+    }
+    setCategory('components', false);
     const primaryLabel = button.getAttribute('data-config-action-label') ?? (action === 'remove-component' ? 'Remove component' : 'Save changes');
     setText('[data-config-window-kind]', button.getAttribute('data-config-kind') ?? 'Component configuration');
     setText('[data-config-window-title]', button.getAttribute('data-config-title') ?? 'Configure component');
-    setText('[data-config-window-summary]', button.getAttribute('data-config-summary') ?? 'Component configuration edits need a guarded project config action.');
+    setText('[data-config-window-summary]', button.getAttribute('data-config-summary') ?? 'Preview component configuration changes before writing the project config.');
     setText('[data-config-window-name]', button.getAttribute('data-config-name') ?? '');
     setText('[data-config-window-role]', button.getAttribute('data-config-role') ?? '');
     setText('[data-config-window-tracker]', button.getAttribute('data-config-tracker') ?? '');
     setText('[data-config-window-branch]', button.getAttribute('data-config-branch') ?? '');
     setText('[data-config-window-path]', button.getAttribute('data-config-path') ?? '');
     setText('[data-config-window-state]', button.getAttribute('data-config-state') ?? 'pending configuration action');
-    setText('[data-config-window-primary]', primaryLabel);
-    setInput('[data-config-window-input-name]', button.getAttribute('data-config-name') ?? '');
-    setInput('[data-config-window-input-path]', button.getAttribute('data-config-path') ?? '');
+    setInput('[data-config-window-input-id]', activeComponentId);
+    setInput('[data-config-window-input-name]', action === 'add-component' ? '' : button.getAttribute('data-config-name') ?? '');
+    setInput('[data-config-window-input-path]', action === 'add-component' ? '' : button.getAttribute('data-config-path') ?? '');
+    setInput('[data-config-window-input-role]', action === 'add-component' ? 'dependency' : button.getAttribute('data-config-role') ?? 'dependency');
+    setInput('[data-config-window-input-kind]', action === 'add-component' ? 'git' : button.getAttribute('data-config-repo-kind') ?? 'git');
+    setInput('[data-config-window-input-branch]', action === 'add-component' ? 'main' : button.getAttribute('data-config-branch') ?? '');
+    setInput('[data-config-window-input-remote]', action === 'add-component' ? '' : button.getAttribute('data-config-remote-url') ?? '');
+    setChecked('[data-config-window-remove-confirm]', false);
+    setHidden('[data-config-window-remove-confirm-wrap]', action !== 'remove-component');
+    setDisabled('[data-config-window-input-id]', action !== 'add-component');
+    setDisabled('[data-config-window-input-name]', action === 'remove-component');
+    setDisabled('[data-config-window-input-path]', action === 'remove-component');
+    setDisabled('[data-config-window-input-role]', action === 'remove-component');
+    setDisabled('[data-config-window-input-kind]', action === 'remove-component');
+    setDisabled('[data-config-window-input-branch]', action !== 'add-component');
+    setDisabled('[data-config-window-input-remote]', action === 'remove-component');
+    setText('[data-config-window-preview-output]', 'No preview yet.');
+    setText('[data-config-window-status]', actionToken ? 'Preview required before apply.' : 'Cockpit action token is missing.');
+    setText('[data-config-window-apply]', primaryLabel);
+    setDisabled('[data-config-window-preview]', !actionToken);
+    setDisabled('[data-config-window-apply]', true);
     overlay.hidden = false;
     overlay.setAttribute('aria-hidden', 'false');
-    overlay.querySelector('[data-cockpit-config-close]')?.focus?.();
+    overlay.querySelector(action === 'add-component' ? '[data-config-window-input-id]' : '[data-config-window-input-name]')?.focus?.();
+  };
+  const clearProposal = () => {
+    activeProposal = null;
+    setDisabled('[data-config-window-apply]', true);
+    setText('[data-config-window-status]', 'Preview required before apply.');
+  };
+  const currentIntent = () => {
+    const id = String(overlay.querySelector('[data-config-window-input-id]')?.value ?? '').trim();
+    const name = String(overlay.querySelector('[data-config-window-input-name]')?.value ?? '').trim();
+    const sourceRoot = String(overlay.querySelector('[data-config-window-input-path]')?.value ?? '').trim();
+    const role = String(overlay.querySelector('[data-config-window-input-role]')?.value ?? '').trim();
+    const kind = String(overlay.querySelector('[data-config-window-input-kind]')?.value ?? '').trim();
+    const branch = String(overlay.querySelector('[data-config-window-input-branch]')?.value ?? '').trim();
+    const remoteUrl = String(overlay.querySelector('[data-config-window-input-remote]')?.value ?? '').trim();
+    if (activeAction === 'add-component') {
+      return { kind: 'add_component', answers: { components: [{ id, name, role, source: { kind: 'reference_existing', path: sourceRoot, ...(branch ? { defaultBranch: branch } : {}), ...(remoteUrl ? { remoteUrl } : {}) } }], localWorkTracking: { enabled: true, provider: 'local' } } };
+    }
+    if (activeAction === 'remove-component') {
+      return { kind: 'remove_component', componentId: activeComponentId };
+    }
+    const patch = { name, kind, role, sourceRoot, remoteUrl: remoteUrl || null };
+    return { kind: 'edit_component', componentId: activeComponentId, patch };
+  };
+  const renderProposal = (proposal) => {
+    const errors = (proposal?.diagnostics ?? []).filter((diagnostic) => diagnostic.severity === 'error');
+    const warnings = (proposal?.diagnostics ?? []).filter((diagnostic) => diagnostic.severity !== 'error');
+    const lines = [
+      proposal?.summary ?? 'Preview returned no summary.',
+      errors.length ? `${errors.length} blocker${errors.length === 1 ? '' : 's'}.` : 'Ready to apply.',
+      warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}.` : '',
+      ...errors.slice(0, 3).map((diagnostic) => diagnostic.message),
+      ...warnings.slice(0, 2).map((diagnostic) => diagnostic.message),
+    ].filter(Boolean);
+    setText('[data-config-window-preview-output]', lines.join(' '));
+    setText('[data-config-window-status]', errors.length ? 'Blocked.' : 'Preview ready.');
+    const confirmed = activeAction !== 'remove-component' || Boolean(overlay.querySelector('[data-config-window-remove-confirm]')?.checked);
+    setDisabled('[data-config-window-apply]', errors.length > 0 || !confirmed);
+  };
+  const preview = async () => {
+    setText('[data-config-window-status]', 'Previewing...');
+    setDisabled('[data-config-window-preview]', true);
+    setDisabled('[data-config-window-apply]', true);
+    try {
+      const headers = { 'content-type': 'application/json' };
+      if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;
+      const response = await fetch(`${baseUrl}/api/cockpit/project-config/preview${workspaceQuery(workspaceId)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ intent: currentIntent() }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);
+      activeProposal = payload.proposal;
+      renderProposal(activeProposal);
+    } catch (error) {
+      activeProposal = null;
+      setText('[data-config-window-preview-output]', error instanceof Error ? error.message : String(error));
+      setText('[data-config-window-status]', 'Preview failed.');
+    } finally {
+      setDisabled('[data-config-window-preview]', !actionToken);
+    }
+  };
+  const apply = async () => {
+    if (!activeProposal) {
+      await preview();
+      if (!activeProposal) return;
+    }
+    const confirmed = activeAction !== 'remove-component' || Boolean(overlay.querySelector('[data-config-window-remove-confirm]')?.checked);
+    if (!confirmed) {
+      setText('[data-config-window-status]', 'Confirm removal first.');
+      return;
+    }
+    setText('[data-config-window-status]', 'Applying...');
+    setDisabled('[data-config-window-preview]', true);
+    setDisabled('[data-config-window-apply]', true);
+    try {
+      const headers = { 'content-type': 'application/json' };
+      if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;
+      const response = await fetch(`${baseUrl}/api/cockpit/project-config/apply${workspaceQuery(workspaceId)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ expectedRevision: activeProposal.revision, intent: activeProposal.intent }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);
+      setText('[data-config-window-status]', 'Applied.');
+      setText('[data-config-window-preview-output]', `Updated ${payload.result?.writtenFiles?.length ?? 0} file${payload.result?.writtenFiles?.length === 1 ? '' : 's'}.`);
+      if (typeof onMutation === 'function') await onMutation();
+      close();
+    } catch (error) {
+      activeProposal = null;
+      setText('[data-config-window-preview-output]', error instanceof Error ? error.message : String(error));
+      setText('[data-config-window-status]', 'Apply failed. Refresh and preview again.');
+      setDisabled('[data-config-window-preview]', !actionToken);
+    }
   };
   container.querySelectorAll('[data-cockpit-config-action]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       open(button);
+    });
+  });
+  overlay.querySelectorAll('input, select').forEach((field) => {
+    field.addEventListener('input', () => {
+      if (field.matches('[data-config-window-remove-confirm]')) return;
+      clearProposal();
+    });
+    field.addEventListener('change', () => {
+      if (field.matches('[data-config-window-remove-confirm]')) {
+        if (activeProposal) renderProposal(activeProposal);
+        return;
+      }
+      clearProposal();
+    });
+  });
+  overlay.querySelector('[data-config-window-preview]')?.addEventListener('click', preview);
+  overlay.querySelector('[data-config-window-apply]')?.addEventListener('click', apply);
+  overlay.querySelectorAll('[data-config-category-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeAction = button.getAttribute('data-config-category-tab') === 'components'
+        ? activeAction
+        : 'settings-category';
+      activeProposal = null;
+      setCategory(button.getAttribute('data-config-category-tab') ?? 'components', true);
     });
   });
   overlay.querySelectorAll('[data-cockpit-config-close]').forEach((button) => {

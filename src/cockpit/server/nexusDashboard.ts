@@ -47,6 +47,7 @@ import {
   summarizePublication,
 } from "./nexusDashboardAutomationModel.js";
 import { summarizeLocalTrackedWork, summarizeTrackedWork } from "./nexusDashboardTrackedWorkModel.js";
+import { summarizeDashboardSettings } from "./nexusDashboardSettingsModel.js";
 import { buildDashboardEvents } from "./nexusDashboardEvents.js";
 import { dashboardSignals, dashboardSummary } from "./nexusDashboardSignals.js";
 import { capture, captureAsync, isoString, nonEmptyString } from "./nexusDashboardModelUtils.js";
@@ -111,6 +112,12 @@ export type {
   NexusDashboardThreadSummary,
   NexusDashboardPluginRecord,
   NexusDashboardPluginSummary,
+  NexusDashboardSettingsScope,
+  NexusDashboardSettingsMutationState,
+  NexusDashboardSettingsSensitivity,
+  NexusDashboardSettingsItem,
+  NexusDashboardSettingsCategory,
+  NexusDashboardSettingsSummary,
   NexusDashboardTrackedWorkKind,
   NexusDashboardTrackedWorkItem,
   NexusDashboardTrackedWorkSummary,
@@ -227,6 +234,16 @@ export async function buildNexusDashboardSnapshot(
   const authority = summarizeAuthority(
     automation.value?.authority ?? targetReport.value?.authority ?? null,
   );
+  const settings = summarizeDashboardSettings({
+    projectRoot,
+    projectConfig,
+    components: componentSummaries,
+    plugins,
+    gitWorkflows,
+    publication,
+    authority,
+    homePath: options.homePath,
+  });
   const blockers = dashboardBlockers({
     automation,
     eligibleWork,
@@ -280,6 +297,7 @@ export async function buildNexusDashboardSnapshot(
     features,
     gitWorkflows,
     plugins,
+    settings,
     trackedWork,
     publication,
     authority,
@@ -307,6 +325,16 @@ export async function buildNexusDashboardWorkspaceShell(
     threads: emptyThreadSummary(),
   });
   const gitWorkflows = summarizeGitWorkflows(projectRoot, projectConfig);
+  const settings = summarizeDashboardSettings({
+    projectRoot,
+    projectConfig,
+    components: componentSummaries,
+    plugins,
+    gitWorkflows,
+    publication: [],
+    authority: null,
+    homePath: options.homePath,
+  });
 
   return {
     version: 1,
@@ -333,6 +361,7 @@ export async function buildNexusDashboardWorkspaceShell(
     features,
     gitWorkflows,
     plugins,
+    settings,
     trackedWork: emptyTrackedWorkSummary(),
     publication: [],
     authority: null,
