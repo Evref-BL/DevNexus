@@ -258,6 +258,62 @@ export interface NexusDashboardPluginSummary {
   records: NexusDashboardPluginRecord[];
 }
 
+export type NexusDashboardSettingsScope =
+  | "built-in"
+  | "project"
+  | "workspace"
+  | "host-local"
+  | "auth-profile"
+  | "secret-store"
+  | "session";
+
+export type NexusDashboardSettingsMutationState =
+  | "editable"
+  | "preview-only"
+  | "read-only"
+  | "blocked";
+
+export type NexusDashboardSettingsSensitivity =
+  | "public"
+  | "local"
+  | "sensitive"
+  | "secret";
+
+export interface NexusDashboardSettingsItem {
+  id: string;
+  label: string;
+  scope: NexusDashboardSettingsScope;
+  source: string | null;
+  effectiveValue: string;
+  sensitivity: NexusDashboardSettingsSensitivity;
+  mutationState: NexusDashboardSettingsMutationState;
+  mutationContract: string | null;
+  detail: string;
+  blocker: string | null;
+}
+
+export interface NexusDashboardSettingsCategory {
+  id: string;
+  label: string;
+  summary: string;
+  primaryScope: NexusDashboardSettingsScope;
+  mutationState: NexusDashboardSettingsMutationState;
+  itemCount: number;
+  editableCount: number;
+  blockedCount: number;
+  readOnlyCount: number;
+  secretCount: number;
+  items: NexusDashboardSettingsItem[];
+}
+
+export interface NexusDashboardSettingsSummary {
+  totalCategoryCount: number;
+  editableCategoryCount: number;
+  blockedCategoryCount: number;
+  redactedSecretCount: number;
+  categories: NexusDashboardSettingsCategory[];
+}
+
 export type NexusDashboardTrackedWorkKind =
   | "blocked"
   | "ready"
@@ -406,6 +462,7 @@ export interface NexusDashboardSnapshot {
   features: NexusDashboardFeatureSummary;
   gitWorkflows: NexusDashboardGitWorkflowSummary;
   plugins: NexusDashboardPluginSummary;
+  settings: NexusDashboardSettingsSummary;
   trackedWork: NexusDashboardTrackedWorkSummary;
   publication: NexusDashboardPublicationSummary[];
   authority: NexusDashboardAuthoritySummary | null;

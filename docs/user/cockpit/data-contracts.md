@@ -102,6 +102,38 @@ records, and recent run records. It must not expose raw
 `automation.gitWorkflows` JSON; editable configuration belongs in a future
 Settings surface with validation and an explicit apply step.
 
+## Settings Contract
+
+Cockpit Settings are schema/catalog driven. The UI should not present raw
+project, home, provider, or secret-store JSON as the normal editing surface.
+Every setting category should expose:
+
+- the scope that owns it
+- the source file or service, if safe to show
+- the effective status
+- whether it is editable, preview-only, read-only, or blocked
+- the mutation contract required before it can be written
+- whether values are portable, host-local, provider-backed, or secret
+
+The cockpit uses these setting layers:
+
+| Layer | Purpose | Default cockpit write status |
+| --- | --- | --- |
+| Built-in defaults | DevNexus product defaults. | read-only |
+| Project config | Portable team configuration committed with the workspace. | editable only through typed project-config routes |
+| Workspace state | Local DevNexus operational records for this workspace. | read-only unless a specific local action contract exists |
+| Host-local config | Machine/user preferences, local paths, auth profile metadata, and runtime adapters. | blocked until local-only write contracts exist |
+| Auth profiles | Named account and provider references. | visible and redacted; writes need separate auth contracts |
+| Secret stores | Tokens, private keys, passwords, and refresh material. | never serialized to the browser |
+| Session overrides | CLI or cockpit temporary choices. | local/session-only |
+
+The current writable Settings category is component configuration. It can add,
+edit, preview, and remove component configuration records through
+`/api/cockpit/project-config/preview` and
+`/api/cockpit/project-config/apply`. Other categories may be visible in the
+Settings window, but they must show disabled or blocked states with a precise
+reason until their mutation policy and tests exist.
+
 ## Workspace Drill-Down
 
 A host app can preserve context by keeping the `workspace` query parameter on

@@ -540,6 +540,79 @@ describe("nexus dashboard client", () => {  it("renders graph node popovers as s
       features: { activeCount: 0, needsAttentionCount: 0, records: [] },
       gitWorkflows: { profiles: [], runs: [], activeRunCount: 0, waitingRunCount: 0, blockedRunCount: 0 },
       plugins: { enabledCount: 0, capabilityCount: 0, records: [] },
+      settings: {
+        totalCategoryCount: 3,
+        editableCategoryCount: 1,
+        blockedCategoryCount: 1,
+        redactedSecretCount: 1,
+        categories: [
+          {
+            id: "components",
+            label: "Components",
+            summary: "Component registration is writable through typed preview and apply routes.",
+            primaryScope: "project",
+            mutationState: "editable",
+            itemCount: 1,
+            editableCount: 1,
+            blockedCount: 0,
+            readOnlyCount: 0,
+            secretCount: 0,
+            items: [],
+          },
+          {
+            id: "auth-profiles",
+            label: "Auth Profiles",
+            summary: "Account references are visible as redacted profiles, not raw credentials.",
+            primaryScope: "auth-profile",
+            mutationState: "blocked",
+            itemCount: 1,
+            editableCount: 0,
+            blockedCount: 1,
+            readOnlyCount: 0,
+            secretCount: 0,
+            items: [
+              {
+                id: "auth-profiles.records",
+                label: "Configured auth profiles",
+                scope: "auth-profile",
+                source: "DevNexus home config",
+                effectiveValue: "1 profiles",
+                sensitivity: "sensitive",
+                mutationState: "blocked",
+                mutationContract: "auth-profile mutation contract",
+                detail: "Profile ids and capability state only.",
+                blocker: "Auth profile writes need local account selection.",
+              },
+            ],
+          },
+          {
+            id: "secrets",
+            label: "Secrets",
+            summary: "Secret values are write-only or external to the cockpit payload.",
+            primaryScope: "secret-store",
+            mutationState: "read-only",
+            itemCount: 1,
+            editableCount: 0,
+            blockedCount: 0,
+            readOnlyCount: 1,
+            secretCount: 1,
+            items: [
+              {
+                id: "secrets.values",
+                label: "Credential material",
+                scope: "secret-store",
+                source: "host credential store",
+                effectiveValue: "redacted",
+                sensitivity: "secret",
+                mutationState: "read-only",
+                mutationContract: null,
+                detail: "Tokens and private keys are never serialized to the browser.",
+                blocker: null,
+              },
+            ],
+          },
+        ],
+      },
       trackedWork: { readyCount: 0, blockedCount: 0, importCandidateCount: 0, staleCount: 0, records: [] },
       threads: { totalCount: 0, activeCount: 0, needsDecisionCount: 0, records: [] },
       history: { totalCommitCount: 0, repositories: [], incomplete: false, detail: null },
@@ -560,6 +633,14 @@ describe("nexus dashboard client", () => {  it("renders graph node popovers as s
     expect(rendered).toContain('data-config-window-remove-confirm');
     expect(rendered).toContain("Save changes");
     expect(rendered).toContain("Remove component");
+    expect(rendered).toContain('id="settings-panel"');
+    expect(rendered).toContain('data-cockpit-config-action="settings-category" data-config-category-id="auth-profiles"');
+    expect(rendered).toContain('data-config-category-tab="auth-profiles"');
+    expect(rendered).toContain('data-config-category-pane="auth-profiles"');
+    expect(rendered).toContain("Account references are visible as redacted profiles, not raw credentials.");
+    expect(rendered).toContain("Credential material");
+    expect(rendered).toContain("redacted");
+    expect(rendered).toContain("Auth profile writes need local account selection.");
   });
 
   it("keeps visible dashboard content stable during background refresh", async () => {

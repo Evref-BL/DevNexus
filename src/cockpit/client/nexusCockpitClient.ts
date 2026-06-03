@@ -465,7 +465,77 @@ function cockpitComponentConfigAttributes(component, snapshot, actionLabel) {
 }
 
 function renderCockpitConfigWindow(snapshot) {
-  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Preview component configuration changes before writing the project config.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections"><button type="button" class="selected">Components</button><button type="button" disabled title="Workflow settings need a separate policy.">Workflows</button><button type="button" disabled title="Extension settings need a separate policy.">Extensions</button></nav><section class="dn-config-pane"><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component id</span><input type="text" data-config-window-input-id autocomplete="off" /></label><label><span>Component name</span><input type="text" data-config-window-input-name autocomplete="off" /></label><label><span>Role</span><select data-config-window-input-role><option value="primary">primary</option><option value="extension">extension</option><option value="addon">addon</option><option value="dependency">dependency</option><option value="optional">optional</option></select></label><label><span>Repository kind</span><select data-config-window-input-kind><option value="git">git</option><option value="local">local</option></select></label><label><span>Source root</span><input type="text" data-config-window-input-path autocomplete="off" /></label><label><span>Default branch</span><input type="text" data-config-window-input-branch autocomplete="off" /></label><label class="wide"><span>Remote URL</span><input type="text" data-config-window-input-remote autocomplete="off" /></label><label class="wide dn-config-confirm" data-config-window-remove-confirm-wrap hidden><input type="checkbox" data-config-window-remove-confirm /> <span>Remove the component record from project configuration. Source files stay untouched.</span></label></div><div class="dn-config-preview" data-config-window-preview-output aria-live="polite">No preview yet.</div><div class="dn-config-actions"><button class="dn-action" type="button" data-config-window-preview>Preview changes</button><button class="dn-action" type="button" data-config-window-apply disabled>Save changes</button><span data-config-window-status>Preview required before apply.</span></div></section></div></div></section>`;
+  const settings = snapshot.settings ?? { categories: [] };
+  return `<section class="dn-config-overlay" data-cockpit-config-window hidden aria-hidden="true"><div class="dn-config-window" role="dialog" aria-modal="false" aria-labelledby="cockpit-config-window-title"><header><div><span class="dn-eyebrow" data-config-window-kind>Component configuration</span><h2 id="cockpit-config-window-title" data-config-window-title>Configure component</h2><p data-config-window-summary>Preview component configuration changes before writing the project config.</p></div><button class="dn-config-close" type="button" data-cockpit-config-close aria-label="Close configuration window">×</button></header><div class="dn-config-window-body"><nav class="dn-config-nav" aria-label="Configuration sections">${renderSettingsCategoryNav(settings)}</nav>${renderSettingsCategoryPanes(settings, snapshot)}</div></div></section>`;
+}
+
+function renderSettingsCategoryNav(settings) {
+  const categories = settings?.categories?.length ? settings.categories : fallbackSettingsCategories();
+  return categories.map((category, index) => {
+    const selected = index === 0 ? ' selected' : '';
+    return `<button type="button" class="${selected}" data-config-category-tab="${escapeHtml(category.id)}" data-config-kind="${escapeHtml(settingsCategoryKind(category))}" data-config-title="${escapeHtml(category.label)}" data-config-summary="${escapeHtml(category.summary)}"><span>${escapeHtml(category.label)}</span><em class="dn-config-state state-${escapeAttribute(category.mutationState)}">${escapeHtml(settingsCategoryStatusText(category))}</em></button>`;
+  }).join('');
+}
+
+function renderSettingsCategoryPanes(settings, snapshot) {
+  const categories = settings?.categories?.length ? settings.categories : fallbackSettingsCategories();
+  return categories.map((category, index) => {
+    const selected = index === 0 ? ' selected' : '';
+    if (category.id === 'components') {
+      return `<section class="dn-config-pane${selected}" data-config-category-pane="components"><div class="dn-config-category-summary">${renderSettingsCategorySummary(category)}</div><dl class="dn-config-facts"><div><dt>Name</dt><dd data-config-window-name>${escapeHtml(snapshot.project?.name ?? 'Component')}</dd></div><div><dt>Role</dt><dd data-config-window-role>component</dd></div><div><dt>Tracker</dt><dd data-config-window-tracker>not configured</dd></div><div><dt>Branch</dt><dd data-config-window-branch>not configured</dd></div><div><dt>Source</dt><dd data-config-window-path title="${escapeHtml(snapshot.project?.root ?? '')}">${escapeHtml(snapshot.project?.root ?? 'not configured')}</dd></div><div><dt>State</dt><dd data-config-window-state>not opened</dd></div></dl><div class="dn-config-editor"><label><span>Component id</span><input type="text" data-config-window-input-id autocomplete="off" /></label><label><span>Component name</span><input type="text" data-config-window-input-name autocomplete="off" /></label><label><span>Role</span><select data-config-window-input-role><option value="primary">primary</option><option value="extension">extension</option><option value="addon">addon</option><option value="dependency">dependency</option><option value="optional">optional</option></select></label><label><span>Repository kind</span><select data-config-window-input-kind><option value="git">git</option><option value="local">local</option></select></label><label><span>Source root</span><input type="text" data-config-window-input-path autocomplete="off" /></label><label><span>Default branch</span><input type="text" data-config-window-input-branch autocomplete="off" /></label><label class="wide"><span>Remote URL</span><input type="text" data-config-window-input-remote autocomplete="off" /></label><label class="wide dn-config-confirm" data-config-window-remove-confirm-wrap hidden><input type="checkbox" data-config-window-remove-confirm /> <span>Remove the component record from project configuration. Source files stay untouched.</span></label></div><div class="dn-config-preview" data-config-window-preview-output aria-live="polite">No preview yet.</div><div class="dn-config-actions"><button class="dn-action" type="button" data-config-window-preview>Preview changes</button><button class="dn-action" type="button" data-config-window-apply disabled>Save changes</button><span data-config-window-status>Preview required before apply.</span></div></section>`;
+    }
+    return `<section class="dn-config-pane dn-config-readonly-pane${selected}" data-config-category-pane="${escapeHtml(category.id)}"><div class="dn-config-category-summary">${renderSettingsCategorySummary(category)}</div><div class="dn-config-item-list">${(category.items ?? []).map(renderSettingsItem).join('')}</div></section>`;
+  }).join('');
+}
+
+function renderSettingsCategorySummary(category) {
+  return `<div><span class="dn-eyebrow">${escapeHtml(category.primaryScope ?? 'settings')}</span><strong>${escapeHtml(settingsCategoryStatusText(category))}</strong><p>${escapeHtml(category.summary ?? '')}</p></div><div class="dn-config-category-counts"><span>${escapeHtml(countLabel(category.itemCount ?? 0, 'setting'))}</span><span>${escapeHtml(countLabel(category.blockedCount ?? 0, 'blocked item'))}</span></div>`;
+}
+
+function renderSettingsItem(item) {
+  return `<article class="dn-config-item state-${escapeAttribute(item.mutationState)}"><div><strong>${escapeHtml(item.label)}</strong><p>${escapeHtml(item.detail)}</p>${item.blocker ? `<em>${escapeHtml(item.blocker)}</em>` : ''}</div><dl><div><dt>Scope</dt><dd>${escapeHtml(settingsScopeLabel(item.scope))}</dd></div><div><dt>Source</dt><dd title="${escapeHtml(item.source ?? 'not configured')}">${escapeHtml(item.source ?? 'not configured')}</dd></div><div><dt>Effective</dt><dd>${escapeHtml(item.effectiveValue ?? 'not configured')}</dd></div><div><dt>Status</dt><dd>${escapeHtml(settingsMutationLabel(item.mutationState))}</dd></div></dl></article>`;
+}
+
+function fallbackSettingsCategories() {
+  return [{
+    id: 'components',
+    label: 'Components',
+    summary: 'Component configuration is available after the workspace snapshot loads.',
+    primaryScope: 'project',
+    mutationState: 'editable',
+    itemCount: 0,
+    editableCount: 0,
+    blockedCount: 0,
+    readOnlyCount: 0,
+    secretCount: 0,
+    items: [],
+  }];
+}
+
+function settingsCategoryKind(category) {
+  return category.id === 'components' ? 'Component configuration' : 'Settings';
+}
+
+function settingsCategoryStatusText(category) {
+  if ((category.blockedCount ?? 0) > 0) return `${category.blockedCount} blocked`;
+  if ((category.editableCount ?? 0) > 0) return 'Editable';
+  if ((category.secretCount ?? 0) > 0) return 'Redacted';
+  return settingsMutationLabel(category.mutationState);
+}
+
+function settingsMutationLabel(state) {
+  if (state === 'editable') return 'Editable';
+  if (state === 'preview-only') return 'Preview only';
+  if (state === 'blocked') return 'Blocked';
+  return 'Read only';
+}
+
+function settingsScopeLabel(scope) {
+  if (scope === 'built-in') return 'Built-in';
+  if (scope === 'host-local') return 'Host local';
+  if (scope === 'auth-profile') return 'Auth profile';
+  if (scope === 'secret-store') return 'Secret store';
+  return String(scope ?? 'settings').replace(/^\w/u, (letter) => letter.toUpperCase());
 }
 
 function renderWorkflowRail(snapshot) {
@@ -505,9 +575,15 @@ function safeHistoryRows(snapshot) {
 }
 
 function renderSettingsRail(snapshot) {
-  const plugins = snapshot.plugins ?? {};
-  const count = [countLabel(plugins.enabledCount ?? 0, 'enabled plugin'), plugins.capabilityCount ? countLabel(plugins.capabilityCount, 'capability', 'capabilities') : null].filter(Boolean).join(' · ');
-  return `<section class="dn-rail-section" id="plugins-panel"><span class="dn-rail-heading">Settings</span><p>Extensions, local tools, and cockpit options.</p><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
+  const settings = snapshot.settings ?? {};
+  const categories = settings.categories ?? [];
+  const count = [
+    countLabel(settings.totalCategoryCount ?? categories.length, 'category', 'categories'),
+    settings.blockedCategoryCount ? countLabel(settings.blockedCategoryCount, 'blocked category', 'blocked categories') : null,
+    settings.redactedSecretCount ? `${settings.redactedSecretCount} redacted` : null,
+  ].filter(Boolean).join(' · ');
+  const buttons = categories.slice(0, 5).map((category) => `<button class="dn-rail-settings-row" type="button" data-cockpit-config-action="settings-category" data-config-category-id="${escapeHtml(category.id)}" data-config-kind="${escapeHtml(settingsCategoryKind(category))}" data-config-title="${escapeHtml(category.label)}" data-config-summary="${escapeHtml(category.summary)}"><span>${escapeHtml(category.label)}</span><em class="state-${escapeAttribute(category.mutationState)}">${escapeHtml(settingsCategoryStatusText(category))}</em></button>`).join('');
+  return `<section class="dn-rail-section" id="settings-panel"><span class="dn-rail-heading">Settings</span><p>Project, host-local, provider, and cockpit configuration.</p><div class="dn-rail-settings-list">${buttons}</div><span class="dn-rail-muted">${escapeHtml(count)}</span></section>`;
 }
 
 function renderCockpitOperationsPanel(snapshot, panels) {
@@ -547,11 +623,36 @@ function bindCockpitConfigWindow(container, baseUrl = '', actionToken = '', work
     const element = overlay.querySelector(selector);
     if (element) element.disabled = Boolean(value);
   };
+  const setCategory = (categoryId = 'components', updateHeader = false) => {
+    const id = categoryId || 'components';
+    let selectedTab = null;
+    overlay.querySelectorAll('[data-config-category-tab]').forEach((tab) => {
+      const selected = tab.getAttribute('data-config-category-tab') === id;
+      tab.classList.toggle('selected', selected);
+      if (selected) selectedTab = tab;
+    });
+    overlay.querySelectorAll('[data-config-category-pane]').forEach((pane) => {
+      pane.classList.toggle('selected', pane.getAttribute('data-config-category-pane') === id);
+    });
+    if (updateHeader && selectedTab) {
+      setText('[data-config-window-kind]', selectedTab.getAttribute('data-config-kind') ?? 'Settings');
+      setText('[data-config-window-title]', selectedTab.getAttribute('data-config-title') ?? 'Settings');
+      setText('[data-config-window-summary]', selectedTab.getAttribute('data-config-summary') ?? 'Inspect configuration scope, source, and mutation status.');
+    }
+  };
   const open = (button) => {
     const action = button.getAttribute('data-cockpit-config-action') ?? '';
     activeAction = action;
     activeComponentId = button.getAttribute('data-config-component-id') ?? '';
     activeProposal = null;
+    if (action === 'settings-category') {
+      setCategory(button.getAttribute('data-config-category-id') ?? 'components', true);
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      overlay.querySelector('.dn-config-nav button.selected')?.focus?.();
+      return;
+    }
+    setCategory('components', false);
     const primaryLabel = button.getAttribute('data-config-action-label') ?? (action === 'remove-component' ? 'Remove component' : 'Save changes');
     setText('[data-config-window-kind]', button.getAttribute('data-config-kind') ?? 'Component configuration');
     setText('[data-config-window-title]', button.getAttribute('data-config-title') ?? 'Configure component');
@@ -704,6 +805,15 @@ function bindCockpitConfigWindow(container, baseUrl = '', actionToken = '', work
   });
   overlay.querySelector('[data-config-window-preview]')?.addEventListener('click', preview);
   overlay.querySelector('[data-config-window-apply]')?.addEventListener('click', apply);
+  overlay.querySelectorAll('[data-config-category-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeAction = button.getAttribute('data-config-category-tab') === 'components'
+        ? activeAction
+        : 'settings-category';
+      activeProposal = null;
+      setCategory(button.getAttribute('data-config-category-tab') ?? 'components', true);
+    });
+  });
   overlay.querySelectorAll('[data-cockpit-config-close]').forEach((button) => {
     button.addEventListener('click', close);
   });

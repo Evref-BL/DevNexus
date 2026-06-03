@@ -48,9 +48,43 @@ afterEach(cleanupDashboardTestTempDirs);
 
 describe("nexus dashboard model", () => {  it("builds a typed snapshot and weave from project facts", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-");
+    const homePath = makeTempDir("dev-nexus-dashboard-home-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const config = projectConfig();
     saveProjectConfig(projectRoot, config);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles: [
+          {
+            id: "human-profile",
+            provider: "github",
+            credentialKind: "environment_token",
+            environmentKeys: ["DEV_NEXUS_PRIVATE_TOKEN"],
+          },
+        ],
+        claimAuthorityProfiles: [
+          {
+            id: "claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_PRIVATE_DATABASE_URL",
+            schema: "dev_nexus",
+          },
+        ],
+        remoteExecution: {
+          commandProfiles: [{ id: "default", command: "ssh" }],
+        },
+        hostOverlays: [{ hostId: "local", transport: { kind: "local" } }],
+        projects: [],
+      },
+      validateNexusHomeConfigBase,
+    );
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
       now: fixedClock("2026-05-21T09:00:00.000Z"),
@@ -97,6 +131,7 @@ describe("nexus dashboard model", () => {  it("builds a typed snapshot and weave
 
     const snapshot = await buildNexusDashboardSnapshot({
       projectRoot,
+      homePath,
       gitRunner: fakeGitRunner(),
       now: fixedClock("2026-05-21T10:05:00.000Z"),
     });
@@ -155,7 +190,41 @@ describe("nexus dashboard model", () => {  it("builds a typed snapshot and weave
         totalCount: 3,
         capabilityCount: 2,
       },
+      settings: {
+        totalCategoryCount: 9,
+        blockedCategoryCount: 6,
+        redactedSecretCount: 1,
+      },
     });
+    expect(snapshot.settings.categories.map((category) => category.id)).toEqual([
+      "components",
+      "workflows",
+      "plugins",
+      "automation",
+      "providers",
+      "host-local",
+      "auth-profiles",
+      "secrets",
+      "session",
+    ]);
+    expect(snapshot.settings.categories.find((category) => category.id === "components")).toMatchObject({
+      mutationState: "editable",
+      editableCount: 1,
+    });
+    expect(snapshot.settings.categories.find((category) => category.id === "auth-profiles")).toMatchObject({
+      mutationState: "blocked",
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          effectiveValue: "1 profiles",
+          blocker: expect.stringContaining("secret-store separation"),
+        }),
+        expect.objectContaining({
+          effectiveValue: "1 claim authority profiles",
+        }),
+      ]),
+    });
+    expect(JSON.stringify(snapshot.settings)).not.toContain("DEV_NEXUS_PRIVATE_TOKEN");
+    expect(JSON.stringify(snapshot.settings)).not.toContain("DEV_NEXUS_PRIVATE_DATABASE_URL");
     expect(snapshot.threads.records).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
