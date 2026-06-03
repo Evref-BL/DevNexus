@@ -83,6 +83,10 @@ import {
   routeDashboardThreadAction,
 } from "./nexusDashboardServerChatRoutes.js";
 import {
+  routeDashboardProjectConfigApply,
+  routeDashboardProjectConfigPreview,
+} from "./nexusDashboardServerConfigRoutes.js";
+import {
   resolveDashboardWorkspaceSelection,
   workspaceIdFromUrl,
   workspaceSelectionFromHostIndex,
@@ -336,6 +340,35 @@ async function routeDashboardRequest(
       url.pathname === "/api/dashboard/thread-action")
   ) {
     await routeDashboardThreadAction(
+      request,
+      response,
+      snapshotOptions,
+      actionToken,
+      dashboardCache,
+      url,
+    );
+    return;
+  }
+  if (
+    method === "POST" &&
+    (url.pathname === "/api/cockpit/project-config/preview" ||
+      url.pathname === "/api/dashboard/project-config/preview")
+  ) {
+    await routeDashboardProjectConfigPreview(
+      request,
+      response,
+      snapshotOptions,
+      actionToken,
+      url,
+    );
+    return;
+  }
+  if (
+    method === "POST" &&
+    (url.pathname === "/api/cockpit/project-config/apply" ||
+      url.pathname === "/api/dashboard/project-config/apply")
+  ) {
+    await routeDashboardProjectConfigApply(
       request,
       response,
       snapshotOptions,
