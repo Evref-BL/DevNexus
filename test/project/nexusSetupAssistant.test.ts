@@ -2471,6 +2471,60 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("blocks when adapter readiness sees provider-incompatible MCP schemas", () => {
+    const projectRoot = makeTempDir(
+      "dev-nexus-setup-agent-client-schema-invalid-",
+    );
+    const sourceRoot = makeTempDir(
+      "dev-nexus-setup-agent-client-schema-source-",
+    );
+    const sourceCliPath = writeAgentClientSourceRuntime(sourceRoot);
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      projectedDevNexusMcpToml(),
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+      agentClientAdapter: {
+        sourceRoot,
+        sourceCliPath,
+        commandRunner: readyAgentClientCommandRunner(),
+        mcpToolSchemaProvider: () => [
+          {
+            name: "publication_pull_request_merge",
+            inputSchema: {
+              type: "object",
+              properties: {
+                branchRole: { type: ["string", "null"] },
+              },
+              additionalProperties: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-client-adapter-codex",
+        status: "blocked",
+        summary: expect.stringContaining("schema=invalid"),
+        nextAction: expect.stringContaining("Fix DevNexus MCP input schemas"),
+      }),
+    );
+  });
+
   it("reports unsupported agent-client adapter targets", () => {
     const projectRoot = makeTempDir(
       "dev-nexus-setup-agent-client-unsupported-",

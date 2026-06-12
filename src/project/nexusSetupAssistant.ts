@@ -41,6 +41,14 @@ import {
   defaultNexusMcpGatewayServerName,
   nexusMcpGatewayAgentTargets,
 } from "../mcp/nexusMcpGatewayProjection.js";
+import {
+  listDevNexusMcpTools,
+  type McpTool,
+} from "../mcp/nexusMcpToolCatalog.js";
+import {
+  listMcpInputSchemaProviderIssues,
+  type McpInputSchemaProviderIssue,
+} from "../mcp/nexusMcpSchemaCompatibility.js";
 import { findForbiddenSharedHostLocalDetails } from "../hosts/nexusHostRegistry.js";
 import {
   deriveNexusProjectHostingRepositoryName,
@@ -226,6 +234,7 @@ export interface NexusSetupAgentClientAdapterDiagnosticsOptions {
   commandRunner?: NexusAgentClientRuntimeCommandRunner;
   commandLocator?: NexusAgentClientRuntimeCommandLocator;
   fileExists?: (filePath: string) => boolean;
+  mcpToolSchemaProvider?: () => readonly McpTool[];
 }
 
 const setupFlows: NexusSetupFlowSummary[] = [
@@ -1559,12 +1568,19 @@ function agentClientAdapterReadinessCheck(options: {
   });
   const mcpCheck = agentMcpServerConfiguredCheck(options.target);
   const mcpState = agentClientMcpState(mcpCheck, options.target);
+  const schemaCheck = agentMcpSchemaCompatibilityCheck({
+    target: options.target,
+    toolSchemaProvider: options.diagnostics.mcpToolSchemaProvider,
+  });
+  const schemaState = agentClientMcpSchemaState(schemaCheck);
   const selected = plan.runtime.selected;
   const runtimeMode = selected?.mode ?? "none";
   const runtimeVersion = selected?.packageVersion ?? "unknown";
   const commandLine = plan.invocation?.commandLine ?? "unavailable";
   const status: NexusSetupCheckStatus = !plan.invocation
     ? "blocked"
+    : schemaCheck.status === "blocked"
+      ? "blocked"
     : mcpCheck.status === "passed"
       ? plan.status === "warning" ? "warning" : "passed"
       : "warning";
@@ -1575,9 +1591,9 @@ function agentClientAdapterReadinessCheck(options: {
     summary:
       `${options.target.provider} adapter readiness: runtime=${runtimeMode}; ` +
       `version=${runtimeVersion}; node=${plan.runtime.node.summary}; ` +
-      `npm=${plan.runtime.npm.summary}; mcp=${mcpState}; ` +
+      `npm=${plan.runtime.npm.summary}; mcp=${mcpState}; schema=${schemaState}; ` +
       `pluginProjection=${pluginSummary}; command=${commandLine}.`,
-    nextAction: agentClientAdapterNextAction({ plan, mcpCheck }),
+    nextAction: agentClientAdapterNextAction({ plan, mcpCheck, schemaCheck }),
     details: {
       client,
       runtimeStatus: plan.runtime.status,
@@ -1585,6 +1601,9 @@ function agentClientAdapterReadinessCheck(options: {
       selectedRuntimeVersion: runtimeVersion,
       mcpStatus: mcpCheck.status,
       mcpSummary: mcpCheck.summary,
+      schemaStatus: schemaCheck.status,
+      schemaSummary: schemaCheck.summary,
+      schemaIssues: schemaCheck.details?.issues,
       diagnostics: plan.diagnostics,
       advisory: plan.advisory,
     },
@@ -1610,9 +1629,66 @@ function agentClientMcpState(
   return "warning";
 }
 
+interface NexusMcpToolSchemaIssue extends McpInputSchemaProviderIssue {
+  tool: string;
+}
+
+function agentMcpSchemaCompatibilityCheck(options: {
+  target: MaterializedNexusAgentMcpTarget;
+  toolSchemaProvider?: () => readonly McpTool[];
+}): NexusSetupCheckResult {
+  const checkBase = {
+    id: `agent-mcp-schema-${setupCheckIdPart(options.target.agent)}-${setupCheckIdPart(options.target.serverName)}`,
+    title: `${options.target.agent} MCP schemas ${options.target.serverName}`,
+  };
+
+  if (options.target.serverName !== "dev_nexus") {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary: `${options.target.serverName} is not the DevNexus core MCP server; core schema compatibility check skipped.`,
+      nextAction: null,
+    };
+  }
+
+  const tools = options.toolSchemaProvider
+    ? options.toolSchemaProvider()
+    : listDevNexusMcpTools();
+  const issues: NexusMcpToolSchemaIssue[] = tools.flatMap((tool) =>
+    listMcpInputSchemaProviderIssues(tool.inputSchema).map((issue) => ({
+      tool: tool.name,
+      ...issue,
+    })),
+  );
+
+  if (issues.length === 0) {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary: "DevNexus MCP input schemas are provider-compatible.",
+      nextAction: null,
+    };
+  }
+
+  const first = issues[0]!;
+  return {
+    ...checkBase,
+    status: "blocked",
+    summary: `DevNexus MCP input schemas have ${issues.length} provider compatibility issue(s); first: ${first.tool} ${first.path} ${first.summary}`,
+    nextAction:
+      "Fix DevNexus MCP input schemas, rebuild the source-current runtime, rerun setup check, then refresh or restart the agent session.",
+    details: { issues },
+  };
+}
+
+function agentClientMcpSchemaState(check: NexusSetupCheckResult): string {
+  return check.status === "passed" ? "ready" : "invalid";
+}
+
 function agentClientAdapterNextAction(options: {
   plan: ReturnType<typeof planNexusAgentClientAdapterCommand>;
   mcpCheck: NexusSetupCheckResult;
+  schemaCheck: NexusSetupCheckResult;
 }): string | null {
   if (!options.plan.invocation) {
     const packageOperation = options.plan.advisory.packageOperations[0];
@@ -1620,6 +1696,10 @@ function agentClientAdapterNextAction(options: {
       return `${packageOperation.summary} Approve and run: ${packageOperation.command}`;
     }
     return options.plan.diagnostics[0] ?? "Install or configure a DevNexus runtime.";
+  }
+
+  if (options.schemaCheck.status === "blocked") {
+    return options.schemaCheck.nextAction ?? null;
   }
 
   if (options.mcpCheck.status !== "passed") {
