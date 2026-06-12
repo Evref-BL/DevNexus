@@ -114,6 +114,12 @@ export interface NexusPreparedWorktreeSetupStatusCounts {
 }
 
 export interface NexusPreparedWorktreeSummary {
+  worktreePath: string;
+  branchName: string;
+  baseRef: string | null;
+  componentId: string;
+  workItemId: string | null;
+  nextAction: string | null;
   scope: NexusManualWorktreeScope;
   projectRoot: string;
   project: {
@@ -517,6 +523,12 @@ export function summarizeNexusManualWorktreeResult(
   });
 
   return {
+    worktreePath: result.worktree.worktreePath,
+    branchName: result.worktree.branchName,
+    baseRef: result.worktree.baseRef,
+    componentId: result.worktree.componentId,
+    workItemId: result.worktree.workItem?.id ?? null,
+    nextAction: result.nextActions[0] ?? null,
     scope: result.scope,
     projectRoot: result.projectRoot,
     project: {

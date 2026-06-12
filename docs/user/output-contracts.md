@@ -32,6 +32,12 @@ Use the fields this way:
 - `retrieval`: commands or MCP calls that return the full data.
 - `nextCursor`: a cursor when the compact result is paginated.
 
+Commands and MCP tools that create or prepare a durable resource must keep the
+resource's primary identifiers at the top level of the compact result. For
+example, `worktree_prepare` exposes `worktreePath`, `branchName`, `baseRef`,
+`componentId`, `workItemId`, and the immediate `nextAction` outside the larger
+nested worktree and setup summaries.
+
 Compact defaults should not include raw logs, full provider payloads, complete
 work item dumps, large status trees, or verbose generated configuration.
 
