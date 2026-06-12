@@ -2501,6 +2501,14 @@ describe("DevNexus MCP server", () => {
     expect(prepared.worktree.worktreePath).toBe(
       path.join(projectRoot, "worktrees", "mcp-demo", "parallel-chat"),
     );
+    expect(prepared).toMatchObject({
+      worktreePath: path.join(projectRoot, "worktrees", "mcp-demo", "parallel-chat"),
+      branchName: "codex/mcp-demo/parallel-chat",
+      baseRef: "main",
+      componentId: "mcp-demo",
+      workItemId: null,
+    });
+    expect(prepared.nextAction).toContain(prepared.worktreePath);
     expect(prepared.setup.context.contextJsonPath).toBe(
       path.join(
         projectRoot,
@@ -2666,6 +2674,14 @@ describe("DevNexus MCP server", () => {
     expect(prepared.worktree.worktreePath).toBe(
       path.join(projectRoot, "worktrees", "addon", "codex-addon-local-1"),
     );
+    expect(prepared).toMatchObject({
+      worktreePath: path.join(projectRoot, "worktrees", "addon", "codex-addon-local-1"),
+      branchName: "codex/addon/local-1",
+      baseRef: "main",
+      componentId: "addon",
+      workItemId: "local-1",
+    });
+    expect(prepared.nextAction).toContain(prepared.worktreePath);
     expect(prepared.component).toMatchObject({
       id: "addon",
       name: "Addon",
