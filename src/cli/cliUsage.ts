@@ -2,6 +2,45 @@ export function usage(): string {
   return [
     "Usage:",
     "  dev-nexus --help",
+    "  dev-nexus <family> --help",
+    "  dev-nexus <family> <command> --help",
+    "",
+    "Command families:",
+    "  dev-nexus home --help                 Host-local DevNexus home config",
+    "  dev-nexus auth --help                 Provider authentication",
+    "  dev-nexus workspace --help            Workspace lifecycle, config, MCP, plugins",
+    "  dev-nexus setup --help                Guided setup checks and records",
+    "  dev-nexus diagnostics --help          CLI, docs, and runtime diagnostics",
+    "  dev-nexus host --help                 Host capability checks",
+    "  dev-nexus coordination --help         Worktree handoffs and integration planning",
+    "  dev-nexus remote-execution --help     Recorded remote verification requests",
+    "  dev-nexus worktree --help             Component worktree preparation",
+    "  dev-nexus git-workflow --help         Branch strategy decision graphs",
+    "  dev-nexus publication --help          Push, PR, review, and release policy",
+    "  dev-nexus review --help               Review policy checks",
+    "  dev-nexus quick-fix --help            Small generated fix plans",
+    "  dev-nexus work-item --help            Tracker-backed work items and sync",
+    "  dev-nexus ci-failure-intake --help    CI failure capture",
+    "  dev-nexus cockpit --help              Local cockpit server and weave",
+    "  dev-nexus automation --help           Runs, target cycles, heartbeats, agents",
+    "  dev-nexus mcp-stdio --help            Native MCP server",
+    "  dev-nexus mcp-gateway-stdio --help    MCP gateway server",
+    "",
+    "Focused examples:",
+    "  dev-nexus workspace init --help",
+    "  dev-nexus workspace component add --help",
+    "  dev-nexus work-item create --help",
+    "  dev-nexus publication pull-request upsert --help",
+    "",
+    "Use --json on commands that support machine-readable output.",
+    "For the full command catalog, ask for a focused family or subcommand help page.",
+  ].join("\n");
+}
+
+export function fullUsage(): string {
+  return [
+    "Usage:",
+    "  dev-nexus --help",
     "  dev-nexus mcp-stdio",
     "  dev-nexus mcp-gateway-stdio",
     "  dev-nexus home init [home-path] [options]",
@@ -881,11 +920,14 @@ export function focusedCommandUsageForArgv(argv: string[]): string | null {
 }
 
 function focusedCommandUsage(commandPath: string): string {
-  const lines = usage().split("\n");
+  const lines = fullUsage().split("\n");
   const usageLine = lines.find((line) =>
     line.trimStart().startsWith(`dev-nexus ${commandPath}`)
   );
-  const optionBlock = commandOptionBlock(lines, `Options for ${commandPath}:`);
+  const optionBlock = [
+    ...commandOptionBlock(lines, `Options for ${commandPath}:`),
+    ...commandOptionBlock(lines, `Options ${commandPath}:`),
+  ];
   return [
     "Usage:",
     usageLine ?? `  dev-nexus ${commandPath} [options]`,
@@ -898,7 +940,7 @@ function focusedCommandFamilyUsage(
   commandPaths: string[],
 ): string {
   const commandPath = commandTokens.join(" ");
-  const lines = usage().split("\n");
+  const lines = fullUsage().split("\n");
   const directOptionBlock = commandOptionBlock(lines, `Options for ${commandPath}:`);
   const commandOptionBlockLines =
     directOptionBlock.length > 0
@@ -920,7 +962,7 @@ function focusedCommandFamilyUsage(
 }
 
 function usageCommandPaths(): string[] {
-  return usage()
+  return fullUsage()
     .split("\n")
     .filter((line) => line.startsWith("  dev-nexus "))
     .map(commandPathFromUsageLine)

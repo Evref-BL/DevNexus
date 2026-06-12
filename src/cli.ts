@@ -16,12 +16,14 @@ import {
 export type { DevNexusCliDependencies } from "./cli/cliCommandContext.js";
 import { handleCiFailureIntakeCommand } from "./cli/cliCiFailureIntakeCommand.js";
 import {
+  fullUsage,
   focusedCommandUsageForArgv,
   projectComponentAddUsage,
   projectSetupUsage,
   usage,
 } from "./cli/cliUsage.js";
 export {
+  fullUsage,
   focusedCommandUsageForArgv,
   projectComponentAddUsage,
   projectSetupUsage,
@@ -1041,7 +1043,7 @@ const rootCommandHandlers: Record<string, RootCommandHandler> = {
   config: handleConfigReferenceCommand,
   setup: handleSetupCommand,
   diagnostics: (argv, dependencies) =>
-    handleDiagnosticsCommand(argv, { ...dependencies, usage }),
+    handleDiagnosticsCommand(argv, { ...dependencies, usage: fullUsage }),
   host: handleHostCommand,
   coordination: handleCoordinationCommand,
   "remote-execution": (argv, dependencies) =>

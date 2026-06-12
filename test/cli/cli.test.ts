@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { main, usage } from "../../src/cli.js";
+import { fullUsage, main } from "../../src/cli.js";
 import {
   createOrRefreshNexusWorktreeLease,
   createLocalWorkTrackerProvider,
@@ -604,7 +604,7 @@ function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
 }
 
 function documentedCommandPaths(): string[] {
-  return usage()
+  return fullUsage()
     .split("\n")
     .filter((line) => line.startsWith("  dev-nexus "))
     .map(commandPathFromUsageLine)
@@ -663,10 +663,8 @@ afterEach(() => {
 });
 
 describe("dev-nexus cli", () => {
-  it("prints usage", async () => {
-    const output = captureOutput();
-
-    await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
+  it("keeps the full command catalog for command discovery", () => {
+    const output = { output: () => fullUsage() };
 
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus auth github-app user login");
@@ -923,6 +921,22 @@ describe("dev-nexus cli", () => {
       ok: true,
       removed: true,
     });
+  });
+
+  it("prints compact root help with command family guidance", async () => {
+    const output = captureOutput();
+
+    await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
+
+    const text = output.output();
+    expect(text.trimEnd().split("\n").length).toBeLessThanOrEqual(80);
+    expect(text).toContain("Command families:");
+    expect(text).toContain("dev-nexus workspace --help");
+    expect(text).toContain("dev-nexus work-item --help");
+    expect(text).toContain("dev-nexus publication --help");
+    expect(text).toContain("dev-nexus automation --help");
+    expect(text).not.toContain("Options for work-item create:");
+    expect(text).not.toContain("dev-nexus work-item update");
   });
 
   it("prints focused workspace init help", async () => {
@@ -2669,7 +2683,7 @@ describe("dev-nexus cli", () => {
 
   it("keeps onboarding documentation command examples on the CLI surface", () => {
     const usagePrefixes = new Set(
-      usage()
+      fullUsage()
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter((line) => line.startsWith("dev-nexus "))
