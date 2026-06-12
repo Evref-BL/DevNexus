@@ -623,6 +623,10 @@ describe("nexus dashboard client", () => {  it("renders graph node popovers as s
     expect(rendered).toContain('data-cockpit-config-action="add-component"');
     expect(rendered).toContain('data-cockpit-config-action="edit-component"');
     expect(rendered).toContain('data-cockpit-config-action="remove-component"');
+    expect(rendered).toContain('data-config-window-preview');
+    expect(rendered).toContain('data-config-window-apply disabled');
+    expect(rendered).toContain('Source files stay untouched.');
+    expect(rendered).toContain('Preview required before apply.');
     expect(rendered).toContain('data-cockpit-config-window hidden aria-hidden="true"');
     expect(rendered).toContain('role="dialog"');
     expect(rendered).toContain('id="cockpit-config-window-title"');
