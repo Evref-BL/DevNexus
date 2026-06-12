@@ -883,6 +883,12 @@ export const devNexusMcpTools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        detail: {
+          type: "string",
+          enum: ["summary", "full"],
+          default: "summary",
+          description: "summary returns the compact default result envelope; full returns the complete discovery status tree.",
+        },
       },
       additionalProperties: false,
     },

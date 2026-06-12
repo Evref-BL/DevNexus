@@ -3208,8 +3208,60 @@ describe("DevNexus MCP server", () => {
       }),
     );
 
-    const result = toolJson(
+    const compactResult = toolJson(
       await callDevNexusMcpTool("work_item_discovery_status", { projectRoot }),
+    );
+    expect(compactResult).toMatchObject({
+      ok: true,
+      contract: "dev-nexus.result.compact.v1",
+      mode: "compact",
+      kind: "work_item_discovery_status",
+      summary: {
+        project: {
+          id: "mcp-demo",
+          name: "MCP Demo",
+        },
+      },
+      stats: {
+        componentCount: 1,
+        trackerCount: 2,
+        selectedTrackerCount: 2,
+        warningCount: 1,
+      },
+      findings: expect.arrayContaining([
+        expect.objectContaining({
+          kind: "warning",
+          componentId: "primary",
+          trackerId: "github-inbox",
+          message: expect.stringContaining("github-inbox skipped"),
+        }),
+      ]),
+      omitted: expect.arrayContaining([
+        expect.objectContaining({
+          path: "components",
+          retrieval: "Use retrieval[0] for full output.",
+        }),
+      ]),
+      retrieval: expect.arrayContaining([
+        expect.objectContaining({
+          mcpTool: {
+            name: "work_item_discovery_status",
+            arguments: {
+              projectRoot,
+              detail: "full",
+            },
+          },
+        }),
+      ]),
+      nextCursor: null,
+    });
+    expect(compactResult.components).toBeUndefined();
+
+    const result = toolJson(
+      await callDevNexusMcpTool("work_item_discovery_status", {
+        projectRoot,
+        detail: "full",
+      }),
     );
 
     expect(result).toMatchObject({

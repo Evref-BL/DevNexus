@@ -41,6 +41,8 @@ publication rules agents need before they edit code.
   and workspace repository hosting.
 - [Multi-tracker work tracking](user/multi-tracker.md) covers local and
   provider-backed trackers.
+- [Output contracts](user/output-contracts.md) covers compact CLI/MCP result
+  envelopes and full-output escape hatches.
 - [DevNexus cockpit](user/cockpit/index.md) covers the host cockpit,
   workspace drill-downs, HITL actions, plugins, and embeddable data contracts.
 

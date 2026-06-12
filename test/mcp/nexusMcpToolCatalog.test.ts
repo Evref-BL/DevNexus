@@ -178,6 +178,7 @@ describe("DevNexus MCP tool catalog", () => {
       "target_cycle_list",
       "target_cycle_record",
       "work_item_list",
+      "work_item_discovery_status",
     ]) {
       expect(toolsByName.get(toolName)?.inputSchema).toMatchObject({
         properties: {

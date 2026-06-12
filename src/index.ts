@@ -54,6 +54,7 @@ export * from "./operations/nexusExternalIssueVisibility.js";
 export * from "./publication/nexusForgePublication.js";
 export * from "./publication/nexusForgeRepositoryResolver.js";
 export * from "./work-items/nexusWorkItemDiscoveryStatus.js";
+export * from "./work-items/nexusWorkItemDiscoveryStatusCompact.js";
 export * from "./work-items/nexusWorkItemClaimAuthority.js";
 export * from "./work-items/nexusPostgresWorkItemClaimAuthority.js";
 export * from "./work-items/nexusWorkItemClaim.js";

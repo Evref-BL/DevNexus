@@ -326,6 +326,7 @@ import {
   getNexusWorkItemDiscoveryStatus,
   type NexusWorkItemDiscoveryStatus,
 } from "./work-items/nexusWorkItemDiscoveryStatus.js";
+import { compactNexusWorkItemDiscoveryStatus } from "./work-items/nexusWorkItemDiscoveryStatusCompact.js";
 import {
   claimNexusEligibleWorkItem,
   releaseNexusWorkItemAuthorityClaim,
@@ -577,7 +578,7 @@ interface ParsedWorkItemCreateCommand {
 
 interface ParsedWorkItemDiscoveryStatusCommand {
   projectRoot: string;
-  json?: boolean;
+  json?: "compact" | "full";
 }
 
 interface ParsedWorkItemClaimNextCommand {
@@ -4693,7 +4694,13 @@ function parseWorkItemDiscoveryStatusCommand(
   for (const arg of rest) {
     switch (arg) {
       case "--json":
-        parsed.json = true;
+        parsed.json = "compact";
+        break;
+      case "--json=compact":
+        parsed.json = "compact";
+        break;
+      case "--json=full":
+        parsed.json = "full";
         break;
       default:
         throw new Error(`Unknown work-item discovery-status option: ${arg}`);
@@ -7832,9 +7839,13 @@ function printWorkItemDiscoveryStatusResult(
   parsed: ParsedWorkItemDiscoveryStatusCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
-  if (parsed.json) {
-    writeJson(stdout, payload);
+  if (parsed.json === "compact") {
+    writeJson(stdout, compactNexusWorkItemDiscoveryStatus(result));
+    return;
+  }
+
+  if (parsed.json === "full") {
+    writeJson(stdout, { ok: true, ...result });
     return;
   }
 
