@@ -55,6 +55,7 @@ import {
 import {
   getNexusWorkItemDiscoveryStatus,
 } from "../work-items/nexusWorkItemDiscoveryStatus.js";
+import { compactNexusWorkItemDiscoveryStatus } from "../work-items/nexusWorkItemDiscoveryStatusCompact.js";
 import {
   createHostAuthProfileCredentialBroker,
   type NexusProviderCredentialCommandRunner,
@@ -1219,13 +1220,15 @@ async function callWorkItemReadMcpTool(
 ): Promise<DevNexusMcpToolResult | undefined> {
   switch (name) {
     case "work_item_discovery_status":
-      return toolResult({
-        ok: true,
-        ...getNexusWorkItemDiscoveryStatus({
-          projectRoot: projectRootFromArgs(args),
-          homePath: optionalString(args, "homePath", "arguments"),
-        }),
+      const discoveryStatus = getNexusWorkItemDiscoveryStatus({
+        projectRoot: projectRootFromArgs(args),
+        homePath: optionalString(args, "homePath", "arguments"),
       });
+      return toolResult(
+        mcpDetailFromArgs(args) === "full"
+          ? { ok: true, ...discoveryStatus }
+          : compactNexusWorkItemDiscoveryStatus(discoveryStatus),
+      );
     case "work_item_claim_next": {
       assertMcpMutationAllowed(args, context, {
         command: "work_item_claim_next",

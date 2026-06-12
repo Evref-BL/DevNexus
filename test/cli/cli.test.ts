@@ -7130,7 +7130,61 @@ describe("dev-nexus cli", () => {
     );
   });
 
-  it("prints read-only work item discovery status as json", async () => {
+  it("prints compact work item discovery status json by default", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(["work-item", "discovery-status", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      contract: "dev-nexus.result.compact.v1",
+      mode: "compact",
+      kind: "work_item_discovery_status",
+      summary: {
+        project: {
+          id: "demo-project",
+          name: "Demo Project",
+        },
+      },
+      stats: {
+        componentCount: expect.any(Number),
+        trackerCount: expect.any(Number),
+      },
+      omitted: expect.arrayContaining([
+        expect.objectContaining({
+          path: "components",
+          retrieval: "Use retrieval[0] for full output.",
+        }),
+      ]),
+      retrieval: expect.arrayContaining([
+        expect.objectContaining({
+          command: [
+            "dev-nexus",
+            "work-item",
+            "discovery-status",
+            projectRoot,
+            "--json=full",
+          ],
+          mcpTool: {
+            name: "work_item_discovery_status",
+            arguments: {
+              projectRoot,
+              detail: "full",
+            },
+          },
+        }),
+      ]),
+      nextCursor: null,
+    });
+    expect(payload.components).toBeUndefined();
+  });
+
+  it("prints read-only work item discovery status as full json", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     saveProjectConfig(
       projectRoot,
@@ -7186,7 +7240,7 @@ describe("dev-nexus cli", () => {
     );
     const output = captureOutput();
 
-    await main(["work-item", "discovery-status", projectRoot, "--json"], {
+    await main(["work-item", "discovery-status", projectRoot, "--json=full"], {
       stdout: output.writer,
     });
 
