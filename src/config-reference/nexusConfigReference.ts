@@ -25,6 +25,7 @@ const agentTargetsDoc = {
   href: "agent-targets.md",
 };
 const agentWorkflowsDoc = { label: "Agent workflows", href: "agent-workflows.md" };
+const outputContractsDoc = { label: "Output contracts", href: "output-contracts.md" };
 const gitWorkflowsDoc = { label: "Git workflow integration", href: "git-workflows.md" };
 const multiTrackerDoc = { label: "Multi-tracker work tracking", href: "multi-tracker.md" };
 const postgresDoc = {
@@ -339,6 +340,26 @@ export const nexusConfigReferenceEntries: NexusConfigReferenceEntry[] = [
       "search",
       "limit",
       "eligibleWorkMode",
+    ],
+  },
+  {
+    scope: "workspace",
+    path: "automation.executor",
+    type: "object",
+    summary:
+      "Run-once executor command, timeout, verification depth, and optional subprocess output filtering.",
+    docs: [agentWorkflowsDoc, outputContractsDoc],
+    parserFieldNames: [
+      "executor",
+      "command",
+      "timeoutMs",
+      "runFullVerification",
+      "outputFilter",
+      "enabled",
+      "commandExecutables",
+      "commandPrefixes",
+      "preferTools",
+      "preserveRawOutputDirectory",
     ],
   },
   {
@@ -804,7 +825,9 @@ export const nexusConfigReferenceParserFieldNames = [
   "command",
   "commandArgs",
   "commandEnvironment",
+  "commandExecutables",
   "commandPaths",
+  "commandPrefixes",
   "commandProfileRefs",
   "commandProfiles",
   "coAuthors",
@@ -940,6 +963,7 @@ export const nexusConfigReferenceParserFieldNames = [
   "number",
   "objective",
   "outputByteLimit",
+  "outputFilter",
   "outputLineLimit",
   "owner",
   "ownerKind",
@@ -953,6 +977,8 @@ export const nexusConfigReferenceParserFieldNames = [
   "policyGateIds",
   "port",
   "postgres",
+  "preferTools",
+  "preserveRawOutputDirectory",
   "privateKeyPath",
   "profile",
   "profiles",

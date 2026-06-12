@@ -78,6 +78,7 @@ export * from "./worktrees/nexusWorkspaceMetadataFreshness.js";
 export * from "./work-items/nexusNodePostgresClaimSqlClient.js";
 export * from "./runtime/nexusNpmRuntime.js";
 export * from "./runtime/nexusPathResolver.js";
+export * from "./runtime/nexusSubprocessOutputFilter.js";
 export * from "./project/nexusPluginCapabilities.js";
 export * from "./providers/nexusProviderCredentialBroker.js";
 export * from "./providers/nexusProviderFreshness.js";
