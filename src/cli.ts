@@ -145,6 +145,7 @@ import {
 import {
   defaultNexusAutomationConfig,
 } from "./automation/nexusAutomationConfig.js";
+import type { NexusSubprocessOutputFilterPolicy } from "./runtime/nexusSubprocessOutputFilter.js";
 import type {
   NexusExternalIssueVisibilitySummary,
 } from "./operations/nexusExternalIssueVisibility.js";
@@ -2634,6 +2635,7 @@ async function handleAutomationCommand(
               command: commandOptions.command,
               commandRunner: dependencies.commandRunner,
               gitRunner: dependencies.gitRunner,
+              outputFilter: commandOptions.outputFilter,
               runFullVerification: commandOptions.runFullVerification,
               timeoutMs: commandOptions.timeoutMs,
             }),
@@ -2729,12 +2731,13 @@ async function handleAutomationCommand(
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
       executor: createNexusAutomationCommandExecutor({
-        command: commandOptions.command,
-        commandRunner: dependencies.commandRunner,
-        gitRunner: dependencies.gitRunner,
-        runFullVerification: commandOptions.runFullVerification,
-        timeoutMs: commandOptions.timeoutMs,
-      }),
+          command: commandOptions.command,
+          commandRunner: dependencies.commandRunner,
+          gitRunner: dependencies.gitRunner,
+          outputFilter: commandOptions.outputFilter,
+          runFullVerification: commandOptions.runFullVerification,
+          timeoutMs: commandOptions.timeoutMs,
+        }),
     });
     printAutomationRunOnceResult(
       result,
@@ -2888,6 +2891,7 @@ function resolveAutomationCommandCliOptions(
 ): {
   mode: "run_once" | "agent_launch";
   command: string;
+  outputFilter?: NexusSubprocessOutputFilterPolicy;
   runFullVerification: boolean;
   timeoutMs?: number;
 } {
@@ -2921,6 +2925,9 @@ function resolveAutomationCommandCliOptions(
   return {
     mode,
     command,
+    ...(mode === "run_once" && automationConfig?.executor.outputFilter
+      ? { outputFilter: automationConfig.executor.outputFilter }
+      : {}),
     runFullVerification:
       parsed.runFullVerification ??
       config.automation?.executor.runFullVerification ??

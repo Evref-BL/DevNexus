@@ -1,4 +1,8 @@
 import type { WorkStatus } from "../work-items/workTrackingTypes.js";
+import type {
+  NexusSubprocessOutputFilterPolicy,
+  NexusSubprocessOutputFilterTool,
+} from "../runtime/nexusSubprocessOutputFilter.js";
 import {
   validateNexusCiTierPolicyConfig,
   type NexusCiTierPolicyConfig,
@@ -128,6 +132,7 @@ export interface NexusAutomationExecutorConfig {
   command: string | null;
   timeoutMs: number | null;
   runFullVerification: boolean;
+  outputFilter: NexusSubprocessOutputFilterPolicy | null;
 }
 
 export interface NexusAutomationAgentRelaunchConfig {
@@ -560,6 +565,7 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     command: null,
     timeoutMs: null,
     runFullVerification: false,
+    outputFilter: null,
   },
   agent: {
     command: null,
@@ -2301,6 +2307,7 @@ function validateExecutorConfig(
     ...optionalNullableStringField(record, "command", pathName),
     ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
     ...optionalBooleanField(record, "runFullVerification", pathName),
+    ...optionalExecutorOutputFilterField(record, "outputFilter", pathName),
   };
 }
 
@@ -2851,6 +2858,67 @@ function assertRecord(value: unknown, pathName: string): Record<string, unknown>
   }
 
   return value as Record<string, unknown>;
+}
+
+function optionalExecutorOutputFilterField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusSubprocessOutputFilterPolicy | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<
+      Key,
+      NexusSubprocessOutputFilterPolicy | null
+    >;
+  }
+
+  const filterPath = `${pathName}.${key}`;
+  const filterRecord = assertRecord(value, filterPath);
+  return {
+    [key]: {
+      enabled: optionalBoolean(filterRecord, "enabled", filterPath) ?? true,
+      ...optionalArrayField(
+        filterRecord,
+        "commandExecutables",
+        filterPath,
+        requiredNonEmptyString,
+      ),
+      ...optionalArrayField(
+        filterRecord,
+        "commandPrefixes",
+        filterPath,
+        requiredNonEmptyString,
+      ),
+      ...optionalArrayField(
+        filterRecord,
+        "preferTools",
+        filterPath,
+        requiredOutputFilterTool,
+      ),
+      ...optionalStringField(
+        filterRecord,
+        "preserveRawOutputDirectory",
+        filterPath,
+      ),
+    },
+  } as Record<Key, NexusSubprocessOutputFilterPolicy | null>;
+}
+
+function requiredOutputFilterTool(
+  value: unknown,
+  pathName: string,
+): NexusSubprocessOutputFilterTool {
+  const tool = requiredNonEmptyString(value, pathName);
+  if (tool !== "rtk" && tool !== "snip") {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be one of: rtk, snip`,
+    );
+  }
+  return tool;
 }
 
 function optionalBoolean(

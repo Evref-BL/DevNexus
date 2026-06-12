@@ -57,3 +57,51 @@ dev-nexus work-item discovery-status <workspace-root> --json=full
 
 The MCP tool `work_item_discovery_status` follows the same contract. Its default
 result is compact. Pass `detail: "full"` for the full discovery status tree.
+
+## Subprocess output
+
+DevNexus should reduce output at the highest structured layer that owns the
+data.
+
+Use direct structured output when DevNexus owns the data model, for example a
+CLI or MCP command that can return a compact result envelope plus a full
+retrieval path.
+
+Use built-in preview compression when DevNexus only has captured subprocess
+streams. The automation command runner keeps the existing bounded stdout and
+stderr preview behavior as the fallback path.
+
+Use RTK or Snip output filtering only when a command-runner policy explicitly
+selects known noisy commands. Filtering is presentation-only: DevNexus still
+executes the configured command directly and then filters the captured stdout
+and stderr files. A future execution-wrapper policy would be required before
+DevNexus may run the original command through another executable.
+
+The automation executor supports `automation.executor.outputFilter`:
+
+```json
+{
+  "automation": {
+    "executor": {
+      "outputFilter": {
+        "enabled": true,
+        "commandExecutables": ["git", "npm"],
+        "commandPrefixes": ["npm test", "npm run check"],
+        "preferTools": ["rtk", "snip"],
+        "preserveRawOutputDirectory": ".dev-nexus/automation/command-output"
+      }
+    }
+  }
+}
+```
+
+`commandExecutables` matches an executable name, basename, absolute path, or
+`"*"` for every executor command. `commandPrefixes` matches the display command
+or its leading words. `preferTools` is tried in order. RTK uses `rtk log
+<captured-file>` so it filters captured output without changing command
+semantics. Snip is optional; if it is missing or fails, DevNexus falls back to
+the raw bounded preview.
+
+Set `preserveRawOutputDirectory` when raw stdout and stderr files should remain
+available for debugging. Keep that directory ignored or otherwise outside
+tracked workspace state unless the artifacts are intentionally published.

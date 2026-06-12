@@ -22,6 +22,11 @@ import type {
 import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
 import { resolveNexusCommandPath } from "../runtime/nexusCommandPath.js";
 import {
+  filterNexusSubprocessOutput,
+  type NexusSubprocessOutputFilterPolicy,
+  type NexusSubprocessOutputFilterRecord,
+} from "../runtime/nexusSubprocessOutputFilter.js";
+import {
   nexusPublicationCommandGuardrailId,
   publicationGuardrailEnvironment,
 } from "./nexusWorktreePublicationGuardrails.js";
@@ -29,6 +34,7 @@ import {
 export interface NexusAutomationCommandRunOptions {
   cwd: string;
   env: NodeJS.ProcessEnv;
+  outputFilter?: NexusSubprocessOutputFilterPolicy;
   timeoutMs?: number;
 }
 
@@ -45,6 +51,12 @@ export interface NexusAutomationCommandRunResult {
   stderr: string;
   exitCode: number | null;
   error?: string;
+  outputFiltering?: NexusAutomationCommandOutputFiltering;
+}
+
+export interface NexusAutomationCommandOutputFiltering {
+  stdout: NexusSubprocessOutputFilterRecord;
+  stderr: NexusSubprocessOutputFilterRecord;
 }
 
 export type NexusAutomationCommandRunner = (
@@ -58,6 +70,7 @@ export interface CreateNexusAutomationCommandExecutorOptions {
   commandRunner?: NexusAutomationCommandRunner;
   gitRunner?: GitRunner;
   env?: NodeJS.ProcessEnv;
+  outputFilter?: NexusSubprocessOutputFilterPolicy;
   timeoutMs?: number;
 }
 
@@ -82,6 +95,7 @@ export function createNexusAutomationCommandExecutor(
     const commandResult = commandRunner(command, {
       cwd: input.worktree.worktreePath,
       env,
+      outputFilter: options.outputFilter,
       timeoutMs: options.timeoutMs,
     });
     const verification: WorktreeVerificationInput[] = [
@@ -111,6 +125,7 @@ export function createNexusAutomationCommandExecutor(
           commandRunner(verificationCommand, {
             cwd: input.worktree.worktreePath,
             env,
+            outputFilter: options.outputFilter,
             timeoutMs: options.timeoutMs,
           }),
         ),
@@ -172,13 +187,17 @@ export function defaultNexusAutomationCommandRunner(
   }
 
   try {
+    const output = readCommandOutputPreviews(commandSpec, capture, options);
     return {
       command: commandSpec.display,
       cwd: options.cwd,
-      stdout: readOutputPreview(capture.stdoutPath),
-      stderr: readOutputPreview(capture.stderrPath),
+      stdout: output.stdout,
+      stderr: output.stderr,
       exitCode: result?.status ?? null,
       ...(result?.error ? { error: result.error.message } : {}),
+      ...(output.outputFiltering
+        ? { outputFiltering: output.outputFiltering }
+        : {}),
     };
   } finally {
     capture.remove();
@@ -631,6 +650,85 @@ function newCommitIds(
   } catch {
     return [];
   }
+}
+
+function readCommandOutputPreviews(
+  commandSpec: NexusAutomationCommandSpec,
+  capture: ReturnType<typeof createCommandCaptureFiles>,
+  options: NexusAutomationCommandRunOptions,
+): {
+  stdout: string;
+  stderr: string;
+  outputFiltering?: NexusAutomationCommandOutputFiltering;
+} {
+  const rawOutputPaths = preserveRawCommandOutput(
+    capture,
+    options.cwd,
+    options.outputFilter,
+  );
+  const stdout = filterNexusSubprocessOutput({
+    command: {
+      display: commandSpec.display,
+      executable: commandSpec.command,
+    },
+    cwd: options.cwd,
+    env: options.env,
+    inputPath: capture.stdoutPath,
+    rawOutputPath: rawOutputPaths.stdoutPath,
+    stream: "stdout",
+    timeoutMs: options.timeoutMs,
+    policy: options.outputFilter,
+    readRawOutput: () => readOutputPreview(capture.stdoutPath),
+  });
+  const stderr = filterNexusSubprocessOutput({
+    command: {
+      display: commandSpec.display,
+      executable: commandSpec.command,
+    },
+    cwd: options.cwd,
+    env: options.env,
+    inputPath: capture.stderrPath,
+    rawOutputPath: rawOutputPaths.stderrPath,
+    stream: "stderr",
+    timeoutMs: options.timeoutMs,
+    policy: options.outputFilter,
+    readRawOutput: () => readOutputPreview(capture.stderrPath),
+  });
+
+  return {
+    stdout: stdout.text,
+    stderr: stderr.text,
+    ...(options.outputFilter
+      ? {
+          outputFiltering: {
+            stdout: stdout.record,
+            stderr: stderr.record,
+          },
+        }
+      : {}),
+  };
+}
+
+function preserveRawCommandOutput(
+  capture: ReturnType<typeof createCommandCaptureFiles>,
+  cwd: string,
+  outputFilter?: NexusSubprocessOutputFilterPolicy,
+): { stdoutPath?: string; stderrPath?: string } {
+  const directory = outputFilter?.preserveRawOutputDirectory;
+  if (!directory) {
+    return {};
+  }
+
+  const artifactRoot = path.resolve(cwd, directory);
+  fs.mkdirSync(artifactRoot, { recursive: true });
+  const artifactDirectory = fs.mkdtempSync(
+    path.join(artifactRoot, "command-output-"),
+  );
+  const stdoutPath = path.join(artifactDirectory, "stdout.log");
+  const stderrPath = path.join(artifactDirectory, "stderr.log");
+  fs.copyFileSync(capture.stdoutPath, stdoutPath);
+  fs.copyFileSync(capture.stderrPath, stderrPath);
+  return { stdoutPath, stderrPath };
 }
 
 function outputText(value: string | Buffer | null | undefined): string {

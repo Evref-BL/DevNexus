@@ -9,6 +9,7 @@ import {
   parseNexusAutomationCommandExpression,
   type NexusAutomationCommandRunner,
 } from "../../src/automation/nexusAutomationCommandExecutor.js";
+import type { NexusSubprocessOutputFilterToolRunner } from "../../src/runtime/nexusSubprocessOutputFilter.js";
 import {
   nexusPublicationCommandGuardrailId,
 } from "../../src/automation/nexusWorktreePublicationGuardrails.js";
@@ -251,6 +252,35 @@ describe("nexus automation command executor", () => {
     expect(result.status).toBe("completed");
   });
 
+  it("passes output filter policy to executor and verification commands", async () => {
+    const observed = new Set<unknown>();
+    const outputFilter = {
+      enabled: true,
+      commandExecutables: ["npm"],
+      preferTools: ["rtk" as const],
+    };
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      observed.add(options.outputFilter);
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const executor = createNexusAutomationCommandExecutor({
+      command: "npm test",
+      commandRunner,
+      outputFilter,
+      runFullVerification: true,
+    });
+
+    await executor(executorInput(automationConfig()));
+
+    expect(observed).toEqual(new Set([outputFilter]));
+  });
+
   it("keeps stdout and stderr tails in failed command summaries", async () => {
     const executor = createNexusAutomationCommandExecutor({
       command: "node noisy-task.js",
@@ -371,5 +401,102 @@ describe("nexus automation command executor", () => {
       display:
         '"C:\\\\Program Files\\\\OpenAI\\\\Codex\\\\codex.exe" exec --model "GPT 5" ""',
     });
+  });
+
+  it("filters model-visible output with RTK without changing the executed command", () => {
+    const script =
+      "process.stdout.write('raw stdout\\n'); process.stderr.write('raw stderr\\n');";
+    const command = `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`;
+    const toolCalls: string[] = [];
+    const toolRunner: NexusSubprocessOutputFilterToolRunner = (request) => {
+      toolCalls.push(`${request.tool}:${request.stream}:${request.args.join(" ")}`);
+      const raw = fs.readFileSync(request.inputPath, "utf8");
+      return {
+        status: "filtered",
+        output: `filtered ${request.stream}: ${raw.trim()}`,
+      };
+    };
+
+    const result = defaultNexusAutomationCommandRunner(command, {
+      cwd: process.cwd(),
+      env: process.env,
+      outputFilter: {
+        enabled: true,
+        commandExecutables: [process.execPath],
+        preferTools: ["rtk"],
+        toolRunner,
+      },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.command).toBe(command);
+    expect(result.stdout).toBe("filtered stdout: raw stdout");
+    expect(result.stderr).toBe("filtered stderr: raw stderr");
+    expect(result.outputFiltering?.stdout).toMatchObject({
+      status: "applied",
+      tool: "rtk",
+    });
+    expect(result.outputFiltering?.stderr).toMatchObject({
+      status: "applied",
+      tool: "rtk",
+    });
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls[0]).toMatch(/^rtk:stdout:log .+stdout\.log$/);
+    expect(toolCalls[1]).toMatch(/^rtk:stderr:log .+stderr\.log$/);
+  });
+
+  it("falls back to raw previews when the preferred output filter is unavailable", () => {
+    const script = "process.stdout.write('raw stdout\\n');";
+    const command = `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`;
+    const result = defaultNexusAutomationCommandRunner(command, {
+      cwd: process.cwd(),
+      env: process.env,
+      outputFilter: {
+        enabled: true,
+        commandExecutables: [process.execPath],
+        preferTools: ["snip"],
+        toolRunner: () => ({
+          status: "unavailable",
+          diagnostic: "snip was not found on PATH",
+        }),
+      },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("raw stdout\n");
+    expect(result.outputFiltering?.stdout).toMatchObject({
+      status: "unavailable",
+      tool: "snip",
+      reason: "snip was not found on PATH",
+    });
+  });
+
+  it("can preserve raw output artifacts while returning filtered previews", () => {
+    const artifacts = fs.mkdtempSync(
+      path.join(os.tmpdir(), "nexus-output-artifacts-"),
+    );
+    const script = "process.stdout.write('raw artifact stdout\\n');";
+    const command = `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`;
+
+    const result = defaultNexusAutomationCommandRunner(command, {
+      cwd: process.cwd(),
+      env: process.env,
+      outputFilter: {
+        enabled: true,
+        commandExecutables: [process.execPath],
+        preferTools: ["rtk"],
+        preserveRawOutputDirectory: artifacts,
+        toolRunner: () => ({
+          status: "filtered",
+          output: "compact stdout",
+        }),
+      },
+    });
+
+    const rawPath = result.outputFiltering?.stdout.rawOutputPath;
+    expect(result.stdout).toBe("compact stdout");
+    expect(rawPath).toBeTruthy();
+    expect(rawPath?.startsWith(artifacts)).toBe(true);
+    expect(fs.readFileSync(rawPath!, "utf8")).toBe("raw artifact stdout\n");
   });
 });

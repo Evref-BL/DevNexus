@@ -36,6 +36,7 @@ dev-nexus config reference --scope workspace --json
 | `hosting` | object |  | no |  | Provider hosting, repository provisioning, access repair, and remotes. | [Providers, auth, and hosting](providers-auth-hosting.md) |
 | `automation` | object |  | no |  | Automation selector, executor, verification, publication, and safety policy. | [Agent workflows](agent-workflows.md), [Publication workflows](publication-workflows.md) |
 | `automation.selector` | object |  | no |  | Eligible work-item filters such as statuses, labels, assignees, search, and limit. | [Agent workflows](agent-workflows.md) |
+| `automation.executor` | object |  | no |  | Run-once executor command, timeout, verification depth, and optional subprocess output filtering. | [Agent workflows](agent-workflows.md), [Output contracts](output-contracts.md) |
 | `automation.verification` | object |  | no |  | Focused and full verification commands used by automation and handoffs. | [Agent workflows](agent-workflows.md) |
 | `automation.publication` | object |  | no |  | Branch, review, package, release, and credential policy for publishing work. | [Publication workflows](publication-workflows.md) |
 | `automation.publication.strategy` | string | `local_only`, `direct_integration`, `review_handoff`, `blocked` | no |  | Publication strategy selected by automation and PR handoff commands. | [Publication workflows](publication-workflows.md) |
@@ -82,40 +83,40 @@ The index is field-name based because the parsers also contain nested and provid
 `artifactRetention`, `assignees`, `authProfile`, `authProfiles`, `authority`, `automation`, `backend`, `backoff`
 `baseDelayMs`, `behind`, `board`, `boardId`, `body`, `branch`, `branchNaming`, `branchPublication`
 `branchStrategy`, `branches`, `candidatePrefix`, `capabilities`, `capabilityTags`, `checkCommand`, `ciTiers`, `claimAuthorityProfiles`
-`cleanup`, `clientId`, `command`, `commandArgs`, `commandEnvironment`, `commandPaths`, `commandProfileRefs`, `commandProfiles`
-`coAuthors`, `commentPolicy`, `communication`, `componentId`, `componentRoots`, `components`, `componentsRoot`, `configFormat`
-`configPath`, `configSchema`, `conflictWinner`, `connectionProfileId`, `connectionString`, `connectionStringEnv`, `coordinationHandoffs`, `coordinatorProfileId`
-`credentialIdentity`, `credentialKind`, `cycleLedgerPath`, `decisionGraph`, `defaultBranch`, `defaultBranchStrategy`, `defaultCorePack`, `defaultIntentPrefix`
-`defaultToolsApprovalMode`, `defaultWorkTrackerId`, `dependencyLinks`, `description`, `directExternalSelection`, `directTargetPush`, `directory`, `displayName`
-`diverged`, `driver`, `dryRun`, `eligibleWorkMode`, `email`, `enabled`, `endpoint`, `environment`
-`environmentKeys`, `ephemeralThreadDefault`, `excludeLabels`, `excludedTools`, `executor`, `executorMode`, `exposure`, `extensions`
-`failureLimit`, `fallbackRemote`, `featureBranchDelivery`, `featureBranchPattern`, `finalLimit`, `finalPullRequest`, `finalPullRequestCreation`, `fingerprints`
-`flow`, `focusedCommands`, `from`, `fullCommands`, `gates`, `gateway`, `gitIdentity`, `gitUserEmail`
-`gitUserName`, `gitWorkflows`, `githubApp`, `githubCliConfigDir`, `greenMain`, `handle`, `handles`, `heartbeatIntervalMs`
-`home`, `host`, `hostId`, `hostLocalSafetyHints`, `hostOverlays`, `hosting`, `hosts`, `id`
-`identityRef`, `importRequiredFirst`, `includedServers`, `includedTools`, `installCommand`, `installationAccount`, `integrationBranch`, `integrationPreference`
-`integrationPrefix`, `intelligence`, `intendedUse`, `intervalMs`, `invitationPolicy`, `issueType`, `itemId`, `itemKey`
-`itemNumber`, `items`, `kind`, `labels`, `leaseDurationMs`, `ledger`, `license`, `limit`
-`limits`, `localPolicy`, `lock`, `manualActor`, `manualInstructions`, `manualRemote`, `materialization`, `maxConcurrentSubagents`
-`maxCycles`, `maxDelayMs`, `maxWorkItems`, `mcp`, `mcpExposure`, `mergeAuthority`, `milestones`, `missingCredentialBehavior`
-`mode`, `model`, `mutationClass`, `name`, `nameTemplate`, `namespace`, `nextOwner`, `nodeId`
-`nodes`, `notes`, `number`, `objective`, `outputByteLimit`, `outputLineLimit`, `owner`, `ownerKind`
-`packageKind`, `packageName`, `packagePublish`, `path`, `paths`, `platformTags`, `plugins`, `policyGateIds`
-`port`, `postgres`, `privateKeyPath`, `profile`, `profiles`, `projectId`, `projectKey`, `projectRoot`
-`projects`, `projectsRoot`, `promotion`, `protocol`, `provenance`, `provider`, `providerFilters`, `providerIdentity`
-`providerMutationAuthProfile`, `providerQuery`, `providerWrites`, `provisioning`, `publicRewrite`, `publication`, `purposes`, `push`
-`pushUrl`, `queryLimit`, `reason`, `reasoning`, `relationships`, `relaunch`, `release`, `releasePublish`
-`releaseTrain`, `remote`, `remoteExecution`, `remoteUrl`, `remotes`, `repo`, `repositories`, `repository`
-`repositoryId`, `repositoryName`, `repositoryOwner`, `repositoryScopes`, `repositoryUrl`, `requirePassing`, `required`, `requiredCapabilities`
-`requiredChecks`, `requiredEvidence`, `requiredPermission`, `requiredProviderPermissions`, `resumeInputs`, `retention`, `review`, `reviewBranchPattern`
-`role`, `roleBindings`, `roles`, `runFullVerification`, `runnerProfiles`, `safety`, `scannedRoles`, `schedule`
-`schema`, `scope`, `search`, `selector`, `serverName`, `setup`, `setupInstructions`, `setupNotes`
-`shell`, `skillId`, `skills`, `slug`, `source`, `sourceComponentId`, `sourceControl`, `sourceRoot`
-`sshHost`, `sshHostAlias`, `sshUser`, `staleAfterMs`, `staleChecks`, `staleClaimPolicy`, `start`, `startNodeId`
-`statePath`, `statusFieldId`, `statusOptions`, `statuses`, `stopWhenNoEligibleWork`, `storePath`, `strategy`, `summary`
-`surfaces`, `tailscaleAddress`, `target`, `targetAgents`, `targetBranch`, `targetComponents`, `template`, `timeoutMs`
-`title`, `to`, `tokenRefreshBufferSeconds`, `tools`, `trackerDiscovery`, `trackerId`, `trackerLimits`, `transitions`
-`transport`, `trigger`, `trustSemantics`, `ttlDays`, `unknownActorFallbackRole`, `unscopedName`, `update`, `url`
-`valueHint`, `variable`, `variant`, `verification`, `version`, `versionPlanning`, `versionPolicy`, `visibility`
-`whileEligible`, `workItemClaims`, `workTrackerCommunication`, `workTrackers`, `workTracking`, `workspaceRoots`, `workspacesRoot`, `worktreesRoot`
-`wrongBase`
+`cleanup`, `clientId`, `command`, `commandArgs`, `commandEnvironment`, `commandExecutables`, `commandPaths`, `commandPrefixes`
+`commandProfileRefs`, `commandProfiles`, `coAuthors`, `commentPolicy`, `communication`, `componentId`, `componentRoots`, `components`
+`componentsRoot`, `configFormat`, `configPath`, `configSchema`, `conflictWinner`, `connectionProfileId`, `connectionString`, `connectionStringEnv`
+`coordinationHandoffs`, `coordinatorProfileId`, `credentialIdentity`, `credentialKind`, `cycleLedgerPath`, `decisionGraph`, `defaultBranch`, `defaultBranchStrategy`
+`defaultCorePack`, `defaultIntentPrefix`, `defaultToolsApprovalMode`, `defaultWorkTrackerId`, `dependencyLinks`, `description`, `directExternalSelection`, `directTargetPush`
+`directory`, `displayName`, `diverged`, `driver`, `dryRun`, `eligibleWorkMode`, `email`, `enabled`
+`endpoint`, `environment`, `environmentKeys`, `ephemeralThreadDefault`, `excludeLabels`, `excludedTools`, `executor`, `executorMode`
+`exposure`, `extensions`, `failureLimit`, `fallbackRemote`, `featureBranchDelivery`, `featureBranchPattern`, `finalLimit`, `finalPullRequest`
+`finalPullRequestCreation`, `fingerprints`, `flow`, `focusedCommands`, `from`, `fullCommands`, `gates`, `gateway`
+`gitIdentity`, `gitUserEmail`, `gitUserName`, `gitWorkflows`, `githubApp`, `githubCliConfigDir`, `greenMain`, `handle`
+`handles`, `heartbeatIntervalMs`, `home`, `host`, `hostId`, `hostLocalSafetyHints`, `hostOverlays`, `hosting`
+`hosts`, `id`, `identityRef`, `importRequiredFirst`, `includedServers`, `includedTools`, `installCommand`, `installationAccount`
+`integrationBranch`, `integrationPreference`, `integrationPrefix`, `intelligence`, `intendedUse`, `intervalMs`, `invitationPolicy`, `issueType`
+`itemId`, `itemKey`, `itemNumber`, `items`, `kind`, `labels`, `leaseDurationMs`, `ledger`
+`license`, `limit`, `limits`, `localPolicy`, `lock`, `manualActor`, `manualInstructions`, `manualRemote`
+`materialization`, `maxConcurrentSubagents`, `maxCycles`, `maxDelayMs`, `maxWorkItems`, `mcp`, `mcpExposure`, `mergeAuthority`
+`milestones`, `missingCredentialBehavior`, `mode`, `model`, `mutationClass`, `name`, `nameTemplate`, `namespace`
+`nextOwner`, `nodeId`, `nodes`, `notes`, `number`, `objective`, `outputByteLimit`, `outputFilter`
+`outputLineLimit`, `owner`, `ownerKind`, `packageKind`, `packageName`, `packagePublish`, `path`, `paths`
+`platformTags`, `plugins`, `policyGateIds`, `port`, `postgres`, `preferTools`, `preserveRawOutputDirectory`, `privateKeyPath`
+`profile`, `profiles`, `projectId`, `projectKey`, `projectRoot`, `projects`, `projectsRoot`, `promotion`
+`protocol`, `provenance`, `provider`, `providerFilters`, `providerIdentity`, `providerMutationAuthProfile`, `providerQuery`, `providerWrites`
+`provisioning`, `publicRewrite`, `publication`, `purposes`, `push`, `pushUrl`, `queryLimit`, `reason`
+`reasoning`, `relationships`, `relaunch`, `release`, `releasePublish`, `releaseTrain`, `remote`, `remoteExecution`
+`remoteUrl`, `remotes`, `repo`, `repositories`, `repository`, `repositoryId`, `repositoryName`, `repositoryOwner`
+`repositoryScopes`, `repositoryUrl`, `requirePassing`, `required`, `requiredCapabilities`, `requiredChecks`, `requiredEvidence`, `requiredPermission`
+`requiredProviderPermissions`, `resumeInputs`, `retention`, `review`, `reviewBranchPattern`, `role`, `roleBindings`, `roles`
+`runFullVerification`, `runnerProfiles`, `safety`, `scannedRoles`, `schedule`, `schema`, `scope`, `search`
+`selector`, `serverName`, `setup`, `setupInstructions`, `setupNotes`, `shell`, `skillId`, `skills`
+`slug`, `source`, `sourceComponentId`, `sourceControl`, `sourceRoot`, `sshHost`, `sshHostAlias`, `sshUser`
+`staleAfterMs`, `staleChecks`, `staleClaimPolicy`, `start`, `startNodeId`, `statePath`, `statusFieldId`, `statusOptions`
+`statuses`, `stopWhenNoEligibleWork`, `storePath`, `strategy`, `summary`, `surfaces`, `tailscaleAddress`, `target`
+`targetAgents`, `targetBranch`, `targetComponents`, `template`, `timeoutMs`, `title`, `to`, `tokenRefreshBufferSeconds`
+`tools`, `trackerDiscovery`, `trackerId`, `trackerLimits`, `transitions`, `transport`, `trigger`, `trustSemantics`
+`ttlDays`, `unknownActorFallbackRole`, `unscopedName`, `update`, `url`, `valueHint`, `variable`, `variant`
+`verification`, `version`, `versionPlanning`, `versionPolicy`, `visibility`, `whileEligible`, `workItemClaims`, `workTrackerCommunication`
+`workTrackers`, `workTracking`, `workspaceRoots`, `workspacesRoot`, `worktreesRoot`, `wrongBase`

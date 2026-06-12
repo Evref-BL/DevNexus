@@ -1468,6 +1468,7 @@ describe("workspace config", () => {
         command: "node task.js",
         timeoutMs: 120000,
         runFullVerification: true,
+        outputFilter: null,
       },
       agent: {
         command: null,
