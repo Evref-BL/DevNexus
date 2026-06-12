@@ -173,6 +173,10 @@ tools. A raw `dev-nexus mcp-stdio` smoke test only proves the server command can
 start. The agent session is ready when the active agent exposes those tools in
 the opened DevNexus workspace.
 
+`dev-nexus setup check <workspace-root> join-existing-project` also reports
+whether the DevNexus MCP input schemas are provider-compatible before Codex or
+another agent provider tries to load them.
+
 See [Agent targets and projection cleanup](agent-targets.md) for provider
 examples, active target configuration, and stale generated support cleanup.
 
